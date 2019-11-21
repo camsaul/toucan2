@@ -107,12 +107,12 @@
       (throw (ex-info (format "Don't know what to do with arg: %s. Expected keyword or map" arg1)
                       {:arg arg1, :all-args args})))))
 
-(defn primary-key-value
+(defn primary-key-values
   ([object]
    (when object
      (let [model (types/model object)
            pk    (primary-key model)]
-       (select-keys object (if (sequential? pk) pk [pk])))))
+       (map object (if (sequential? pk) pk [pk])))))
 
   ([model m]
-   (primary-key-value (types/instance model m))))
+   (primary-key-values (types/instance model m))))

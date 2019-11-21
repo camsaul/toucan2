@@ -92,9 +92,9 @@
 
   clojure.lang.ILookup
   (valAt [_ k]
-    (.valAt hsql k))
+    (get hsql k))
   (valAt [_ k not-found]
-    (.valAt hsql k not-found))
+    (get hsql k not-found))
 
   clojure.lang.IFn
   (applyTo [_ arglist]
@@ -122,6 +122,19 @@
 
 (defn query? [x]
   (clojure.core/instance? Query x))
+
+(defn query
+  ([]
+   (->Query nil nil nil nil))
+
+  ([a-model]
+   (->Query (model a-model) nil nil nil))
+
+  ([a-model hsql]
+   (->Query (model a-model) hsql nil nil))
+
+  ([a-model hsql opts]
+   (->Query (model a-model) hsql opts nil)))
 
 (defn honeysql-form [^Query query]
   (when query

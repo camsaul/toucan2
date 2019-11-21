@@ -5,6 +5,7 @@
             [fourcan
              [compile :as compile]
              [debug :as debug]
+             [types :as types]
              [hierarchy :as hierarchy]]
             [methodical.core :as m]))
 
@@ -59,42 +60,52 @@
          Exception #"model :toucan.models-test/compound-key expected 2 primary key values \[:id_1 :id_2\], got 0 values"
          (compile/primary-key-where-clause ::compound-key [])))))
 
+(deftest primary-key-values-test
+  (is (= [20]
+         (compile/primary-key-values (types/instance :bird {:id 20}))))
+  (is (= [1 2]
+         (compile/primary-key-values (types/instance ::compound-key {:id_1 1, :id_2 2, :id_3 3})))))
+
 
 (deftest compile-test
   (testing "basic compilation of HoneySQL forms"
     (is (= ["SELECT * FROM \"my\".\"table\""]
-           (compile/compile nil {:select [:*], :from [:my.table]})))
+           (compile/compile-honeysql nil {:select [:*], :from [:my.table]})))
     (is (= ["SELECT * FROM \"my\".\"table\" WHERE \"field\" = ?" 2]
-           (compile/compile :model {:select [:*], :from [:my.table] :where [:= :field 2]}))))
+           (compile/compile-honeysql :model {:select [:*], :from [:my.table] :where [:= :field 2]}))))
   (testing "SQL should be returned as-is, wrapped in a vector if needed"
     (is (= ["SELECT *"]
-           (compile/compile nil "SELECT *")))
+           (compile/compile-honeysql nil "SELECT *")))
     (is (= ["SELECT * WHERE x = ?" 100]
-           (compile/compile nil ["SELECT * WHERE x = ?" 100]))))
+           (compile/compile-honeysql nil ["SELECT * WHERE x = ?" 100]))))
   (testing "with debugging enabled, compilation before/after should be printed"
-    (is (= ["(compile :model {:select [:*], :from [:table]})"
+    (is (= ["(compile-honeysql :model {:select [:*], :from [:table]})"
             ";; -> [\"SELECT * FROM \\\"table\\\"\"]"]
            (str/split-lines
             (with-out-str
               (debug/debug
-                (compile/compile :model {:select [:*], :from [:table]}))))))))
+                (compile/compile-honeysql :model {:select [:*], :from [:table]}))))))))
 
 (m/defmethod compile/honeysql-options ::compile
   [_]
   nil)
 
-(m/defmethod compile/compile ::compile-2
+(m/defmethod compile/compile-honeysql ::compile-2
   [_ form]
   form)
 
 (deftest custom-compile-test
   (testing "We should be able to override HoneySQL options such as `:quoting` by implementing `honeysql-options`"
     (is (= ["SELECT * FROM my.table"]
-           (compile/compile ::compile {:select [:*], :from [:my.table]}))))
+           (compile/compile-honeysql ::compile {:select [:*], :from [:my.table]}))))
   (testing "We should be able to override compilation behavior entirely by implementing `compile`"
     (is (= {:select [:*], :from [:my.table]}
-           (compile/compile ::compile-2 {:select [:*], :from [:my.table]}))))
+           (compile/compile-honeysql ::compile-2 {:select [:*], :from [:my.table]}))))
   (testing "debugging should stil work even if overriding `compile`"
-    (is (= ["(compile :fourcan.compile-test/compile-2 form)"
+    (is (= ["(compile-honeysql :fourcan.compile-test/compile-2 form)"
             ";; -> form"]
-           (str/split-lines (with-out-str (debug/debug (compile/compile ::compile-2 'form))))))))
+           (str/split-lines (with-out-str (debug/debug (compile/compile-honeysql ::compile-2 'form))))))))
+
+
+;; TODO - test different quoting styles
+;; TODO - test auto-conversion between dashes and underscores
