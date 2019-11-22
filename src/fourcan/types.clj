@@ -134,15 +134,24 @@
    (->Query (model a-model) hsql nil nil))
 
   ([a-model hsql opts]
-   (->Query (model a-model) hsql opts nil)))
+   (->Query (model a-model) hsql opts nil))
+
+  ([a-model hsql opts mta]
+   (->Query (model a-model) hsql opts mta)))
 
 (defn honeysql-form [^Query query]
   (when query
     (.hsql query)))
 
+(defn update-honeysql-form [query f & args]
+  (query (model query) (apply f (honeysql-form query) args) (query-options query) (meta query)))
+
 (defn query-options [^Query query]
   (when query
     (.options query)))
+
+(defn update-query-options [^Query q f & args]
+  (query (model q) (honeysql-form q) (apply f (query-options q) args) (meta q)))
 
 (p.types/deftype+ Instance [modl orig m mta]
   Model

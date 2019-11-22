@@ -33,3 +33,9 @@
     (test.u/create-birds-table!)
     (is (= [[1 "Toucan"] [2 "Pigeon"] [3 "Pelican"]]
            (seq (db/select :bird))))))
+
+(deftest select-one-test
+  (test.u/with-test-data-source
+    (test.u/create-birds-table!)
+    (is (= [1 "Toucan"]
+           (db/select-one :bird)))))

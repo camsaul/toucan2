@@ -45,8 +45,10 @@
 
 ;; NOCOMMIT
 (defn create-birds-table! []
-  (jdbc/execute! "CREATE TABLE \"bird\" (\"id\" INTEGER, \"species\" TEXT);")
-  (jdbc/execute! "INSERT INTO \"bird\" (\"id\", \"species\") VALUES (1, 'Toucan'), (2, 'Pigeon'), (3, 'Pelican');"))
+  (try
+    (jdbc/execute! "CREATE TABLE \"bird\" (\"id\" INTEGER, \"species\" TEXT);")
+    (jdbc/execute! "INSERT INTO \"bird\" (\"id\", \"species\") VALUES (1, 'Toucan'), (2, 'Pigeon'), (3, 'Pelican');")
+    (catch Throwable _)))
 
 (defonce ^:private data-source
   (delay (test-data-source -1)))

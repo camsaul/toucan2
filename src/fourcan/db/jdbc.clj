@@ -113,12 +113,12 @@
    cols))
 
 (defn read-all-vectors [model ^ResultSet rset cols {:keys [row-xform]
-                                                    :or   {row-xform identity}
+                                                    :or   {row-xform (fn [_ row] row)}
                                                     :as   options}]
   (loop [acc []]
     (if-not (.next rset)
       acc
-      (let [row (row-xform (read-row model rset cols options))]
+      (let [row (row-xform cols (read-row model rset cols options))]
         (recur (conj acc row))))))
 
 (defn read-results [model ^ResultSet rset {:keys [results-fn]
