@@ -1,18 +1,106 @@
-(defproject fourcan "1.0.0"
-  :dependencies
-  [
-   [honeysql "0.9.5" :exclusions [org.clojure/clojurescript]]
-   [methodical "0.9.4-alpha"]
-   [potemkin "0.4.5"]
-   [pretty "1.0.1"]
-   [org.clojure/core.async "0.4.500"]
-   [org.clojure/java.jdbc "0.7.9"]
+(defproject bluejdbc "1.0.0-SNAPSHOT"
+  :url "https://github.com/camsaul/bluejdbc"
+  :min-lein-version "2.5.0"
 
-   ]
+  :license {:name "Eclipse Public License"
+            :url  "https://raw.githubusercontent.com/camsaul/bluejdbc/master/LICENSE"}
+
+  :aliases
+  {"deps"                      ["with-profile" "+deps" "deps"]
+   "test"                      ["with-profile" "+test" "test"]
+   "bikeshed"                  ["with-profile" "+bikeshed" "bikeshed" "--max-line-length" "120"]
+   "check-namespace-decls"     ["with-profile" "+check-namespace-decls" "check-namespace-decls"]
+   "eastwood"                  ["with-profile" "+eastwood" "eastwood"]
+   "check-reflection-warnings" ["with-profile" "+reflection-warnings" "check"]
+   "docstring-checker"         ["with-profile" "+docstring-checker" "docstring-checker"]
+   "yagni"                     ["with-profile" "+yagni" "yagni"]
+   ;; `lein lint` will run all linters
+   "lint"                      ["do" ["eastwood"] ["bikeshed"] ["yagni"] ["check-namespace-decls"] ["docstring-checker"]]}
+
+  :dependencies
+  [[clojure.java-time "0.3.2"]
+   [honeysql "0.9.10" :exclusions [org.clojure/clojurescript]]
+   [metabase/second-date "1.0.0"]
+   [methodical "0.9.4-alpha"]
+   [org.clojure/tools.logging "1.0.0"]
+   [potemkin "0.4.5"]
+   [pretty "1.0.4"]]
 
   :profiles
-  {:dev
+  {:h2
    {:dependencies
-    [[org.clojure/clojure "1.10.1"]
-     [com.h2database/h2 "1.4.197"]
-     [org.clojure/tools.reader "1.1.1"]]}})
+    [[com.h2database/h2 "1.4.200"]]}
+
+   :postgres
+   {:dependencies
+    [[org.postgresql/postgresql "42.2.12"]]}
+
+   :mysql
+   {:dependencies
+    [[org.mariadb.jdbc/mariadb-java-client "2.6.0"]]}
+
+   :jdbc-drivers
+   [:h2 :postgres :mysql]
+
+   :dev
+   [:jdbc-drivers
+    {:dependencies
+     [[org.clojure/clojure "1.10.1"]
+      [pjstadig/humane-test-output "0.10.0"]]
+
+     :repl-options
+     {:init-ns bluejdbc.core}
+
+     :source-paths ["dev/src"]
+
+     :injections
+     [(require 'pjstadig.humane-test-output 'dev)
+      (pjstadig.humane-test-output/activate!)]
+
+     :global-vars
+     {*warn-on-reflection* true}}]
+
+   ;; this is mostly for the benefit of fetching/caching deps on CI -- a single profile with *all* deps
+   :deps
+   [:dev :jdbc-drivers]
+
+   :eastwood
+   {:plugins
+    [[jonase/eastwood "0.3.11" :exclusions [org.clojure/clojure]]]
+
+    :add-linters
+    [:unused-private-vars
+     :unused-namespaces
+     :unused-fn-args
+     :unused-locals]
+
+    :exclude-linters
+    [:deprecations]}
+
+   :docstring-checker
+   {:plugins
+    [[docstring-checker "1.0.3"]]
+
+    :docstring-checker
+    {:exclude [#"test"]}}
+
+   :bikeshed
+   {:plugins
+    [[lein-bikeshed "0.5.2"]]
+    :bikeshed {:max-line-length 160}}
+
+   :yagni
+   {:plugins
+    [[venantius/yagni "0.1.7"]]}
+
+   :check-namespace-decls
+   {:plugins               [[lein-check-namespace-decls "1.0.2"]]
+    :source-paths          ^:replace ["src" "test"]
+    :check-namespace-decls {:prefix-rewriting false}}}
+
+  :deploy-repositories
+  [["clojars"
+    {:url           "https://clojars.org/repo"
+     :username      :env/clojars_username
+     :password      :env/clojars_password
+     :sign-releases false}]])
