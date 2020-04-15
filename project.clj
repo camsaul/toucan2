@@ -7,15 +7,17 @@
 
   :aliases
   {"deps"                      ["with-profile" "+deps" "deps"]
+   "deploy"                    ["with-profile" "+deploy" "deploy"]
    "test"                      ["with-profile" "+test" "test"]
    "bikeshed"                  ["with-profile" "+bikeshed" "bikeshed" "--max-line-length" "120"]
    "check-namespace-decls"     ["with-profile" "+check-namespace-decls" "check-namespace-decls"]
+   "cloverage"                 ["with-profile" "+cloverage" "cloverage"]
    "eastwood"                  ["with-profile" "+eastwood" "eastwood"]
    "check-reflection-warnings" ["with-profile" "+reflection-warnings" "check"]
    "docstring-checker"         ["with-profile" "+docstring-checker" "docstring-checker"]
    "yagni"                     ["with-profile" "+yagni" "yagni"]
    ;; `lein lint` will run all linters
-   "lint"                      ["do" ["eastwood"] ["bikeshed"] ["yagni"] ["check-namespace-decls"] ["docstring-checker"]]}
+   "lint"                      ["do" ["eastwood"] ["bikeshed"] ["yagni"] ["check-namespace-decls"] ["docstring-checker"] ["cloverage"]]}
 
   :dependencies
   [[clojure.java-time "0.3.2"]
@@ -54,8 +56,9 @@
      :source-paths ["dev/src"]
 
      :injections
-     [(require 'pjstadig.humane-test-output 'dev)
-      (pjstadig.humane-test-output/activate!)]
+     [(require 'pjstadig.humane-test-output)
+      (pjstadig.humane-test-output/activate!)
+      (try (require 'dev) (catch Throwable _))]
 
      :global-vars
      {*warn-on-reflection* true}}]
@@ -63,6 +66,24 @@
    ;; this is mostly for the benefit of fetching/caching deps on CI -- a single profile with *all* deps
    :deps
    [:dev :jdbc-drivers]
+
+   :test
+   {}
+
+   :cloverage
+   {:dependencies
+    ;; Required by both Potemkin and Cloverage, but Potemkin uses an older version that breaks Cloverage's ablity to
+    ;; understand certain forms. Explicitly specify newer version here.
+    [[riddley "0.1.14"]]
+
+    :plugins
+    [[lein-cloverage "1.1.2"]]
+
+    ;; don't count ./dev stuff for code coverage calcualations.
+    :source-paths ^:replace ["src"]
+
+    :cloverage
+    {:fail-threshold 95}}
 
    :eastwood
    {:plugins
@@ -96,7 +117,14 @@
    :check-namespace-decls
    {:plugins               [[lein-check-namespace-decls "1.0.2"]]
     :source-paths          ^:replace ["src" "test"]
-    :check-namespace-decls {:prefix-rewriting false}}}
+    :check-namespace-decls {:prefix-rewriting false}}
+
+   ;; run `lein check-reflection-warnings` to check for reflection warnings
+   :reflection-warnings
+   {:global-vars {*warn-on-reflection* true}}
+
+   :deploy
+   {:dependencies [[org.clojure/clojure "1.10.1"]]}}
 
   :deploy-repositories
   [["clojars"
