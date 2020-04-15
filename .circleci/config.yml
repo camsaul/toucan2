@@ -72,6 +72,9 @@ jobs:
         default: default
       lein-command:
         type: string
+      after-steps:
+        type: steps
+        default: []
     executor: << parameters.e >>
     steps:
       - attach-workspace
@@ -79,6 +82,7 @@ jobs:
       - run:
           command: lein << parameters.lein-command >>
           no_output_timeout: 5m
+      - steps: << parameters.after-steps >>
 
   reflection-warnings:
     executor: default
