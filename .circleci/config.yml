@@ -80,6 +80,15 @@ jobs:
           command: lein << parameters.lein-command >>
           no_output_timeout: 5m
 
+  reflection-warnings:
+    executor: default
+    steps:
+      - attach-workspace
+      - restore-deps-cache
+      - run:
+          command: ./check-for-reflection-warnings.sh
+          no_output_timeout: 3m
+
 
 ########################################################################################################################
 #                                                      WORKFLOWS                                                       #
@@ -139,6 +148,19 @@ workflows:
           lein-command: yagni
 
       - lein:
+          name: cloverage
+          requires:
+            - deps
+          lein-command: cloverage --codecov
+          after-steps:
+            - run:
+                command: bash <(curl -s https://codecov.io/bash)
+
+      - reflection-warnings:
+          requires:
+            - deps
+
+      - lein:
           name: deploy
           requires:
             - bikeshed
@@ -146,6 +168,8 @@ workflows:
             - eastwood
             - namespace-decls
             - yagni
+            - cloverage
+            - reflection-warnings
             - tests
             - tests-java-11
           lein-command: deploy clojars
