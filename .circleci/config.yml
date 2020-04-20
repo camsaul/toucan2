@@ -10,10 +10,89 @@ executors:
     docker:
       - image: circleci/clojure:lein-2.9.1
 
+  h2:
+    working_directory: /home/circleci/camsaul/bluejdbc/
+    docker:
+      - image: circleci/clojure:lein-2.9.1
+        environment:
+          JDBC_URL: jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1
+
   java-11:
     working_directory: /home/circleci/camsaul/bluejdbc/
     docker:
       - image: circleci/clojure:openjdk-11-lein-2.9.1
+        environment:
+          JDBC_URL: jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1
+
+  postgres-9-6:
+    working_directory: /home/circleci/camsaul/bluejdbc/
+    docker:
+      - image: circleci/clojure:lein-2.9.1
+        environment:
+          JDBC_URL: jdbc:postgresql://localhost:5432/circle_test?user=circle_test
+      - image: circleci/postgres:9.6-alpine
+        environment:
+          POSTGRES_USER: circle_test
+          POSTGRES_DB: circle_test
+
+  postgres-latest:
+    working_directory: /home/circleci/camsaul/bluejdbc/
+    docker:
+      - image: circleci/clojure:lein-2.9.1
+        environment:
+          JDBC_URL: jdbc:postgresql://localhost:5432/circle_test?user=circle_test
+      - image: postgres:latest
+        environment:
+          POSTGRES_USER: circle_test
+          POSTGRES_DB: circle_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+
+  mysql-5-7:
+    working_directory: /home/circleci/camsaul/bluejdbc/
+    docker:
+      - image: circleci/clojure:lein-2.9.1
+        environment:
+          JDBC_URL: jdbc:mysql://localhost:3306/circle_test?user=root
+      - image: circleci/mysql:5.7.23
+
+  mysql-latest:
+    working_directory: /home/circleci/camsaul/bluejdbc/
+    docker:
+      - image: circleci/clojure:lein-2.9.1
+        environment:
+          JDBC_URL: jdbc:mysql://localhost:3306/circle_test?user=root
+      - image: circleci/mysql:latest
+
+  mariadb-10-2:
+    working_directory: /home/circleci/camsaul/bluejdbc/
+    docker:
+      - image: circleci/clojure:lein-2.9.1
+        environment:
+          JDBC_URL: jdbc:mysql://localhost:3306/circle_test?user=root
+      - image: circleci/mariadb:10.2.23
+
+  mariadb-latest:
+    working_directory: /home/circleci/camsaul/bluejdbc/
+    docker:
+      - image: circleci/clojure:lein-2.9.1
+        environment:
+          JDBC_URL: jdbc:mysql://localhost:3306/circle_test?user=root
+      - image: mariadb:latest
+        environment:
+          MYSQL_DATABASE: circle_test
+          MYSQL_USER: root
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+
+  sqlserver-2017:
+    working_directory: /home/circleci/camsaul/bluejdbc/
+    docker:
+      - image: circleci/clojure:lein-2.9.1
+        environment:
+          JDBC_URL: jdbc:sqlserver://localhost:1433/?user=SA&password=123456
+      - image: mcr.microsoft.com/mssql/server:2017-latest
+        environment:
+          ACCEPT_EULA: Y
+          SA_PASSWORD: 123456
 
 
 ########################################################################################################################
@@ -109,17 +188,69 @@ workflows:
             - checkout
 
       - lein:
-          name: tests
+          name: postgres-9-6
           requires:
             - deps
+          e: postgres-9-6
           lein-command: test
 
       - lein:
-          name: tests-java-11
+          name: postgres-latest
+          requires:
+            - deps
+          e: postgres-latest
+          lein-command: test
+
+      - lein:
+          name: h2
+          requires:
+            - deps
+          e: h2
+          lein-command: test
+
+      - lein:
+          name: h2-java-11
           requires:
             - deps
           e: java-11
           lein-command: test
+
+      - lein:
+          name: mysql-5-7
+          requires:
+            - deps
+          e: mysql-5-7
+          lein-command: test
+
+      - lein:
+          name: mysql-latest
+          requires:
+            - deps
+          e: mysql-latest
+          lein-command: test
+
+      - lein:
+          name: mariadb-10-2
+          requires:
+            - deps
+          e: mariadb-10-2
+          lein-command: test
+
+      - lein:
+          name: mariadb-latest
+          requires:
+            - deps
+          e: mariadb-latest
+          lein-command: test
+
+      - lein:
+          name: sqlserver-2017
+          requires:
+            - deps
+          e: sqlserver-2017
+          lein-command: test
+
+      # TODO -- SQLite, Apache Derby, etc.
 
       - lein:
           name: eastwood
@@ -174,8 +305,15 @@ workflows:
             - yagni
             - cloverage
             - reflection-warnings
-            - tests
-            - tests-java-11
+            - postgres-9-6
+            - postgres-latest
+            - h2
+            - h2-java-11
+            - mysql-5-7
+            - mysql-latest
+            - mariadb-10-2
+            - mariadb-latest
+            - sqlserver-2017
           lein-command: deploy clojars
           filters:
             branches:
