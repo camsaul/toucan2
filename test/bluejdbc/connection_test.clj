@@ -17,8 +17,8 @@
 
 ;; TODO -- details should be set by env var
 (deftest connection-from-url-test
-  (t/only :postgres
-    (let [url "jdbc:postgresql://localhost:5432/harbormaster_dev"]
+  (t/only :postgresql
+    (let [url (t/jdbc-url)]
       (testing "Should fail without username/password"
         (is (thrown?
              Exception

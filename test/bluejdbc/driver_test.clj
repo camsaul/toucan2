@@ -5,7 +5,7 @@
 
 (deftest driver-test
   (testing "Should be able to get a Driver"
-    (t/only :postgres
+    (t/only :postgresql
       (let [pg-driver-class (Class/forName "org.postgresql.Driver")]
         (testing "from a Driver"
           (let [driver (.newInstance pg-driver-class)]

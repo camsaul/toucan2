@@ -26,10 +26,18 @@
     (log/debugf "Loading integrations for %s" class-name)
     (require integration-namespace)))
 
+;; NOCOMMIT
+(try
+  (require 'bluejdbc.test)
+  (def jdbc-url ((resolve 'bluejdbc.test/jdbc-url)))
+  (catch Throwable _
+    (def jdbc-url nil)))
+
+;; NOCOMMIT
 (defn y []
-  (with-open [conn (connection "jdbc:postgresql://localhost:5432/harbormaster_dev" {:connection/user        "cam"
-                                                                                    :connection/password    "cam"
-                                                                                    :result-set/holdability :close-cursors-at-commit})
+  (with-open [conn (connection jdbc-url {:connection/user        "cam"
+                                         :connection/password    "cam"
+                                         :result-set/holdability :close-cursors-at-commit})
               stmt (prepared-statement conn {:select [[(t/offset-date-time "2020-04-15T07:04:02.465161Z") :my-date]]}
                                        {:honeysql/quoting :ansi, :honeysql/allow-dashed-names? true})
               rs   (.executeQuery stmt)]
@@ -46,10 +54,11 @@
     #_(pstmt/set-object! 1 (t/offset-date-time) :timestamp-with-timezone)
     ))
 
+;; NOCOMMIT
 (defn x []
   (reduce
    conj
-   (reducible-query "jdbc:postgresql://localhost:5432/harbormaster_dev"
+   (reducible-query jdbc-url
                     {:select [:id :user-id [:created-at :created] [(t/offset-date-time "2020-04-15T07:04:02.465161Z") :my-date]]
                      :from   [:session]}
                     {:connection/user              "cam"
@@ -59,13 +68,17 @@
                      :honeysql/allow-dashed-names? true
                      :results/xform                namespaced-maps-xform})))
 
-(def url "jdbc:postgresql://localhost:5432/harbormaster_dev?user=cam&password=cam")
+;; NOCOMMIT
+(def url jdbc-url)
 
+;; NOCOMMIT
 (defn z []
   (query url ["SELECT ?" (t/offset-date-time "2020-04-15T07:04:02.465161Z")]))
 
+;; NOCOMMIT
 (defn a []
   (query-one url "SELECT now()"))
 
+;; NOCOMMIT
 (defn b []
   (query-one url "SELECT now()" {:results/xform nil}))

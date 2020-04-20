@@ -48,6 +48,7 @@
    [:jdbc-drivers
     {:dependencies
      [[org.clojure/clojure "1.10.1"]
+      [environ "1.1.0"]
       [pjstadig/humane-test-output "0.10.0"]]
 
      :repl-options
