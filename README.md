@@ -9,4 +9,6 @@
 
 # Blue JDBC
 
+![Blue JDBC](https://github.com/camsaul/bluejdbc/blob/master/assets/bluejdbc.png)
+
 Docs are coming!
