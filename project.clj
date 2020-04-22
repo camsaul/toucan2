@@ -9,7 +9,7 @@
   {"deps"                      ["with-profile" "+deps" "deps"]
    "deploy"                    ["with-profile" "+deploy" "deploy"]
    "test"                      ["with-profile" "+test" "test"]
-   "bikeshed"                  ["with-profile" "+bikeshed" "bikeshed" "--max-line-length" "120"]
+   "bikeshed"                  ["with-profile" "+bikeshed" "bikeshed" "--max-line-length" "180"]
    "check-namespace-decls"     ["with-profile" "+check-namespace-decls" "check-namespace-decls"]
    "cloverage"                 ["with-profile" "+cloverage" "cloverage"]
    "eastwood"                  ["with-profile" "+eastwood" "eastwood"]
@@ -84,20 +84,21 @@
     :source-paths ^:replace ["src"]
 
     :cloverage
-    {:fail-threshold 95}}
+    {:fail-threshold 30}}
 
    :eastwood
    {:plugins
     [[jonase/eastwood "0.3.11" :exclusions [org.clojure/clojure]]]
 
-    :add-linters
-    [:unused-private-vars
-     :unused-namespaces
-     :unused-fn-args
-     :unused-locals]
+    :eastwood
+    {:config-files [".eastwood-config.clj"]
 
-    :exclude-linters
-    [:deprecations]}
+     :add-linters
+     [:unused-private-vars
+      :unused-locals]
+
+     :exclude-linters
+     [:deprecations]}}
 
    :docstring-checker
    {:plugins

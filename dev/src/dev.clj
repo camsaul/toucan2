@@ -11,7 +11,7 @@
 (defn- log! [message]
   (send log-agent (fn [_ msg] (println msg)) message))
 
-(defn- logger [ns]
+(defn- logger [namespac]
   (reify log.impl/Logger
     (enabled? [_ level]
       true)
@@ -19,15 +19,13 @@
       (let [e (when e
                 (u/pprint-to-str (Throwable->map e)))
             s (format "%s [%s] %s%s"
-                      (ns-name ns)
+                      (ns-name namespac)
                       (str/upper-case (name level))
                       message
                       (if e
                         (str "\n" e)
                         ""))]
-        (log! s)
-        #_(locking println
-          (println s))))))
+        (log! s)))))
 
 (def ^:private logger-factory
   (reify log.impl/LoggerFactory
@@ -84,7 +82,6 @@
                                (concat (type-annotation param-type) [(symbol param-name)]))
                              param-types param-names)
         args         (vec (cons '_ typed-params))
-        body         `(~(symbol (str \. name)) ~proxied-object-symb ~@param-names)
         return-type  (type-annotation (.getReturnType method))
         form         `(~@return-type ~(symbol name) ~args (~(symbol (str \. name)) ~proxied-object-symb ~@param-names))]
     (println (pr-str form))))

@@ -18,7 +18,8 @@
  [query reducible-query query query-one execute! insert!])
 
 ;; load integrations
-(doseq [[class-name integration-namespace] {"org.postgresql.Driver" 'bluejdbc.integrations.postgres}]
+(doseq [[class-name integration-namespace] {"org.postgresql.Driver"   'bluejdbc.integrations.postgres
+                                            "org.mariadb.jdbc.Driver" 'bluejdbc.integrations.mysql}]
   (when (try
           (Class/forName class-name)
           (catch Throwable _))

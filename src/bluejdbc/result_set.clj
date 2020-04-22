@@ -302,7 +302,10 @@
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.OffsetTime))
 
-(defn index-range [^ResultSetMetaData rsmeta]
+(defn index-range
+  "Return a sequence of indecies for all the columns in a result set. (`ResultSet` column indecies start at one in an
+  effort to trip up developers.)"
+  [^ResultSetMetaData rsmeta]
   (range 1 (inc (.getColumnCount rsmeta))))
 
 (defn row-thunk
@@ -320,17 +323,21 @@
          (when (.next rs)
            (thunk)))))))
 
-(defn column-names [^ResultSet rs]
+(defn column-names
+  "Return a sequence of column names (as keywords) for the rows in a `ResultSet`."
+  [^ResultSet rs]
   (let [rsmeta (.getMetaData rs)]
     (vec (for [i (index-range rsmeta)]
            (keyword (.getColumnLabel rsmeta i))))))
 
-(defn namespaced-column-names [^ResultSet rs]
+(defn namespaced-column-names
+  "Return a sequence of namespaced keyword column names for the rows in a `ResultSet`, e.g. `:table/column`."
+  [^ResultSet rs]
   (let [rsmeta (.getMetaData rs)]
     (vec (for [i (index-range rsmeta)]
            (keyword (.getTableName rsmeta i) (.getColumnLabel rsmeta i))))))
 
-(defn maps-xform* [rs column-names]
+(defn- maps-xform* [rs column-names]
   (fn [rf]
     (fn
       ([]
@@ -342,17 +349,24 @@
       ([acc row]
        (rf acc (zipmap column-names row))))))
 
-(defn maps-xform [rs]
+(defn maps-xform
+  "A `ResultSet` transform that returns rows as maps with unqualified keys e.g. `:column`. This is the default and is
+  applied if no other values of `:results/xform` are passed in options."
+  [rs]
   (maps-xform* rs (column-names rs)))
 
-(defn namespaced-maps-xform [rs]
+(defn namespaced-maps-xform
+  "A `ResultSet` transform that returns rows as maps with namespaced keys e.g.`:table/column`."
+  [rs]
   (maps-xform* rs (namespaced-column-names rs)))
 
 (defn reduce-result-set
+  "Reduce the rows in a `ResultSet` using reducing function `rf`."
+  {:arglists '([rs rf init] [rs options rf init])}
   ([rs rf init]
    (reduce-result-set rs (protocols/options rs) rf init))
 
-  ([rs {xform :results/xform, :or {xform maps-xform} :as options} rf init]
+  ([rs {xform :results/xform} rf init]
    (let [xform (if xform
                  (xform rs)
                  identity)
@@ -368,10 +382,24 @@
              acc)))))))
 
 (defn result-set-seq
-  (^clojure.lang.ISeq [rs]
+  "Return a lazy sequence of rows from a `ResultSet`. Make sure you consume all the rows in the `ResultSet` while it is
+  still open!
+
+    ;; good
+    (with-open [rs (jdbc/results stmt)]
+      (doseq [row (result-set-seq rs)]
+        ...))
+
+    ;; bad -- ResultSet is closed before we finish the `doseq` loop
+    (doseq [row (with-open [rs (jdbc/results stmt)]
+                  (jdbc/results stmt))]
+      ...)"
+  {:arglists '(^clojure.lang.ISeq [rs]
+               ^clojure.lang.ISeq [rs options])}
+  ([rs]
    (result-set-seq rs (protocols/options rs)))
 
-  (^clojure.lang.ISeq [rs {xform :results/xform, :or {xform maps-xform} :as options}]
+  ([rs {xform :results/xform, :or {xform maps-xform}}]
    (let [xform        (if xform
                         (xform rs)
                         identity)

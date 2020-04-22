@@ -90,7 +90,10 @@
     (insert! conn :user [:id :name] [[1 \"Cam\"] [2 \"Sam\"]]
 
   Returns number of rows inserted."
-  {:arglists '(^Integer [conn table-name columns? rows options?])}
+  {:arglists '(^Integer [conn table-name rows]
+               ^Integer [conn table-name columns rows]
+               ^Integer [conn table-name rows options]
+               ^Integer [conn table-name columns rows options])}
   ([conn table-name rows]
    (insert! conn table-name nil rows nil))
 
