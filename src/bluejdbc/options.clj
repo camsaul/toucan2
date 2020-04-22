@@ -24,23 +24,23 @@
                                             (str v))))
       properties)))
 
-(m/defmulti with-option
+(m/defmulti set-option!
   "Apply an option from a map. Should return `jdbc-object` when finished."
   {:arglists '([jdbc-object k v])}
   (fn [jdbc-object k v]
     [(class jdbc-object) (keyword k)]))
 
-(m/defmethod with-option :default
+(m/defmethod set-option! :default
   [jdbc-object k v]
   jdbc-object)
 
-(m/defmulti with-options
+(m/defmulti set-options!
   "Apply options (usually a map) to a JDBC object."
   {:arglists '([jdbc-object options])}
   (fn [jdbc-object options]
     [(class jdbc-object) (class options)]))
 
-(m/defmethod with-options :default
+(m/defmethod set-options! :default
   [jdbc-object options]
   ;; TODO -- need newer version of Methodical to fix this
   (cond
@@ -50,7 +50,7 @@
     (map? options)
     (reduce
      (fn [jdbc-object [k v]]
-       (with-option jdbc-object k v))
+       (set-option! jdbc-object k v))
      jdbc-object
      options)
 
@@ -62,16 +62,16 @@
 
 ;; TODO -- fix me
 #_
-(m/defmethod with-options [:default nil]
+(m/defmethod set-options! [:default nil]
   [jdbc-object _]
   jdbc-object)
 
-#_(m/defmethod with-options [:default clojure.lang.IPersistentMap]
+#_(m/defmethod set-options! [:default clojure.lang.IPersistentMap]
   [jdbc-object m]
   (reduce
    (fn [jdbc-object [k v]]
-     (with-option jdbc-object k v))
+     (set-option! jdbc-object k v))
    jdbc-object
    m))
 
-;; impls of `with-option` for various classes are in their respective namespaces.
+;; impls of `set-option!` for various classes are in their respective namespaces.
