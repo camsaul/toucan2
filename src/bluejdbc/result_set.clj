@@ -282,23 +282,23 @@
   (fn []
     (.getObject rs i klass)))
 
-(m/defmethod read-column-thunk [ResultSet :type/timestamp]
+(m/defmethod read-column-thunk [:default :type/timestamp]
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.LocalDateTime))
 
-(m/defmethod read-column-thunk [ResultSet :type/timestamp-with-timezone]
+(m/defmethod read-column-thunk [:default :type/timestamp-with-timezone]
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.OffsetDateTime))
 
-(m/defmethod read-column-thunk [ResultSet :type/date]
+(m/defmethod read-column-thunk [:default :type/date]
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.LocalDate))
 
-(m/defmethod read-column-thunk [ResultSet :type/time]
+(m/defmethod read-column-thunk [:default :type/time]
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.LocalTime))
 
-(m/defmethod read-column-thunk [ResultSet :type/time-with-timezone]
+(m/defmethod read-column-thunk [:default :type/time-with-timezone]
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.OffsetTime))
 
