@@ -1,8 +1,7 @@
 (ns bluejdbc.statement
   "Protocols, methods, functions, macros, etc. for working with `java.sql.PreparedStatement`s."
   (:require [bluejdbc.options :as options]
-            [bluejdbc.protocols :as protocols]
-            [bluejdbc.result-set :as result-set]
+            [bluejdbc.result-set :as rs]
             [bluejdbc.types :as types]
             [bluejdbc.util :as u]
             [clojure.tools.logging :as log]
@@ -19,7 +18,7 @@
   (pretty [_]
     (list 'proxy-prepared-statement stmt opts))
 
-  protocols/BlueJDBCProxy
+  options/Options
   (options [_]
     opts)
 
@@ -82,7 +81,7 @@
    [_]
    (-> (.executeQuery stmt)
        (options/set-options! opts)
-       (result-set/proxy-result-set opts)))
+       (rs/proxy-result-set opts)))
 
   ;; cannot actually be called on a `PreparedStatement`
   (^java.sql.ResultSet executeQuery [_ ^String a] (.executeQuery stmt a))
@@ -182,21 +181,26 @@
   (^ProxyPreparedStatement [stmt options]
    (when stmt
      (if (instance? ProxyPreparedStatement stmt)
-       (protocols/with-options stmt (merge (protocols/options stmt) options))
+       (options/with-options stmt (merge (options/options stmt) options))
        (ProxyPreparedStatement. stmt nil options)))))
 
 (defn set-object!
-  ([^PreparedStatement stmt ^Integer index object]
-   (log/tracef "(set-object! stmt %d ^%s %s)" index (some-> object class .getCanonicalName) (pr-str object))
-   (.setObject stmt index object))
+  "Set `PreparedStatement` parameter at index `i` to `object` by calling `.setObject`, optionally with a
+  `target-sql-type` (which may be either the raw Java enum integer, e.g. `java.sql.Types/INTEGER`, or the keyword name
+  of it, e.g. `:integer`.)"
+  ([^PreparedStatement stmt ^Integer i object]
+   (log/tracef "(set-object! stmt %d ^%s %s)" i (some-> object class .getCanonicalName) (pr-str object))
+   (.setObject stmt i object))
 
-  ([^PreparedStatement stmt ^Integer index object target-sql-type]
-   (log/tracef "(set-object! stmt %d ^%s %s %s)" index
+  ([^PreparedStatement stmt ^Integer i object target-sql-type]
+   (log/tracef "(set-object! stmt %d ^%s %s %s)" i
                (some-> object class .getCanonicalName) (pr-str object)
                (u/reverse-lookup types/type target-sql-type))
-   (.setObject stmt index object (types/type target-sql-type))))
+   (.setObject stmt i object (types/type target-sql-type))))
 
 (m/defmulti set-parameter!
+  "Set `PreparedStatement` parameter at index `i` to `object`. Dispatches on `:connection/type`, if present, in
+  `options`; and by the class of `Object`. The default implementation calls `set-object!`."
   {:arglists '([^PreparedStatement stmt ^Integer i object options])}
   (fn [_ _ object options]
     [(:connection/type options) (class object)]))
@@ -245,7 +249,10 @@
   stmt)
 
 (p.types/defprotocol+ CreatePreparedStatement
-  (prepare!* ^bluejdbc.statement.ProxyPreparedStatement [this ^Connection conn options]))
+  "Protocol for anything that can be used to create a `PreparedStatement` in combination with a `Connection`."
+  (prepare!* ^bluejdbc.statement.ProxyPreparedStatement [this ^Connection conn options]
+    "Create a `ProxyPreparedStatement` from `this` for `Connection` `conn`. This is a low-level method -- unless adding a
+    new implementation, use the higher-level `prepare!`."))
 
 (defn format-honeysql
   "Compile a HoneySQL form into `[sql & args]`."
@@ -270,9 +277,9 @@
                                               :as         options}]
     (let [stmt (.prepareStatement conn
                                   s
-                                  (result-set/type rs-type)
-                                  (result-set/concurrency concurrency)
-                                  (result-set/holdability holdability))]
+                                  (rs/type rs-type)
+                                  (rs/concurrency concurrency)
+                                  (rs/holdability holdability))]
       (options/set-options! stmt options)
       (proxy-prepared-statement stmt options)))
 
@@ -301,7 +308,7 @@
   (^ProxyPreparedStatement [conn query options]
    (assert (instance? java.sql.Connection conn)
            (str "Not a Connection: " (class conn)))
-   (prepare!* query conn (merge (protocols/options conn) options))))
+   (prepare!* query conn (merge (options/options conn) options))))
 
 (defn do-with-prepared-statement
   "Impl for `with-prepared-statement`."

@@ -2,7 +2,8 @@
   (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
             [potemkin.collections :as p.collections]
-            [potemkin.types :as p.types]))
+            [potemkin.types :as p.types]
+            [pretty.core :as pretty]))
 
 (defn static-instances
   "Utility function to get the static members of a class. Returns map of `lisp-case` keyword names of members -> value."
@@ -21,6 +22,7 @@
               (.get f nil)])))
 
 (defn enum-value*
+  "Part of impl for `EnumMap`."
   ^Integer [m namespac k not-found]
   (if (integer? k)
     k
@@ -33,6 +35,7 @@
           not-found)))))
 
 (defn reverse-lookup*
+  "Part of impl for `EnumMap`."
   [reverse-lookup-map namespac k not-found]
   (cond
     (and (keyword? k) (namespace k))
@@ -45,9 +48,13 @@
     (get reverse-lookup-map k (or not-found k))))
 
 (p.types/defprotocol+ EnumReverseLookup
-  (reverse-lookup [m] [m k] [m k not-found]))
+  "Protocol for an enum map that can look up values by key *and* keys by value."
+  (reverse-lookup [m] [m k] [m k not-found]
+    "Look up a map value by its key. Reverse version of `get`."))
 
 (p.types/deftype+ EnumMap [m rev namespac mta]
+  pretty/PrettyPrintable
+
   EnumReverseLookup
   (reverse-lookup [_]
     rev)
@@ -81,14 +88,31 @@
   (with-meta* [_ new-meta]
     (EnumMap. m rev namespac new-meta)))
 
-(defn enum-map [m namespac]
+(defn enum-map
+  "Create a new enum map that supports reverse lookup. Impl for `define-enums` macro."
+  [m namespac]
   (EnumMap. m
             (zipmap (vals m)
                     (keys m))
             namespac
             (meta m)))
 
-(defmacro define-enums [symb klass & [re & {:as options}]]
+(defmacro define-enums
+  "Create a new enum map, which exposed integer enums defined in a specific Java class as a Clojure-style map. The map
+  supports reverse lookup.
+
+    (define-enums sql-type java.sql.Types)
+
+    sql-type
+    ;; -> {:sql-type/boolean 16, ...}
+
+    ;; k->v lookup accepts either typed or untyped keywords.
+    (sql-type :boolean)          ; -> 16
+    (sql-type :sql-type/boolean) ; -> 16
+
+    ;; reverse looped
+    (reverse-lookup sql-type 16) ; -> :type/boolean"
+  [symb klass & [re & {:as options}]]
   `(def ~(with-meta symb {:arglists ''(^Integer [k] ^Integer [k not-found])})
      ~(format "Map of %s enum values, namespaced keyword -> int." symb)
      (let [options# ~(merge {:namespace      (keyword symb)
@@ -133,7 +157,9 @@
        ;; move minus sign at end to front
        [#"(^[^-]+)-$"         "-$1"]]))))
 
-(defn pprint-to-str [x]
+(defn pprint-to-str
+  "Pretty-print `x` to a string. Mostly used for log message purposes."
+  ^String [x]
   (with-open [w (java.io.StringWriter.)]
     (binding [pprint/*print-right-margin* 120]
       (pprint/pprint x w))

@@ -1,7 +1,6 @@
 (ns bluejdbc.connection
   (:require [bluejdbc.driver :as driver]
             [bluejdbc.options :as options]
-            [bluejdbc.protocols :as protocols]
             [bluejdbc.result-set :as result-set]
             [bluejdbc.statement :as statement]
             [bluejdbc.util :as u]
@@ -19,7 +18,7 @@
   (pretty [_]
     (list 'proxy-connection conn opts))
 
-  protocols/BlueJDBCProxy
+  options/Options
   (options [_]
     opts)
 
@@ -141,7 +140,7 @@
   (^ProxyConnection [conn options]
    (when conn
      (if (instance? ProxyConnection conn)
-       (protocols/with-options conn (merge (protocols/options conn) options))
+       (options/with-options conn (merge (options/options conn) options))
        (ProxyConnection. conn nil options)))))
 
 (p.types/defprotocol+ CreateConnection

@@ -1,6 +1,6 @@
 (ns bluejdbc.statement-test
   (:require [bluejdbc.core :as jdbc]
-            [bluejdbc.protocols :as protocols]
+            [bluejdbc.options :as options]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [java-time :as t]))
@@ -15,7 +15,7 @@
 
         (testing "with the same options"
           (is (= {:x :y}
-                 (select-keys (protocols/options rs) [:x]))))))))
+                 (select-keys (options/options rs) [:x]))))))))
 
 (deftest reducible-test
   (testing "ProxyPreparedStatements should be reducible"
