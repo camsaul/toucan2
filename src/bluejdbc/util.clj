@@ -20,7 +20,7 @@
              [(keyword (some-> namespce name) (str/lower-case (str/replace (name-transform field-name) #"_" "-")))
               (.get f nil)])))
 
-(defn- enum-value*
+(defn enum-value*
   ^Integer [m namespac k not-found]
   (if (integer? k)
     k
@@ -32,7 +32,8 @@
           (get m (keyword (name namespac) (name k)) not-found)
           not-found)))))
 
-(defn- reverse-lookup* [rev namespac k not-found]
+(defn reverse-lookup*
+  [reverse-lookup-map namespac k not-found]
   (cond
     (and (keyword? k) (namespace k))
     k
@@ -41,7 +42,7 @@
     (keyword (name namespac) (name k))
 
     :else
-    (get rev k (or not-found k))))
+    (get reverse-lookup-map k (or not-found k))))
 
 (p.types/defprotocol+ EnumReverseLookup
   (reverse-lookup [m] [m k] [m k not-found]))
