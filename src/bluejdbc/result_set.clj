@@ -1,6 +1,6 @@
 (ns bluejdbc.result-set
   (:refer-clojure :exclude [type])
-  (:require [bluejdbc.protocols :as protocols]
+  (:require [bluejdbc.options :as options]
             [bluejdbc.types :as types]
             [bluejdbc.util :as u]
             [clojure.tools.logging :as log]
@@ -21,7 +21,7 @@
   (pretty [_]
     (list 'proxy-result-set rs opts))
 
-  protocols/BlueJDBCProxy
+  options/Options
   (options [_]
     opts)
 
@@ -259,7 +259,7 @@
 
   (^ProxyResultSet [rs options]
    (if (instance? ProxyResultSet rs)
-     (protocols/with-options rs (merge (protocols/options rs) options))
+     (options/with-options rs (merge (options/options rs) options))
      (ProxyResultSet. rs nil options))))
 
 (m/defmulti read-column-thunk
@@ -312,7 +312,7 @@
   "Returns a thunk that can be called repeatedly to get the next row in the result set, using appropriate methods to
   fetch each value in the row. Returns `nil` when the result set has no more rows."
   ([rs]
-   (row-thunk rs (protocols/options rs)))
+   (row-thunk rs (options/options rs)))
 
   ([^ResultSet rs options]
    (let [rsmeta (.getMetaData rs)
@@ -364,9 +364,9 @@
   "Reduce the rows in a `ResultSet` using reducing function `rf`."
   {:arglists '([rs rf init] [rs options rf init])}
   ([rs rf init]
-   (reduce-result-set rs (protocols/options rs) rf init))
+   (reduce-result-set rs (options/options rs) rf init))
 
-  ([rs {xform :results/xform} rf init]
+  ([rs {xform :results/xform, :or {xform maps-xform}} rf init]
    (let [xform (if xform
                  (xform rs)
                  identity)
@@ -397,7 +397,7 @@
   {:arglists '(^clojure.lang.ISeq [rs]
                ^clojure.lang.ISeq [rs options])}
   ([rs]
-   (result-set-seq rs (protocols/options rs)))
+   (result-set-seq rs (options/options rs)))
 
   ([rs {xform :results/xform, :or {xform maps-xform}}]
    (let [xform        (if xform

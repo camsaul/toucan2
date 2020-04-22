@@ -1,7 +1,6 @@
 (ns bluejdbc.connection-test
   (:require [bluejdbc.core :as jdbc]
             [bluejdbc.options :as options]
-            [bluejdbc.protocols :as protocols]
             [bluejdbc.test :as test]
             [clojure.string :as str]
             [clojure.test :refer :all]
@@ -21,7 +20,7 @@
 
         (testing "options should be passed along"
           (is (= {:x :y}
-                 (select-keys (protocols/options stmt) [:x]))))))))
+                 (select-keys (options/options stmt) [:x]))))))))
 
 (p.types/defrecord+ ^:private MockConnection3 []
   java.sql.Connection
@@ -119,7 +118,7 @@
                    (.getCanonicalName (class conn))))
             (testing "Options should be set; :connection/type should be added"
               (is (= (assoc options :connection/type :bluejdbc-test-driver)
-                     (protocols/options conn))))
+                     (options/options conn))))
 
             (let [unwrapped (.unwrap conn MockConnection3)]
               (testing "Should be able to unwrap"

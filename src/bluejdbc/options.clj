@@ -2,7 +2,23 @@
   (:require [methodical.core :as m]
             [potemkin.types :as p.types]))
 
+(p.types/defprotocol+ Options
+  "Protocol for anything that has Blue JDBC options, such as the various proxy classes JDBC interfaces."
+  (options [this]
+    "Get Blue JDBC options map associated with an instance of a Blue JDBC proxy class.")
+
+  (with-options [this new-options]
+    "Replace the Blue JDBC options map for an instance of a Blue JDBC proxy class."))
+
+(extend-protocol Options
+  Object
+  (options [_] nil)
+
+  nil
+  (options [_] nil))
+
 (p.types/defprotocol+ CoerceToProperties
+  "Protocol for anything that can be coerced to an instance of `java.util.Properties`."
   (->Properties ^java.util.Properties [this]
     "Coerce `this` to a `java.util.Properties`."))
 

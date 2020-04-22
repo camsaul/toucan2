@@ -3,6 +3,7 @@
             [potemkin.types :as p.types]))
 
 (p.types/defprotocol+ CoerceToDriver
+  "Protocol for anything that can be coerced to a `java.sql.Driver.`"
   (driver ^java.sql.Driver [this]
     "Coerce `this` to a `java.sql.Driver`."))
 
