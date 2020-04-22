@@ -9,6 +9,7 @@
                             (define-clojure-indent
                               (p.types/defprotocol+ '(1 (:defn)))
                               (p.types/defrecord+ '(2 nil nil (:defn)))
+                              (p.types/deftype+ '(2 nil nil (:defn)))
                               (insert! 1)
                               (transaction 2))))
                   ;; if you're using clj-refactor (highly recommended!), prefer prefix notation when cleaning the ns

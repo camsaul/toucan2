@@ -7,12 +7,11 @@
             [java-time :as t]
             [methodical.core :as m]
             [second-date.core :as second-date])
-  (:import [java.sql ResultSet ResultSetMetaData]
-           [org.postgresql.jdbc PgPreparedStatement PgResultSet]))
+  (:import [java.sql ResultSet ResultSetMetaData]))
 
 ;; for some reason postgres `TIMESTAMP WITH TIME ZONE` columns still come back as `Type/TIMESTAMP`, which seems like a
 ;; bug with the JDBC driver?
-(m/defmethod result-set/read-column-thunk [PgResultSet :type/timestamp]
+(m/defmethod result-set/read-column-thunk [:postgresql :type/timestamp]
   [^ResultSet rs ^ResultSetMetaData rsmeta ^Integer i _]
   (let [^Class klass (if (= (str/lower-case (.getColumnTypeName rsmeta i)) "timestamptz")
                        java.time.OffsetDateTime
@@ -22,7 +21,7 @@
 
 ;; Sometimes Postgres times come back as strings like `07:23:18.331+00` (no minute in offset) and there's a bug in the
 ;; JDBC driver where it can't parse those correctly. We can do it ourselves in that case.
-(m/defmethod result-set/read-column-thunk [PgResultSet :type/time]
+(m/defmethod result-set/read-column-thunk [:postgresql :type/time]
   [^ResultSet rs rsmeta ^Integer i options]
   (let [parent-thunk ((get-method result-set/read-column-thunk [:default :time]) rs rsmeta i options)]
     (fn []
@@ -36,7 +35,7 @@
 ;; The postgres JDBC driver cannot properly read MONEY columns — see https://github.com/pgjdbc/pgjdbc/issues/425. Work
 ;; around this by checking whether the column type name is `money`, and reading it out as a String and parsing to a
 ;; BigDecimal if so; otherwise, proceeding as normal
-(m/defmethod result-set/read-column-thunk [PgResultSet :type/double]
+(m/defmethod result-set/read-column-thunk [:postgresql :type/double]
   [^ResultSet rs ^ResultSetMetaData rsmeta ^Integer i _]
   (if (= (.getColumnTypeName rsmeta i) "money")
     (fn []
@@ -45,7 +44,7 @@
       (.getObject rs i))))
 
 ;; Postgres doesn't support OffsetTime
-(m/defmethod statement/set-parameter [PgPreparedStatement java.time.OffsetTime]
+(m/defmethod statement/set-parameter! [:postgresql java.time.OffsetTime]
   [stmt i t options]
   (let [local-time (t/local-time (t/with-offset-same-instant t (t/zone-offset 0)))]
-    (statement/set-parameter stmt i local-time options)))
+    (statement/set-parameter! stmt i local-time options)))
