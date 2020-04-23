@@ -1,8 +1,8 @@
 (ns bluejdbc.connection
   (:require [bluejdbc.driver :as driver]
             [bluejdbc.options :as options]
-            [bluejdbc.result-set :as result-set]
-            [bluejdbc.statement :as statement]
+            [bluejdbc.result-set :as rs]
+            [bluejdbc.statement :as stmt]
             [bluejdbc.util :as u]
             [clojure.tools.logging :as log]
             [methodical.core :as m]
@@ -78,39 +78,40 @@
   (^java.sql.CallableStatement prepareCall [_ ^String a ^int b ^int c ^int d] (.prepareCall conn a b c d))
 
   (^java.sql.PreparedStatement prepareStatement
-   [_ ^String sql]
-   (statement/proxy-prepared-statement (.prepareStatement conn sql) opts))
+   [this ^String sql]
+   (-> (stmt/proxy-prepared-statement (.prepareStatement conn sql) (assoc opts :_connection this))))
 
   (^java.sql.PreparedStatement prepareStatement
-   [_ ^String sql ^"[Ljava.lang.String;" column-names]
+   [this ^String sql ^"[Ljava.lang.String;" column-names]
    (-> (.prepareStatement conn sql column-names)
-       (options/set-options! opts)
-       (statement/proxy-prepared-statement opts)))
+       (stmt/proxy-prepared-statement (assoc opts :_connection this))))
 
   (^java.sql.PreparedStatement prepareStatement
-   [_ ^String sql ^ints column-indexes]
+   [this ^String sql ^ints column-indexes]
    (-> (.prepareStatement conn sql column-indexes)
-       (options/set-options! opts)
-       (statement/proxy-prepared-statement opts)))
+       (stmt/proxy-prepared-statement (assoc opts :_connection this))))
 
   (^java.sql.PreparedStatement prepareStatement
-   [_ ^String sql ^int auto-generated-keys]
+   [this ^String sql ^int auto-generated-keys]
    (-> (.prepareStatement conn sql auto-generated-keys)
-       (options/set-options! opts)
-       (statement/proxy-prepared-statement opts)))
+       (stmt/proxy-prepared-statement (assoc opts :_connection this))))
 
   (^java.sql.PreparedStatement prepareStatement
-   [_ ^String sql ^int result-set-type ^int result-set-concurrency]
-   (statement/prepare! conn sql (assoc opts
-                                       :result-set/type result-set-type
-                                       :result-set/concurrency result-set-concurrency)))
+   [this ^String sql ^int result-set-type ^int result-set-concurrency]
+   (-> (.prepareStatement conn sql result-set-type result-set-concurrency)
+       (stmt/proxy-prepared-statement (assoc opts
+                                             :_connection this
+                                             :result-set/type (u/reverse-lookup rs/type result-set-type)
+                                             :result-set/concurrency (u/reverse-lookup rs/concurrency result-set-concurrency)))))
 
   (^java.sql.PreparedStatement prepareStatement
-   [_ ^String sql ^int result-set-type ^int result-set-concurrency ^int result-set-holdability]
-   (statement/prepare! conn sql (assoc opts
-                                       :result-set/type result-set-type
-                                       :result-set/concurrency result-set-concurrency
-                                       :result-set/holdability result-set-holdability)))
+   [this ^String sql ^int result-set-type ^int result-set-concurrency ^int result-set-holdability]
+   (-> (.prepareStatement conn sql result-set-type result-set-concurrency result-set-holdability)
+       (stmt/proxy-prepared-statement (assoc opts
+                                             :_connection this
+                                             :result-set/type (u/reverse-lookup rs/type result-set-type)
+                                             :result-set/concurrency (u/reverse-lookup rs/concurrency result-set-concurrency)
+                                             :result-set/holdability (u/reverse-lookup rs/holdability result-set-holdability)))))
 
   (^void releaseSavepoint [_ ^java.sql.Savepoint a] (.releaseSavepoint conn a))
   (^void rollback [_] (.rollback conn))
@@ -140,8 +141,10 @@
   (^ProxyConnection [conn options]
    (when conn
      (if (instance? ProxyConnection conn)
-       (options/with-options conn (merge (options/options conn) options))
-       (ProxyConnection. conn nil options)))))
+       (options/with-applied-options conn options)
+       (do
+         (options/set-options! conn options)
+         (ProxyConnection. conn nil options))))))
 
 (p.types/defprotocol+ CreateConnection
   "Protocol for anything that can used to create a new `Connection`."
@@ -156,17 +159,13 @@
                                properties       :connection/properties
                                :as              options}]
   (log/trace "Creating new Connection from JDBC connection string")
-  (let [conn (cond
-               driver             (.connect (driver/driver driver) s (options/->Properties properties))
-               (or user password) (DriverManager/getConnection s user password)
-               properties         (DriverManager/getConnection s (options/->Properties properties))
-               :else              (DriverManager/getConnection s))]
-    (options/set-options! conn (dissoc options
-                                       :connection/driver
-                                       :connection/user
-                                       :connection/password
-                                       :connection/properties))
-    (proxy-connection conn (assoc options :connection/type (keyword (second (re-find #"^jdbc:([^:]+):" s)))))))
+  (let [conn    (cond
+                  driver             (.connect (driver/driver driver) s (options/->Properties properties))
+                  (or user password) (DriverManager/getConnection s user password)
+                  properties         (DriverManager/getConnection s (options/->Properties properties))
+                  :else              (DriverManager/getConnection s))
+        options (assoc options :connection/type (keyword (second (re-find #"^jdbc:([^:]+):" s))))]
+    (proxy-connection conn options)))
 
 (defn create-connection-from-clojure-java-jdbc-map!
   "Create a new JDBC connection from a `clojure.java.jdbc`-style map."
@@ -182,9 +181,7 @@
 
     :else
     ;; TODO -- other stuff
-    (throw (ex-info "TODO" {}))
-    #_(assoc options :connection/type (keyword (:subprotocol options)))
-    #_(options/set-options! m options)))
+    (throw (ex-info "TODO" {}))))
 
 (defn create-connection-from-datasource!
   "Create a new JDBC connection from a DataSource."
@@ -193,7 +190,6 @@
   (let [conn (if (or user password)
                (.getConnection data-source user password)
                (.getConnection data-source))]
-    (options/set-options! conn (dissoc options :connection/user :connection/password))
     (proxy-connection conn options)))
 
 (extend-protocol CreateConnection
@@ -213,73 +209,66 @@
 
 (defn connect!
   "Create a new JDBC connection from `source`."
-  (^ProxyConnection [source]
-   (connect!* source nil))
+  (^ProxyConnection [connectable]
+   (connect!* connectable nil))
 
-  (^ProxyConnection [source options]
-   (connect!* source options)))
+  (^ProxyConnection [connectable options]
+   (connect!* connectable options)))
 
 (defn do-with-connection
   "Impl for `with-connection`."
-  [source options f]
-  (if (instance? Connection source)
-    (let [conn (proxy-connection source options)]
+  [connectable options f]
+  (if (instance? Connection connectable)
+    (let [conn (proxy-connection connectable options)]
       (f conn))
-    (with-open [conn (connect! source options)]
+    (with-open [conn (connect! connectable options)]
       (f conn))))
 
 (defmacro with-connection
-  "Execute `body` with `conn-binding` bound to a `Connection`. If `source` is already a `Connection`, `body` is executed
-  using that `Connection`; if `source` is something else like a JDBC URL, a new `Connection` will be created for the
+  "Execute `body` with `conn-binding` bound to a `Connection`. If `connectable` is already a `Connection`, `body` is executed
+  using that `Connection`; if `connectable` is something else like a JDBC URL, a new `Connection` will be created for the
   duration of `body` and closed afterward.
 
   You can use this macro to accept either a `Connection` or something that can be used to create a `Connection` and
   handle either case appropriately."
-  {:arglists '([[conn-binding source] & body] [[conn-binding source options] & body])}
-  [[conn-binding source options] & body]
-  `(do-with-connection ~source ~options (fn [~(vary-meta conn-binding assoc :tag 'bluejdbc.connection.ProxyConnection)]
-                                          ~@body)))
+  {:arglists '([[conn-binding connectable] & body] [[conn-binding connectable options] & body])}
+  [[conn-binding connectable options] & body]
+  `(do-with-connection ~connectable ~options (fn [~(vary-meta conn-binding assoc :tag 'bluejdbc.connection.ProxyConnection)]
+                                               ~@body)))
 
 
 ;;;; Option handling
 
 (m/defmethod options/set-option! [Connection :connection/auto-commit?]
   [^Connection conn _ auto-commit?]
-  (log/tracef "Set Connection auto commit -> %s" (boolean auto-commit?))
   (.setReadOnly conn (boolean auto-commit?)))
 
 (m/defmethod options/set-option! [Connection :connection/catalog]
   [^Connection conn _ catalog]
-  (log/tracef "Set Connection catalog -> %s" catalog)
   (doto conn
     (.setCatalog (str catalog))))
 
 (m/defmethod options/set-option! [Connection :connection/client-info]
   [^Connection conn _ properties]
-  (log/tracef "Set Connection client info -> %s" properties)
   (doto conn
     (.setClientInfo conn (options/->Properties properties))))
 
 (m/defmethod options/set-option! [Connection :result-set/holdability]
   [^Connection conn _ holdability]
-  (log/tracef "Set Connection holdability -> %s" (u/reverse-lookup result-set/holdability holdability))
   (doto conn
-    (.setHoldability (result-set/holdability holdability))))
+    (.setHoldability (rs/holdability holdability))))
 
 (m/defmethod options/set-option! [Connection :connection/read-only?]
   [^Connection conn _ read-only?]
-  (log/tracef "Set Connection read only -> %s" (boolean read-only?))
   (doto conn
     (.setReadOnly (boolean read-only?))))
 
 (m/defmethod options/set-option! [Connection :connection/schema]
   [^Connection conn _ schema]
-  (log/tracef "Set Connection schema -> %s" schema)
   (doto conn
     (.setSchema (str schema))))
 
 (m/defmethod options/set-option! [Connection :connection/transaction-isolation]
   [^Connection conn _ level]
-  (log/tracef "Set Connection transaction isolation -> %s" (u/reverse-lookup transaction-isolation-level level))
   (doto conn
     (.setTransactionIsolation (transaction-isolation-level level))))

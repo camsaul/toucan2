@@ -17,6 +17,8 @@
 
 ;; for some reason postgres `TIMESTAMP WITH TIME ZONE` columns still come back as `Type/TIMESTAMP`, which seems like a
 ;; bug with the JDBC driver?
+;;
+;; We can look at the actual column type name to distinguish between the two
 (m/defmethod rs/read-column-thunk [:postgresql :type/timestamp]
   [^ResultSet rs ^ResultSetMetaData rsmeta ^Integer i _]
   (let [^Class klass (if (= (str/lower-case (.getColumnTypeName rsmeta i)) "timestamptz")

@@ -15,7 +15,13 @@
 
         (testing "with the same options"
           (is (= {:x :y}
-                 (select-keys (options/options rs) [:x]))))))))
+                 (select-keys (options/options rs) [:x]))))
+
+        (testing "the ProxyResultSet should be able to return its parent ProxyPreparedStatement"
+          (is (identical? stmt (.getStatement rs)))
+
+          (testing "and its parent ProxyConnection"
+            (is (identical? conn (.. rs getStatement getConnection)))))))))
 
 (deftest reducible-test
   (testing "ProxyPreparedStatements should be reducible"

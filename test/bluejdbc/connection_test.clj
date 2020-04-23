@@ -14,15 +14,18 @@
                   stmt (.prepareStatement conn "SELECT 1;")]
         ;; in case classes get redefined
         (is (= "bluejdbc.connection.ProxyConnection"
-               (.getCanonicalName (class conn))))
+               (some-> conn class .getCanonicalName)))
         (is (= "bluejdbc.statement.ProxyPreparedStatement"
-               (.getCanonicalName (class stmt))))
+               (some-> stmt class .getCanonicalName)))
 
         (testing "options should be passed along"
           (is (= {:x :y}
-                 (select-keys (options/options stmt) [:x]))))))))
+                 (select-keys (options/options stmt) [:x]))))
 
-(p.types/defrecord+ ^:private MockConnection3 []
+        (testing "the ProxyPreparedStatment should be able to return its parent ProxyConnection"
+          (is (identical? conn (.getConnection stmt))))))))
+
+(p.types/defrecord+ ^:private MockConnection []
   java.sql.Connection
 
   java.lang.AutoCloseable
@@ -33,32 +36,32 @@
     (when (instance? interface this)
       this)))
 
-(p.types/defrecord+ ^:private TestDriver3 []
+(p.types/defrecord+ ^:private TestDriver []
   java.sql.Driver
   (acceptsURL [_ url]
     (str/starts-with? url "jdbc:bluejdbc-test-driver:"))
 
   (connect [_ url properties]
-    (assoc (MockConnection3.)
+    (assoc (MockConnection.)
            :url        url
            :properties (into {} (for [[k v] properties]
                                   [(keyword k) v])))))
 
-(p.types/defrecord+ ^:private TestDriver4 []
+(p.types/defrecord+ ^:private TestDriver2 []
   java.sql.Driver
   (acceptsURL [_ url]
     (str/starts-with? url "jdbc:bluejdbc-test-driver:"))
 
   (connect [_ url properties]
-    (assoc (MockConnection3.)
+    (assoc (MockConnection.)
            :url        url
            :properties (into {} (for [[k v] properties]
                                   [(keyword k) v]))
-           :driver TestDriver4)))
+           :driver TestDriver2)))
 
 (defn- do-with-registered-driver
   ([thunk]
-   (do-with-registered-driver (TestDriver3.) thunk))
+   (do-with-registered-driver (TestDriver.) thunk))
 
   ([driver thunk]
    (try
@@ -77,15 +80,15 @@
 
       (with-test-driver
         (let [driver (DriverManager/getDriver mock-url)]
-          (is (= "bluejdbc.connection_test.TestDriver3"
-                 (.getCanonicalName (class driver))))
+          (is (= "bluejdbc.connection_test.TestDriver"
+                 (some-> driver class .getCanonicalName)))
 
           (is (= true
                  (.acceptsURL driver mock-url))))
 
         (with-open [conn (DriverManager/getConnection mock-url)]
-          (is (= "bluejdbc.connection_test.MockConnection3"
-                 (.getCanonicalName (class conn)))))))))
+          (is (= "bluejdbc.connection_test.MockConnection"
+                 (some-> conn class .getCanonicalName))))))))
 
 (deftest connection-from-url-test
   (testing "Should be able to get a Connection from a JDBC connection string"
@@ -109,21 +112,21 @@
                 :expected    {:properties {:user "cam", :password "cam"}}}
                {:description "with a specific driver"
                 :url         "jdbc:bluejdbc-test-driver://localhost:1337/my_db"
-                :options     {:connection/driver (TestDriver4.)}
+                :options     {:connection/driver (TestDriver2.)}
                 :expected    {:properties {}
-                              :driver     TestDriver4}}]]
+                              :driver     TestDriver2}}]]
         (testing description
           (with-open [conn (jdbc/connect! url options)]
             (is (= "bluejdbc.connection.ProxyConnection"
-                   (.getCanonicalName (class conn))))
+                   (some-> conn class .getCanonicalName)))
             (testing "Options should be set; :connection/type should be added"
               (is (= (assoc options :connection/type :bluejdbc-test-driver)
                      (options/options conn))))
 
-            (let [unwrapped (.unwrap conn MockConnection3)]
+            (let [unwrapped (.unwrap conn MockConnection)]
               (testing "Should be able to unwrap"
-                (is (= "bluejdbc.connection_test.MockConnection3"
-                       (.getCanonicalName (class unwrapped))))
+                (is (= "bluejdbc.connection_test.MockConnection"
+                       (some-> unwrapped class .getCanonicalName)))
 
                 (is (= (merge {:url url}
                               expected)

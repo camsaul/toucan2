@@ -14,7 +14,167 @@
 (u/define-enums holdability     ResultSet #"_CURSORS_" :namespace :result-set-holdability, :name-transform identity)
 (u/define-enums fetch-direction ResultSet #"FETCH_")
 
-(declare reduce-result-set result-set-seq)
+
+;;;; Reading Results
+
+(m/defmulti read-column-thunk
+  "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
+  {:arglists '([^java.sql.ResultSet rs ^java.sql.ResultSetMetaData rsmeta ^Integer i options])}
+  (fn [rs ^ResultSetMetaData rsmeta ^Integer i options]
+    (let [col-type (u/reverse-lookup types/type (.getColumnType rsmeta i))]
+      (log/tracef "Column %d %s is of type %s" i (pr-str (.getColumnLabel rsmeta i)) col-type)
+      [(:connection/type options) col-type])))
+
+(m/defmethod read-column-thunk :default
+  [^ResultSet rs rsmeta ^Integer i options]
+  (do
+    (log/tracef "Fetching values in column %d with (.getObject rs %d)" i i)
+    (fn []
+      (.getObject rs i))))
+
+(defn- get-object-of-class-thunk [^ResultSet rs, ^Integer i, ^Class klass]
+  (log/tracef "Fetching values in column %d with (.getObject rs %d %s)" i i (.getCanonicalName klass))
+  (fn []
+    (.getObject rs i klass)))
+
+(m/defmethod read-column-thunk [:default :type/timestamp]
+  [rs _ i _]
+  (get-object-of-class-thunk rs i java.time.LocalDateTime))
+
+(m/defmethod read-column-thunk [:default :type/timestamp-with-timezone]
+  [rs _ i _]
+  (get-object-of-class-thunk rs i java.time.OffsetDateTime))
+
+(m/defmethod read-column-thunk [:default :type/date]
+  [rs _ i _]
+  (get-object-of-class-thunk rs i java.time.LocalDate))
+
+(m/defmethod read-column-thunk [:default :type/time]
+  [rs _ i _]
+  (get-object-of-class-thunk rs i java.time.LocalTime))
+
+(m/defmethod read-column-thunk [:default :type/time-with-timezone]
+  [rs _ i _]
+  (get-object-of-class-thunk rs i java.time.OffsetTime))
+
+(defn index-range
+  "Return a sequence of indecies for all the columns in a result set. (`ResultSet` column indecies start at one in an
+  effort to trip up developers.)"
+  [^ResultSetMetaData rsmeta]
+  (range 1 (inc (.getColumnCount rsmeta))))
+
+(defn row-thunk
+  "Returns a thunk that can be called repeatedly to get the next row in the result set, using appropriate methods to
+  fetch each value in the row. Returns `nil` when the result set has no more rows."
+  ([rs]
+   (row-thunk rs (options/options rs)))
+
+  ([^ResultSet rs options]
+   (let [rsmeta (.getMetaData rs)
+         fns    (for [i (index-range rsmeta)]
+                  (read-column-thunk rs rsmeta (int i) options))]
+     (let [thunk (apply juxt fns)]
+       (fn row-thunk* []
+         (when (.next rs)
+           (thunk)))))))
+
+
+;;;; row xforms
+
+(defn column-names
+  "Return a sequence of column names (as keywords) for the rows in a `ResultSet`."
+  [^ResultSet rs]
+  (let [rsmeta (.getMetaData rs)]
+    (vec (for [i (index-range rsmeta)]
+           (keyword (.getColumnLabel rsmeta i))))))
+
+(defn namespaced-column-names
+  "Return a sequence of namespaced keyword column names for the rows in a `ResultSet`, e.g. `:table/column`."
+  [^ResultSet rs]
+  (let [rsmeta (.getMetaData rs)]
+    (vec (for [i (index-range rsmeta)]
+           (keyword (.getTableName rsmeta i) (.getColumnLabel rsmeta i))))))
+
+(defn- maps-xform* [rs column-names]
+  (fn [rf]
+    (fn
+      ([]
+       (rf))
+
+      ([acc]
+       (rf acc))
+
+      ([acc row]
+       (rf acc (zipmap column-names row))))))
+
+(defn maps-xform
+  "A `ResultSet` transform that returns rows as maps with unqualified keys e.g. `:column`. This is the default and is
+  applied if no other values of `:results/xform` are passed in options."
+  [rs]
+  (maps-xform* rs (column-names rs)))
+
+(defn namespaced-maps-xform
+  "A `ResultSet` transform that returns rows as maps with namespaced keys e.g.`:table/column`."
+  [rs]
+  (maps-xform* rs (namespaced-column-names rs)))
+
+
+;;;; Reducing/seq-ing result sets
+
+(defn reduce-result-set
+  "Reduce the rows in a `ResultSet` using reducing function `rf`."
+  {:arglists '([rs rf init] [rs options rf init])}
+  ([rs rf init]
+   (reduce-result-set rs (options/options rs) rf init))
+
+  ([rs {xform :results/xform, :or {xform maps-xform}} rf init]
+   (let [xform (if xform
+                 (xform rs)
+                 identity)
+         rf    (xform rf)
+         thunk (row-thunk rs)]
+     (loop [acc init]
+       (if (reduced? acc)
+         @acc
+         (if-let [row (thunk)]
+           (recur (rf acc row))
+           (do
+             (log/trace "All rows consumed.")
+             acc)))))))
+
+(defn result-set-seq
+  "Return a lazy sequence of rows from a `ResultSet`. Make sure you consume all the rows in the `ResultSet` while it is
+  still open!
+
+    ;; good
+    (with-open [rs (jdbc/results stmt)]
+      (doseq [row (result-set-seq rs)]
+        ...))
+
+    ;; bad -- ResultSet is closed before we finish the `doseq` loop
+    (doseq [row (with-open [rs (jdbc/results stmt)]
+                  (jdbc/results stmt))]
+      ...)"
+  {:arglists '(^clojure.lang.ISeq [rs]
+               ^clojure.lang.ISeq [rs options])}
+  ([rs]
+   (result-set-seq rs (options/options rs)))
+
+  ([rs {xform :results/xform, :or {xform maps-xform}}]
+   (let [xform        (if xform
+                        (xform rs)
+                        identity)
+         rf           (xform (fn [_ row] row))
+         thunk        (row-thunk rs)
+         ;; TODO -- should this be `^:once fn*` ??
+         lazy-results (fn lazy-results []
+                        (lazy-seq
+                         (when-let [row (thunk)]
+                           (cons (rf nil row) (lazy-results)))))]
+     (lazy-results))))
+
+
+;;;; ProxyResultSet
 
 (p.types/deftype+ ProxyResultSet [^ResultSet rs mta opts]
   pretty/PrettyPrintable
@@ -128,7 +288,11 @@
   (^java.sql.SQLXML getSQLXML [_ ^int a] (.getSQLXML rs a))
   (^short getShort [_ ^String a] (.getShort rs a))
   (^short getShort [_ ^int a] (.getShort rs a))
-  (^java.sql.Statement getStatement [_] (.getStatement rs))
+
+  (^java.sql.Statement getStatement [_]
+   (or (:_statement opts)
+       (.getStatement rs)))
+
   (^String getString [_ ^int a] (.getString rs a))
   (^String getString [_ ^String a] (.getString rs a))
   (^java.sql.Time getTime [_ ^String a ^java.util.Calendar b] (.getTime rs a b))
@@ -259,155 +423,7 @@
 
   (^ProxyResultSet [rs options]
    (if (instance? ProxyResultSet rs)
-     (options/with-options rs (merge (options/options rs) options))
-     (ProxyResultSet. rs nil options))))
-
-(m/defmulti read-column-thunk
-  "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
-  {:arglists '([^java.sql.ResultSet rs ^java.sql.ResultSetMetaData rsmeta ^Integer i options])}
-  (fn [rs ^ResultSetMetaData rsmeta ^Integer i options]
-    (let [col-type (u/reverse-lookup types/type (.getColumnType rsmeta i))]
-      (log/tracef "Column %d %s is of type %s" i (pr-str (.getColumnLabel rsmeta i)) col-type)
-      [(:connection/type options) col-type])))
-
-(m/defmethod read-column-thunk :default
-  [^ResultSet rs rsmeta ^Integer i options]
-  (do
-    (log/tracef "Fetching values in column %d with (.getObject rs %d)" i i)
-    (fn []
-      (.getObject rs i))))
-
-(defn- get-object-of-class-thunk [^ResultSet rs, ^Integer i, ^Class klass]
-  (log/tracef "Fetching values in column %d with (.getObject rs %d %s)" i i (.getCanonicalName klass))
-  (fn []
-    (.getObject rs i klass)))
-
-(m/defmethod read-column-thunk [:default :type/timestamp]
-  [rs _ i _]
-  (get-object-of-class-thunk rs i java.time.LocalDateTime))
-
-(m/defmethod read-column-thunk [:default :type/timestamp-with-timezone]
-  [rs _ i _]
-  (get-object-of-class-thunk rs i java.time.OffsetDateTime))
-
-(m/defmethod read-column-thunk [:default :type/date]
-  [rs _ i _]
-  (get-object-of-class-thunk rs i java.time.LocalDate))
-
-(m/defmethod read-column-thunk [:default :type/time]
-  [rs _ i _]
-  (get-object-of-class-thunk rs i java.time.LocalTime))
-
-(m/defmethod read-column-thunk [:default :type/time-with-timezone]
-  [rs _ i _]
-  (get-object-of-class-thunk rs i java.time.OffsetTime))
-
-(defn index-range
-  "Return a sequence of indecies for all the columns in a result set. (`ResultSet` column indecies start at one in an
-  effort to trip up developers.)"
-  [^ResultSetMetaData rsmeta]
-  (range 1 (inc (.getColumnCount rsmeta))))
-
-(defn row-thunk
-  "Returns a thunk that can be called repeatedly to get the next row in the result set, using appropriate methods to
-  fetch each value in the row. Returns `nil` when the result set has no more rows."
-  ([rs]
-   (row-thunk rs (options/options rs)))
-
-  ([^ResultSet rs options]
-   (let [rsmeta (.getMetaData rs)
-         fns    (for [i (index-range rsmeta)]
-                  (read-column-thunk rs rsmeta (int i) options))]
-     (let [thunk (apply juxt fns)]
-       (fn row-thunk* []
-         (when (.next rs)
-           (thunk)))))))
-
-(defn column-names
-  "Return a sequence of column names (as keywords) for the rows in a `ResultSet`."
-  [^ResultSet rs]
-  (let [rsmeta (.getMetaData rs)]
-    (vec (for [i (index-range rsmeta)]
-           (keyword (.getColumnLabel rsmeta i))))))
-
-(defn namespaced-column-names
-  "Return a sequence of namespaced keyword column names for the rows in a `ResultSet`, e.g. `:table/column`."
-  [^ResultSet rs]
-  (let [rsmeta (.getMetaData rs)]
-    (vec (for [i (index-range rsmeta)]
-           (keyword (.getTableName rsmeta i) (.getColumnLabel rsmeta i))))))
-
-(defn- maps-xform* [rs column-names]
-  (fn [rf]
-    (fn
-      ([]
-       (rf))
-
-      ([acc]
-       (rf acc))
-
-      ([acc row]
-       (rf acc (zipmap column-names row))))))
-
-(defn maps-xform
-  "A `ResultSet` transform that returns rows as maps with unqualified keys e.g. `:column`. This is the default and is
-  applied if no other values of `:results/xform` are passed in options."
-  [rs]
-  (maps-xform* rs (column-names rs)))
-
-(defn namespaced-maps-xform
-  "A `ResultSet` transform that returns rows as maps with namespaced keys e.g.`:table/column`."
-  [rs]
-  (maps-xform* rs (namespaced-column-names rs)))
-
-(defn reduce-result-set
-  "Reduce the rows in a `ResultSet` using reducing function `rf`."
-  {:arglists '([rs rf init] [rs options rf init])}
-  ([rs rf init]
-   (reduce-result-set rs (options/options rs) rf init))
-
-  ([rs {xform :results/xform, :or {xform maps-xform}} rf init]
-   (let [xform (if xform
-                 (xform rs)
-                 identity)
-         rf    (xform rf)
-         thunk (row-thunk rs)]
-     (loop [acc init]
-       (if (reduced? acc)
-         @acc
-         (if-let [row (thunk)]
-           (recur (rf acc row))
-           (do
-             (log/trace "All rows consumed.")
-             acc)))))))
-
-(defn result-set-seq
-  "Return a lazy sequence of rows from a `ResultSet`. Make sure you consume all the rows in the `ResultSet` while it is
-  still open!
-
-    ;; good
-    (with-open [rs (jdbc/results stmt)]
-      (doseq [row (result-set-seq rs)]
-        ...))
-
-    ;; bad -- ResultSet is closed before we finish the `doseq` loop
-    (doseq [row (with-open [rs (jdbc/results stmt)]
-                  (jdbc/results stmt))]
-      ...)"
-  {:arglists '(^clojure.lang.ISeq [rs]
-               ^clojure.lang.ISeq [rs options])}
-  ([rs]
-   (result-set-seq rs (options/options rs)))
-
-  ([rs {xform :results/xform, :or {xform maps-xform}}]
-   (let [xform        (if xform
-                        (xform rs)
-                        identity)
-         rf           (xform (fn [_ row] row))
-         thunk        (row-thunk rs)
-         ;; TODO -- should this be `^:once fn*` ??
-         lazy-results (fn lazy-results []
-                        (lazy-seq
-                         (when-let [row (thunk)]
-                           (cons (rf nil row) (lazy-results)))))]
-     (lazy-results))))
+     (options/with-applied-options rs options)
+     (do
+       (options/set-options! rs options)
+       (ProxyResultSet. rs nil options)))))
