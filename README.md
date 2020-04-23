@@ -48,6 +48,33 @@ Blue JDBC is a new Clojure interface to JDBC with an an emphasis on ease-of-use,
 
 ### Rationale
 
-Why use Blue JDBC? What's wrong with [`clojure.java.jdbc`](https://github.com/clojure/java.jdbc) or [`next.jdbc`](https://github.com/seancorfield/next-jdbc)?
+One might wonder whether the world needs another Clojure JDBC library. For many years,
+[`clojure.java.jdbc`](https://github.com/clojure/java.jdbc) was the go-to Clojure JDBC library. I've personally spent
+hundreds if not thousands of hours working with it as part of [Metabase](https://github.com/metabase/metabase).
 
-(TODO)
+Sean Corfield's successor library, [`next.jdbc`](https://github.com/seancorfield/next-jdbc), [fixes some of the
+shortcomings of `clojure.java.jdbc` and makes some big improvements](https://corfield.org/blog/2019/07/04/next-jdbc/).
+
+Blue JDBC shares a similar role as `next.jdbc` as a successor to `clojure.java.jdbc`, but features like HoneySQL integration,
+out-of-the-box `java.time` support, and support for different database engines make it better-suited to some use cases.
+
+### Development & Tests
+
+Blue JDBC currently runs tests against:
+
+*  Postgres 9.6
+*  Postgres latest
+*  H2
+*  MySQL 5.7
+*  MySQL latest
+*  MariaDB 10.2
+*  MariaDB latest
+*  SQL Server 2017
+
+To run tests against a DB of your choice, set the environment variable `JDBC_URL` and run `lein test`:
+
+```bash
+JDBC_URL='jdbc:postgresql://localhost:5432/bluejdbc_test?user=cam&password=cam' lein test
+```
+
+Blue JDBC will automatically do the right thing based on the protocol.
