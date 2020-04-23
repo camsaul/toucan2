@@ -54,6 +54,8 @@
 
 (p.types/deftype+ EnumMap [m rev namespac mta]
   pretty/PrettyPrintable
+  (pretty [_]
+    (list 'bluejdbc.util/enun-map m namespac))
 
   EnumReverseLookup
   (reverse-lookup [_]

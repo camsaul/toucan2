@@ -13,6 +13,75 @@
   (:import [java.sql Connection PreparedStatement ResultSet Statement]
            [java.time Instant LocalDate LocalDateTime LocalTime OffsetDateTime OffsetTime ZonedDateTime]))
 
+;;;; Parameters
+
+(defn set-object!
+  "Set `PreparedStatement` parameter at index `i` to `object` by calling `.setObject`, optionally with a
+  `target-sql-type` (which may be either the raw Java enum integer, e.g. `java.sql.Types/INTEGER`, or the keyword name
+  of it, e.g. `:integer`.)"
+  ([^PreparedStatement stmt ^Integer i object]
+   (log/tracef "(set-object! stmt %d ^%s %s)" i (some-> object class .getCanonicalName) (pr-str object))
+   (.setObject stmt i object))
+
+  ([^PreparedStatement stmt ^Integer i object target-sql-type]
+   (log/tracef "(set-object! stmt %d ^%s %s %s)" i
+               (some-> object class .getCanonicalName) (pr-str object)
+               (u/reverse-lookup types/type target-sql-type))
+   (.setObject stmt i object (types/type target-sql-type))))
+
+(m/defmulti set-parameter!
+  "Set `PreparedStatement` parameter at index `i` to `object`. Dispatches on `:connection/type`, if present, in
+  `options`; and by the class of `Object`. The default implementation calls `set-object!`."
+  {:arglists '([^PreparedStatement stmt ^Integer i object options])}
+  (fn [_ _ object options]
+    [(:connection/type options) (class object)]))
+
+(m/defmethod set-parameter! :default
+  [stmt i object options]
+  (set-object! stmt i object))
+
+(m/defmethod set-parameter! [:default LocalDate]
+  [stmt i t _]
+  (set-object! stmt i t :date))
+
+(m/defmethod set-parameter! [:default LocalTime]
+  [stmt i t _]
+  (set-object! stmt i t :time))
+
+(m/defmethod set-parameter! [:default LocalDateTime]
+  [stmt i t _]
+  (set-object! stmt i t :timestamp))
+
+(m/defmethod set-parameter! [:default OffsetTime]
+  [stmt i t _]
+  (set-object! stmt i t :time-with-timezone))
+
+(m/defmethod set-parameter! [:default OffsetDateTime]
+  [stmt i t _]
+  (set-object! stmt i t :timestamp-with-timezone))
+
+(m/defmethod set-parameter! [:default ZonedDateTime]
+  [stmt i t _]
+  (set-object! stmt i t :timestamp-with-timezone))
+
+(m/defmethod set-parameter! [:default Instant]
+  [driver stmt i t]
+  (set-parameter! driver stmt i (t/offset-date-time t (t/zone-offset 0))))
+
+(defn set-parameters!
+  "Set parameters for the prepared statement by calling `set-parameter!` for each parameter. Returns `stmt`."
+  ^PreparedStatement [stmt params options]
+  (dorun
+   (map-indexed
+    (fn [i param]
+      (log/tracef "Set param %d -> %s" (inc i) (pr-str param))
+      (set-parameter! stmt (inc i) param options))
+    params))
+  stmt)
+
+
+;;;; Proxy Prepared Statement
+
 (p.types/deftype+ ProxyPreparedStatement [^PreparedStatement stmt mta opts]
   pretty/PrettyPrintable
   (pretty [_]
@@ -78,10 +147,8 @@
   (^long executeLargeUpdate [_ ^String a] (.executeLargeUpdate stmt a))
 
   (^java.sql.ResultSet executeQuery
-   [_]
-   (-> (.executeQuery stmt)
-       (options/set-options! opts)
-       (rs/proxy-result-set opts)))
+   [this]
+   (rs/proxy-result-set (.executeQuery stmt) (assoc opts :_statement this)))
 
   ;; cannot actually be called on a `PreparedStatement`
   (^java.sql.ResultSet executeQuery [_ ^String a] (.executeQuery stmt a))
@@ -90,7 +157,11 @@
   (^int executeUpdate [_ ^String a ^ints b] (.executeUpdate stmt a b))
   (^int executeUpdate [_ ^String a] (.executeUpdate stmt a))
   (^int executeUpdate [_ ^String a ^int b] (.executeUpdate stmt a b))
-  (^java.sql.Connection getConnection [_] (.getConnection stmt))
+
+  (^java.sql.Connection getConnection [_]
+   (or (:_connection opts)
+       (.getConnection stmt)))
+
   (^int getFetchDirection [_] (.getFetchDirection stmt))
   (^int getFetchSize [_] (.getFetchSize stmt))
   (^java.sql.ResultSet getGeneratedKeys [_] (.getGeneratedKeys stmt))
@@ -181,72 +252,10 @@
   (^ProxyPreparedStatement [stmt options]
    (when stmt
      (if (instance? ProxyPreparedStatement stmt)
-       (options/with-options stmt (merge (options/options stmt) options))
-       (ProxyPreparedStatement. stmt nil options)))))
-
-(defn set-object!
-  "Set `PreparedStatement` parameter at index `i` to `object` by calling `.setObject`, optionally with a
-  `target-sql-type` (which may be either the raw Java enum integer, e.g. `java.sql.Types/INTEGER`, or the keyword name
-  of it, e.g. `:integer`.)"
-  ([^PreparedStatement stmt ^Integer i object]
-   (log/tracef "(set-object! stmt %d ^%s %s)" i (some-> object class .getCanonicalName) (pr-str object))
-   (.setObject stmt i object))
-
-  ([^PreparedStatement stmt ^Integer i object target-sql-type]
-   (log/tracef "(set-object! stmt %d ^%s %s %s)" i
-               (some-> object class .getCanonicalName) (pr-str object)
-               (u/reverse-lookup types/type target-sql-type))
-   (.setObject stmt i object (types/type target-sql-type))))
-
-(m/defmulti set-parameter!
-  "Set `PreparedStatement` parameter at index `i` to `object`. Dispatches on `:connection/type`, if present, in
-  `options`; and by the class of `Object`. The default implementation calls `set-object!`."
-  {:arglists '([^PreparedStatement stmt ^Integer i object options])}
-  (fn [_ _ object options]
-    [(:connection/type options) (class object)]))
-
-(m/defmethod set-parameter! :default
-  [stmt i object options]
-  (set-object! stmt i object))
-
-(m/defmethod set-parameter! [:default LocalDate]
-  [stmt i t _]
-  (set-object! stmt i t :date))
-
-(m/defmethod set-parameter! [:default LocalTime]
-  [stmt i t _]
-  (set-object! stmt i t :time))
-
-(m/defmethod set-parameter! [:default LocalDateTime]
-  [stmt i t _]
-  (set-object! stmt i t :timestamp))
-
-(m/defmethod set-parameter! [:default OffsetTime]
-  [stmt i t _]
-  (set-object! stmt i t :time-with-timezone))
-
-(m/defmethod set-parameter! [:default OffsetDateTime]
-  [stmt i t _]
-  (set-object! stmt i t :timestamp-with-timezone))
-
-(m/defmethod set-parameter! [:default ZonedDateTime]
-  [stmt i t _]
-  (set-object! stmt i t :timestamp-with-timezone))
-
-(m/defmethod set-parameter! [:default Instant]
-  [driver stmt i t]
-  (set-parameter! driver stmt i (t/offset-date-time t (t/zone-offset 0))))
-
-(defn set-parameters!
-  "Set parameters for the prepared statement by calling `set-parameter!` for each parameter. Returns `stmt`."
-  ^PreparedStatement [stmt params options]
-  (dorun
-   (map-indexed
-    (fn [i param]
-      (log/tracef "Set param %d -> %s" (inc i) (pr-str param))
-      (set-parameter! stmt (inc i) param options))
-    params))
-  stmt)
+       (options/with-applied-options stmt options)
+       (do
+         (options/set-options! stmt options)
+         (ProxyPreparedStatement. stmt nil options))))))
 
 (p.types/defprotocol+ CreatePreparedStatement
   "Protocol for anything that can be used to create a `PreparedStatement` in combination with a `Connection`."
@@ -269,18 +278,17 @@
   ;; plain SQL string
   String
   (prepare!* [s ^Connection conn {rs-type     :result-set/type
-                                              concurrency :result-set/concurrency
-                                              holdability :result-set/holdability
-                                              :or         {rs-type     :forward-only
-                                                           concurrency :read-only
-                                                           holdability (.getHoldability conn)}
-                                              :as         options}]
+                                  concurrency :result-set/concurrency
+                                  holdability :result-set/holdability
+                                  :or         {rs-type     :forward-only
+                                               concurrency :read-only
+                                               holdability (.getHoldability conn)}
+                                  :as         options}]
     (let [stmt (.prepareStatement conn
                                   s
                                   (rs/type rs-type)
                                   (rs/concurrency concurrency)
                                   (rs/holdability holdability))]
-      (options/set-options! stmt options)
       (proxy-prepared-statement stmt options)))
 
   ;; [sql & args] or [honeysql & args] vector
@@ -348,5 +356,4 @@
 (m/defmethod options/set-option! [Statement :statement/max-rows]
   [^Statement stmt _ ^Integer max-rows]
   (when max-rows
-    (log/tracef "Set Statement max rows -> %d" max-rows)
     (.setMaxRows stmt max-rows)))
