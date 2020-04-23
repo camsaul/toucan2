@@ -55,8 +55,12 @@ hundreds if not thousands of hours working with it as part of [Metabase](https:/
 Sean Corfield's successor library, [`next.jdbc`](https://github.com/seancorfield/next-jdbc), [fixes some of the
 shortcomings of `clojure.java.jdbc` and makes some big improvements](https://corfield.org/blog/2019/07/04/next-jdbc/).
 
-Blue JDBC shares a similar role as `next.jdbc` as a successor to `clojure.java.jdbc`, but features like HoneySQL integration,
-out-of-the-box `java.time` support, and support for different database engines make it better-suited to some use cases.
+Blue JDBC shares a similar role as `next.jdbc` as a successor to `clojure.java.jdbc`, but with slightly different aims:
+
+*  Blue JDBC aims to be REPL-friendly and "batteries included". Feature like being able to use HoneySQL anywhere you
+   can use SQL and out-of-the-box support for `java.time`, currency types, Postgres JSON columns, and more mean the
+   low-level boilerplate is part of the library and not your part of your project.
+*  Blue JDBC aims to be more flexible and customizable and is fully database-aware
 
 ### Development & Tests
 

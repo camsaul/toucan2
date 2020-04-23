@@ -111,6 +111,3 @@
   [url]
   (alter-var-root #'env/env assoc :jdbc-url url)
   nil)
-
-;; NOCOMMIT
-#_(set-jdbc-url! "jdbc:postgresql://localhost:5432/test-data?user=cam&password=cam")
