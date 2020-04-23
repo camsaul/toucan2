@@ -23,7 +23,7 @@
   [[clojure.java-time "0.3.2"]
    [honeysql "0.9.10" :exclusions [org.clojure/clojurescript]]
    [metabase/second-date "1.0.0"]
-   [methodical "0.9.4-alpha"]
+   [methodical "0.10.0-alpha"]
    [org.clojure/tools.logging "1.0.0"]
    [potemkin "0.4.5"]
    [pretty "1.0.4"]]
@@ -66,7 +66,7 @@
 
    ;; this is mostly for the benefit of fetching/caching deps on CI -- a single profile with *all* deps
    :deps
-   [:dev :jdbc-drivers]
+   [:dev :jdbc-drivers :cloverage]
 
    :test
    {}
@@ -75,7 +75,7 @@
    {:dependencies
     ;; Required by both Potemkin and Cloverage, but Potemkin uses an older version that breaks Cloverage's ablity to
     ;; understand certain forms. Explicitly specify newer version here.
-    [[riddley "0.1.14"]]
+    [[riddley "0.2.0"]]
 
     :plugins
     [[lein-cloverage "1.1.2"]]
@@ -108,8 +108,7 @@
     {:exclude [#"test"]}}
 
    :bikeshed
-   {:plugins
-    [[lein-bikeshed "0.5.2"]]
+   {:plugins  [[lein-bikeshed "0.5.2"]]
     :bikeshed {:max-line-length 160}}
 
    :yagni
