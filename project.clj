@@ -9,6 +9,7 @@
   {"deps"                      ["with-profile" "+deps" "deps"]
    "deploy"                    ["with-profile" "+deploy" "deploy"]
    "test"                      ["with-profile" "+test" "test"]
+   "repl"                      ["with-profile" "+repl" "repl"]
    "bikeshed"                  ["with-profile" "+bikeshed" "bikeshed" "--max-line-length" "180"]
    "check-namespace-decls"     ["with-profile" "+check-namespace-decls" "check-namespace-decls"]
    "cloverage"                 ["with-profile" "+cloverage" "cloverage"]
@@ -63,6 +64,11 @@
 
      :global-vars
      {*warn-on-reflection* true}}]
+
+   ;; for local dev anything in ./local/src is added to the classpath. Entire dir is git-ignored. So you can store
+   ;; local JDBC URLs for testing there
+   :repl
+   {:source-paths ["local/src"]}
 
    ;; this is mostly for the benefit of fetching/caching deps on CI -- a single profile with *all* deps
    :deps
