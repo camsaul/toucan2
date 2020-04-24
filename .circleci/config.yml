@@ -277,15 +277,10 @@ workflows:
           lein-command: bikeshed
 
       - lein:
-          name: yagni
-          requires:
-            - deps
-          lein-command: yagni
-
-      - lein:
           name: cloverage
           requires:
             - deps
+          e: postgres-latest
           lein-command: cloverage --codecov
           after-steps:
             - run:
@@ -302,7 +297,6 @@ workflows:
             - docstring-checker
             - eastwood
             - namespace-decls
-            - yagni
             - cloverage
             - reflection-warnings
             - postgres-9-6

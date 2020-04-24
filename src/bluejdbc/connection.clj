@@ -79,7 +79,7 @@
 
   (^java.sql.PreparedStatement prepareStatement
    [this ^String sql]
-   (-> (stmt/proxy-prepared-statement (.prepareStatement conn sql) (assoc opts :_connection this))))
+   (stmt/proxy-prepared-statement (.prepareStatement conn sql) (assoc opts :_connection this)))
 
   (^java.sql.PreparedStatement prepareStatement
    [this ^String sql ^"[Ljava.lang.String;" column-names]
