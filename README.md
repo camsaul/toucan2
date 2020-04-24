@@ -82,3 +82,10 @@ JDBC_URL='jdbc:postgresql://localhost:5432/bluejdbc_test?user=cam&password=cam' 
 ```
 
 Blue JDBC will automatically do the right thing based on the protocol.
+
+## License
+
+Code, documentation, and artwork copyright © 2020 [Cam Saul](https://camsaul.com).
+
+Distributed under the [Eclipse Public License](https://raw.githubusercontent.com/camsaul/bluejdbc/master/LICENSE),
+same as Clojure.
