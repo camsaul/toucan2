@@ -16,9 +16,8 @@
    "eastwood"                  ["with-profile" "+eastwood" "eastwood"]
    "check-reflection-warnings" ["with-profile" "+reflection-warnings" "check"]
    "docstring-checker"         ["with-profile" "+docstring-checker" "docstring-checker"]
-   "yagni"                     ["with-profile" "+yagni" "yagni"]
    ;; `lein lint` will run all linters
-   "lint"                      ["do" ["eastwood"] ["bikeshed"] ["yagni"] ["check-namespace-decls"] ["docstring-checker"] ["cloverage"]]}
+   "lint"                      ["do" ["eastwood"] ["bikeshed"] ["check-namespace-decls"] ["docstring-checker"] ["cloverage"]]}
 
   :dependencies
   [[clojure.java-time "0.3.2"]
@@ -90,7 +89,7 @@
     :source-paths ^:replace ["src"]
 
     :cloverage
-    {:fail-threshold 30}}
+    {:fail-threshold 45}}
 
    :eastwood
    {:plugins
@@ -116,10 +115,6 @@
    :bikeshed
    {:plugins  [[lein-bikeshed "0.5.2"]]
     :bikeshed {:max-line-length 160}}
-
-   :yagni
-   {:plugins
-    [[venantius/yagni "0.1.7"]]}
 
    :check-namespace-decls
    {:plugins               [[lein-check-namespace-decls "1.0.2"]]
