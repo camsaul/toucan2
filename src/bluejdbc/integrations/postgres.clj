@@ -36,7 +36,6 @@
       (try
         (parent-thunk)
         (catch Throwable _
-          (println "_:" _) ; NOCOMMIT
           (let [s (.getString rs i)]
             (log/tracef "Error reading Postgres TIME value, fetching as string '%s'" s)
             (second-date/parse s)))))))
