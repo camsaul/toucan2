@@ -22,7 +22,7 @@
   (options [_]
            opts)
 
-  (with-options [_ new-options]
+  (with-options* [_ new-options]
     (ProxyConnection. conn mta new-options))
 
   clojure.lang.IObj
@@ -77,7 +77,7 @@
   (^ProxyConnection [conn options]
    (when conn
      (if (instance? ProxyConnection conn)
-       (options/with-applied-options conn options)
+       (options/with-options conn options)
        (do
          (options/set-options! conn options)
          (ProxyConnection. conn nil options))))))

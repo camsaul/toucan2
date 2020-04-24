@@ -93,7 +93,7 @@
     :source-paths ^:replace ["src"]
 
     :cloverage
-    {:fail-threshold 45}}
+    {:fail-threshold 50}}
 
    :eastwood
    {:plugins
@@ -128,7 +128,8 @@
 
    ;; run `lein check-reflection-warnings` to check for reflection warnings
    :reflection-warnings
-   {:global-vars {*warn-on-reflection* true}}
+   {:global-vars  {*warn-on-reflection* true}
+    :source-paths ^:replace ["src" "test"]}
 
    :deploy
    {:dependencies [[org.clojure/clojure "1.10.1"]]}}
