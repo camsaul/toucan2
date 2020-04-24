@@ -104,3 +104,13 @@
       (set-options! x new-options)
       (cond-> (with-options x (merge (options x) new-options))
         (meta x) (with-meta (meta x))))))
+
+(defn available-options
+  "Returns a set of all options that can be set on a JDBC object of class `klass`.
+
+    (available-options java.sql.Connection) ; -> #{:connection/schema ...}"
+  [klass]
+  (into #{} (for [[dispatch-value] (m/primary-methods set-option!)
+                  :when            (and (sequential? dispatch-value)
+                                        (isa? klass (first dispatch-value)))]
+              (second dispatch-value))))

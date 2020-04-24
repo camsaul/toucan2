@@ -201,56 +201,54 @@ workflows:
           e: postgres-latest
           lein-command: test
 
-      - lein:
-          name: h2
-          requires:
-            - deps
-          e: h2
-          lein-command: test
+      # - lein:
+      #     name: h2
+      #     requires:
+      #       - deps
+      #     e: h2
+      #     lein-command: test
 
-      - lein:
-          name: h2-java-11
-          requires:
-            - deps
-          e: java-11
-          lein-command: test
+      # - lein:
+      #     name: h2-java-11
+      #     requires:
+      #       - deps
+      #     e: java-11
+      #     lein-command: test
 
-      - lein:
-          name: mysql-5-7
-          requires:
-            - deps
-          e: mysql-5-7
-          lein-command: test
+      # - lein:
+      #     name: mysql-5-7
+      #     requires:
+      #       - deps
+      #     e: mysql-5-7
+      #     lein-command: test
 
-      - lein:
-          name: mysql-latest
-          requires:
-            - deps
-          e: mysql-latest
-          lein-command: test
+      # - lein:
+      #     name: mysql-latest
+      #     requires:
+      #       - deps
+      #     e: mysql-latest
+      #     lein-command: test
 
-      - lein:
-          name: mariadb-10-2
-          requires:
-            - deps
-          e: mariadb-10-2
-          lein-command: test
+      # - lein:
+      #     name: mariadb-10-2
+      #     requires:
+      #       - deps
+      #     e: mariadb-10-2
+      #     lein-command: test
 
-      - lein:
-          name: mariadb-latest
-          requires:
-            - deps
-          e: mariadb-latest
-          lein-command: test
+      # - lein:
+      #     name: mariadb-latest
+      #     requires:
+      #       - deps
+      #     e: mariadb-latest
+      #     lein-command: test
 
-      - lein:
-          name: sqlserver-2017
-          requires:
-            - deps
-          e: sqlserver-2017
-          lein-command: test
-
-      # TODO -- SQLite, Apache Derby, etc.
+      # - lein:
+      #     name: sqlserver-2017
+      #     requires:
+      #       - deps
+      #     e: sqlserver-2017
+      #     lein-command: test
 
       - lein:
           name: eastwood
@@ -301,13 +299,13 @@ workflows:
             - reflection-warnings
             - postgres-9-6
             - postgres-latest
-            - h2
-            - h2-java-11
-            - mysql-5-7
-            - mysql-latest
-            - mariadb-10-2
-            - mariadb-latest
-            - sqlserver-2017
+            # - h2
+            # - h2-java-11
+            # - mysql-5-7
+            # - mysql-latest
+            # - mariadb-10-2
+            # - mariadb-latest
+            # - sqlserver-2017
           lein-command: deploy clojars
           filters:
             branches:

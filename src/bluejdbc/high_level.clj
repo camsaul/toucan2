@@ -1,7 +1,8 @@
-(ns bluejdbc.query
+(ns bluejdbc.high-level
   "Higher-level functions."
   (:require [bluejdbc.connection :as conn]
             [bluejdbc.statement :as stmt]
+            [clojure.tools.logging :as log]
             [pretty.core :as pretty])
   (:import java.sql.PreparedStatement))
 
@@ -108,3 +109,48 @@
                               (when (seq columns)
                                 {:columns columns}))]
      (execute! connectable honeysql-form options))))
+
+(defn do-transaction
+  "Impl for `transaction` macro."
+  [connectable f]
+  (conn/with-connection [conn connectable]
+    (log/trace "Begin transaction")
+    (let [orig-auto-commit (.getAutoCommit conn)]
+      ;; use two `try` blocks here so if `.setSavepoint` throws an Exception the original value of auto-commit is
+      ;; restored
+      (try
+        (.setAutoCommit conn false)
+        (let [savepoint (.setSavepoint conn)]
+          (try
+            (f conn)
+            (log/trace "Commit transaction")
+            (.commit conn)
+            (catch Throwable e
+              (log/trace "Rolling back transaction")
+              (.rollback conn savepoint)
+              (throw e))))
+        (finally
+          (.setAutoCommit conn orig-auto-commit))))))
+
+(defmacro transaction
+  "Execute `body` inside a JDBC transaction. Transaction is committed if body completes successfully; if body throws an
+  Exception, transaction is aborted.
+
+  `transaction` can be used with anything connectable, and binding the resulting connection is optional:
+
+    ;; option 1
+    (transaction [conn my-datasource]
+      ...)
+
+    ;; option 2
+    (jdbc/with-connection [conn my-datasource]
+      (transaction conn
+        ...))"
+  {:style/indent 1, :arglists '([connectable & body] [[conn-binding connectable] & body])}
+  [arg & body]
+  (if (and (sequential? arg)
+           (symbol? (first arg)))
+    (let [[conn-binding connectable] arg]
+      `(do-transaction ~connectable (fn [~conn-binding] ~@body)))
+    (let [connectable arg]
+      `(do-transaction ~connectable (fn [_conn#] ~@body)))))
