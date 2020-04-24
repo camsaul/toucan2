@@ -40,17 +40,17 @@
           (doseq [[description {:keys [xform expected]}]
                   {"none (vectors)"
                    {:xform    nil
-                    :expected [[1 "Cam" (t/local-date-time "2020-04-21T16:56")]
-                               [2 "Sam" (t/local-date-time "2019-01-11T15:56")]]}
+                    :expected [[1 "Cam" (t/local-date-time "2020-04-21T23:56")]
+                               [2 "Sam" (t/local-date-time "2019-01-11T23:56")]]}
 
                    "namespaced maps"
                    {:xform    rs/namespaced-maps-xform
                     :expected [{:people/id         1
                                 :people/name       "Cam"
-                                :people/created_at (t/local-date-time "2020-04-21T16:56")}
+                                :people/created_at (t/local-date-time "2020-04-21T23:56")}
                                {:people/id         2
                                 :people/name       "Sam"
-                                :people/created_at (t/local-date-time "2019-01-11T15:56" )}]}}]
+                                :people/created_at (t/local-date-time "2019-01-11T23:56" )}]}}]
             (testing description
               (is (= expected
                      (transduce (take 2) conj [] (stmt/results stmt {:results/xform xform}))))

@@ -33,8 +33,8 @@
     (let [[method-name arglist] form]
       (is (= {:tag 'java.sql.PreparedStatement}
              (meta method-name)))
-      (is (= [nil {:tag 'java.lang.String} {:tag 'int} {:tag 'int} {:tag 'int}]
-             (map meta arglist))))))
+      (is (= [nil 'java.lang.String 'int 'int 'int]
+             (map (comp :tag meta) arglist))))))
 
 (deftest proxy-class-methods-test
   (is (= '((method1 [_ a b] (.method1 obj a b))

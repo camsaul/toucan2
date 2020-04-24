@@ -54,6 +54,10 @@
      :repl-options
      {:init-ns bluejdbc.core}
 
+     ;; this is mostly so tests don't change answers between my local machine (on Pacific time) and CI (UTC)
+     :jvm-opts
+     ["-Duser.timezone=UTC"]
+
      :source-paths ["dev/src"]
 
      :injections
@@ -103,7 +107,8 @@
       :unused-locals]
 
      :exclude-linters
-     [:deprecations]}}
+     [:deprecations
+      :implicit-dependencies]}}
 
    :docstring-checker
    {:plugins
