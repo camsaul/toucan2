@@ -1,6 +1,5 @@
 (ns bluejdbc.options
-  (:require [bluejdbc.options :as options]
-            [clojure.data :as data]
+  (:require [clojure.data :as data]
             [clojure.tools.logging :as log]
             [methodical.core :as m]
             [potemkin.types :as p.types]))
@@ -103,5 +102,5 @@
     x
     (do
       (set-options! x new-options)
-      (cond-> (with-options x (merge (options/options x) new-options))
+      (cond-> (with-options x (merge (options x) new-options))
         (meta x) (with-meta (meta x))))))

@@ -31,13 +31,14 @@
 ;; JDBC driver where it can't parse those correctly. We can do it ourselves in that case.
 (m/defmethod rs/read-column-thunk [:postgresql :type/time]
   [^ResultSet rs rsmeta ^Integer i options]
-  (let [parent-thunk ((get-method rs/read-column-thunk [:default :time]) rs rsmeta i options)]
+  (let [parent-thunk (next-method rs rsmeta i options)]
     (fn []
       (try
         (parent-thunk)
         (catch Throwable _
+          (println "_:" _) ; NOCOMMIT
           (let [s (.getString rs i)]
-            (log/tracef "Error in Postgres JDBC driver reading TIME value, fetching as string '%s'" s)
+            (log/tracef "Error reading Postgres TIME value, fetching as string '%s'" s)
             (second-date/parse s)))))))
 
 ;; The postgres JDBC driver cannot properly read MONEY columns — see https://github.com/pgjdbc/pgjdbc/issues/425. Work

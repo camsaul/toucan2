@@ -32,7 +32,9 @@
 
 (deftest honeysql-options-test
   (testing "Make sure HoneySQL options are applied"
-    (let [options {:honeysql/quoting             :ansi
+    (let [options {:honeysql/quoting             (case (test/db-type)
+                                                   (:mysql :mariadb) :mysql
+                                                   :ansi)
                    :honeysql/allow-dashed-names? true}]
       (with-open [conn (jdbc/connect! (test/jdbc-url) options)
                   stmt (jdbc/prepare! conn
