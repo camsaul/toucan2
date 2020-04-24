@@ -116,6 +116,11 @@
   (mapv (comp keyword #(str/replace % #"_" "-") u/qualified-name)
         names))
 
+(m/defmethod transform-column-names :snake-case
+  [_ names]
+  (mapv (comp keyword #(str/replace % #"-" "_") u/qualified-name)
+        names))
+
 (defn column-names-with-options
   "Implementations of the `maps` `ResultSet` transform. Fetch a sequence column names from `ResultSet` `rs` and apply
   transforms in `options-set`. `options-set` can include any method of `transform-column-names`.
@@ -164,8 +169,8 @@
     (jdbc/query conn \"SELECT * FROM user\" {:results/xform (maps :namespaced)})
     ;; -> [{:user/id 1, :user/name \"Cam\"} ...]
 
-  Current options included `:namespaced`, `:lisp-case`, `:lower-case`, and `:upper-case`. You can add more options by
-  adding implementations for `bluejdbc.result-set/transform-column-names`."
+  Current options include `:namespaced`, `:lisp-case`, `:snake-case`, `:lower-case`, and `:upper-case`. You can add
+  more options by adding implementations for `bluejdbc.result-set/transform-column-names`."
   (maps* nil))
 
 
