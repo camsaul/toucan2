@@ -117,7 +117,8 @@
       java.sql.Connection
       (prepareStatement [_] (.prepareStatement conn))
       ...)"
-  {:style/indent 3}
+  ;; TODO -- not sure if right
+  {:style/indent '(3 nil nil (:defn))}
   [class-name interface [proxied-obj-field & other-fields] & body]
   {:pre [(symbol? class-name) (symbol? interface) (symbol? proxied-obj-field) (every? symbol? other-fields)]}
   (let [resolved-interface     (resolve interface)

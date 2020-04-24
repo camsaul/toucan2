@@ -4,7 +4,7 @@
             [clojure.tools.logging :as log]
             [clojure.tools.logging.impl :as log.impl]
             [environ.core :as env])
-  (:import [java.util.concurrent Executors ExecutorService ThreadFactory]))
+  (:import [java.util.concurrent Executors ThreadFactory]))
 
 (defonce ^:private log-executor
   (delay
@@ -16,7 +16,8 @@
              (.setDaemon true))))))))
 
 (defn- log! [message]
-  (.submit ^ExecutorService @log-executor ^Runnable (fn [] (println message)))
+  (locking println (println message))
+  #_(.submit ^ExecutorService @log-executor ^Runnable (fn [] (println message)))
   nil)
 
 (defn- logger [namespac]

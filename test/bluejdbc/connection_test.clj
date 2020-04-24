@@ -25,6 +25,12 @@
         (testing "the ProxyPreparedStatment should be able to return its parent ProxyConnection"
           (is (identical? conn (.getConnection stmt))))))))
 
+(deftest proxy-database-metadata-test
+  (testing "ProxyConnection.getMetaData should return a ProxyDatabaseMetaData"
+    (with-open [conn (jdbc/connect! (test/jdbc-url))]
+      (is (= "bluejdbc.metadata.ProxyDatabaseMetaData"
+             (some-> (.getMetaData conn) class .getCanonicalName))))))
+
 (p.types/defrecord+ ^:private MockConnection []
   java.sql.Connection
 

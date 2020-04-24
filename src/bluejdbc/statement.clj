@@ -114,7 +114,7 @@
   PreparedStatement
   (^java.sql.ResultSet executeQuery
    [this]
-   (rs/proxy-result-set (.executeQuery stmt) (assoc opts :_statement this)))
+   (rs/reducible-result-set (.executeQuery stmt) (assoc opts :_statement this)))
 
   (^java.sql.Connection getConnection [_]
    (or (:_connection opts)
@@ -122,16 +122,8 @@
 
 (defn proxy-prepared-statement
   "Wrap `PreparedStatement` in a `ProxyPreparedStatment`, if it is not already wrapped."
-  (^ProxyPreparedStatement [stmt]
-   (proxy-prepared-statement stmt nil))
-
-  (^ProxyPreparedStatement [stmt options]
-   (when stmt
-     (if (instance? ProxyPreparedStatement stmt)
-       (options/with-options stmt options)
-       (do
-         (options/set-options! stmt options)
-         (ProxyPreparedStatement. stmt nil options))))))
+  (^ProxyPreparedStatement [stmt & [options]]
+   (u/proxy-wrap ProxyPreparedStatement ->ProxyPreparedStatement stmt options)))
 
 (p.types/defprotocol+ CreatePreparedStatement
   "Protocol for anything that can be used to create a `PreparedStatement` in combination with a `Connection`."
