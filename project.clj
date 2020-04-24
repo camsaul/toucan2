@@ -1,4 +1,4 @@
-(defproject bluejdbc "1.0.0-SNAPSHOT"
+(defproject bluejdbc "0.1.0-alpha-SNAPSHOT"
   :url "https://github.com/camsaul/bluejdbc"
   :min-lein-version "2.5.0"
 
