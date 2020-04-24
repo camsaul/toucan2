@@ -9,8 +9,9 @@
   (options [this]
     "Get Blue JDBC options map associated with an instance of a Blue JDBC proxy class.")
 
-  (with-options [this new-options]
-    "Replace the Blue JDBC options map for an instance of a Blue JDBC proxy class."))
+  (with-options* [this new-options]
+    "Return a copy of `this` with the options map changed to `new-options`. Low-level method; prefer `with-options`,
+    which merges the existing options and applies them to the underlying JDBC object."))
 
 (extend-protocol Options
   Object
@@ -93,16 +94,15 @@
          jdbc-object
          changes)))))
 
-;; TODO -- maybe rename this to `with-options` and `with-options` to `with-options*`?
-(defn with-applied-options
-  "Changes options of `x` by merging in `new-options` and calls `set-options!` to apply them. If `new-options` are identical to
-  existing options, this function is a no-op."
+(defn with-options
+  "Changes options of `x` by merging in `new-options` and calls `set-options!` to apply them. If `new-options` are
+  identical to existing options, this function is a no-op."
   [x new-options]
   (if (= (options x) new-options)
     x
     (do
       (set-options! x new-options)
-      (cond-> (with-options x (merge (options x) new-options))
+      (cond-> (with-options* x (merge (options x) new-options))
         (meta x) (with-meta (meta x))))))
 
 (defn available-options

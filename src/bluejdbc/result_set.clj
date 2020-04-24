@@ -184,7 +184,7 @@
   (options [_]
     opts)
 
-  (with-options [_ new-options]
+  (with-options* [_ new-options]
     (ProxyResultSet. rs mta new-options))
 
   clojure.lang.IObj
@@ -218,7 +218,7 @@
 
   (^ProxyResultSet [rs options]
    (if (instance? ProxyResultSet rs)
-     (options/with-applied-options rs options)
+     (options/with-options rs options)
      (do
        (options/set-options! rs options)
        (ProxyResultSet. rs nil options)))))

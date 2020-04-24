@@ -3,13 +3,21 @@
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [clojure.tools.logging.impl :as log.impl]
-            [environ.core :as env]))
+            [environ.core :as env])
+  (:import [java.util.concurrent Executors ExecutorService ThreadFactory]))
 
-(def ^:private log-agent
-  (agent nil))
+(defonce ^:private log-executor
+  (delay
+    (let [counter (atom -1)]
+      (Executors/newSingleThreadExecutor
+       (reify ThreadFactory
+         (newThread [_ runnable]
+           (doto (Thread. runnable (str "log-thread-" (swap! counter inc)))
+             (.setDaemon true))))))))
 
 (defn- log! [message]
-  (send log-agent (fn [_ msg] (println msg)) message))
+  (.submit ^ExecutorService @log-executor ^Runnable (fn [] (println message)))
+  nil)
 
 (defn- logger [namespac]
   (reify log.impl/Logger

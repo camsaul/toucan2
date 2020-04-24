@@ -91,7 +91,7 @@
   (options [_]
     opts)
 
-  (with-options [_ new-options]
+  (with-options* [_ new-options]
     (ProxyPreparedStatement. stmt mta new-options))
 
   clojure.lang.IObj
@@ -128,7 +128,7 @@
   (^ProxyPreparedStatement [stmt options]
    (when stmt
      (if (instance? ProxyPreparedStatement stmt)
-       (options/with-applied-options stmt options)
+       (options/with-options stmt options)
        (do
          (options/set-options! stmt options)
          (ProxyPreparedStatement. stmt nil options))))))
