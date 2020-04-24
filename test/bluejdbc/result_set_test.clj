@@ -95,6 +95,10 @@
           (is (= #{:AbC-dEF :ghi-JKL}
                  (column-names {:results/xform (jdbc/maps :lisp-case)}))))
 
+        (testing "snake-cased identifiers"
+          (is (= #{:AbC_dEF :ghi_JKL}
+                 (column-names {:results/xform (jdbc/maps :snake-case)}))))
+
         (testing "lower lisp-cased identifiers"
           (is (= #{:abc-def :ghi-jkl}
                  (column-names {:results/xform (jdbc/maps :lower-case :lisp-case)}))))
