@@ -17,16 +17,8 @@
   []
   (keyword (second (re-find #"^jdbc:([^:]+):" (jdbc-url)))))
 
-(def ^:dynamic *db-type* nil)
-
-(defn do-only [dbs thunk]
-  (let [db-type (db-type)]
-    (doseq [db (if (keyword? dbs)
-                 [dbs]
-                 (set dbs))]
-      (when (= db db-type)
-        (binding [*db-type* db]
-          (thunk))))))
+(defn as-set [dbs]
+  (if (keyword? dbs) #{dbs} (set dbs)))
 
 (defmacro only
   "Only run `body` against DBs if we are currently testing against them.
@@ -38,7 +30,15 @@
       ...)"
   {:style/indent 1}
   [dbs & body]
-  `(do-only ~dbs (fn [] ~@body)))
+  `(when (contains? (as-set ~dbs) (db-type))
+     ~@body))
+
+(defmacro exclude
+  "Execute `body` for all DBs except `dbs`."
+  {:style/indent 1}
+  [dbs & body]
+  `(when-not (contains? (as-set ~dbs) (db-type))
+     ~@body))
 
 (defn do-with-test-data [conn thunk]
   (jdbc/with-connection [conn conn]

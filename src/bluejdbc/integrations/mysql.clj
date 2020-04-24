@@ -1,6 +1,5 @@
 (ns bluejdbc.integrations.mysql
-  (:require [bluejdbc.result-set :as rs]
-            [bluejdbc.statement :as stmt]
+  (:require [bluejdbc.statement :as stmt]
             [java-time :as t]
             [methodical.core :as m]))
 
@@ -15,11 +14,15 @@
 ;;
 ;; Check and see if the column type is `TIMESTAMP` (as opposed to `DATETIME`, which is the equivalent of
 ;; LocalDateTime), and normalize it to a UTC timestamp if so.
-(m/defmethod rs/read-column-thunk [:mysql :type/timestamp]
-  [^java.sql.ResultSet rs rsmeta ^Integer i options]
-  (println ".. rs getStatement getConnection):" (.. rs getStatement getConnection)) ; NOCOMMIT
-  (when-let [t (.getObject rs i java.time.LocalDateTime)]
-    t
-    #_(if (= (.getColumnTypeName rsmeta i) "TIMESTAMP")
-        (t/with-offset-same-instant (t/offset-date-time t (t/zone-id session-time-zone)) (t/zone-offset 0))
-        t)))
+;;
+;; TODO
+;;
+;; (m/defmethod rs/read-column-thunk [:mysql :type/timestamp]
+;;   [^java.sql.ResultSet rs rsmeta ^Integer i options]
+;;   (println ".. rs getStatement getConnection):" (.. rs getStatement getConnection .getServerTimezoneTZ)) ; NOCOMMIT
+;;   (fn []
+;;     (when-let [t (.getObject rs i java.time.LocalDateTime)]
+;;       t
+;;       #_(if (= (.getColumnTypeName rsmeta i) "TIMESTAMP")
+;;           (t/with-offset-same-instant (t/offset-date-time t (t/zone-id session-time-zone)) (t/zone-offset 0))
+;;           t))))

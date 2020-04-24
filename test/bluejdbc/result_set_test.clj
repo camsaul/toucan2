@@ -59,3 +59,35 @@
                 (is (= expected
                        (stmt/with-prepared-statement [stmt conn stmt {:results/xform xform}]
                          (transduce (take 2) conj [] (stmt/results stmt)))))))))))))
+
+(deftest time-columns-test
+  (is (= [(t/local-time "16:57:09")]
+         (jdbc/query-one (test/jdbc-url) ["SELECT CAST(? AS time)" (t/local-time "16:57:09")] {:results/xform nil}))))
+
+(deftest date-columns-test
+  (testing "Make sure fetching DATE columns works correctly"
+    (is (= [(t/local-date "2020-04-23")]
+           (jdbc/query-one (test/jdbc-url) ["SELECT CAST(? AS date)" (t/local-date "2020-04-23")] {:results/xform nil})))))
+
+(deftest datetime-columns-test
+  (testing "Make sure fetching DATETIME columns works correctly"
+    ;; Postgres doesn't have a DATETIME type
+    (test/exclude #{:postgresql}
+      (is (= [(t/local-date-time "2020-04-23T16:57:09")]
+             (jdbc/query-one (test/jdbc-url)
+                             ["SELECT CAST(? AS datetime)" (t/local-date-time "2020-04-23T16:57:09")]
+                             {:results/xform nil}))))))
+
+(deftest timestamp-columns-test
+  (testing "Make sure fetching TIMESTAMP (without time zone) columns works correctly"
+    (is (= [(t/local-date-time "2020-04-23T16:57:09")]
+           (jdbc/query-one (test/jdbc-url)
+                           [(case (test/db-type)
+                              :mysql "SELECT timestamp(?)"
+                              "SELECT CAST(? AS timestamp)")
+                            (t/local-date-time "2020-04-23T16:57:09")]
+                           {:results/xform nil})))))
+
+;; TODO -- timestamp with time zone
+
+;; TODO -- time with time zone (for DBs that support it)
