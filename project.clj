@@ -99,6 +99,8 @@
    {:plugins
     [[jonase/eastwood "0.3.11" :exclusions [org.clojure/clojure]]]
 
+    :source-paths ^:replace ["src" "test"]
+
     :eastwood
     {:config-files [".eastwood-config.clj"]
 

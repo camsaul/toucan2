@@ -1,5 +1,6 @@
 (ns bluejdbc.connection
   (:require [bluejdbc.driver :as driver]
+            [bluejdbc.metadata :as metadata]
             [bluejdbc.options :as options]
             [bluejdbc.result-set :as rs]
             [bluejdbc.statement :as stmt]
@@ -33,6 +34,9 @@
             (ProxyConnection. conn new-meta opts))
 
   Connection
+  (^java.sql.DatabaseMetaData getMetaData [this]
+   (metadata/proxy-database-metadata (.getMetaData conn) (assoc opts :_connection this)))
+
   (^java.sql.PreparedStatement prepareStatement
    [this ^String sql]
    (stmt/proxy-prepared-statement (.prepareStatement conn sql) (assoc opts :_connection this)))
@@ -71,16 +75,8 @@
 
 (defn proxy-connection
   "Wrap a `Connection` in a `ProxyConnection`, if not already wrapped."
-  (^ProxyConnection [conn]
-   (proxy-connection conn nil))
-
-  (^ProxyConnection [conn options]
-   (when conn
-     (if (instance? ProxyConnection conn)
-       (options/with-options conn options)
-       (do
-         (options/set-options! conn options)
-         (ProxyConnection. conn nil options))))))
+  ^ProxyConnection [conn & [options]]
+  (u/proxy-wrap ProxyConnection ->ProxyConnection conn options))
 
 (p.types/defprotocol+ CreateConnection
   "Protocol for anything that can used to create a new `Connection`."

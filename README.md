@@ -32,7 +32,7 @@ Blue JDBC is a new Clojure interface to JDBC with an an emphasis on ease-of-use,
                  :from      [:checkins]
                  :left-join [:venues [:= :checkins.venue_id :venues.id]]
                  :where     [:= :venues.id 25]}
-                {:results/xform jdbc/namespaced-maps-xform}
+                {:results/xform (jdbc/maps :namespaced)}
 ;; ->
 {:checkins/date      #object[java.time.LocalDate 0x60156e1b "2014-11-16"]
  :checkins/id        12

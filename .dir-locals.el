@@ -4,13 +4,14 @@
                             ;; Specify which arg is the docstring for certain macros
                             ;; (Add more as needed)
                             (put 's/defn 'clojure-doc-string-elt 2)
+                            (put 'm/defmulti 'clojure-doc-string-elt 2)
                             (put 'p.types/defprotocol+ 'clojure-doc-string-elt 2)
 
                             (define-clojure-indent
                               (p.types/defprotocol+ '(1 (:defn)))
                               (p.types/defrecord+ '(2 nil nil (:defn)))
                               (p.types/deftype+ '(2 nil nil (:defn)))
-                              (u/define-proxy-class '(2 nil nil (:defn)))
+                              (u/define-proxy-class '(3 nil nil (:defn)))
                               (insert! 1)
                               (transaction 2))))
                   ;; if you're using clj-refactor (highly recommended!), prefer prefix notation when cleaning the ns

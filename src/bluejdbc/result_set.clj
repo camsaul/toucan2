@@ -3,6 +3,7 @@
   (:require [bluejdbc.options :as options]
             [bluejdbc.types :as types]
             [bluejdbc.util :as u]
+            [clojure.string :as str]
             [clojure.tools.logging :as log]
             [methodical.core :as m]
             [pretty.core :as pretty])
@@ -80,13 +81,6 @@
 
 ;;;; row xforms
 
-(defn column-names
-  "Return a sequence of column names (as keywords) for the rows in a `ResultSet`."
-  [^ResultSet rs]
-  (let [rsmeta (.getMetaData rs)]
-    (vec (for [i (index-range rsmeta)]
-           (keyword (.getColumnLabel rsmeta i))))))
-
 (defn namespaced-column-names
   "Return a sequence of namespaced keyword column names for the rows in a `ResultSet`, e.g. `:table/column`."
   [^ResultSet rs]
@@ -94,28 +88,85 @@
     (vec (for [i (index-range rsmeta)]
            (keyword (.getTableName rsmeta i) (.getColumnLabel rsmeta i))))))
 
-(defn- maps-xform* [rs column-names]
-  (fn [rf]
-    (fn
-      ([]
-       (rf))
+(defn column-names
+  "Return a sequence of column names (as keywords) for the rows in a `ResultSet`."
+  [^ResultSet rs]
+  (let [rsmeta (.getMetaData rs)]
+    (vec (for [i (index-range rsmeta)]
+           (keyword (.getColumnLabel rsmeta i))))))
 
-      ([acc]
-       (rf acc))
+(m/defmulti transform-column-names
+  "Impl for the `maps` result set rows transform. See docstring for `maps` for more details."
+  {:arglists '([transform-name column-names])}
+  (fn [transform-name _]
+    (keyword transform-name)))
 
-      ([acc row]
-       (rf acc (zipmap column-names row))))))
+(m/defmethod transform-column-names :lower-case
+  [_ names]
+  (mapv (comp keyword str/lower-case u/qualified-name)
+        names))
 
-(defn maps-xform
-  "A `ResultSet` transform that returns rows as maps with unqualified keys e.g. `:column`. This is the default and is
-  applied if no other values of `:results/xform` are passed in options."
-  [rs]
-  (maps-xform* rs (column-names rs)))
+(m/defmethod transform-column-names :upper-case
+  [_ names]
+  (mapv (comp keyword str/upper-case u/qualified-name)
+        names))
 
-(defn namespaced-maps-xform
-  "A `ResultSet` transform that returns rows as maps with namespaced keys e.g.`:table/column`."
-  [rs]
-  (maps-xform* rs (namespaced-column-names rs)))
+(m/defmethod transform-column-names :lisp-case
+  [_ names]
+  (mapv (comp keyword #(str/replace % #"_" "-") u/qualified-name)
+        names))
+
+(defn column-names-with-options
+  "Implementations of the `maps` `ResultSet` transform. Fetch a sequence column names from `ResultSet` `rs` and apply
+  transforms in `options-set`. `options-set` can include any method of `transform-column-names`.
+
+    (column-names-with-options rs nil) ; -> [:col_1 :col_2]
+    (column-names-with-options rs #{:lisp-case}) ; -> [:col-1 :col-2]"
+  [rs options-set]
+  (let [names (if (contains? options-set :namespaced)
+                (namespaced-column-names rs)
+                (column-names rs))]
+    (reduce
+     (fn [names option]
+       (transform-column-names option names))
+     names
+     (disj options-set :namespaced))))
+
+(defn- maps-reducing-fn [rs options]
+  (let [column-names (column-names-with-options rs options)]
+    (fn [rf]
+      (fn
+        ([]
+         (rf))
+
+        ([acc]
+         (rf acc))
+
+        ([acc row]
+         (rf acc (zipmap column-names row)))))))
+
+(defn- maps*
+  [default-options]
+  (fn [x & more]
+    (if (instance? ResultSet x)
+      (let [rs x]
+        (maps-reducing-fn rs default-options))
+      (let [options (into (set default-options) (cons x more))]
+        (fn [rs]
+          (maps-reducing-fn rs options))))))
+
+(def ^{:arglists '([rs] [& options])} maps
+  "A `ResultSet` transform that returns rows as maps. By default, maps are unqualified keys, e.g. `:column`; this is the
+  default row transform used if no other values of `:results/xform` are passed in options.
+
+  `maps` can take one or more `options` that transform the keys used in the resulting maps:
+
+    (jdbc/query conn \"SELECT * FROM user\" {:results/xform (maps :namespaced)})
+    ;; -> [{:user/id 1, :user/name \"Cam\"} ...]
+
+  Current options included `:namespaced`, `:lisp-case`, `:lower-case`, and `:upper-case`. You can add more options by
+  adding implementations for `bluejdbc.result-set/transform-column-names`."
+  (maps* nil))
 
 
 ;;;; Reducing/seq-ing result sets
@@ -126,7 +177,7 @@
   ([rs rf init]
    (reduce-result-set rs (options/options rs) rf init))
 
-  ([rs {xform :results/xform, :or {xform maps-xform}} rf init]
+  ([rs {xform :results/xform, :or {xform maps}} rf init]
    (let [xform (if xform
                  (xform rs)
                  identity)
@@ -159,7 +210,7 @@
   ([rs]
    (result-set-seq rs (options/options rs)))
 
-  ([rs {xform :results/xform, :or {xform maps-xform}}]
+  ([rs {xform :results/xform, :or {xform maps}}]
    (let [xform        (if xform
                         (xform rs)
                         identity)
@@ -178,7 +229,7 @@
 (u/define-proxy-class ProxyResultSet ResultSet [rs mta opts]
   pretty/PrettyPrintable
   (pretty [_]
-    (list 'proxy-result-set rs opts))
+    (list 'reducible-result-set rs opts))
 
   options/Options
   (options [_]
@@ -211,14 +262,7 @@
    (or (:_statement opts)
        (.getStatement rs))))
 
-(defn proxy-result-set
+(defn reducible-result-set
   "Wrap `ResultSet` in a `ProxyResultSet`, if it is not already wrapped."
-  (^ProxyResultSet [rs]
-   (proxy-result-set rs nil))
-
-  (^ProxyResultSet [rs options]
-   (if (instance? ProxyResultSet rs)
-     (options/with-options rs options)
-     (do
-       (options/set-options! rs options)
-       (ProxyResultSet. rs nil options)))))
+  ^ProxyResultSet [rs & [options]]
+  (u/proxy-wrap ProxyResultSet ->ProxyResultSet rs options))

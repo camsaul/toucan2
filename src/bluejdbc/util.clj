@@ -1,5 +1,6 @@
 (ns bluejdbc.util
-  (:require [bluejdbc.util.macros.enum-map :as enum-map]
+  (:require [bluejdbc.options :as options]
+            [bluejdbc.util.macros.enum-map :as enum-map]
             [bluejdbc.util.macros.proxy-class :as proxy-class]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
@@ -42,3 +43,25 @@
     (binding [pprint/*print-right-margin* 120]
       (pprint/pprint x w))
     (str w)))
+
+(defn qualified-name
+  "Return `k` as a string, qualified by its namespace, if any (unlike `name`). Handles `nil` values gracefully as well
+  (also unlike `name`).
+
+     (u/qualified-name :type/FK) -> \"type/FK\""
+  [k]
+  (when (some? k)
+    (if-let [namespac (when (instance? clojure.lang.Named k)
+                        (namespace k))]
+      (str namespac "/" (name k))
+      (name k))))
+
+(defn proxy-wrap
+  "Wrap `object` in `proxy-class` if it is not already wrapped, and apply options."
+  [^Class proxy-class constructor-fn object options]
+  (when object
+    (if (instance? proxy-class object)
+      (options/with-options object options)
+      (do
+        (options/set-options! object options)
+        (constructor-fn object nil options)))))

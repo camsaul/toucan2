@@ -33,8 +33,8 @@
                  (vec rs2))))))))
 
 (deftest alternative-row-transforms-test
-  (testing "Should be able to return rows as"
-    (jdbc/with-connection [conn (test/jdbc-url)]
+  (jdbc/with-connection [conn (test/jdbc-url)]
+    (testing "Should be able to return rows as"
       (test/with-test-data conn
         (with-open [stmt (jdbc/prepare! conn "SELECT * FROM people ORDER BY id ASC;")]
           (doseq [[description {:keys [xform expected]}]
@@ -44,13 +44,22 @@
                                [2 "Sam" (t/local-date-time "2019-01-11T23:56")]]}
 
                    "namespaced maps"
-                   {:xform    rs/namespaced-maps-xform
+                   {:xform    (rs/maps :namespaced)
                     :expected [{:people/id         1
                                 :people/name       "Cam"
                                 :people/created_at (t/local-date-time "2020-04-21T23:56")}
                                {:people/id         2
                                 :people/name       "Sam"
-                                :people/created_at (t/local-date-time "2019-01-11T23:56" )}]}}]
+                                :people/created_at (t/local-date-time "2019-01-11T23:56" )}]}
+
+                   "namespaced lisp-case maps"
+                   {:xform    (rs/maps :namespaced :lisp-case)
+                    :expected [{:people/id         1
+                                :people/name       "Cam"
+                                :people/created-at (t/local-date-time "2020-04-21T23:56")}
+                               {:people/id         2
+                                :people/name       "Sam"
+                                :people/created-at (t/local-date-time "2019-01-11T23:56" )}]}}]
             (testing description
               (is (= expected
                      (transduce (take 2) conj [] (stmt/results stmt {:results/xform xform}))))
@@ -59,6 +68,40 @@
                 (is (= expected
                        (stmt/with-prepared-statement [stmt conn stmt {:results/xform xform}]
                          (transduce (take 2) conj [] (stmt/results stmt)))))))))))))
+
+(deftest transform-column-names-test
+  (jdbc/with-connection [conn (test/jdbc-url)]
+    (letfn [(column-names [options]
+              (set (keys (jdbc/query-one conn
+                                         {:select [[1 "AbC_dEF"] [2 "ghi-JKL"]]}
+                                         (merge {:honeysql/quoting (case (test/db-type)
+                                                                     (:mysql :mariadb) :mysql
+                                                                     :ansi)}
+                                                options)))))]
+      (testing "sanity check"
+        (is (= #{:AbC_dEF :ghi-JKL}
+               (column-names nil))))
+
+      (testing "Should be able to return"
+        (testing "lower-cased identifiers"
+          (is (= #{:abc_def :ghi-jkl}
+                 (column-names {:results/xform (jdbc/maps :lower-case)}))))
+
+        (testing "upper-cased identifiers"
+          (is (= #{:ABC_DEF :GHI-JKL}
+                 (column-names {:results/xform (jdbc/maps :upper-case)}))))
+
+        (testing "lisp-cased identifiers"
+          (is (= #{:AbC-dEF :ghi-JKL}
+                 (column-names {:results/xform (jdbc/maps :lisp-case)}))))
+
+        (testing "lower lisp-cased identifiers"
+          (is (= #{:abc-def :ghi-jkl}
+                 (column-names {:results/xform (jdbc/maps :lower-case :lisp-case)}))))
+
+        (testing "upper lisp-cased identifiers"
+          (is (= #{:ABC-DEF :GHI-JKL}
+                 (column-names {:results/xform (jdbc/maps :upper-case :lisp-case)}))))))))
 
 (deftest time-columns-test
   (is (= [(t/local-time "16:57:09")]
