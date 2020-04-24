@@ -44,7 +44,7 @@
   (jdbc/with-connection [conn conn]
     (try
       (jdbc/execute! conn "CREATE TABLE people (id INTEGER NOT NULL, name TEXT NOT NULL, created_at TIMESTAMP NOT NULL);")
-      (t/with-clock (t/mock-clock (t/instant "2020-04-21T16:56:00-07:00") (t/zone-id "America/Los_Angeles"))
+      (t/with-clock (t/mock-clock (t/instant (t/offset-date-time "2020-04-21T16:56:00.000-07:00")) (t/zone-id "America/Los_Angeles"))
         (jdbc/insert! conn :people [:id :name :created_at]
                       [[1 "Cam" (t/offset-date-time "2020-04-21T16:56:00.000-07:00")]
                        [2 "Sam" (t/offset-date-time "2019-01-11T15:56:00.000-08:00")]

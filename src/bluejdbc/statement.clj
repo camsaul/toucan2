@@ -82,7 +82,7 @@
 
 ;;;; Proxy Prepared Statement
 
-(p.types/deftype+ ProxyPreparedStatement [^PreparedStatement stmt mta opts]
+(u/define-proxy-class ProxyPreparedStatement PreparedStatement [stmt mta opts]
   pretty/PrettyPrintable
   (pretty [_]
     (list 'proxy-prepared-statement stmt opts))
@@ -111,138 +111,14 @@
     (with-open [rs (.executeQuery this)]
       (reduce rf [] rs)))
 
-  java.sql.Wrapper
-  (^boolean isWrapperFor [this ^Class interface]
-   (or (instance? interface this)
-       (.isWrapperFor stmt interface)))
-
-  (unwrap [this ^Class interface]
-    (if (instance? interface this)
-      this
-      (.unwrap stmt interface)))
-
   PreparedStatement
-  (^void addBatch [_] (.addBatch stmt))
-  (^void addBatch [_ ^String a] (.addBatch stmt a))
-  (^void cancel [_] (.cancel stmt))
-  (^void clearBatch [_] (.clearBatch stmt))
-  (^void clearParameters [_] (.clearParameters stmt))
-  (^void clearWarnings [_] (.clearWarnings stmt))
-  (^void close [_] (.close stmt))
-  (^void closeOnCompletion [_] (.closeOnCompletion stmt))
-  (^String enquoteIdentifier [_ ^String a ^boolean b] (.enquoteIdentifier stmt a b))
-  (^String enquoteLiteral [_ ^String a] (.enquoteLiteral stmt a))
-  (^String enquoteNCharLiteral [_ ^String a] (.enquoteNCharLiteral stmt a))
-  (^boolean execute [_] (.execute stmt))
-  (^boolean execute [_ ^String a ^int b] (.execute stmt a b))
-  (^boolean execute [_ ^String a ^ints b] (.execute stmt a b))
-  (^boolean execute [_ ^String a ^ "[Ljava.lang.String;" b] (.execute stmt a b))
-  (^boolean execute [_ ^String a] (.execute stmt a))
-  (^ints executeBatch [_] (.executeBatch stmt))
-  (^longs executeLargeBatch [_] (.executeLargeBatch stmt))
-  (^long executeLargeUpdate [_] (.executeLargeUpdate stmt))
-  (^long executeLargeUpdate [_ ^String a ^ "[Ljava.lang.String;" b] (.executeLargeUpdate stmt a b))
-  (^long executeLargeUpdate [_ ^String a ^ints b] (.executeLargeUpdate stmt a b))
-  (^long executeLargeUpdate [_ ^String a ^int b] (.executeLargeUpdate stmt a b))
-  (^long executeLargeUpdate [_ ^String a] (.executeLargeUpdate stmt a))
-
   (^java.sql.ResultSet executeQuery
    [this]
    (rs/proxy-result-set (.executeQuery stmt) (assoc opts :_statement this)))
 
-  ;; cannot actually be called on a `PreparedStatement`
-  (^java.sql.ResultSet executeQuery [_ ^String a] (.executeQuery stmt a))
-  (^int executeUpdate [_] (.executeUpdate stmt))
-  (^int executeUpdate [_ ^String a ^ "[Ljava.lang.String;" b] (.executeUpdate stmt a b))
-  (^int executeUpdate [_ ^String a ^ints b] (.executeUpdate stmt a b))
-  (^int executeUpdate [_ ^String a] (.executeUpdate stmt a))
-  (^int executeUpdate [_ ^String a ^int b] (.executeUpdate stmt a b))
-
   (^java.sql.Connection getConnection [_]
    (or (:_connection opts)
-       (.getConnection stmt)))
-
-  (^int getFetchDirection [_] (.getFetchDirection stmt))
-  (^int getFetchSize [_] (.getFetchSize stmt))
-  (^java.sql.ResultSet getGeneratedKeys [_] (.getGeneratedKeys stmt))
-  (^long getLargeMaxRows [_] (.getLargeMaxRows stmt))
-  (^long getLargeUpdateCount [_] (.getLargeUpdateCount stmt))
-  (^int getMaxFieldSize [_] (.getMaxFieldSize stmt))
-  (^int getMaxRows [_] (.getMaxRows stmt))
-  (^java.sql.ResultSetMetaData getMetaData [_] (.getMetaData stmt))
-  (^boolean getMoreResults [_] (.getMoreResults stmt))
-  (^boolean getMoreResults [_ ^int a] (.getMoreResults stmt a))
-  (^java.sql.ParameterMetaData getParameterMetaData [_] (.getParameterMetaData stmt))
-  (^int getQueryTimeout [_] (.getQueryTimeout stmt))
-  (^java.sql.ResultSet getResultSet [_] (.getResultSet stmt))
-  (^int getResultSetConcurrency [_] (.getResultSetConcurrency stmt))
-  (^int getResultSetHoldability [_] (.getResultSetHoldability stmt))
-  (^int getResultSetType [_] (.getResultSetType stmt))
-  (^int getUpdateCount [_] (.getUpdateCount stmt))
-  (^java.sql.SQLWarning getWarnings [_] (.getWarnings stmt))
-  (^boolean isCloseOnCompletion [_] (.isCloseOnCompletion stmt))
-  (^boolean isClosed [_] (.isClosed stmt))
-  (^boolean isPoolable [_] (.isPoolable stmt))
-  (^boolean isSimpleIdentifier [_ ^String a] (.isSimpleIdentifier stmt a))
-  (^void setArray [_ ^int a ^java.sql.Array b] (.setArray stmt a b))
-  (^void setAsciiStream [_ ^int a ^java.io.InputStream b] (.setAsciiStream stmt a b))
-  (^void setAsciiStream [_ ^int a ^java.io.InputStream b ^int c] (.setAsciiStream stmt a b c))
-  (^void setAsciiStream [_ ^int a ^java.io.InputStream b ^long c] (.setAsciiStream stmt a b c))
-  (^void setBigDecimal [_ ^int a ^java.math.BigDecimal b] (.setBigDecimal stmt a b))
-  (^void setBinaryStream [_ ^int a ^java.io.InputStream b ^long c] (.setBinaryStream stmt a b c))
-  (^void setBinaryStream [_ ^int a ^java.io.InputStream b] (.setBinaryStream stmt a b))
-  (^void setBinaryStream [_ ^int a ^java.io.InputStream b ^int c] (.setBinaryStream stmt a b c))
-  (^void setBlob [_ ^int a ^java.io.InputStream b ^long c] (.setBlob stmt a b c))
-  (^void setBlob [_ ^int a ^java.io.InputStream b] (.setBlob stmt a b))
-  (^void setBlob [_ ^int a ^java.sql.Blob b] (.setBlob stmt a b))
-  (^void setBoolean [_ ^int a ^boolean b] (.setBoolean stmt a b))
-  (^void setByte [_ ^int a ^byte b] (.setByte stmt a b))
-  (^void setBytes [_ ^int a ^bytes b] (.setBytes stmt a b))
-  (^void setCharacterStream [_ ^int a ^java.io.Reader b ^int c] (.setCharacterStream stmt a b c))
-  (^void setCharacterStream [_ ^int a ^java.io.Reader b ^long c] (.setCharacterStream stmt a b c))
-  (^void setCharacterStream [_ ^int a ^java.io.Reader b] (.setCharacterStream stmt a b))
-  (^void setClob [_ ^int a ^java.sql.Clob b] (.setClob stmt a b))
-  (^void setClob [_ ^int a ^java.io.Reader b] (.setClob stmt a b))
-  (^void setClob [_ ^int a ^java.io.Reader b ^long c] (.setClob stmt a b c))
-  (^void setCursorName [_ ^String a] (.setCursorName stmt a))
-  (^void setDate [_ ^int a ^java.sql.Date b ^java.util.Calendar c] (.setDate stmt a b c))
-  (^void setDate [_ ^int a ^java.sql.Date b] (.setDate stmt a b))
-  (^void setDouble [_ ^int a ^double b] (.setDouble stmt a b))
-  (^void setEscapeProcessing [_ ^boolean a] (.setEscapeProcessing stmt a))
-  (^void setFetchDirection [_ ^int a] (.setFetchDirection stmt a))
-  (^void setFetchSize [_ ^int a] (.setFetchSize stmt a))
-  (^void setFloat [_ ^int a ^float b] (.setFloat stmt a b))
-  (^void setInt [_ ^int a ^int b] (.setInt stmt a b))
-  (^void setLargeMaxRows [_ ^long a] (.setLargeMaxRows stmt a))
-  (^void setLong [_ ^int a ^long b] (.setLong stmt a b))
-  (^void setMaxFieldSize [_ ^int a] (.setMaxFieldSize stmt a))
-  (^void setMaxRows [_ ^int a] (.setMaxRows stmt a))
-  (^void setNCharacterStream [_ ^int a ^java.io.Reader b ^long c] (.setNCharacterStream stmt a b c))
-  (^void setNCharacterStream [_ ^int a ^java.io.Reader b] (.setNCharacterStream stmt a b))
-  (^void setNClob [_ ^int a ^java.sql.NClob b] (.setNClob stmt a b))
-  (^void setNClob [_ ^int a ^java.io.Reader b ^long c] (.setNClob stmt a b c))
-  (^void setNClob [_ ^int a ^java.io.Reader b] (.setNClob stmt a b))
-  (^void setNString [_ ^int a ^String b] (.setNString stmt a b))
-  (^void setNull [_ ^int a ^int b ^String c] (.setNull stmt a b c))
-  (^void setNull [_ ^int a ^int b] (.setNull stmt a b))
-  (^void setObject [_ ^int a ^Object b ^int c] (.setObject stmt a b c))
-  (^void setObject [_ ^int a ^Object b] (.setObject stmt a b))
-  (^void setObject [_ ^int a ^Object b ^java.sql.SQLType c] (.setObject stmt a b c))
-  (^void setObject [_ ^int a ^Object b ^int c ^int d] (.setObject stmt a b c d))
-  (^void setObject [_ ^int a ^Object b ^java.sql.SQLType c ^int d] (.setObject stmt a b c d))
-  (^void setPoolable [_ ^boolean a] (.setPoolable stmt a))
-  (^void setQueryTimeout [_ ^int a] (.setQueryTimeout stmt a))
-  (^void setRef [_ ^int a ^java.sql.Ref b] (.setRef stmt a b))
-  (^void setRowId [_ ^int a ^java.sql.RowId b] (.setRowId stmt a b))
-  (^void setSQLXML [_ ^int a ^java.sql.SQLXML b] (.setSQLXML stmt a b))
-  (^void setShort [_ ^int a ^short b] (.setShort stmt a b))
-  (^void setString [_ ^int a ^String b] (.setString stmt a b))
-  (^void setTime [_ ^int a ^java.sql.Time b ^java.util.Calendar c] (.setTime stmt a b c))
-  (^void setTime [_ ^int a ^java.sql.Time b] (.setTime stmt a b))
-  (^void setTimestamp [_ ^int a ^java.sql.Timestamp b] (.setTimestamp stmt a b))
-  (^void setTimestamp [_ ^int a ^java.sql.Timestamp b ^java.util.Calendar c] (.setTimestamp stmt a b c))
-  (^void setURL [_ ^int a ^java.net.URL b] (.setURL stmt a b))
-  (^void setUnicodeStream [_ ^int a ^java.io.InputStream b ^int c] (.setUnicodeStream stmt a b c)))
+       (.getConnection stmt))))
 
 (defn proxy-prepared-statement
   "Wrap `PreparedStatement` in a `ProxyPreparedStatment`, if it is not already wrapped."

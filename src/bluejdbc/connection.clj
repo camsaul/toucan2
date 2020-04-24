@@ -13,70 +13,26 @@
 
 (u/define-enums transaction-isolation-level Connection #"^TRANSACTION_")
 
-(p.types/deftype+ ProxyConnection [^Connection conn mta opts]
+(u/define-proxy-class ProxyConnection Connection [conn mta opts]
   pretty/PrettyPrintable
   (pretty [_]
-    (list 'proxy-connection conn opts))
+          (list 'proxy-connection conn opts))
 
   options/Options
   (options [_]
-    opts)
+           opts)
 
   (with-options [_ new-options]
     (ProxyConnection. conn mta new-options))
 
   clojure.lang.IObj
   (meta [_]
-    mta)
+        mta)
 
   (withMeta [_ new-meta]
-    (ProxyConnection. conn new-meta opts))
-
-  java.sql.Wrapper
-  (^boolean isWrapperFor [this ^Class interface]
-   (or (instance? interface this)
-       (.isWrapperFor conn interface)))
-
-  (unwrap [this ^Class interface]
-    (if (instance? interface this)
-      this
-      (.unwrap conn interface)))
+            (ProxyConnection. conn new-meta opts))
 
   Connection
-  (^void abort [_ ^java.util.concurrent.Executor a] (.abort conn a))
-  (^void beginRequest [_] (.beginRequest conn))
-  (^void clearWarnings [_] (.clearWarnings conn))
-  (^void close [_] (.close conn))
-  (^void commit [_] (.commit conn))
-  (^java.sql.Array createArrayOf [_ ^String a ^ "[Ljava.lang.Object;" b] (.createArrayOf conn a b))
-  (^java.sql.Blob createBlob [_] (.createBlob conn))
-  (^java.sql.Clob createClob [_] (.createClob conn))
-  (^java.sql.NClob createNClob [_] (.createNClob conn))
-  (^java.sql.SQLXML createSQLXML [_] (.createSQLXML conn))
-  (^java.sql.Statement createStatement [_] (.createStatement conn))
-  (^java.sql.Statement createStatement [_ ^int a ^int b ^int c] (.createStatement conn a b c))
-  (^java.sql.Statement createStatement [_ ^int a ^int b] (.createStatement conn a b))
-  (^java.sql.Struct createStruct [_ ^String a ^ "[Ljava.lang.Object;" b] (.createStruct conn a b))
-  (^void endRequest [_] (.endRequest conn))
-  (^boolean getAutoCommit [_] (.getAutoCommit conn))
-  (^String getCatalog [_] (.getCatalog conn))
-  (^java.util.Properties getClientInfo [_] (.getClientInfo conn))
-  (^String getClientInfo [_ ^String a] (.getClientInfo conn a))
-  (^int getHoldability [_] (.getHoldability conn))
-  (^java.sql.DatabaseMetaData getMetaData [_] (.getMetaData conn))
-  (^int getNetworkTimeout [_] (.getNetworkTimeout conn))
-  (^String getSchema [_] (.getSchema conn))
-  (^int getTransactionIsolation [_] (.getTransactionIsolation conn))
-  (^java.util.Map getTypeMap [_] (.getTypeMap conn))
-  (^java.sql.SQLWarning getWarnings [_] (.getWarnings conn))
-  (^boolean isClosed [_] (.isClosed conn))
-  (^boolean isReadOnly [_] (.isReadOnly conn))
-  (^boolean isValid [_ ^int a] (.isValid conn a))
-  (^String nativeSQL [_ ^String a] (.nativeSQL conn a))
-  (^java.sql.CallableStatement prepareCall [_ ^String a] (.prepareCall conn a))
-  (^java.sql.CallableStatement prepareCall [_ ^String a ^int b ^int c] (.prepareCall conn a b c))
-  (^java.sql.CallableStatement prepareCall [_ ^String a ^int b ^int c ^int d] (.prepareCall conn a b c d))
-
   (^java.sql.PreparedStatement prepareStatement
    [this ^String sql]
    (stmt/proxy-prepared-statement (.prepareStatement conn sql) (assoc opts :_connection this)))
@@ -111,27 +67,7 @@
                                              :_connection this
                                              :result-set/type (u/reverse-lookup rs/type result-set-type)
                                              :result-set/concurrency (u/reverse-lookup rs/concurrency result-set-concurrency)
-                                             :result-set/holdability (u/reverse-lookup rs/holdability result-set-holdability)))))
-
-  (^void releaseSavepoint [_ ^java.sql.Savepoint a] (.releaseSavepoint conn a))
-  (^void rollback [_] (.rollback conn))
-  (^void rollback [_ ^java.sql.Savepoint a] (.rollback conn a))
-  (^void setAutoCommit [_ ^boolean a] (.setAutoCommit conn a))
-  (^void setCatalog [_ ^String a] (.setCatalog conn a))
-  (^void setClientInfo [_ ^java.util.Properties a] (.setClientInfo conn a))
-  (^void setClientInfo [_ ^String a ^String b] (.setClientInfo conn a b))
-  (^void setHoldability [_ ^int a] (.setHoldability conn a))
-  (^void setNetworkTimeout [_ ^java.util.concurrent.Executor a ^int b] (.setNetworkTimeout conn a b))
-  (^void setReadOnly [_ ^boolean a] (.setReadOnly conn a))
-  (^java.sql.Savepoint setSavepoint [_] (.setSavepoint conn))
-  (^java.sql.Savepoint setSavepoint [_ ^String a] (.setSavepoint conn a))
-  (^void setSchema [_ ^String a] (.setSchema conn a))
-  (^void setShardingKey [_ ^java.sql.ShardingKey a] (.setShardingKey conn a))
-  (^void setShardingKey [_ ^java.sql.ShardingKey a ^java.sql.ShardingKey b] (.setShardingKey conn a b))
-  (^boolean setShardingKeyIfValid [_ ^java.sql.ShardingKey a ^java.sql.ShardingKey b ^int c] (.setShardingKeyIfValid conn a b c))
-  (^boolean setShardingKeyIfValid [_ ^java.sql.ShardingKey a ^int b] (.setShardingKeyIfValid conn a b))
-  (^void setTransactionIsolation [_ ^int a] (.setTransactionIsolation conn a))
-  (^void setTypeMap [_ ^java.util.Map a] (.setTypeMap conn a)))
+                                             :result-set/holdability (u/reverse-lookup rs/holdability result-set-holdability))))))
 
 (defn proxy-connection
   "Wrap a `Connection` in a `ProxyConnection`, if not already wrapped."
