@@ -9,7 +9,7 @@
   "JDBC URL to run tests against."
   ^String []
   (let [url (env/env :jdbc-url)]
-    (assert (not (str/blank? url)))
+    (assert (not (str/blank? url)) "Env var JDBC_URL msut be set before running tests")
     url))
 
 (defn db-type
