@@ -51,8 +51,14 @@
       [environ "1.2.0"]
       [pjstadig/humane-test-output "0.10.0"]]
 
+     :plugins
+     [[lein-environ "1.2.0"]]
+
      :repl-options
      {:init-ns bluejdbc.core}
+
+     ;; default value of JDBC_URL if no other value is set
+     :env {:jdbc-url "jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1"}
 
      ;; this is mostly so tests don't change answers between my local machine (on Pacific time) and CI (UTC)
      :jvm-opts
