@@ -179,6 +179,41 @@
           (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive false}
                   {:id 2, :price 2, :name "Cheap Pizza", :expensive false}
                   {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}]
+                 (venues))))
+        (testing "no rows affected"
+          (is (= 0
+                 (jdbc/update! conn :venues {:price 5} {:expensive true})))
+          (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive false}
+                  {:id 2, :price 2, :name "Cheap Pizza", :expensive false}
+                  {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}]
+                 (venues))))))))
+
+(deftest delete!-test
+  (jdbc/with-connection [conn (test/jdbc-url)]
+    (with-test-table conn :venues "(id INTEGER NOT NULL, price INTEGER NOT NULL, name TEXT NOT NULL)"
+      (is (= 3
+             (jdbc/insert! conn :venues [{:id 1, :price 1, :name "Cheap Burgers"}
+                                         {:id 2, :price 2, :name "Cheap Pizza"}
+                                         {:id 3, :price 4, :name "Expensive Sushi"}])))
+      (letfn [(venues []
+                (jdbc/query conn {:select   [:*]
+                                  :from     [:venues]
+                                  :order-by [[:id :asc]]}))]
+        (testing "map conditions"
+          (is (= 1
+                 (jdbc/delete! conn :venues {:price 2})))
+          (is (= [{:id 1, :price 1, :name "Cheap Burgers"}
+                  {:id 3, :price 4, :name "Expensive Sushi"}]
+                 (venues))))
+        (testing "HoneySQL-style conditions"
+          (is (= 1
+                 (jdbc/delete! conn :venues [:= :price 4])))
+          (is (= [{:id 1, :price 1, :name "Cheap Burgers"}]
+                 (venues))))
+        (testing "No conditions"
+          (is (= 1
+                 (jdbc/delete! conn :venues nil)))
+          (is (= []
                  (venues))))))))
 
 (defn- transaction-test-names [conn]
