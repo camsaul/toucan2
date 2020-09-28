@@ -137,3 +137,55 @@
                 (is (= (merge {:url url}
                               expected)
                        (into {} unwrapped)))))))))))
+
+(deftest connection-from-map-test
+  (testing "Should be able to get a Connection from a clojure.java.jdbc-style map"
+    (let [m {:classname   "org.h2.Driver"
+             :subprotocol "h2"
+             :subname     "mem:bluejdbc_test;DB_CLOSE_DELAY=-1"}]
+      (doseq [[description m] {"with classname"           m
+                               "without classname"        (dissoc m :classname)
+                               "subprotocol is a keyword" (update m :subprotocol keyword)
+                               "classname is a Class"     (assoc m :classname org.h2.Driver)
+                               "classname is a symbol"    (update m :classname symbol)}]
+        (testing description
+          (testing (format "\nm = %s" (pr-str m))
+            (doseq [options [nil
+                             {:option? true}]]
+              (testing (format "\noptions = %s" (pr-str options))
+                (with-open [conn (jdbc/connect! m options)]
+                  (is (instance? java.sql.Connection conn))
+                  (is (= "bluejdbc.connection.ProxyConnection"
+                         (some-> conn class .getCanonicalName)))
+                  (is (= [{:ONE 1}]
+                         (jdbc/query conn "SELECT 1 AS one;")))
+                  (when options
+                    (is (= {:option? true}
+                           (options/options conn))))))))))))
+  (testing "Other parameters should be passed as Properties"
+    (with-test-driver
+      (with-open [conn (jdbc/connect! {:classname   `TestDriver
+                                       :subprotocol "bluejdbc-test-driver"
+                                       :subname     "wow"
+                                       :x           100
+                                       :y           true
+                                       :z           "OK"})]
+        (is (= "bluejdbc.connection.ProxyConnection"
+               (some-> conn class .getCanonicalName)))
+        (let [unwrapped (.unwrap conn MockConnection)]
+          (is (= {:url        "jdbc:bluejdbc-test-driver:wow"
+                  :properties {:x "100"
+                               :y "true" :z "OK"}}
+                 (into {} unwrapped)))))))
+  (testing "Should throw Exception if subprotocol is missing"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Can't create Connection .*: missing :subprotocol"
+         (jdbc/connect! {:classname "org.h2.Driver"
+                         :subname   "mem:bluejdbc_test;DB_CLOSE_DELAY=-1"}))))
+  (testing "Should throw Exception if subname is missing"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Can't create Connection .*: missing :subname"
+         (jdbc/connect! {:classname   "org.h2.Driver"
+                         :subprotocol "h2"})))))

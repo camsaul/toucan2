@@ -9,29 +9,31 @@
             [methodical.core :as m]
             [potemkin.types :as p.types]
             [pretty.core :as pretty])
-  (:import [java.sql Connection DriverManager]
+  (:import [java.sql Connection Driver DriverManager]
            javax.sql.DataSource))
 
 (u/define-enums transaction-isolation-level Connection #"^TRANSACTION_")
 
+;; `ProxyConnection` wraps a `java.sql.Connection` `conn`, but returns special Clojure-friendly versions of
+;; `PreparedStatement` and other classes automatically. It also supports Clojure metadata and an options map.
 (u/define-proxy-class ProxyConnection Connection [conn mta opts]
   pretty/PrettyPrintable
   (pretty [_]
-          (list 'proxy-connection conn opts))
+    (list 'proxy-connection conn opts))
 
   options/Options
   (options [_]
-           opts)
+    opts)
 
   (with-options* [_ new-options]
     (ProxyConnection. conn mta new-options))
 
   clojure.lang.IObj
   (meta [_]
-        mta)
+    mta)
 
   (withMeta [_ new-meta]
-            (ProxyConnection. conn new-meta opts))
+    (ProxyConnection. conn new-meta opts))
 
   Connection
   (^java.sql.DatabaseMetaData getMetaData [this]
@@ -99,6 +101,17 @@
         options (assoc options :connection/type (keyword (second (re-find #"^jdbc:([^:]+):" s))))]
     (proxy-connection conn options)))
 
+(defn- connection-with-class-name ^Connection [class-name ^String jdbc-url ^java.util.Properties properties]
+  (let [^Class klass (cond
+                       (string? class-name) (Class/forName class-name)
+                       (symbol? class-name) (Class/forName (name class-name))
+                       :else                class-name)]
+    (assert (instance? Class klass))
+    (assert (isa? klass java.sql.Driver) (format "%s is not a subclass of java.sql.Driver" (.getCanonicalName klass)))
+    (let [^Driver driver (.newInstance klass)]
+      (.connect driver jdbc-url properties))))
+
+;; TODO -- support both clojure.java.jdbc-style maps and jdbc.next-style maps
 (defn create-connection-from-clojure-java-jdbc-map!
   "Create a new JDBC connection from a `clojure.java.jdbc`-style map."
   ^ProxyConnection [m options]
@@ -111,13 +124,28 @@
     (:datasource m)
     (connect!* (:datasource m) options)
 
-    :else
-    ;; TODO -- other stuff
-    (throw (ex-info "TODO" {}))))
+    ((every-pred :subprotocol :subname) m)
+    (let [{:keys [classname subprotocol subname]} m
+          jdbc-url                                (format "jdbc:%s:%s" (name subprotocol) subname)
+          properties                              (options/->Properties (dissoc m :classname :subprotocol :subname))]
+      (-> (if classname
+            (connection-with-class-name classname jdbc-url properties)
+            (DriverManager/getConnection jdbc-url properties))
+          (proxy-connection options)))
+
+    (not (:subprotocol m))
+    (throw (ex-info "Can't create Connection from clojure.java.jdbc-style map: missing :subprotocol"
+                    {:keys (vec (keys m))}))
+
+    (not (:subname m))
+    (throw (ex-info "Can't create Connection from clojure.java.jdbc-style map: missing :subname"
+                    {:keys (vec (keys m))}))))
 
 (defn create-connection-from-datasource!
   "Create a new JDBC connection from a DataSource."
-  ^ProxyConnection [^javax.sql.DataSource data-source {^String user :connection/user, ^String password :connection/password, :as options}]
+  ^ProxyConnection [^javax.sql.DataSource data-source {^String user     :connection/user
+                                                       ^String password :connection/password
+                                                       :as              options}]
   (log/trace "Getting new Connection from DataSource")
   (let [conn (if (or user password)
                (.getConnection data-source user password)
