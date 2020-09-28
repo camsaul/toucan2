@@ -151,10 +151,17 @@
                                 {:where where-clause}))]
      (execute! connectable honeysql-form options))))
 
-;; TODO
 (defn delete!
-  ([connectable table-name conditions])
-  ([connectable table-name conditions options]))
+  "Convenience for deleting row(s). Args and options are the same as `update!` (excluding changes). Returns number of
+  rows deleted."
+  ([connectable table-name conditions]
+   (delete! connectable table-name conditions nil))
+
+  ([connectable table-name conditions options]
+   (let [honeysql-form (merge {:delete-from table-name}
+                              (when-let [where-clause (conditions->where-clause conditions)]
+                                {:where where-clause}))]
+     (execute! connectable honeysql-form options))))
 
 ;; TODO
 (defn select
