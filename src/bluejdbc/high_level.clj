@@ -91,21 +91,23 @@
     (insert! connectable :user [:id :name] [[1 \"Cam\"] [2 \"Sam\"]]
 
   Returns number of rows inserted."
-  {:arglists '(^Integer [connectable table-name rows]
-               ^Integer [connectable table-name columns rows]
-               ^Integer [connectable table-name rows options]
-               ^Integer [connectable table-name columns rows options])}
-  ([connectable table-name rows]
-   (insert! connectable table-name nil rows nil))
+  {:arglists '(^Integer [connectable table-name row-or-rows]
+               ^Integer [connectable table-name columns row-or-rows]
+               ^Integer [connectable table-name row-or-rows options]
+               ^Integer [connectable table-name columns row-or-rows options])}
+  ([connectable table-name row-or-rows]
+   (insert! connectable table-name nil row-or-rows nil))
 
   ([connectable table-name x y]
    (if (map? y)
      (insert! connectable table-name nil x   y)
      (insert! connectable table-name x   y nil)))
 
-  ([connectable table-name columns rows options]
+  ([connectable table-name columns row-or-rows options]
    (let [honeysql-form (merge {:insert-into table-name
-                               :values      rows}
+                               :values      (if (map? row-or-rows)
+                                              [row-or-rows]
+                                              row-or-rows)}
                               (when (seq columns)
                                 {:columns columns}))]
      (execute! connectable honeysql-form options))))
