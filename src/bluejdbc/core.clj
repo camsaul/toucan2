@@ -25,7 +25,7 @@
 
 (p/import-vars
  [conn connect! transaction-isolation-level with-connection]
- [high-level execute! insert! query query-one reducible-query transaction]
+ [high-level execute! insert! query query-one reducible-query transaction update! delete! select]
  [metadata metadata]
  [metadata-fns with-metadata database-info driver-info catalogs schemas table-types tables columns]
  [options options with-options]
