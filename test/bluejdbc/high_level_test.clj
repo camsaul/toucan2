@@ -52,7 +52,13 @@
 
   (testing "With a custom results xform"
     (is (= ["abc"]
-           (jdbc/query-one (test/jdbc-url) "SELECT 'abc' AS abc;" {:results/xform nil})))))
+           (jdbc/query-one (test/jdbc-url) "SELECT 'abc' AS abc;" {:results/xform nil}))))
+
+  (testing "query that returns no columns should still work"
+    (is (= {}
+           (jdbc/query-one (test/jdbc-url) "SELECT;")))
+    (is (= []
+           (jdbc/query-one (test/jdbc-url) "SELECT;" {:results/xform nil})))))
 
 (deftest execute-test
   (testing "execute!"

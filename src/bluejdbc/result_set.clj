@@ -73,10 +73,12 @@
    (let [rsmeta (.getMetaData rs)
          fns    (for [i (index-range rsmeta)]
                   (read-column-thunk rs rsmeta (int i) options))]
-     (let [thunk (apply juxt fns)]
-       (fn row-thunk* []
-         (when (.next rs)
-           (thunk)))))))
+     (if (empty? fns)
+       (constantly [])
+       (let [thunk (apply juxt fns)]
+         (fn row-thunk* []
+           (when (.next rs)
+             (thunk))))))))
 
 
 ;;;; row xforms
