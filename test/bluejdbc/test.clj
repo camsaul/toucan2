@@ -12,6 +12,12 @@
     (assert (not (str/blank? url)) "Env var JDBC_URL msut be set before running tests")
     url))
 
+(defn set-jdbc-url!
+  "Intended for REPL usage. Change the JDBC URL we're testing against."
+  [new-jdbc-url]
+  (alter-var-root #'env/env assoc :jdbc-url new-jdbc-url)
+  nil)
+
 (defn db-type
   "Type of database we're tetsing against, e.g. `:postgresql`."
   []
