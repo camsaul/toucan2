@@ -61,7 +61,7 @@
     (is (= []
            (jdbc/query-one (test/jdbc-url) "SELECT;" {:results/xform nil})))))
 
-(deftest execute-test
+(deftest execute!-test
   (testing "execute!"
     (jdbc/with-connection [conn (test/jdbc-url)]
       (try
@@ -82,23 +82,32 @@
        (finally
          (jdbc/execute! conn# ~(format "DROP TABLE IF EXISTS %s;" (name table-name)))))))
 
-(deftest insert-test
+(deftest insert!-test
   (testing "insert!"
-    (doseq [[description f] {"with row maps"
-                             (fn [conn]
-                               (jdbc/insert! conn :execute_test_table [{:id 1, :name "Cam"}
-                                                                       {:id 2, :name "Sam"}]))
+    (doseq [[description {:keys [f expected]}]
+            {"with row maps"
+             {:f        (fn [conn]
+                          (jdbc/insert! conn :execute_test_table [{:id 1, :name "Cam"}
+                                                                  {:id 2, :name "Sam"}]))
+              :expected [{:id 1, :name "Cam"}
+                         {:id 2, :name "Sam"}]}
 
-                             "with row vectors"
-                             (fn [conn]
-                               (jdbc/insert! conn :execute_test_table [:id :name] [[1 "Cam"] [2 "Sam"]]))}]
+             "with a single row map"
+             {:f        (fn [conn]
+                          (jdbc/insert! conn :execute_test_table {:id 1, :name "Cam"}))
+              :expected [{:id 1, :name "Cam"}]}
+
+             "with row vectors"
+             {:f        (fn [conn]
+                          (jdbc/insert! conn :execute_test_table [:id :name] [[1 "Cam"] [2 "Sam"]]))
+              :expected [{:id 1, :name "Cam"}
+                         {:id 2, :name "Sam"}]}}]
       (testing description
         (jdbc/with-connection [conn (test/jdbc-url)]
           (with-test-table conn :execute_test_table "(id INTEGER NOT NULL, name TEXT NOT NULL)"
-            (is (= 2
+            (is (= (count expected)
                    (f conn)))
-            (is (= [{:id 1, :name "Cam"}
-                    {:id 2, :name "Sam"}]
+            (is (= expected
                    (jdbc/query conn {:select   [:*]
                                      :from     [:execute_test_table]
                                      :order-by [[:id :asc]]})))))))))
