@@ -21,10 +21,10 @@
 
   :dependencies
   [[clojure.java-time "0.3.2"]
-   [honeysql "0.9.10" :exclusions [org.clojure/clojurescript]]
+   [honeysql "1.0.444" :exclusions [org.clojure/clojurescript]]
    [metabase/second-date "1.0.0"]
    [methodical "0.10.0-alpha"]
-   [org.clojure/tools.logging "1.0.0"]
+   [org.clojure/tools.logging "1.1.0"]
    [potemkin "0.4.5"]
    [pretty "1.0.4"]]
 
@@ -35,11 +35,11 @@
 
    :postgres
    {:dependencies
-    [[org.postgresql/postgresql "42.2.12"]]}
+    [[org.postgresql/postgresql "42.2.16"]]}
 
    :mysql
    {:dependencies
-    [[org.mariadb.jdbc/mariadb-java-client "2.6.0"]]}
+    [[org.mariadb.jdbc/mariadb-java-client "2.7.0"]]}
 
    :jdbc-drivers
    [:h2 :postgres :mysql]
@@ -48,7 +48,7 @@
    [:jdbc-drivers
     {:dependencies
      [[org.clojure/clojure "1.10.1"]
-      [environ "1.1.0"]
+      [environ "1.2.0"]
       [pjstadig/humane-test-output "0.10.0"]]
 
      :repl-options
@@ -82,12 +82,11 @@
 
    :cloverage
    {:dependencies
-    ;; Required by both Potemkin and Cloverage, but Potemkin uses an older version that breaks Cloverage's ablity to
-    ;; understand certain forms. Explicitly specify newer version here.
-    [[riddley "0.2.0"]]
+    ;; using my fork until the next release of the main repo is out.
+    [[camsaul/cloverage "1.2.1.1"]]
 
     :plugins
-    [[lein-cloverage "1.1.2"]]
+    [[camsaul/lein-cloverage  "1.2.1.1"]]
 
     ;; don't count ./dev stuff for code coverage calcualations.
     :source-paths ^:replace ["src"]
