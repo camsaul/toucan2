@@ -83,7 +83,7 @@
        (.executeUpdate stmt)))))
 
 (defn insert!
-  "Convenience for inserting rows. `rows` can either be maps or vectors. You should supply `columns` if rows are not
+  "Convenience for inserting row(s). `rows` can either be maps or vectors. You should supply `columns` if rows are not
   maps.
 
     (insert! connectable :user [{:id 1, :name \"Cam\"} {:id 2, :name \"Sam\"}])
@@ -109,6 +109,55 @@
                               (when (seq columns)
                                 {:columns columns}))]
      (execute! connectable honeysql-form options))))
+
+(defn conditions->where-clause
+  "Convert `conditions` to a HoneySQL-style WHERE clause vector if it is not already one (e.g., if it is a map)."
+  [conditions]
+  (cond
+    (map? conditions)
+    (let [clauses (for [[k v] conditions]
+                    (if (vector? v)
+                      (into [(first v) k] (rest v))
+                      [:= k v]))]
+      (if (> (bounded-count 2 clauses) 1)
+        (into [:and] clauses)
+        (first clauses)))
+
+    (seq conditions)
+    conditions))
+
+(defn update!
+  "Convenience for updating row(s). `conditions` can be either a map of `{field value}` or a HoneySQL-style vector where
+  clause. Returns number of rows updated.
+
+    ;; UPDATE venues SET expensive = false WHERE price = 1
+    (jdbc/update! conn :venues {:price 1} {:expensive false})
+
+    ;; Same as above, but with HoneySQL-style vector conditions
+    (jdbc/update! conn :venues [:= :price 1] {:expensive false})
+
+    ;; To use an operator other than `:=`, wrap the value in a vector e.g. `[:operator & values]`
+    ;; UPDATE venues SET expensive = false WHERE price BETWEEN 1 AND 2
+    (jdbc/update! conn :venues {:price [:between 1 2]} {:expensive false})"
+  ([connectable table-name conditions changes]
+   (update! connectable table-name conditions changes nil))
+
+  ([connectable table-name conditions changes options]
+   (let [honeysql-form (merge {:update table-name
+                               :set    changes}
+                              (when-let [where-clause (conditions->where-clause conditions)]
+                                {:where where-clause}))]
+     (execute! connectable honeysql-form options))))
+
+;; TODO
+(defn delete!
+  ([connectable table-name conditions])
+  ([connectable table-name conditions options]))
+
+;; TODO
+(defn select
+  ([connectable table-name conditions])
+  ([connectable table-name conditions options]))
 
 (defn do-transaction
   "Impl for `transaction` macro."

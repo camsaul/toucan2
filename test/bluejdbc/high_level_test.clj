@@ -1,5 +1,6 @@
 (ns bluejdbc.high-level-test
   (:require [bluejdbc.core :as jdbc]
+            [bluejdbc.high-level :as high-level]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [java-time :as t]))
@@ -74,6 +75,7 @@
 (defmacro ^:private with-test-table {:style/indent 3} [conn table-name fields & body]
   `(let [conn# ~conn]
      (try
+       (jdbc/execute! conn# ~(format "DROP TABLE IF EXISTS %s;" (name table-name)))
        (is (= 0
               (jdbc/execute! conn# ~(format "CREATE TABLE %s %s;" (name table-name) fields))))
        ~@body
@@ -100,6 +102,75 @@
                    (jdbc/query conn {:select   [:*]
                                      :from     [:execute_test_table]
                                      :order-by [[:id :asc]]})))))))))
+
+(deftest conditions->where-clause-test
+  (testing "nil"
+    (is (= nil
+           (high-level/conditions->where-clause nil))))
+  (testing "empty map"
+    (is (= nil
+           (high-level/conditions->where-clause {}))))
+  (testing "map"
+    (is (= [:= :a 1]
+           (high-level/conditions->where-clause {:a 1})))
+    (is (= [:and [:= :a 1] [:= :b 2]]
+           (high-level/conditions->where-clause {:a 1, :b 2})))
+    (testing "value is a vector"
+      (is (= [:> :a 1]
+             (high-level/conditions->where-clause {:a [:> 1]}))))
+    (testing "value is a vector"
+      (is (= [:between :a 1 100]
+             (high-level/conditions->where-clause {:a [:between 1 100]})))))
+  (testing "HoneySQL-style vector"
+    (is (= [:between :a 1 100]
+           (high-level/conditions->where-clause [:between :a 1 100])))))
+
+(deftest update!-test
+  (jdbc/with-connection [conn (test/jdbc-url)]
+    (with-test-table conn :venues "(id INTEGER NOT NULL, price INTEGER NOT NULL, name TEXT NOT NULL, expensive BOOLEAN)"
+      (is (= 3
+             (jdbc/insert! conn :venues [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
+                                         {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
+                                         {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}])))
+      (letfn [(venues []
+                (jdbc/query conn {:select   [:*]
+                                  :from     [:venues]
+                                  :order-by [[:id :asc]]}))]
+        (testing "Basic field = x condition"
+          (is (= 1
+                 (jdbc/update! conn :venues {:price 4} {:expensive true})))
+          (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
+                  {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
+                  {:id 3, :price 4, :name "Expensive Sushi", :expensive true}]
+                 (venues))))
+        (testing "fancy field = [...] conditions"
+          (is (= 2
+                 (jdbc/update! conn :venues {:price [:< 3]} {:expensive false})))
+          (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive false}
+                  {:id 2, :price 2, :name "Cheap Pizza", :expensive false}
+                  {:id 3, :price 4, :name "Expensive Sushi", :expensive true}]
+                 (venues)))
+          (testing "More that 1 arg"
+            (is (= 2
+                   (jdbc/update! conn :venues {:price [:between 1 3]} {:expensive nil})))
+            (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
+                    {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
+                    {:id 3, :price 4, :name "Expensive Sushi", :expensive true}]
+                   (venues)))))
+        (testing "no conditions"
+          (is (= 3
+                 (jdbc/update! conn :venues nil {:expensive nil})))
+          (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
+                  {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
+                  {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}]
+                 (venues))))
+        (testing "conditions as HoneySQL clause"
+          (is (= 2
+                 (jdbc/update! conn :venues [:<= :price 3] {:expensive false})))
+          (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive false}
+                  {:id 2, :price 2, :name "Cheap Pizza", :expensive false}
+                  {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}]
+                 (venues))))))))
 
 (defn- transaction-test-names [conn]
   (jdbc/query conn "SELECT * FROM transaction_test_table ORDER BY name ASC;" {:results/xform nil}))
