@@ -163,11 +163,6 @@
                                 {:where where-clause}))]
      (execute! connectable honeysql-form options))))
 
-;; TODO
-(defn select
-  ([connectable table-name conditions])
-  ([connectable table-name conditions options]))
-
 (defn do-transaction
   "Impl for `transaction` macro."
   [connectable f]
