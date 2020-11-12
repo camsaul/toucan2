@@ -1,6 +1,7 @@
 (ns bluejdbc.high-level
   "Higher-level functions."
   (:require [bluejdbc.connection :as conn]
+            [bluejdbc.options :as options]
             [bluejdbc.statement :as stmt]
             [bluejdbc.util.log :as log]
             [pretty.core :as pretty])
@@ -62,25 +63,42 @@
   ([connectable query-or-stmt options]
    (reduce-first (reducible-query connectable query-or-stmt (assoc options :stmt/max-rows 1)))))
 
+(defn generated-keys [^PreparedStatement stmt]
+  (log/trace "Fetching generated keys")
+  (let [ks (:statement/return-generated-keys (options/options stmt))]
+    (with-open [rs (.getGeneratedKeys stmt)]
+      (into [] (cond
+                 (keyword? ks)    (map ks rs)
+                 (sequential? ks) (map #(select-keys % ks) rs)
+                 :else            rs)))))
+
 (defn execute!
   "Execute a SQL *statement*, which can be SQL/HoneySQL/a `PreparedStatement`. The content of `query-or-stmt` itself
   must be either a DML statement such as `INSERT`, `UPDATE`, or `DELETE`, or a SQL statement that returns nothing,
   such as a DDL statement such as `CREATE TABLE`. Returns either the number of rows modified (for DML statements) or
   0 (for statements that return nothing)."
-  {:arglists '(^Integer [stmt] ^Integer [stmt options] ^Integer [connectable query-or-stmt] ^Integer [connectable query-or-stmt options])}
+  {:arglists '(^Integer [stmt]
+               ^Integer [stmt options]
+               ^Integer [connectable query-or-stmt]
+               ^Integer [connectable query-or-stmt options])}
   ([stmt]
    (execute! stmt nil))
 
   ([x y]
    (if (instance? PreparedStatement x)
-     (let [stmt (stmt/proxy-prepared-statement x y)]
-       (.executeUpdate stmt))
-     (execute! x y nil)))
+     (let [[^PreparedStatement stmt options] [x y]
+           affected-rows                     (.executeUpdate stmt)]
+       (if (:statement/return-generated-keys (options/options stmt))
+         (when (pos? affected-rows)
+           (generated-keys stmt))
+         affected-rows))
+     (let [[connectable query-or-stmt] [x y]]
+       (execute! connectable query-or-stmt nil))))
 
   ([connectable query-or-stmt options]
    (conn/with-connection [conn connectable options]
-     (stmt/with-prepared-statement [stmt conn query-or-stmt]
-       (.executeUpdate stmt)))))
+     (stmt/with-prepared-statement [stmt conn query-or-stmt options]
+       (execute! stmt options)))))
 
 (defn insert!
   "Convenience for inserting row(s). `rows` can either be maps or vectors. You should supply `columns` if rows are not
@@ -111,6 +129,15 @@
                               (when (seq columns)
                                 {:columns columns}))]
      (execute! connectable honeysql-form options))))
+
+(defn insert-returning-keys!
+  {:arglists '([connectable table-name row-or-rows]
+               [connectable table-name columns row-or-rows]
+               [connectable table-name row-or-rows options]
+               [connectable table-name columns row-or-rows options])}
+  [connectable & args]
+  (conn/with-connection [conn connectable {:statement/return-generated-keys true}]
+    (apply insert! conn args)))
 
 (defn conditions->where-clause
   "Convert `conditions` to a HoneySQL-style WHERE clause vector if it is not already one (e.g., if it is a map)."

@@ -1,5 +1,5 @@
 (ns bluejdbc.core
-  (:refer-clojure :exclude [type])
+  (:refer-clojure :exclude [defmethod type])
   (:require [bluejdbc.connection :as conn]
             [bluejdbc.high-level :as high-level]
             [bluejdbc.metadata :as metadata]
@@ -28,7 +28,7 @@
 
 (p/import-vars
  [conn connect! named-connectable transaction-isolation-level with-connection]
- [high-level execute! insert! query query-one reducible-query transaction update! delete! select]
+ [high-level execute! insert! insert-returning-keys! query query-one reducible-query transaction update! delete!]
  [metadata metadata]
  [metadata-fns with-metadata database-info driver-info catalogs schemas table-types tables columns]
  [methodical defmethod]

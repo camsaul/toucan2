@@ -87,30 +87,51 @@
     (doseq [[description {:keys [f expected]}]
             {"with row maps"
              {:f        (fn [conn]
-                          (jdbc/insert! conn :execute_test_table [{:id 1, :name "Cam"}
-                                                                  {:id 2, :name "Sam"}]))
+                          (jdbc/insert! conn :insert_test_table [{:id 1, :name "Cam"}
+                                                                 {:id 2, :name "Sam"}]))
               :expected [{:id 1, :name "Cam"}
                          {:id 2, :name "Sam"}]}
 
              "with a single row map"
              {:f        (fn [conn]
-                          (jdbc/insert! conn :execute_test_table {:id 1, :name "Cam"}))
+                          (jdbc/insert! conn :insert_test_table {:id 1, :name "Cam"}))
               :expected [{:id 1, :name "Cam"}]}
 
              "with row vectors"
              {:f        (fn [conn]
-                          (jdbc/insert! conn :execute_test_table [:id :name] [[1 "Cam"] [2 "Sam"]]))
+                          (jdbc/insert! conn :insert_test_table [:id :name] [[1 "Cam"] [2 "Sam"]]))
               :expected [{:id 1, :name "Cam"}
                          {:id 2, :name "Sam"}]}}]
       (testing description
         (jdbc/with-connection [conn (test/jdbc-url)]
-          (with-test-table conn :execute_test_table "(id INTEGER NOT NULL, name TEXT NOT NULL)"
+          (with-test-table conn :insert_test_table "(id INTEGER NOT NULL, name TEXT NOT NULL)"
             (is (= (count expected)
                    (f conn)))
             (is (= expected
                    (jdbc/query conn {:select   [:*]
-                                     :from     [:execute_test_table]
+                                     :from     [:insert_test_table]
                                      :order-by [[:id :asc]]})))))))))
+
+(deftest insert-returning-keys!-test
+  (jdbc/with-connection [conn (test/jdbc-url)]
+    (with-test-table conn :returning_keys_test "(id INTEGER NOT NULL, name TEXT NOT NULL)"
+      (testing "If return-generated-keys is true, just return whatever the DB returns"
+        (is (= [{:id 1, :name "Cam"}]
+               (jdbc/insert-returning-keys! conn
+                                            :returning_keys_test
+                                            {:id 1, :name "Cam"}
+                                            {:statement/return-generated-keys true}))))
+      (testing "Should be able to specify *which* keys get returned"
+        (is (= [1]
+               (jdbc/insert-returning-keys! conn
+                                            :returning_keys_test
+                                            {:id 1, :name "Cam"}
+                                            {:statement/return-generated-keys :id})))
+        (is (= [{:id 1}]
+               (jdbc/insert-returning-keys! conn
+                                            :returning_keys_test
+                                            {:id 1, :name "Cam"}
+                                            {:statement/return-generated-keys [:id]})))))))
 
 (deftest conditions->where-clause-test
   (testing "nil"
