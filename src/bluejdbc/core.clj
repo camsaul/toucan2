@@ -10,6 +10,7 @@
             [bluejdbc.types :as types]
             [bluejdbc.util :as u]
             [bluejdbc.util.log :as log]
+            [methodical.core :as methodical]
             [potemkin :as p]))
 
 ;; fool the linter/cljr-refactor
@@ -17,6 +18,7 @@
          high-level/keep-me
          metadata/keep-me
          metadata-fns/keep-me
+         methodical/keep-me
          log/keep-me
          rs/keep-me
          stmt/keep-me
@@ -25,10 +27,11 @@
          u/keep-me)
 
 (p/import-vars
- [conn connect! transaction-isolation-level with-connection]
+ [conn connect! named-connectable transaction-isolation-level with-connection]
  [high-level execute! insert! query query-one reducible-query transaction update! delete! select]
  [metadata metadata]
  [metadata-fns with-metadata database-info driver-info catalogs schemas table-types tables columns]
+ [methodical defmethod]
  [log with-debug-logging]
  [options options with-options]
  [rs maps]
