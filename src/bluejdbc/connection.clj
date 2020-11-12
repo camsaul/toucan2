@@ -152,6 +152,17 @@
                (.getConnection data-source))]
     (proxy-connection conn options)))
 
+(m/defmulti named-connectable
+  "Define a new named connectable that can be used anywhere instead of using the connectable directly.
+
+    (jdbc/defmethod jdbc/named-connectable :default
+      [_]
+      \"jdbc:postgresql://localhost:5432/my_db\")
+
+    (jdbc/query :default {:select [:*], :from :my_table})"
+  {:arglists ['(k)]}
+  keyword)
+
 (extend-protocol CreateConnection
   ;; JDBC connection URL
   String
@@ -165,7 +176,12 @@
   ;; legacy `clojure.java.jdbc`-style map
   clojure.lang.IPersistentMap
   (connect!* [m options]
-    (create-connection-from-clojure-java-jdbc-map! m options)))
+    (create-connection-from-clojure-java-jdbc-map! m options))
+
+  ;; named connection
+  clojure.lang.Keyword
+  (connect!* [k options]
+    (connect!* (named-connectable k) options)))
 
 (defn connect!
   "Create a new JDBC connection from `source`."
@@ -185,9 +201,9 @@
       (f conn))))
 
 (defmacro with-connection
-  "Execute `body` with `conn-binding` bound to a `Connection`. If `connectable` is already a `Connection`, `body` is executed
-  using that `Connection`; if `connectable` is something else like a JDBC URL, a new `Connection` will be created for the
-  duration of `body` and closed afterward.
+  "Execute `body` with `conn-binding` bound to a `Connection`. If `connectable` is already a `Connection`, `body` is
+  executed using that `Connection`; if `connectable` is something else like a JDBC URL, a new `Connection` will be
+  created for the duration of `body` and closed afterward.
 
   You can use this macro to accept either a `Connection` or something that can be used to create a `Connection` and
   handle either case appropriately."
