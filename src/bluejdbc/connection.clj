@@ -5,7 +5,7 @@
             [bluejdbc.result-set :as rs]
             [bluejdbc.statement :as stmt]
             [bluejdbc.util :as u]
-            [clojure.tools.logging :as log]
+            [bluejdbc.util.log :as log]
             [methodical.core :as m]
             [potemkin.types :as p.types]
             [pretty.core :as pretty])

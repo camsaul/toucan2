@@ -1,12 +1,7 @@
 (ns dev
-  (:require [bluejdbc.util :as u]
-            [clojure.string :as str]
-            [clojure.tools.logging :as log]
-            [clojure.tools.logging.impl :as log.impl]
-            [environ.core :as env])
-  (:import [java.util.concurrent Executors ThreadFactory]))
+  (:require [environ.core :as env]))
 
-(defonce ^:private log-executor
+#_(defonce ^:private log-executor
   (delay
     (let [counter (atom -1)]
       (Executors/newSingleThreadExecutor
@@ -15,12 +10,12 @@
            (doto (Thread. runnable (str "log-thread-" (swap! counter inc)))
              (.setDaemon true))))))))
 
-(defn- log! [message]
+#_(defn- log! [message]
   (locking println (println message))
   #_(.submit ^ExecutorService @log-executor ^Runnable (fn [] (println message)))
   nil)
 
-(defn- logger [namespac]
+#_(defn- logger [namespac]
   (reify log.impl/Logger
     (enabled? [_ level]
       true)
@@ -36,13 +31,13 @@
                         ""))]
         (log! s)))))
 
-(def ^:private logger-factory
+#_(def ^:private logger-factory
   (reify log.impl/LoggerFactory
     (name [_] "My Logger Factory")
     (get-logger [_ ns]
       (logger ns))))
 
-(alter-var-root #'log/*logger-factory* (constantly logger-factory))
+#_(alter-var-root #'log/*logger-factory* (constantly logger-factory))
 
 (defn ns-unmap-all
   "Unmap all interned vars in a namespace. Reset the namespace to a blank slate! Perfect for when you rename everything
