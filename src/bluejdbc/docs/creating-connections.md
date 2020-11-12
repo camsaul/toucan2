@@ -1,0 +1,31 @@
+# Creating Connections
+
+TODO
+
+## Using a `java.sql.Connection` directly
+
+TODO
+
+## Connectables
+
+TODO
+
+### JDBC URLs
+
+TODO
+
+### `DataSource`
+
+TODO
+
+### `clojure.java.jdbc`-style maps
+
+TODO
+
+## Named Connectables
+
+TODO
+
+## Defining Your Own Connectables
+
+TODO

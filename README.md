@@ -11,14 +11,20 @@
 
 ![Blue JDBC](https://github.com/camsaul/bluejdbc/blob/master/assets/bluejdbc.png)
 
-Blue JDBC is a new Clojure interface to JDBC with an an emphasis on ease-of-use, performance, extensibility.
+Blue JDBC is a new Clojure interface to JDBC with an an emphasis on ease-of-use, performance, extensibility, and
+complete documentation.
+
+Documentation can be viewed [here]
 
 ### Key benefits!
 
 * Blue JDBC automatically uses `java.time` everywhere!
-* Blue JDBC supports [HoneySQL](https://github.com/jkk/honeysql) everywhere and its functions. Don't worry -- you can still use raw SQL everywhere as well!
-* Blue JDBC's versions of `java.sql.PreparedStatement` and `java.sql.ResultSet` are reducible/transducible and sequable. Wow!
-* Blue JDBC handles parameters and results in a database-aware fashion -- for example, you can have Blue JDBC convert a `UUID` to a String for MySQL and a byte array for Postgres!
+* Blue JDBC supports [HoneySQL](https://github.com/jkk/honeysql) everywhere and its functions. Don't worry -- you can
+  still use raw SQL everywhere as well!
+* Blue JDBC's versions of `java.sql.PreparedStatement` and `java.sql.ResultSet` are reducible/transducible and
+  sequable. Wow!
+* Blue JDBC handles parameters and results in a database-aware fashion -- for example, you can have Blue JDBC convert
+  a `UUID` to a String for MySQL and a byte array for Postgres!
 * Has its own logo!
 
 ```clj
