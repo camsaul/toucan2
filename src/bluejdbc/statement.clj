@@ -112,6 +112,10 @@
       (reduce rf [] rs)))
 
   PreparedStatement
+  (^java.sql.ResultSet getGeneratedKeys
+   [this]
+   (rs/reducible-result-set (.getGeneratedKeys stmt) (assoc opts :_statement this)))
+
   (^java.sql.ResultSet executeQuery
    [this]
    (rs/reducible-result-set (.executeQuery stmt) (assoc opts :_statement this)))
@@ -145,18 +149,23 @@
 (extend-protocol CreatePreparedStatement
   ;; plain SQL string
   String
-  (prepare!* [s ^Connection conn {rs-type     :result-set/type
-                                  concurrency :result-set/concurrency
-                                  holdability :result-set/holdability
-                                  :or         {rs-type     :forward-only
-                                               concurrency :read-only
-                                               holdability (.getHoldability conn)}
-                                  :as         options}]
-    (let [stmt (.prepareStatement conn
-                                  s
-                                  (rs/type rs-type)
-                                  (rs/concurrency concurrency)
-                                  (rs/holdability holdability))]
+  (prepare!* [s ^Connection conn {rs-type                :result-set/type
+                                  concurrency            :result-set/concurrency
+                                  holdability            :result-set/holdability
+                                  return-generated-keys? :statement/return-generated-keys
+                                  :or                    {rs-type     :forward-only
+                                                          concurrency :read-only
+                                                          holdability (.getHoldability conn)}
+                                  :as                    options}]
+    (let [stmt (if return-generated-keys?
+                 (.prepareStatement conn
+                                    s
+                                    Statement/RETURN_GENERATED_KEYS)
+                 (.prepareStatement conn
+                                    s
+                                    (rs/type rs-type)
+                                    (rs/concurrency concurrency)
+                                    (rs/holdability holdability)))]
       (proxy-prepared-statement stmt options)))
 
   ;; [sql & args] or [honeysql & args] vector

@@ -160,7 +160,7 @@
       \"jdbc:postgresql://localhost:5432/my_db\")
 
     (jdbc/query :default {:select [:*], :from :my_table})"
-  {:arglists ['(k)]}
+  {:arglists '([k])}
   keyword)
 
 (extend-protocol CreateConnection
