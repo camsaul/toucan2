@@ -2,7 +2,7 @@
   "Higher-level functions."
   (:require [bluejdbc.connection :as conn]
             [bluejdbc.statement :as stmt]
-            [clojure.tools.logging :as log]
+            [bluejdbc.util.log :as log]
             [pretty.core :as pretty])
   (:import java.sql.PreparedStatement))
 
@@ -162,6 +162,20 @@
                               (when-let [where-clause (conditions->where-clause conditions)]
                                 {:where where-clause}))]
      (execute! connectable honeysql-form options))))
+
+;; TODO -- not sure this makes sense. what if we wanted to specify order/limit/etc??
+(defn select
+  ([connectable table-name]
+   (select connectable table-name nil nil))
+
+  ([connectable table-name conditions]
+   (select connectable table-name conditions nil))
+
+  ([connectable table-name conditions options]
+   (let [honeysql-form (merge {:select [table-name]}
+                              (when-let [where-clause (conditions->where-clause conditions)]
+                                {:where where-clause}))]
+     (query connectable honeysql-form options))))
 
 (defn do-transaction
   "Impl for `transaction` macro."

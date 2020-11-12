@@ -1,6 +1,6 @@
 (ns bluejdbc.options
-  (:require [clojure.data :as data]
-            [clojure.tools.logging :as log]
+  (:require [bluejdbc.util.log :as log]
+            [clojure.data :as data]
             [methodical.core :as m]
             [potemkin.types :as p.types]))
 

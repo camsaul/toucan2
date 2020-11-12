@@ -3,8 +3,8 @@
   (:require [bluejdbc.options :as options]
             [bluejdbc.types :as types]
             [bluejdbc.util :as u]
+            [bluejdbc.util.log :as log]
             [clojure.string :as str]
-            [clojure.tools.logging :as log]
             [methodical.core :as m]
             [pretty.core :as pretty])
   (:import [java.sql ResultSet ResultSetMetaData]))

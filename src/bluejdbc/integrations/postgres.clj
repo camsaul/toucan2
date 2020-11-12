@@ -2,8 +2,8 @@
   (:require [bluejdbc.result-set :as rs]
             [bluejdbc.statement :as stmt]
             [bluejdbc.util :as u]
+            [bluejdbc.util.log :as log]
             [clojure.string :as str]
-            [clojure.tools.logging :as log]
             [java-time :as t]
             [methodical.core :as m]
             [second-date.core :as second-date])

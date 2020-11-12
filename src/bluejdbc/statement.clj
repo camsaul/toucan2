@@ -4,7 +4,7 @@
             [bluejdbc.result-set :as rs]
             [bluejdbc.types :as types]
             [bluejdbc.util :as u]
-            [clojure.tools.logging :as log]
+            [bluejdbc.util.log :as log]
             [honeysql.core :as hsql]
             [java-time :as t]
             [methodical.core :as m]

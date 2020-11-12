@@ -9,7 +9,7 @@
             [bluejdbc.statement :as stmt]
             [bluejdbc.types :as types]
             [bluejdbc.util :as u]
-            [clojure.tools.logging :as log]
+            [bluejdbc.util.log :as log]
             [potemkin :as p]))
 
 ;; fool the linter/cljr-refactor
@@ -17,6 +17,7 @@
          high-level/keep-me
          metadata/keep-me
          metadata-fns/keep-me
+         log/keep-me
          rs/keep-me
          stmt/keep-me
          types/keep-me
@@ -28,6 +29,7 @@
  [high-level execute! insert! query query-one reducible-query transaction update! delete! select]
  [metadata metadata]
  [metadata-fns with-metadata database-info driver-info catalogs schemas table-types tables columns]
+ [log with-debug-logging]
  [options options with-options]
  [rs maps]
  [stmt prepare! with-prepared-statement results]
@@ -48,3 +50,6 @@
           (catch Throwable _))
     (log/debugf "Loading integrations for %s" class-name)
     (require integration-namespace)))
+
+(defn x []
+  (log/tracef "TEsting %d" 100))
