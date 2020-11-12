@@ -14,7 +14,7 @@
 Blue JDBC is a new Clojure interface to JDBC with an an emphasis on ease-of-use, performance, extensibility, and
 complete documentation.
 
-Documentation can be viewed [here]
+[Documentation is available here.](docs/).
 
 ### Key benefits!
 
