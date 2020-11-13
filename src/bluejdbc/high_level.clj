@@ -67,10 +67,13 @@
   (log/trace "Fetching generated keys")
   (let [ks (:statement/return-generated-keys (options/options stmt))]
     (with-open [rs (.getGeneratedKeys stmt)]
-      (into [] (cond
-                 (keyword? ks)    (map ks rs)
-                 (sequential? ks) (map #(select-keys % ks) rs)
-                 :else            rs)))))
+      (let [result (into []
+                         (cond
+                           (keyword? ks)    (map ks)
+                           (sequential? ks) (map #(select-keys % ks))
+                           :else            identity)
+                         rs)]
+        result))))
 
 (defn execute!
   "Execute a SQL *statement*, which can be SQL/HoneySQL/a `PreparedStatement`. The content of `query-or-stmt` itself

@@ -34,7 +34,7 @@
  [methodical defmethod]
  [log with-debug-logging]
  [options options with-options]
- [rs maps]
+ [rs read-column-thunk maps]
  [stmt prepare! with-prepared-statement results]
  [types type]
  [u reverse-lookup])

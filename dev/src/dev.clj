@@ -1,5 +1,14 @@
 (ns dev
-  (:require [environ.core :as env]))
+  (:require [bluejdbc.core :as jdbc]
+            [environ.core :as env]))
+
+(jdbc/defmethod jdbc/named-connectable :h2
+  [_]
+  "jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1")
+
+(jdbc/defmethod jdbc/named-connectable :postgres
+  [_]
+  "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam")
 
 (defn ns-unmap-all
   "Unmap all interned vars in a namespace. Reset the namespace to a blank slate! Perfect for when you rename everything
