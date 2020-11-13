@@ -18,16 +18,16 @@
     (jdbc/with-connection [conn (test/jdbc-url)]
       (testing "(query"
         (testing "conn query)"
-          (is (= [{:t t}]
+          (is (= (test/results [{:t t}])
                  (jdbc/query conn [sql t]))))
 
         (testing "stmt)"
-          (is (= [{:t t}]
+          (is (= (test/results [{:t t}])
                  (jdbc/with-prepared-statement [stmt conn [sql t]]
                    (jdbc/query stmt)))))
 
         (doseq [[options expected] {nil
-                                    [{:t t}]
+                                    (test/results [{:t t}])
 
                                     {:results/xform nil}
                                     [[t]]
@@ -48,7 +48,7 @@
                      (jdbc/query conn stmt options))))))))))
 
 (deftest query-one-test
-  (is (= {:abc "abc"}
+  (is (= {(test/identifier :abc) "abc"}
          (jdbc/query-one (test/jdbc-url) "SELECT 'abc' AS abc;")))
 
   (testing "With a custom results xform"
@@ -56,9 +56,9 @@
            (jdbc/query-one (test/jdbc-url) "SELECT 'abc' AS abc;" {:results/xform nil}))))
 
   (testing "query that returns no columns should still work"
-    (is (= {}
+    (is (= nil
            (jdbc/query-one (test/jdbc-url) "SELECT;")))
-    (is (= []
+    (is (= nil
            (jdbc/query-one (test/jdbc-url) "SELECT;" {:results/xform nil})))))
 
 (deftest execute!-test
@@ -77,7 +77,7 @@
      (try
        (jdbc/execute! conn# ~(format "DROP TABLE IF EXISTS %s;" (name table-name)))
        (is (= 0
-              (jdbc/execute! conn# ~(format "CREATE TABLE %s %s;" (name table-name) fields))))
+              (jdbc/execute! conn# (format "CREATE TABLE %s %s;" ~(name table-name) ~fields))))
        ~@body
        (finally
          (jdbc/execute! conn# ~(format "DROP TABLE IF EXISTS %s;" (name table-name)))))))
@@ -107,31 +107,35 @@
           (with-test-table conn :insert_test_table "(id INTEGER NOT NULL, name TEXT NOT NULL)"
             (is (= (count expected)
                    (f conn)))
-            (is (= expected
+            (is (= (test/results expected)
                    (jdbc/query conn {:select   [:*]
                                      :from     [:insert_test_table]
                                      :order-by [[:id :asc]]})))))))))
 
 (deftest insert-returning-keys!-test
   (jdbc/with-connection [conn (test/jdbc-url)]
-    (with-test-table conn :returning_keys_test "(id INTEGER NOT NULL, name TEXT NOT NULL)"
+    (with-test-table conn :returning_keys_test (format "(id %s, name TEXT NOT NULL)" (test/autoincrement-type))
       (testing "If return-generated-keys is true, just return whatever the DB returns"
-        (is (= [{:id 1, :name "Cam"}]
+        (is (= (test/results
+                (case (test/db-type)
+                  ;; H2 only returns the keys that were actually generated
+                  :h2 [{:id 1}]
+                  [{:id 1, :name "Cam"}]))
                (jdbc/insert-returning-keys! conn
                                             :returning_keys_test
-                                            {:id 1, :name "Cam"}
+                                            {:name "Cam"}
                                             {:statement/return-generated-keys true}))))
       (testing "Should be able to specify *which* keys get returned"
-        (is (= [1]
+        (is (= [2]
                (jdbc/insert-returning-keys! conn
                                             :returning_keys_test
-                                            {:id 1, :name "Cam"}
-                                            {:statement/return-generated-keys :id})))
-        (is (= [{:id 1}]
+                                            {:name "Cam"}
+                                            {:statement/return-generated-keys (test/identifier :id)})))
+        (is (= (test/results [{:id 3}])
                (jdbc/insert-returning-keys! conn
                                             :returning_keys_test
-                                            {:id 1, :name "Cam"}
-                                            {:statement/return-generated-keys [:id]})))))))
+                                            {:name "Cam"}
+                                            {:statement/return-generated-keys [(test/identifier :id)]})))))))
 
 (deftest conditions->where-clause-test
   (testing "nil"
@@ -169,44 +173,50 @@
         (testing "Basic field = x condition"
           (is (= 1
                  (jdbc/update! conn :venues {:price 4} {:expensive true})))
-          (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
-                  {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
-                  {:id 3, :price 4, :name "Expensive Sushi", :expensive true}]
+          (is (= (test/results
+                  [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
+                   {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
+                   {:id 3, :price 4, :name "Expensive Sushi", :expensive true}])
                  (venues))))
         (testing "fancy field = [...] conditions"
           (is (= 2
                  (jdbc/update! conn :venues {:price [:< 3]} {:expensive false})))
-          (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive false}
-                  {:id 2, :price 2, :name "Cheap Pizza", :expensive false}
-                  {:id 3, :price 4, :name "Expensive Sushi", :expensive true}]
+          (is (= (test/results
+                  [{:id 1, :price 1, :name "Cheap Burgers", :expensive false}
+                   {:id 2, :price 2, :name "Cheap Pizza", :expensive false}
+                   {:id 3, :price 4, :name "Expensive Sushi", :expensive true}])
                  (venues)))
           (testing "More that 1 arg"
             (is (= 2
                    (jdbc/update! conn :venues {:price [:between 1 3]} {:expensive nil})))
-            (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
-                    {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
-                    {:id 3, :price 4, :name "Expensive Sushi", :expensive true}]
+            (is (= (test/results
+                    [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
+                     {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
+                     {:id 3, :price 4, :name "Expensive Sushi", :expensive true}])
                    (venues)))))
         (testing "no conditions"
           (is (= 3
                  (jdbc/update! conn :venues nil {:expensive nil})))
-          (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
-                  {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
-                  {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}]
+          (is (= (test/results
+                  [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
+                   {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
+                   {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}])
                  (venues))))
         (testing "conditions as HoneySQL clause"
           (is (= 2
                  (jdbc/update! conn :venues [:<= :price 3] {:expensive false})))
-          (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive false}
-                  {:id 2, :price 2, :name "Cheap Pizza", :expensive false}
-                  {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}]
+          (is (= (test/results
+                  [{:id 1, :price 1, :name "Cheap Burgers", :expensive false}
+                   {:id 2, :price 2, :name "Cheap Pizza", :expensive false}
+                   {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}])
                  (venues))))
         (testing "no rows affected"
           (is (= 0
                  (jdbc/update! conn :venues {:price 5} {:expensive true})))
-          (is (= [{:id 1, :price 1, :name "Cheap Burgers", :expensive false}
-                  {:id 2, :price 2, :name "Cheap Pizza", :expensive false}
-                  {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}]
+          (is (= (test/results
+                  [{:id 1, :price 1, :name "Cheap Burgers", :expensive false}
+                   {:id 2, :price 2, :name "Cheap Pizza", :expensive false}
+                   {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}])
                  (venues))))))))
 
 (deftest delete!-test
@@ -223,13 +233,15 @@
         (testing "map conditions"
           (is (= 1
                  (jdbc/delete! conn :venues {:price 2})))
-          (is (= [{:id 1, :price 1, :name "Cheap Burgers"}
-                  {:id 3, :price 4, :name "Expensive Sushi"}]
+          (is (= (test/results
+                  [{:id 1, :price 1, :name "Cheap Burgers"}
+                   {:id 3, :price 4, :name "Expensive Sushi"}])
                  (venues))))
         (testing "HoneySQL-style conditions"
           (is (= 1
                  (jdbc/delete! conn :venues [:= :price 4])))
-          (is (= [{:id 1, :price 1, :name "Cheap Burgers"}]
+          (is (= (test/results
+                  [{:id 1, :price 1, :name "Cheap Burgers"}])
                  (venues))))
         (testing "No conditions"
           (is (= 1

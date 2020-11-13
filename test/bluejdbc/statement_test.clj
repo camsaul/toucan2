@@ -27,7 +27,7 @@
   (testing "ProxyPreparedStatements should be reducible"
     (with-open [conn (jdbc/connect! (test/jdbc-url))
                 stmt (jdbc/prepare! conn "SELECT 1 AS one;")]
-      (is (= [{:one 1}]
+      (is (= (test/results [{:one 1}])
              (reduce conj stmt))))))
 
 (deftest honeysql-options-test

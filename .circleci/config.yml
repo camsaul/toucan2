@@ -162,6 +162,8 @@ jobs:
           command: lein << parameters.lein-command >>
           no_output_timeout: 5m
       - steps: << parameters.after-steps >>
+      - store_test_results:
+          path: /home/circleci/camsaul/bluejdbc/target/junit
 
   reflection-warnings:
     executor: default
@@ -201,19 +203,19 @@ workflows:
           e: postgres-latest
           lein-command: test
 
-      # - lein:
-      #     name: h2
-      #     requires:
-      #       - deps
-      #     e: h2
-      #     lein-command: test
+      - lein:
+          name: h2
+          requires:
+            - deps
+          e: h2
+          lein-command: test
 
-      # - lein:
-      #     name: h2-java-11
-      #     requires:
-      #       - deps
-      #     e: java-11
-      #     lein-command: test
+      - lein:
+          name: h2-java-11
+          requires:
+            - deps
+          e: java-11
+          lein-command: test
 
       # - lein:
       #     name: mysql-5-7
@@ -299,8 +301,8 @@ workflows:
             - reflection-warnings
             - postgres-9-6
             - postgres-latest
-            # - h2
-            # - h2-java-11
+            - h2
+            - h2-java-11
             # - mysql-5-7
             # - mysql-latest
             # - mariadb-10-2

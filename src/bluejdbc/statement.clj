@@ -149,23 +149,41 @@
 (extend-protocol CreatePreparedStatement
   ;; plain SQL string
   String
-  (prepare!* [s ^Connection conn {rs-type                :result-set/type
-                                  concurrency            :result-set/concurrency
-                                  holdability            :result-set/holdability
-                                  return-generated-keys? :statement/return-generated-keys
-                                  :or                    {rs-type     :forward-only
-                                                          concurrency :read-only
-                                                          holdability (.getHoldability conn)}
-                                  :as                    options}]
-    (let [stmt (if return-generated-keys?
-                 (.prepareStatement conn
-                                    s
-                                    Statement/RETURN_GENERATED_KEYS)
-                 (.prepareStatement conn
-                                    s
-                                    (rs/type rs-type)
-                                    (rs/concurrency concurrency)
-                                    (rs/holdability holdability)))]
+  (prepare!* [s ^Connection conn {rs-type               :result-set/type
+                                  concurrency           :result-set/concurrency
+                                  holdability           :result-set/holdability
+                                  return-generated-keys :statement/return-generated-keys
+                                  :or                   {rs-type     :forward-only
+                                                         concurrency :read-only
+                                                         holdability (.getHoldability conn)}
+                                  :as                   options}]
+    (let [stmt (cond
+                 (and return-generated-keys
+                      (sequential? return-generated-keys))
+                 (do
+                   (log/trace (pr-str (list '.prepareStatement 'conn s (mapv name return-generated-keys))))
+                   (.prepareStatement conn
+                                      s
+                                      ^"[Ljava.lang.String;" (into-array String (map name return-generated-keys))))
+
+                 return-generated-keys
+                 (do
+                   (log/trace (pr-str (list '.prepareStatement 'conn s 'Statement/RETURN_GENERATED_KEYS)))
+                   (.prepareStatement conn
+                                      s
+                                      Statement/RETURN_GENERATED_KEYS))
+
+                 :else
+                 (do
+                   (log/trace (pr-str (list '.prepareStatement 'conn s
+                                            (u/reverse-lookup rs/type rs-type)
+                                            (u/reverse-lookup rs/concurrency concurrency)
+                                            (u/reverse-lookup rs/holdability holdability))))
+                   (.prepareStatement conn
+                                      s
+                                      (rs/type rs-type)
+                                      (rs/concurrency concurrency)
+                                      (rs/holdability holdability))))]
       (proxy-prepared-statement stmt options)))
 
   ;; [sql & args] or [honeysql & args] vector
