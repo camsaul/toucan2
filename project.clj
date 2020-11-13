@@ -127,7 +127,7 @@
     [[docstring-checker "1.1.0"]]
 
     :docstring-checker
-    {:exclude [#"test"]}}
+    {:exclude [#"test" #"dev"]}}
 
    :bikeshed
    {:plugins  [[lein-bikeshed "0.5.2"]]
