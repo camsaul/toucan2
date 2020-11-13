@@ -49,12 +49,10 @@
     {:dependencies
      [[org.clojure/clojure "1.10.1"]
       [environ "1.2.0"]
-      [pjstadig/humane-test-output "0.10.0"]
-      [test-report-junit-xml "0.2.0"]]
+      [pjstadig/humane-test-output "0.10.0"]]
 
      :plugins
-     [[lein-environ "1.2.0"]
-      [lein-test-report-junit-xml "0.2.0"]]
+     [[lein-environ "1.2.0"]]
 
      :repl-options
      {:init-ns bluejdbc.core}
@@ -73,9 +71,6 @@
       (pjstadig.humane-test-output/activate!)
       (try (require 'dev) (catch Throwable _))]
 
-     :test-report-junit-xml
-     {:output-dir "target/junit"}
-
      :global-vars
      {*warn-on-reflection* true}}]
 
@@ -89,7 +84,14 @@
    [:dev :jdbc-drivers :cloverage]
 
    :test
-   {}
+   {:dependencies
+    [[test-report-junit-xml "0.2.0"]]
+
+    :plugins
+    [[lein-test-report-junit-xml "0.2.0"]]
+
+    :test-report-junit-xml
+    {:output-dir "target/junit"}}
 
    :cloverage
    {:dependencies
