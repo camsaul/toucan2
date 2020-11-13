@@ -63,7 +63,16 @@
   ([connectable query-or-stmt options]
    (reduce-first (reducible-query connectable query-or-stmt (assoc options :stmt/max-rows 1)))))
 
-(defn generated-keys [^PreparedStatement stmt]
+;; TODO -- should this be exported in `bluejdbc.core`?
+(defn generated-keys
+  "Fetch the generated keys created after executing `stmt` (i.e., an `INSERT` statement). Results are a sequence of one
+  result per row, but the format of each row depends on the `:statement/return-generated-keys` option itself: a truthy
+  value returns everything; a keyword column name returns just that column; a sequence of column names returns a
+  sequence of maps containing those keys.
+
+    ;; :statement/return-generated-keys -> :id
+    (generated-keys stmt) -> [1 2 3]"
+  [^PreparedStatement stmt]
   (log/trace "Fetching generated keys")
   (let [ks (:statement/return-generated-keys (options/options stmt))]
     (with-open [rs (.getGeneratedKeys stmt)]
@@ -90,6 +99,7 @@
   ([x y]
    (if (instance? PreparedStatement x)
      (let [[^PreparedStatement stmt options] [x y]
+           stmt                              ^PreparedStatement (options/with-options stmt options)
            affected-rows                     (.executeUpdate stmt)]
        (if (:statement/return-generated-keys (options/options stmt))
          (when (pos? affected-rows)
@@ -134,6 +144,8 @@
      (execute! connectable honeysql-form options))))
 
 (defn insert-returning-keys!
+  "Like `insert!`, but returns the generated keys (e.g. IDs) for the inserted rows. Which keys get returned is
+  database-dependent."
   {:arglists '([connectable table-name row-or-rows]
                [connectable table-name columns row-or-rows]
                [connectable table-name row-or-rows options]
@@ -193,18 +205,17 @@
                                 {:where where-clause}))]
      (execute! connectable honeysql-form options))))
 
-;; TODO -- not sure this makes sense. what if we wanted to specify order/limit/etc??
 (defn select
+  "Convenience for selecting rows from a specific table. TODO -- better docs"
   ([connectable table-name]
    (select connectable table-name nil nil))
 
-  ([connectable table-name conditions]
-   (select connectable table-name conditions nil))
+  ([connectable table-name honeysql-form]
+   (select connectable table-name honeysql-form nil))
 
-  ([connectable table-name conditions options]
+  ([connectable table-name honeysql-form options]
    (let [honeysql-form (merge {:select [table-name]}
-                              (when-let [where-clause (conditions->where-clause conditions)]
-                                {:where where-clause}))]
+                              honeysql-form)]
      (query connectable honeysql-form options))))
 
 (defn do-transaction
