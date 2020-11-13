@@ -162,6 +162,8 @@ jobs:
           command: lein << parameters.lein-command >>
           no_output_timeout: 5m
       - steps: << parameters.after-steps >>
+      - store_test_results:
+          path: /home/circleci/metabase/metabase/target/junit
 
   reflection-warnings:
     executor: default

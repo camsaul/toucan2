@@ -97,9 +97,9 @@
 
 (defn autoincrement-type []
   (case (db-type)
-    :postgres "SERIAL"
-    :h2       "BIGINT AUTO_INCREMENT"
-    :mysql    "INTEGER NOT NULL AUTO_INCREMENT"))
+    :postgresql "SERIAL"
+    :h2         "BIGINT AUTO_INCREMENT"
+    :mysql      "INTEGER NOT NULL AUTO_INCREMENT"))
 
 (defn- h2-clob->string [^org.h2.jdbc.JdbcClob clob]
   (letfn [(->str [^BufferedReader buffered-reader]
