@@ -59,7 +59,13 @@
                                 :people/created-at (t/local-date-time "2020-04-21T23:56")}
                                {:people/id         2
                                 :people/name       "Sam"
-                                :people/created-at (t/local-date-time "2019-01-11T23:56" )}]}}]
+                                :people/created-at (t/local-date-time "2019-01-11T23:56" )}]}
+
+                   "results-xform should be comp-able"
+                   {:xform (fn [rs]
+                             (comp ((rs/maps :namespaced :lisp-case) rs)
+                                   (map (test/identifier :people/id))))
+                    :expected [1 2]}}]
             (testing description
               (is (= (test/results expected)
                      (transduce (take 2) conj [] (stmt/results stmt {:results/xform xform}))))

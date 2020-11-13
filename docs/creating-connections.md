@@ -33,3 +33,7 @@ TODO
 ## Defining Your Own Connectables
 
 TODO
+
+### Setting Up a Connection Pool
+
+TODO

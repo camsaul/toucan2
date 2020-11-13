@@ -28,7 +28,15 @@ TODO
 
 TODO
 
-### Custom Reducing Functions
+### ResultSet Transducers
+
+TODO
+
+#### Composing
+
+TODO
+
+#### Custom Reducing Functions
 
 TODO
 
