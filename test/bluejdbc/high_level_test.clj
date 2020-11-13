@@ -14,7 +14,7 @@
 
 (deftest query-test
   (let [t   (t/offset-date-time "2020-04-15T07:04:02.465161Z")
-        sql "SELECT TIMESTAMP ? AS t;"]
+        sql "SELECT ? AS t;"]
     (jdbc/with-connection [conn (test/jdbc-url)]
       (testing "(query"
         (testing "conn query)"
