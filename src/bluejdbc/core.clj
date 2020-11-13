@@ -28,13 +28,13 @@
 
 (p/import-vars
  [conn connect! named-connectable transaction-isolation-level with-connection]
- [high-level execute! insert! insert-returning-keys! query query-one reducible-query transaction update! delete!]
+ [high-level execute! insert! insert-returning-keys! query query-one reducible-query transaction update! delete! select]
  [metadata metadata]
  [metadata-fns with-metadata database-info driver-info catalogs schemas table-types tables columns]
  [methodical defmethod]
  [log with-debug-logging]
  [options options with-options]
- [rs maps]
+ [rs read-column-thunk maps]
  [stmt prepare! with-prepared-statement results]
  [types type]
  [u reverse-lookup])
@@ -44,8 +44,8 @@
 (p/import-def rs/type result-set-type)
 (p/import-def rs/holdability result-set-holdability)
 
-
 ;; load integrations
+;; TODO -- we should only load these once when a database of the relevant type is used.
 (doseq [[class-name integration-namespace] {"org.postgresql.Driver"   'bluejdbc.integrations.postgres
                                             "org.mariadb.jdbc.Driver" 'bluejdbc.integrations.mysql}]
   (when (try
@@ -53,6 +53,3 @@
           (catch Throwable _))
     (log/debugf "Loading integrations for %s" class-name)
     (require integration-namespace)))
-
-(defn x []
-  (log/tracef "TEsting %d" 100))

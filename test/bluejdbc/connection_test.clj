@@ -190,6 +190,10 @@
          (jdbc/connect! {:classname   "org.h2.Driver"
                          :subprotocol "h2"})))))
 
+(jdbc/defmethod jdbc/named-connectable ::test-connection
+  [_]
+  "jdbc:bluejdbc-test-driver://localhost:1337/my_db")
+
 (deftest named-connectable-test
   (testing "Should be able to create a named connectable; should be identical to using connectable directly"
     (with-test-driver
@@ -199,9 +203,6 @@
             (is (= {:url        "jdbc:bluejdbc-test-driver://localhost:1337/my_db"
                     :properties {}}
                    (into {} unwrapped)))))
-        (jdbc/defmethod jdbc/named-connectable ::test-connection
-          [_]
-          "jdbc:bluejdbc-test-driver://localhost:1337/my_db")
         (jdbc/with-connection [conn ::test-connection]
           (let [unwrapped (.unwrap conn MockConnection)]
             (is (= {:url        "jdbc:bluejdbc-test-driver://localhost:1337/my_db"

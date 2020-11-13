@@ -1,9 +1,12 @@
 (ns bluejdbc.test
   "Test utils."
   (:require [bluejdbc.core :as jdbc]
+            [bluejdbc.util :as u]
             [clojure.string :as str]
             [environ.core :as env]
-            [java-time :as t]))
+            [java-time :as t]
+            [methodical.core :as m])
+  (:import java.io.BufferedReader))
 
 (defn jdbc-url
   "JDBC URL to run tests against."
@@ -64,3 +67,59 @@
   "Execute `body` with some rows loaded into a `people` table."
   [conn & body]
   `(do-with-test-data ~conn (fn [] ~@body)))
+
+(m/defmulti identifier
+  {:arglists '([k])}
+  (fn [_]
+    (db-type)))
+
+(m/defmethod identifier :default
+  [k]
+  k)
+
+(m/defmethod identifier :h2
+  [k]
+  (when k
+    (keyword (str/upper-case (u/qualified-name k)))))
+
+(defn results [m-or-ms]
+  (cond
+    (map? m-or-ms)
+    (let [m m-or-ms]
+      (zipmap (map identifier (keys m))
+              (vals m)))
+
+    (sequential? m-or-ms)
+    (map results m-or-ms)
+
+    :else
+    m-or-ms))
+
+(defn autoincrement-type []
+  (case (db-type)
+    :postgresql "SERIAL"
+    :h2         "BIGINT AUTO_INCREMENT"
+    :mysql      "INTEGER NOT NULL AUTO_INCREMENT"))
+
+(defn- h2-clob->string [^org.h2.jdbc.JdbcClob clob]
+  (letfn [(->str [^BufferedReader buffered-reader]
+            (loop [acc []]
+              (if-let [line (.readLine buffered-reader)]
+                (recur (conj acc line))
+                (str/join "\n" acc))))]
+    (with-open [reader (.getCharacterStream clob)]
+      (if (instance? BufferedReader reader)
+        (->str reader)
+        (with-open [buffered-reader (BufferedReader. reader)]
+          (->str buffered-reader))))))
+
+;; override the read-column-thunk for H2 to convert CLOBs in the results to Strings. This probably isn't the best way
+;; to do this (TODO)
+(jdbc/defmethod jdbc/read-column-thunk [:h2 :default]
+  [rs rsmeta i options]
+  (let [thunk (next-method rs rsmeta i options)]
+    (fn []
+      (let [result (thunk)]
+        (if (instance? org.h2.jdbc.JdbcClob result)
+          (h2-clob->string result)
+          result)))))

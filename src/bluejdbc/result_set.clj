@@ -74,7 +74,7 @@
          fns    (for [i (index-range rsmeta)]
                   (read-column-thunk rs rsmeta (int i) options))]
      (if (empty? fns)
-       (constantly [])
+       (constantly nil)
        (let [thunk (apply juxt fns)]
          (fn row-thunk* []
            (when (.next rs)
@@ -127,7 +127,7 @@
   "Implementations of the `maps` `ResultSet` transform. Fetch a sequence column names from `ResultSet` `rs` and apply
   transforms in `options-set`. `options-set` can include any method of `transform-column-names`.
 
-    (column-names-with-options rs nil) ; -> [:col_1 :col_2]
+    (column-names-with-options rs nil)           ; -> [:col_1 :col_2]
     (column-names-with-options rs #{:lisp-case}) ; -> [:col-1 :col-2]"
   [rs options-set]
   (let [names (if (contains? options-set :namespaced)
@@ -175,7 +175,6 @@
   more options by adding implementations for `bluejdbc.result-set/transform-column-names`."
   (maps* nil))
 
-
 ;;;; Reducing/seq-ing result sets
 
 (defn reduce-result-set
@@ -185,19 +184,15 @@
    (reduce-result-set rs (options/options rs) rf init))
 
   ([rs {xform :results/xform, :or {xform maps}} rf init]
-   (let [xform (if xform
-                 (xform rs)
-                 identity)
-         rf    (xform rf)
+   (let [xform (comp (take-while some?)
+                     (if xform
+                       (xform rs)
+                       identity))
          thunk (row-thunk rs)]
-     (loop [acc init]
-       (if (reduced? acc)
-         @acc
-         (if-let [row (thunk)]
-           (recur (rf acc row))
-           (do
-             (log/trace "All rows consumed.")
-             acc)))))))
+     (reduce
+      (xform rf)
+      init
+      (repeatedly thunk)))))
 
 (defn result-set-seq
   "Return a lazy sequence of rows from a `ResultSet`. Make sure you consume all the rows in the `ResultSet` while it is

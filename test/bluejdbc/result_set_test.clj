@@ -11,7 +11,7 @@
     (with-open [conn (jdbc/connect! (test/jdbc-url))
                 stmt (jdbc/prepare! conn "SELECT 1 AS one;")
                 rs   (jdbc/results stmt)]
-      (is (= [{:one 1}]
+      (is (= (test/results [{:one 1}])
              (reduce conj rs)))
 
       (testing "using a custom row transform"
@@ -24,7 +24,7 @@
     (with-open [conn (jdbc/connect! (test/jdbc-url))
                 stmt (jdbc/prepare! conn "SELECT 1 AS one;")
                 rs   (jdbc/results stmt)]
-      (is (= [{:one 1}]
+      (is (= (test/results [{:one 1}])
              (vec rs)))
 
       (testing "using a custom row transform"
@@ -61,11 +61,11 @@
                                 :people/name       "Sam"
                                 :people/created-at (t/local-date-time "2019-01-11T23:56" )}]}}]
             (testing description
-              (is (= expected
+              (is (= (test/results expected)
                      (transduce (take 2) conj [] (stmt/results stmt {:results/xform xform}))))
 
               (testing "with-prepared-statement"
-                (is (= expected
+                (is (= (test/results expected)
                        (stmt/with-prepared-statement [stmt conn stmt {:results/xform xform}]
                          (transduce (take 2) conj [] (stmt/results stmt)))))))))))))
 
