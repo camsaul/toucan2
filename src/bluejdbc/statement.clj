@@ -146,6 +146,12 @@
       (log/tracef "->\n%s" (u/pprint-to-str sql-args))
       sql-args)))
 
+(defn- quoting-strategy [^Connection conn]
+  (case (.. conn getMetaData getIdentifierQuoteString)
+    "\"" :ansi
+    "`"  :mysql
+    nil))
+
 (extend-protocol CreatePreparedStatement
   ;; plain SQL string
   String
@@ -195,7 +201,9 @@
   ;; HoneySQL map
   clojure.lang.IPersistentMap
   (prepare!* [honeysql-form conn options]
-    (prepare!* (format-honeysql honeysql-form options) conn options)))
+    (prepare!* (format-honeysql honeysql-form options) conn
+               (cond-> options
+                 (not (:honeysql/quoting options)) (assoc :honeysql/quoting (quoting-strategy conn))))))
 
 (defn prepare!
   "Create a new `PreparedStatement` from `query`. `query` is one of:

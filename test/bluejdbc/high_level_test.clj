@@ -14,7 +14,7 @@
 
 (deftest query-test
   (let [t   (t/offset-date-time "2020-04-15T07:04:02.465161Z")
-        sql "SELECT ? AS t;"]
+        sql "SELECT TIMESTAMP ? AS t;"]
     (jdbc/with-connection [conn (test/jdbc-url)]
       (testing "(query"
         (testing "conn query)"
@@ -55,11 +55,13 @@
     (is (= ["abc"]
            (jdbc/query-one (test/jdbc-url) "SELECT 'abc' AS abc;" {:results/xform nil}))))
 
-  (testing "query that returns no columns should still work"
-    (is (= nil
-           (jdbc/query-one (test/jdbc-url) "SELECT;")))
-    (is (= nil
-           (jdbc/query-one (test/jdbc-url) "SELECT;" {:results/xform nil})))))
+  ;; this doesn't work on MySQL
+  (when-not (#{:mysql} (test/db-type))
+    (testing "query that returns no columns should still work"
+      (is (= nil
+             (jdbc/query-one (test/jdbc-url) "SELECT;")))
+      (is (= nil
+             (jdbc/query-one (test/jdbc-url) "SELECT;" {:results/xform nil}))))))
 
 (deftest execute!-test
   (testing "execute!"
@@ -114,28 +116,33 @@
 
 (deftest insert-returning-keys!-test
   (jdbc/with-connection [conn (test/jdbc-url)]
-    (with-test-table conn :returning_keys_test (format "(id %s, name TEXT NOT NULL)" (test/autoincrement-type))
+    (with-test-table conn :returning_keys_test (format "(id %s PRIMARY KEY, name TEXT NOT NULL)" (test/autoincrement-type))
       (testing "If return-generated-keys is true, just return whatever the DB returns"
         (is (= (test/results
                 (case (test/db-type)
                   ;; H2 only returns the keys that were actually generated
-                  :h2 [{:id 1}]
+                  :h2    [{:id 1}]
+                  :mysql [{:insert_id 1}]
                   [{:id 1, :name "Cam"}]))
                (jdbc/insert-returning-keys! conn
                                             :returning_keys_test
                                             {:name "Cam"}
                                             {:statement/return-generated-keys true}))))
-      (testing "Should be able to specify *which* keys get returned"
-        (is (= [2]
-               (jdbc/insert-returning-keys! conn
-                                            :returning_keys_test
-                                            {:name "Cam"}
-                                            {:statement/return-generated-keys (test/identifier :id)})))
-        (is (= (test/results [{:id 3}])
-               (jdbc/insert-returning-keys! conn
-                                            :returning_keys_test
-                                            {:name "Cam"}
-                                            {:statement/return-generated-keys [(test/identifier :id)]})))))))
+      (let [generated-key (case (test/db-type)
+                            :h2    :ID
+                            :mysql :insert_id
+                            :id)]
+        (testing "Should be able to specify *which* keys get returned"
+          (is (= [2]
+                 (jdbc/insert-returning-keys! conn
+                                              :returning_keys_test
+                                              {:name "Cam"}
+                                              {:statement/return-generated-keys generated-key})))
+          (is (= [{generated-key 3}]
+                 (jdbc/insert-returning-keys! conn
+                                              :returning_keys_test
+                                              {:name "Cam"}
+                                              {:statement/return-generated-keys [generated-key]}))))))))
 
 (deftest conditions->where-clause-test
   (testing "nil"
