@@ -38,7 +38,7 @@
   with-connection]
 
  [hydrate
-  hydrate*
+  ;; TODO -- need to import other stuff
   hydrate]
 
  [instance
