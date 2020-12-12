@@ -11,6 +11,10 @@
   [_]
   "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam")
 
+(jdbc/defmethod jdbc/named-connectable :mysql
+  [_]
+  "jdbc:mysql://localhost:3306/metabase_test?user=root")
+
 (defn use! [what]
   (test/set-jdbc-url! (jdbc/named-connectable what)))
 

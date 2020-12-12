@@ -1,55 +1,92 @@
 (ns bluejdbc.core
-  (:refer-clojure :exclude [defmethod type])
-  (:require [bluejdbc.connection :as conn]
-            [bluejdbc.high-level :as high-level]
-            [bluejdbc.metadata :as metadata]
-            [bluejdbc.metadata-fns :as metadata-fns]
-            [bluejdbc.options :as options]
+  (:refer-clojure :exclude [compile defmethod #_instance?])
+  (:require [bluejdbc.compile :as compile]
+            [bluejdbc.connection :as connection]
+            [bluejdbc.hydrate :as hydrate]
+            [bluejdbc.instance :as instance]
+            [bluejdbc.log :as log]
+            [bluejdbc.query :as query]
             [bluejdbc.result-set :as rs]
             [bluejdbc.statement :as stmt]
-            [bluejdbc.types :as types]
-            [bluejdbc.util :as u]
-            [bluejdbc.util.log :as log]
+            [bluejdbc.table-aware :as table-aware]
             [methodical.core :as methodical]
             [potemkin :as p]))
 
-;; fool the linter/cljr-refactor
-(comment conn/keep-me
-         high-level/keep-me
-         metadata/keep-me
-         metadata-fns/keep-me
-         methodical/keep-me
+(comment methodical.core/keep-me
+         compile/keep-me
+         connection/keep-me
+         hydrate/keep-me
          log/keep-me
+         instance/keep-me
+         query/keep-me
          rs/keep-me
          stmt/keep-me
-         types/keep-me
-         options/keep-me
-         u/keep-me)
+         table-aware/keep-me)
 
 (p/import-vars
- [conn connect! named-connectable transaction-isolation-level with-connection]
- [high-level execute! insert! insert-returning-keys! query query-one reducible-query transaction update! delete! select]
- [metadata metadata]
- [metadata-fns with-metadata database-info driver-info catalogs schemas table-types tables columns]
- [methodical defmethod]
- [log with-debug-logging]
- [options options with-options]
+ [methodical
+  defmethod]
+
+ [compile
+  compile*
+  compile]
+
+ [connection
+  driver
+  connection*
+  connection
+  with-connection]
+
+ [hydrate
+  hydrate*
+  hydrate]
+
+ [instance
+  instance
+  #_instance?
+  original
+  changes
+  table
+  with-table]
+
+ [log
+  with-debug-logging]
+
+ ;; TODO
+ #_[metadata with-metadata database-info driver-info catalogs schemas table-types tables columns]
+
+ [query
+  reducible-query*
+  reducible-query
+  query*
+  query
+  query-one*
+  query-one
+  execute!*
+  execute!
+  transaction]
+
+ ;; TODO
  [rs read-column-thunk maps]
- [stmt prepare! with-prepared-statement results]
- [types type]
- [u reverse-lookup])
+ [stmt prepare!]
 
-(p/import-def rs/concurrency result-set-concurrency)
-(p/import-def rs/fetch-direction result-set-fetch-direction)
-(p/import-def rs/type result-set-type)
-(p/import-def rs/holdability result-set-holdability)
-
-;; load integrations
-;; TODO -- we should only load these once when a database of the relevant type is used.
-(doseq [[class-name integration-namespace] {"org.postgresql.Driver"   'bluejdbc.integrations.postgres
-                                            "org.mariadb.jdbc.Driver" 'bluejdbc.integrations.mysql}]
-  (when (try
-          (Class/forName class-name)
-          (catch Throwable _))
-    (log/debugf "Loading integrations for %s" class-name)
-    (require integration-namespace)))
+ [table-aware
+  table-name
+  primary-key*
+  primary-key
+  select*
+  select
+  select-one*
+  select-one
+  insert!*
+  insert!
+  insert-returning-keys!*
+  insert-returning-keys!
+  update!*
+  update!
+  delete!*
+  delete!
+  upsert!*
+  upsert!
+  save!*
+  save!])

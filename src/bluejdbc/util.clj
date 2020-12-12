@@ -1,15 +1,66 @@
 (ns bluejdbc.util
-  (:require [bluejdbc.options :as options]
-            [bluejdbc.util.macros.enum-map :as enum-map]
-            [bluejdbc.util.macros.proxy-class :as proxy-class]
-            [clojure.pprint :as pprint]
+  (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
+            [clojure.walk :as walk]
             [potemkin :as p]))
 
-(comment enum-map/keep-me proxy-class/keep-me)
+(defn keyword-or-class [x]
+  (if (keyword? x)
+    x
+    (class x)))
 
-(p/import-vars [enum-map define-enums reverse-lookup]
-               [proxy-class define-proxy-class])
+(defn dispatch-on-first-arg
+  ([x]         (keyword-or-class x))
+  ([x _]       (keyword-or-class x))
+  ([x _ _]     (keyword-or-class x))
+  ([x _ _ _]   (keyword-or-class x))
+  ([x _ _ _ _] (keyword-or-class x)))
+
+(defn dispatch-on-first-two-args
+  ([x y]       [(keyword-or-class x) (keyword-or-class y)])
+  ([x y _]     [(keyword-or-class x) (keyword-or-class y)])
+  ([x y _ _]   [(keyword-or-class x) (keyword-or-class y)])
+  ([x y _ _ _] [(keyword-or-class x) (keyword-or-class y)]))
+
+(defn dispatch-on-first-three-args
+  ([x y z]     [(keyword-or-class x) (keyword-or-class y) (keyword-or-class z)])
+  ([x y z _]   [(keyword-or-class x) (keyword-or-class y) (keyword-or-class z)])
+  ([x y z _ _] [(keyword-or-class x) (keyword-or-class y) (keyword-or-class z)]))
+
+(p/defprotocol+ CoerceToProperties
+  "Protocol for anything that can be coerced to an instance of `java.util.Properties`."
+  (->Properties ^java.util.Properties [this]
+    "Coerce `this` to a `java.util.Properties`."))
+
+(extend-protocol CoerceToProperties
+  nil
+  (->Properties [_]
+    nil)
+
+  java.util.Properties
+  (->Properties [this]
+    this)
+
+  clojure.lang.IPersistentMap
+  (->Properties [m]
+    (let [properties (java.util.Properties.)]
+      (doseq [[k v] m]
+        (.setProperty properties (name k) (if (keyword? v)
+                                            (name v)
+                                            (str v))))
+      properties)))
+
+(defn assert-no-recurs
+  "Throw an Exception if there are any `recur` forms in `form`."
+  [message form]
+  (walk/postwalk
+   (fn [form]
+     (when (and (seqable? form)
+                (symbol? (first form))
+                (= (first form) 'recur))
+       (throw (ex-info (str "recur is not allowed inside " message) {:form form})))
+     form)
+   form))
 
 (defn parse-currency
   "Parse a currency String to a BigDecimal. Handles a variety of different formats, such as:
@@ -55,13 +106,3 @@
                         (namespace k))]
       (str namespac "/" (name k))
       (name k))))
-
-(defn proxy-wrap
-  "Wrap `object` in `proxy-class` if it is not already wrapped, and apply options."
-  [^Class proxy-class constructor-fn object options]
-  (when object
-    (if (instance? proxy-class object)
-      (options/with-options object options)
-      (do
-        (options/set-options! object options)
-        (constructor-fn object nil options)))))

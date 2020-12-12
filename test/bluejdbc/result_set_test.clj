@@ -1,39 +1,12 @@
 (ns bluejdbc.result-set-test
   (:require [bluejdbc.core :as jdbc]
             [bluejdbc.result-set :as rs]
-            [bluejdbc.statement :as stmt]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [java-time :as t]))
 
-(deftest reducible-test
-  (testing "Make sure ResultSets are reducible"
-    (with-open [conn (jdbc/connect! (test/jdbc-url))
-                stmt (jdbc/prepare! conn "SELECT 1 AS one;")
-                rs   (jdbc/results stmt)]
-      (is (= (test/results [{:one 1}])
-             (reduce conj rs)))
-
-      (testing "using a custom row transform"
-        (with-open [rs2 (jdbc/results stmt {:results/xform nil})]
-          (is (= [[1]]
-                 (reduce conj rs2))))))))
-
-(deftest seq-test
-  (testing "Should be able to treat a ProxyResultSet as a sequence"
-    (with-open [conn (jdbc/connect! (test/jdbc-url))
-                stmt (jdbc/prepare! conn "SELECT 1 AS one;")
-                rs   (jdbc/results stmt)]
-      (is (= (test/results [{:one 1}])
-             (vec rs)))
-
-      (testing "using a custom row transform"
-        (with-open [rs2 (jdbc/results stmt {:results/xform nil})]
-          (is (= [[1]]
-                 (vec rs2))))))))
-
 (deftest alternative-row-transforms-test
-  (jdbc/with-connection [conn (test/jdbc-url)]
+  (jdbc/with-connection [conn (test/connection)]
     (testing "Should be able to return rows as"
       (test/with-test-data conn
         (with-open [stmt (jdbc/prepare! conn "SELECT * FROM people ORDER BY id ASC;")]
@@ -64,25 +37,24 @@
                    "results-xform should be comp-able"
                    {:xform (fn [rs]
                              (comp ((rs/maps :namespaced :lisp-case) rs)
-                                   (map (test/identifier :people/id))))
+                                   (map :people/id)))
                     :expected [1 2]}}]
             (testing description
-              (is (= (test/results expected)
-                     (transduce (take 2) conj [] (stmt/results stmt {:results/xform xform}))))
+              (is (= expected
+                     (with-open [rs (.executeQuery stmt)]
+                       (transduce (take 2) conj [] (rs/reducible-result-set rs {:results/xform xform})))))
 
               (testing "with-prepared-statement"
-                (is (= (test/results expected)
-                       (stmt/with-prepared-statement [stmt conn stmt {:results/xform xform}]
-                         (transduce (take 2) conj [] (stmt/results stmt)))))))))))))
+                (is (= expected
+                       (with-open [rs (.executeQuery stmt)]
+                         (transduce (take 2) conj [] (rs/reducible-result-set rs {:results/xform xform})))))))))))))
 
 (deftest transform-column-names-test
-  (jdbc/with-connection [conn (test/jdbc-url)]
+  (jdbc/with-connection [conn (test/connection)]
     (letfn [(column-names [options]
               (set (keys (jdbc/query-one conn
                                          {:select [[1 "AbC_dEF"] [2 "ghi-JKL"]]}
-                                         (merge {:honeysql/quoting (case (test/db-type)
-                                                                     (:mysql :mariadb) :mysql
-                                                                     :ansi)}
+                                         (merge {:honeysql/quoting :ansi}
                                                 options)))))]
       (testing "sanity check"
         (is (= #{:AbC_dEF :ghi-JKL}
@@ -115,29 +87,27 @@
 
 (deftest time-columns-test
   (is (= [(t/local-time "16:57:09")]
-         (jdbc/query-one (test/jdbc-url) ["SELECT CAST(? AS time)" (t/local-time "16:57:09")] {:results/xform nil}))))
+         (jdbc/query-one (test/connection) ["SELECT CAST(? AS time)" (t/local-time "16:57:09")] {:results/xform nil}))))
 
 (deftest date-columns-test
   (testing "Make sure fetching DATE columns works correctly"
     (is (= [(t/local-date "2020-04-23")]
-           (jdbc/query-one (test/jdbc-url) ["SELECT CAST(? AS date)" (t/local-date "2020-04-23")] {:results/xform nil})))))
+           (jdbc/query-one (test/connection) ["SELECT CAST(? AS date)" (t/local-date "2020-04-23")] {:results/xform nil})))))
 
-(deftest datetime-columns-test
-  (testing "Make sure fetching DATETIME columns works correctly"
-    ;; Postgres doesn't have a DATETIME type
-    (test/exclude #{:postgresql}
-      (is (= [(t/local-date-time "2020-04-23T16:57:09")]
-             (jdbc/query-one (test/jdbc-url)
-                             ["SELECT CAST(? AS datetime)" (t/local-date-time "2020-04-23T16:57:09")]
-                             {:results/xform nil}))))))
+;; (deftest datetime-columns-test
+;;   (testing "Make sure fetching DATETIME columns works correctly"
+;;     ;; Postgres doesn't have a DATETIME type
+;;     (test/exclude #{:postgresql}
+;;       (is (= [(t/local-date-time "2020-04-23T16:57:09")]
+;;              (jdbc/query-one (test/connection)
+;;                              ["SELECT CAST(? AS datetime)" (t/local-date-time "2020-04-23T16:57:09")]
+;;                              {:results/xform nil}))))))
 
 (deftest timestamp-columns-test
   (testing "Make sure fetching TIMESTAMP (without time zone) columns works correctly"
     (is (= [(t/local-date-time "2020-04-23T16:57:09")]
-           (jdbc/query-one (test/jdbc-url)
-                           [(case (test/db-type)
-                              :mysql "SELECT timestamp(?)"
-                              "SELECT CAST(? AS timestamp)")
+           (jdbc/query-one (test/connection)
+                           ["SELECT CAST(? AS timestamp)"
                             (t/local-date-time "2020-04-23T16:57:09")]
                            {:results/xform nil})))))
 
