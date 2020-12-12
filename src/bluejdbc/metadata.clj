@@ -1,119 +1,154 @@
 (ns bluejdbc.metadata
-  (:require [bluejdbc.options :as options]
-            [bluejdbc.result-set :as rs]
-            [bluejdbc.util :as u]
-            [pretty.core :as pretty])
-  (:import bluejdbc.result_set.ProxyResultSet
-           [java.sql Connection DatabaseMetaData ResultSet]))
+  (:require [bluejdbc.connection :as conn]
+            [bluejdbc.result-set :as rs])
+  (:import java.sql.DatabaseMetaData))
 
-(defn metadata-result-set
-  "Helper to return a reducible/seqable `ResultSet` with user-friend map key transformations."
-  ^ProxyResultSet [rs & [options]]
-  (rs/reducible-result-set rs (merge {:results/xform (rs/maps :lower-case :lisp-case)} options)))
+(defn metadata-reducible-results
+  "Helper to return a reducible/seqable metadata results with user-friendly map key transformations."
+  (^clojure.lang.IReduceInit [rs]
+   (metadata-reducible-results rs nil))
 
-(u/define-proxy-class ProxyDatabaseMetaData DatabaseMetaData [dbmeta mta opts]
-  pretty/PrettyPrintable
-  (pretty [_]
-    (list 'proxy-database-metadata dbmeta opts))
+  (^clojure.lang.IReduceInit [rs options]
+   (rs/reducible-result-set rs (merge {:results/xform (rs/maps :lower-case :lisp-case)} options))))
 
-  options/Options
-  (options [_]
-    opts)
+(defn do-with-metadata
+  "Impl for `with-metadata`."
+  [connectable-or-metadata f options]
+  (if (instance? DatabaseMetaData connectable-or-metadata)
+    (f connectable-or-metadata)
+    (conn/with-connection [conn connectable-or-metadata]
+      (f (.getMetaData conn)))))
 
-  (with-options* [_ new-options]
-    (ProxyDatabaseMetaData. dbmeta mta new-options))
+(defmacro with-metadata
+  "Execute `body` with `metadata-binding` bound to a `DatabaseMetaData`"
+  [[metadata-binding connectable-or-metadata & [options]] & body]
+  `(do-with-metadata ~connectable-or-metadata
+                     (fn [~(vary-meta metadata-binding assoc :tag 'java.sql.DatabaseMetaData)]
+                       ~@body)
+                     ~options))
 
-  clojure.lang.IObj
-  (meta [_]
-    mta)
+(defn database-info
+  "Fetch a map of information about this database."
+  [connectable-or-metadata]
+  (with-metadata [metadata connectable-or-metadata]
+    {:name          (.getDatabaseProductName metadata)
+     :version       (.getDatabaseProductVersion metadata)
+     :major-version (.getDatabaseMajorVersion metadata)
+     :minor-version (.getDatabaseMinorVersion metadata)}))
 
-  (withMeta [_ new-meta]
-    (ProxyDatabaseMetaData. dbmeta new-meta opts))
+(defn driver-info
+  "Fetch a map of information about the JDBC driver used for this database."
+  [connectable-or-metadata]
+  (with-metadata [metadata connectable-or-metadata]
+    {:name          (.getDriverName metadata)
+     :version       (.getDriverVersion metadata)
+     :major-version (.getDriverMajorVersion metadata)
+     :minor-version (.getDriverMinorVersion metadata)}))
 
-  DatabaseMetaData
-  (^ResultSet getAttributes [_ ^String catalog ^String schema-pattern ^String type-name-pattern ^String attribute-name-pattern]
-   (metadata-result-set (.getAttributes dbmeta catalog schema-pattern type-name-pattern attribute-name-pattern) opts))
+(defn catalogs
+  "Returns a `clojure.lang.IReduceInit` that when reduced or seqed returns catalog names available in this database.
 
-  (^ResultSet getBestRowIdentifier
-   [_ ^String catalog ^String schema ^String table ^int scope ^boolean nullable]
-   (metadata-result-set (.getBestRowIdentifier dbmeta catalog schema table scope nullable) opts))
+    (into #{} (catalogs conn)) ; -> #{\"my_db\"}"
+  [connectable-or-metadata & [options]]
+  (with-metadata [metadata connectable-or-metadata (merge {:results/xform (constantly (map first))} options)]
+    (metadata-reducible-results
+     (.getCatalogs metadata)
+     options)))
 
-  (^ResultSet getCatalogs [_]
-   (metadata-result-set (.getCatalogs dbmeta) opts))
+(defn schemas
+  "Returns a `clojure.lang.IReduceInit` that when reduced or seqed returns maps of information about schemas in this
+  database.
 
-  (^ResultSet getClientInfoProperties [_]
-   (metadata-result-set (.getClientInfoProperties dbmeta) opts))
+    (vec (schemas conn))
+    ;; ->
+    [{:table-schem \"information_schema\", :table-catalog nil}
+     {:table-schem \"pg_catalog\", :table-catalog nil}
+     {:table-schem \"public\", :table-catalog nil}]
 
-  (^ResultSet getColumnPrivileges [_ ^String catalog ^String schema ^String table ^String column-name-pattern]
-   (metadata-result-set (.getColumnPrivileges dbmeta catalog schema table column-name-pattern) opts))
+  Options:
 
-  (^ResultSet getColumns [_ ^String catalog ^String schema ^String table ^String column-name-pattern]
-   (metadata-result-set (.getColumns dbmeta catalog schema table column-name-pattern) opts))
+  * `:catalog` - a catalog name; must match the catalog name as it is stored in the database; \"\" retrieves those
+    without a catalog; `nil` means catalog name should not be used to narrow down the search.
 
-  (^java.sql.Connection getConnection [_]
-   (or (:_connection opts)
-       (.getConnection dbmeta)))
+  * `:schema-pattern` - a schema name; must match the schema name as it is stored in the database; `nil` means schema
+    name should not be used to narrow down the search"
+  [connectable-or-metadata & {:keys [^String catalog ^String schema-pattern options]}]
+  (with-metadata [metadata connectable-or-metadata options]
+    (metadata-reducible-results
+     (.getSchemas metadata catalog schema-pattern)
+     options)))
 
-  (^ResultSet getExportedKeys [_ ^String catalog ^String schema ^String table]
-   (metadata-result-set (.getExportedKeys dbmeta catalog schema table) opts))
+(defn table-types
+  "Returns a `clojure.lang.IReduceInit` that when reduced or seqed returns a sequence of table types available in this
+  database.
 
-  (^ResultSet getFunctionColumns [_ ^String catalog ^String schema-pattern ^String function-name-pattern ^String column-name-pattern]
-   (metadata-result-set (.getFunctionColumns dbmeta catalog schema-pattern function-name-pattern column-name-pattern) opts))
+    (vec (table-types conn)) ;; -> [\"MATERIALIZED VIEW\" \"TABLE\" \"VIEW\"]"
+  [connectable-or-metadata & [options]]
+  (with-metadata [metadata connectable-or-metadata (merge {:results/xform (constantly (map first))} options)]
+    (metadata-reducible-results
+     (.getTableTypes metadata)
+     options)))
 
-  (^ResultSet getFunctions [_ ^String catalog ^String schema-pattern ^String function-name-pattern]
-   (metadata-result-set (.getFunctions dbmeta catalog schema-pattern function-name-pattern) opts))
+(defn tables
+  "Returns a `clojure.lang.IReduceInit` that when reduced or seqed returns maps of info about tables in this database.
 
-  (^ResultSet getImportedKeys [_ ^String catalog ^String schema ^String table]
-   (metadata-result-set (.getImportedKeys dbmeta catalog schema table) opts))
+    (take 2 (tables conn))
+    ;; ->
+    [{:table-schem \"public\", :table-name \"users\", ...}
+     ...]
 
-  (^ResultSet getIndexInfo [_ ^String catalog ^String schema ^String table ^boolean unique ^boolean approximate]
-   (metadata-result-set (.getIndexInfo dbmeta catalog schema table unique approximate) opts))
+  Options:
 
-  (^ResultSet getPrimaryKeys [_ ^String catalog ^String schema ^String table]
-   (metadata-result-set (.getPrimaryKeys dbmeta catalog schema table) opts))
+  * `:catalog` - a catalog name; must match the catalog name as it is stored in the database; \"\" retrieves those
+    without a catalog; `nil` means catalog name should not be used to narrow down the search.
 
-  (^ResultSet getProcedureColumns [_ ^String catalog ^String schema-pattern ^String procedure-name-pattern ^String column-name-pattern]
-   (metadata-result-set (.getProcedureColumns dbmeta catalog schema-pattern procedure-name-pattern column-name-pattern) opts))
+  * `:schema-pattern` - a schema name; must match the schema name as it is stored in the database; `nil` means schema
+    name should not be used to narrow down the search
 
-  (^ResultSet getProcedures [_ ^String catalog ^String schema-pattern ^String procedure-name-pattern]
-   (metadata-result-set (.getProcedures dbmeta catalog schema-pattern procedure-name-pattern) opts))
+  * `:table-name-pattern` - a table name pattern; must match the table name as it is stored in the database. `nil`
+    means table name should not be used to narrow down the search
 
-  (^ResultSet getPseudoColumns [_ ^String catalog ^String schema-pattern ^String table-name-pattern ^String column-name-pattern]
-   (metadata-result-set (.getPseudoColumns dbmeta catalog schema-pattern table-name-pattern column-name-pattern) opts))
+  *  `:types` -- table type name strings, such as `\"TABLE\"` or `\"VIEW\"`. Use `table-types` to get the available
+     types for the current database. By default, Blue JDBC restricts types to `TABLE` and `VIEW`, which is more useful
+     for exploratory REPL usage. You can pass `nil` to return all types."
+  [connectable-or-metadata & {:keys [^String catalog
+                                     ^String schema-pattern
+                                     ^String table-name-pattern
+                                     types
+                                     options]
+                              :or   {types ["TABLE" "VIEW"]}}]
+  (with-metadata [metadata connectable-or-metadata options]
+    (metadata-reducible-results
+     (.getTables metadata catalog schema-pattern table-name-pattern
+                 (when (seq types)
+                   (into-array String (map str types))))
+     options)))
 
-  (^ResultSet getSchemas [_]
-   (metadata-result-set (.getSchemas dbmeta) opts))
+(defn columns
+  "Returns a `clojure.lang.IReduceInit` that when reduced or seqed returns maps of info about columns in this database.
 
-  (^ResultSet getSchemas [_ ^String catalog ^String schema-pattern]
-   (metadata-result-set (.getSchemas dbmeta catalog schema-pattern) opts))
+    (into #{} (map :column-name (columns conn :table-name-pattern \"users\")))
+    ;; -> #{\"last_login\" \"id\" \"name\" \"password\"}
 
-  (^ResultSet getSuperTables [_ ^String catalog ^String schema-pattern ^String table-name-pattern]
-   (metadata-result-set (.getSuperTables dbmeta catalog schema-pattern table-name-pattern) opts))
+  Options:
 
-  (^ResultSet getSuperTypes [_ ^String catalog ^String schema-pattern ^String type-name-pattern]
-   (metadata-result-set (.getSuperTypes dbmeta catalog schema-pattern type-name-pattern) opts))
+  * `:catalog` - a catalog name; must match the catalog name as it is stored in the database; \"\" retrieves those
+    without a catalog; `nil` means catalog name should not be used to narrow down the search.
 
-  (^ResultSet getTablePrivileges [_ ^String catalog ^String schema-pattern ^String table-name-pattern]
-   (metadata-result-set (.getTablePrivileges dbmeta catalog schema-pattern table-name-pattern) opts))
+  * `:schema-pattern` - a schema name; must match the schema name as it is stored in the database; `nil` means schema
+    name should not be used to narrow down the search
 
-  (^ResultSet getTableTypes [_]
-   (metadata-result-set (.getTableTypes dbmeta) opts))
+  * `:table-name-pattern` - a table name pattern; must match the table name as it is stored in the database. `nil`
+    means table name should not be used to narrow down the search
 
-  (^ResultSet getTables [_ ^String catalog ^String schema-pattern ^String table-name-pattern ^"[Ljava.lang.String;" types]
-   (metadata-result-set (.getTables dbmeta catalog schema-pattern table-name-pattern types) opts))
-
-  (^ResultSet getTypeInfo [_]
-   (metadata-result-set (.getTypeInfo dbmeta) opts))
-
-  (^ResultSet getUDTs [_ ^String catalog ^String schema-pattern ^String type-name-pattern ^ints types]
-   (metadata-result-set (.getUDTs dbmeta catalog schema-pattern type-name-pattern types) opts)))
-
-(defn proxy-database-metadata
-  "Wrap a `DatabaseMetaData` in a `ProxyDatabaseMetaData`, if it is not already wrapped."
-  ^ProxyDatabaseMetaData [dbmeta & [options]]
-  (u/proxy-wrap ProxyDatabaseMetaData ->ProxyDatabaseMetaData dbmeta options))
-
-(defn metadata
-  "Fetch metadata about the current database."
-  ^ProxyDatabaseMetaData [^Connection conn & [options]]
-  (proxy-database-metadata (.getMetaData conn) (merge (options/options conn) options)))
+  *  `:column-name-pattern` - a column name pattern; must match the column name as it is stored in the database. `nil`
+     means column name should not be used to narrow down the search."
+  [connectable-or-metadata & {:keys [^String catalog
+                                     ^String schema-pattern
+                                     ^String table-name-pattern
+                                     ^String column-name-pattern
+                                     options]}]
+  (with-metadata [metadata connectable-or-metadata options]
+    (metadata-reducible-results
+     (.getColumns metadata catalog schema-pattern table-name-pattern column-name-pattern)
+     options)))

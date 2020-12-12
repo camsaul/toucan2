@@ -8,6 +8,9 @@
                             (put 'p.types/defprotocol+ 'clojure-doc-string-elt 2)
 
                             (define-clojure-indent
+                              (p/defprotocol+ '(1 (:defn)))
+                              (p/defrecord+ '(2 nil nil (:defn)))
+                              (p/deftype+ '(2 nil nil (:defn)))
                               (p.types/defprotocol+ '(1 (:defn)))
                               (p.types/defrecord+ '(2 nil nil (:defn)))
                               (p.types/deftype+ '(2 nil nil (:defn)))

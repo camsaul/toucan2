@@ -1,37 +1,38 @@
 (ns bluejdbc.connection-test
   (:require [bluejdbc.core :as jdbc]
-            [bluejdbc.options :as options]
             [bluejdbc.test :as test]
+            [bluejdbc.util :as u]
             [clojure.string :as str]
             [clojure.test :refer :all]
-            [potemkin.types :as p.types])
+            [potemkin :as p])
   (:import java.sql.DriverManager))
 
-(deftest proxy-statement-test
-  (testing "Make sure ProxyConnection.prepareStatement returns a ProxyPreparedStatement"
-    (let [options {:x :y}]
-      (with-open [conn (jdbc/connect! (test/jdbc-url) options)
-                  stmt (.prepareStatement conn "SELECT 1;")]
-        ;; in case classes get redefined
-        (is (= "bluejdbc.connection.ProxyConnection"
-               (some-> conn class .getCanonicalName)))
-        (is (= "bluejdbc.statement.ProxyPreparedStatement"
-               (some-> stmt class .getCanonicalName)))
+(deftest driver-test
+  (testing "Should be able to get a Driver"
+    (let [pg-driver-class (Class/forName "org.postgresql.Driver")]
+      (testing "from a Driver"
+        (let [driver (.newInstance pg-driver-class)]
+          (is (identical? driver
+                          (jdbc/driver driver)))))
 
-        (testing "options should be passed along"
-          (is (= {:x :y}
-                 (select-keys (options/options stmt) [:x]))))
+      (testing "from the Class"
+        (is (instance? pg-driver-class (jdbc/driver pg-driver-class))))
 
-        (testing "the ProxyPreparedStatment should be able to return its parent ProxyConnection"
-          (is (identical? conn (.getConnection stmt))))))))
+      (testing "from String class name"
+        (is (instance? pg-driver-class (jdbc/driver "org.postgresql.Driver"))))
 
-(deftest proxy-database-metadata-test
-  (testing "ProxyConnection.getMetaData should return a ProxyDatabaseMetaData"
-    (with-open [conn (jdbc/connect! (test/jdbc-url))]
-      (is (= "bluejdbc.metadata.ProxyDatabaseMetaData"
-             (some-> (.getMetaData conn) class .getCanonicalName))))))
+      (testing "from String JDBC URL"
+        (is (instance? pg-driver-class (jdbc/driver "jdbc:postgresql://localhost:5432/fake_db")))))))
 
-(p.types/defrecord+ ^:private MockConnection []
+(deftest connection-test
+  (testing "Should be able to create a connection via a function"
+    (jdbc/with-connection [conn test/connection]
+      (is (instance? java.sql.Connection conn))))
+  (testing "Should be able to create a named Connection"
+    (jdbc/with-connection [conn (test/connection)]
+      (is (instance? java.sql.Connection conn)))))
+
+(p/defrecord+ ^:private MockConnection []
   java.sql.Connection
 
   java.lang.AutoCloseable
@@ -42,18 +43,18 @@
     (when (instance? interface this)
       this)))
 
-(p.types/defrecord+ ^:private TestDriver []
+(p/defrecord+ ^:private TestDriver []
   java.sql.Driver
   (acceptsURL [_ url]
-    (str/starts-with? url "jdbc:bluejdbc-test-driver:"))
+              (str/starts-with? url "jdbc:bluejdbc-test-driver:"))
 
   (connect [_ url properties]
-    (assoc (MockConnection.)
-           :url        url
-           :properties (into {} (for [[k v] properties]
-                                  [(keyword k) v])))))
+           (assoc (MockConnection.)
+                  :url        url
+                  :properties (into {} (for [[k v] properties]
+                                         [(keyword k) v])))))
 
-(p.types/defrecord+ ^:private TestDriver2 []
+(p/defrecord+ ^:private TestDriver2 []
   java.sql.Driver
   (acceptsURL [_ url]
     (str/starts-with? url "jdbc:bluejdbc-test-driver:"))
@@ -110,7 +111,7 @@
                 :expected    {:properties {:user "cam", :password "cam"}}}
                {:description "with Properties"
                 :url         "jdbc:bluejdbc-test-driver://localhost:1337/my_db"
-                :options     {:connection/properties (options/->Properties {:user "cam", :password "cam"})}
+                :options     {:connection/properties (u/->Properties {:user "cam", :password "cam"})}
                 :expected    {:properties {:user "cam", :password "cam"}}}
                {:description "with :properties map; should automatically convert to Properties"
                 :url         "jdbc:bluejdbc-test-driver://localhost:1337/my_db"
@@ -122,12 +123,11 @@
                 :expected    {:properties {}
                               :driver     TestDriver2}}]]
         (testing description
-          (with-open [conn (jdbc/connect! url options)]
-            (is (= "bluejdbc.connection.ProxyConnection"
-                   (some-> conn class .getCanonicalName)))
-            (testing "Options should be set; :connection/type should be added"
-              (is (= (assoc options :connection/type :bluejdbc-test-driver)
-                     (options/options conn))))
+          (jdbc/with-connection [conn url options]
+            ;; FIXME
+            #_(testing "Options should be set; :connection/type should be added"
+                (is (= (assoc options :connection/type :bluejdbc-test-driver)
+                       conn)))
 
             (let [unwrapped (.unwrap conn MockConnection)]
               (testing "Should be able to unwrap"
@@ -150,28 +150,16 @@
                                "classname is a symbol"    (update m :classname symbol)}]
         (testing description
           (testing (format "\nm = %s" (pr-str m))
-            (doseq [options [nil
-                             {:option? true}]]
-              (testing (format "\noptions = %s" (pr-str options))
-                (with-open [conn (jdbc/connect! m options)]
-                  (is (instance? java.sql.Connection conn))
-                  (is (= "bluejdbc.connection.ProxyConnection"
-                         (some-> conn class .getCanonicalName)))
-                  (is (= [{:ONE 1}]
-                         (jdbc/query conn "SELECT 1 AS one;")))
-                  (when options
-                    (is (= {:option? true}
-                           (options/options conn))))))))))))
+            (jdbc/with-connection [conn m]
+              (is (instance? java.sql.Connection conn))))))))
   (testing "Other parameters should be passed as Properties"
     (with-test-driver
-      (with-open [conn (jdbc/connect! {:classname   `TestDriver
-                                       :subprotocol "bluejdbc-test-driver"
-                                       :subname     "wow"
-                                       :x           100
-                                       :y           true
-                                       :z           "OK"})]
-        (is (= "bluejdbc.connection.ProxyConnection"
-               (some-> conn class .getCanonicalName)))
+      (jdbc/with-connection [conn {:classname   `TestDriver
+                                   :subprotocol "bluejdbc-test-driver"
+                                   :subname     "wow"
+                                   :x           100
+                                   :y           true
+                                   :z           "OK"}]
         (let [unwrapped (.unwrap conn MockConnection)]
           (is (= {:url        "jdbc:bluejdbc-test-driver:wow"
                   :properties {:x "100"
@@ -181,30 +169,11 @@
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"Can't create Connection .*: missing :subprotocol"
-         (jdbc/connect! {:classname "org.h2.Driver"
-                         :subname   "mem:bluejdbc_test;DB_CLOSE_DELAY=-1"}))))
+         (jdbc/connection {:classname "org.h2.Driver"
+                           :subname   "mem:bluejdbc_test;DB_CLOSE_DELAY=-1"}))))
   (testing "Should throw Exception if subname is missing"
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"Can't create Connection .*: missing :subname"
-         (jdbc/connect! {:classname   "org.h2.Driver"
-                         :subprotocol "h2"})))))
-
-(jdbc/defmethod jdbc/named-connectable ::test-connection
-  [_]
-  "jdbc:bluejdbc-test-driver://localhost:1337/my_db")
-
-(deftest named-connectable-test
-  (testing "Should be able to create a named connectable; should be identical to using connectable directly"
-    (with-test-driver
-      (let [jdbc-url "jdbc:bluejdbc-test-driver://localhost:1337/my_db"]
-        (jdbc/with-connection [conn jdbc-url]
-          (let [unwrapped (.unwrap conn MockConnection)]
-            (is (= {:url        "jdbc:bluejdbc-test-driver://localhost:1337/my_db"
-                    :properties {}}
-                   (into {} unwrapped)))))
-        (jdbc/with-connection [conn ::test-connection]
-          (let [unwrapped (.unwrap conn MockConnection)]
-            (is (= {:url        "jdbc:bluejdbc-test-driver://localhost:1337/my_db"
-                    :properties {}}
-                   (into {} unwrapped)))))))))
+         (jdbc/connection {:classname   "org.h2.Driver"
+                           :subprotocol "h2"})))))

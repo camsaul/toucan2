@@ -1,4 +1,4 @@
-(ns bluejdbc.util.log
+(ns bluejdbc.log
   (:require [clojure.tools.logging :as log]))
 
 (def ^:dynamic *enable-debug-logging*

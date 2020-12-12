@@ -1,53 +1,30 @@
 (ns bluejdbc.test
-  "Test utils."
   (:require [bluejdbc.core :as jdbc]
-            [bluejdbc.util :as u]
-            [clojure.string :as str]
-            [environ.core :as env]
-            [java-time :as t]
-            [methodical.core :as m])
-  (:import java.io.BufferedReader))
+            [clojure.test :refer :all]
+            [java-time :as t]))
 
-(defn jdbc-url
-  "JDBC URL to run tests against."
-  ^String []
-  (let [url (env/env :jdbc-url)]
-    (assert (not (str/blank? url)) "Env var JDBC_URL msut be set before running tests")
-    url))
+;; (jdbc/defmethod jdbc/named-connectable :h2
+;;   [_]
+;;   "jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1")
 
-(defn set-jdbc-url!
-  "Intended for REPL usage. Change the JDBC URL we're testing against."
-  [new-jdbc-url]
-  (alter-var-root #'env/env assoc :jdbc-url new-jdbc-url)
-  nil)
+;; (jdbc/defmethod jdbc/named-connectable :postgres
+;;   [_]
+;;   "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam")
 
-(defn db-type
-  "Type of database we're tetsing against, e.g. `:postgresql`."
-  []
-  (keyword (second (re-find #"^jdbc:([^:]+):" (jdbc-url)))))
+;; (jdbc/defmethod jdbc/named-connectable :mysql
+;;   [_]
+;;   "jdbc:mysql://localhost:3306/metabase_test?user=root")
 
-(defn as-set [dbs]
-  (if (keyword? dbs) #{dbs} (set dbs)))
+(jdbc/defmethod jdbc/connection* :test-connection/postgres
+  [_ options]
+  (jdbc/connection* "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam" options))
 
-(defmacro only
-  "Only run `body` against DBs if we are currently testing against them.
+(defn connection [& _] :test-connection/postgres)
 
-    (only :postgresql
-      ...)
+(defn db-type [] :postgres)
 
-    (only #{:mysql :mariadb}
-      ...)"
-  {:style/indent 1}
-  [dbs & body]
-  `(when (contains? (as-set ~dbs) (db-type))
-     ~@body))
-
-(defmacro exclude
-  "Execute `body` for all DBs except `dbs`."
-  {:style/indent 1}
-  [dbs & body]
-  `(when-not (contains? (as-set ~dbs) (db-type))
-     ~@body))
+(defn autoincrement-type []
+  "SERIAL")
 
 (defn do-with-test-data [conn thunk]
   (jdbc/with-connection [conn conn]
@@ -68,58 +45,12 @@
   [conn & body]
   `(do-with-test-data ~conn (fn [] ~@body)))
 
-(m/defmulti identifier
-  {:arglists '([k])}
-  (fn [_]
-    (db-type)))
-
-(m/defmethod identifier :default
-  [k]
-  k)
-
-(m/defmethod identifier :h2
-  [k]
-  (when k
-    (keyword (str/upper-case (u/qualified-name k)))))
-
-(defn results [m-or-ms]
-  (cond
-    (map? m-or-ms)
-    (let [m m-or-ms]
-      (zipmap (map identifier (keys m))
-              (vals m)))
-
-    (sequential? m-or-ms)
-    (map results m-or-ms)
-
-    :else
-    m-or-ms))
-
-(defn autoincrement-type []
-  (case (db-type)
-    :postgresql "SERIAL"
-    :h2         "BIGINT AUTO_INCREMENT"
-    :mysql      "INTEGER NOT NULL AUTO_INCREMENT"))
-
-(defn- h2-clob->string [^org.h2.jdbc.JdbcClob clob]
-  (letfn [(->str [^BufferedReader buffered-reader]
-            (loop [acc []]
-              (if-let [line (.readLine buffered-reader)]
-                (recur (conj acc line))
-                (str/join "\n" acc))))]
-    (with-open [reader (.getCharacterStream clob)]
-      (if (instance? BufferedReader reader)
-        (->str reader)
-        (with-open [buffered-reader (BufferedReader. reader)]
-          (->str buffered-reader))))))
-
-;; override the read-column-thunk for H2 to convert CLOBs in the results to Strings. This probably isn't the best way
-;; to do this (TODO)
-(jdbc/defmethod jdbc/read-column-thunk [:h2 :default]
-  [rs rsmeta i options]
-  (let [thunk (next-method rs rsmeta i options)]
-    (fn []
-      (let [result (thunk)]
-        (if (instance? org.h2.jdbc.JdbcClob result)
-          (h2-clob->string result)
-          result)))))
+(defmacro with-test-table {:style/indent 3} [conn table-name fields & body]
+  `(let [conn# ~conn]
+     (try
+       (jdbc/execute! conn# ~(format "DROP TABLE IF EXISTS %s;" (name table-name)))
+       (is (= 0
+              (jdbc/execute! conn# (format "CREATE TABLE %s %s;" ~(name table-name) ~fields))))
+       ~@body
+       (finally
+         (jdbc/execute! conn# ~(format "DROP TABLE IF EXISTS %s;" (name table-name)))))))

@@ -1,19 +1,9 @@
 (ns bluejdbc.result-set
-  (:refer-clojure :exclude [type])
-  (:require [bluejdbc.options :as options]
-            [bluejdbc.types :as types]
+  (:require [bluejdbc.log :as log]
             [bluejdbc.util :as u]
-            [bluejdbc.util.log :as log]
             [clojure.string :as str]
-            [methodical.core :as m]
-            [pretty.core :as pretty])
-  (:import [java.sql ResultSet ResultSetMetaData]))
-
-(u/define-enums type            ResultSet #"^TYPE_"    :namespace :result-set-type)
-(u/define-enums concurrency     ResultSet #"^CONCUR_"  :namespace :result-set-concurrency)
-(u/define-enums holdability     ResultSet #"_CURSORS_" :namespace :result-set-holdability, :name-transform identity)
-(u/define-enums fetch-direction ResultSet #"FETCH_")
-
+            [methodical.core :as m])
+  (:import [java.sql ResultSet ResultSetMetaData Types]))
 
 ;;;; Reading Results
 
@@ -21,7 +11,8 @@
   "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
   {:arglists '([^java.sql.ResultSet rs ^java.sql.ResultSetMetaData rsmeta ^Integer i options])}
   (fn [rs ^ResultSetMetaData rsmeta ^Integer i options]
-    (let [col-type (u/reverse-lookup types/type (.getColumnType rsmeta i))]
+    ;; TODO - log nice name for col type
+    (let [col-type (.getColumnType rsmeta i)]
       (log/tracef "Column %d %s is of type %s" i (pr-str (.getColumnLabel rsmeta i)) col-type)
       [(:connection/type options) col-type])))
 
@@ -37,23 +28,23 @@
   (fn []
     (.getObject rs i klass)))
 
-(m/defmethod read-column-thunk [:default :type/timestamp]
+(m/defmethod read-column-thunk [:default Types/TIMESTAMP]
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.LocalDateTime))
 
-(m/defmethod read-column-thunk [:default :type/timestamp-with-timezone]
+(m/defmethod read-column-thunk [:default Types/TIMESTAMP_WITH_TIMEZONE]
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.OffsetDateTime))
 
-(m/defmethod read-column-thunk [:default :type/date]
+(m/defmethod read-column-thunk [:default Types/DATE]
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.LocalDate))
 
-(m/defmethod read-column-thunk [:default :type/time]
+(m/defmethod read-column-thunk [:default Types/TIME]
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.LocalTime))
 
-(m/defmethod read-column-thunk [:default :type/time-with-timezone]
+(m/defmethod read-column-thunk [:default Types/TIME_WITH_TIMEZONE]
   [rs _ i _]
   (get-object-of-class-thunk rs i java.time.OffsetTime))
 
@@ -67,7 +58,7 @@
   "Returns a thunk that can be called repeatedly to get the next row in the result set, using appropriate methods to
   fetch each value in the row. Returns `nil` when the result set has no more rows."
   ([rs]
-   (row-thunk rs (options/options rs)))
+   (row-thunk rs nil))
 
   ([^ResultSet rs options]
    (let [rsmeta (.getMetaData rs)
@@ -181,7 +172,7 @@
   "Reduce the rows in a `ResultSet` using reducing function `rf`."
   {:arglists '([rs rf init] [rs options rf init])}
   ([rs rf init]
-   (reduce-result-set rs (options/options rs) rf init))
+   (reduce-result-set rs nil rf init))
 
   ([rs {xform :results/xform, :or {xform maps}} rf init]
    (let [xform (comp (take-while some?)
@@ -193,6 +184,12 @@
       (xform rf)
       init
       (repeatedly thunk)))))
+
+(defn reducible-result-set ^clojure.lang.IReduceInit [^ResultSet rs options]
+  (reify
+    clojure.lang.IReduceInit
+    (reduce [_ rf init]
+      (reduce-result-set rs options rf init))))
 
 (defn result-set-seq
   "Return a lazy sequence of rows from a `ResultSet`. Make sure you consume all the rows in the `ResultSet` while it is
@@ -210,7 +207,7 @@
   {:arglists '(^clojure.lang.ISeq [rs]
                ^clojure.lang.ISeq [rs options])}
   ([rs]
-   (result-set-seq rs (options/options rs)))
+   (result-set-seq rs nil))
 
   ([rs {xform :results/xform, :or {xform maps}}]
    (let [xform        (if xform
@@ -224,47 +221,3 @@
                          (when-let [row (thunk)]
                            (cons (rf nil row) (lazy-results)))))]
      (lazy-results))))
-
-
-;;;; ProxyResultSet
-
-(u/define-proxy-class ProxyResultSet ResultSet [rs mta opts]
-  pretty/PrettyPrintable
-  (pretty [_]
-    (list 'reducible-result-set rs opts))
-
-  options/Options
-  (options [_]
-    opts)
-
-  (with-options* [_ new-options]
-    (ProxyResultSet. rs mta new-options))
-
-  clojure.lang.IObj
-  (meta [_]
-    mta)
-
-  (withMeta [_ new-meta]
-    (ProxyResultSet. rs new-meta opts))
-
-  clojure.lang.IReduceInit
-  (reduce [this rf init]
-    (reduce-result-set this rf init))
-
-  clojure.lang.IReduce
-  (reduce [this rf]
-    (reduce-result-set this rf []))
-
-  clojure.lang.Seqable
-  (seq [this]
-    (result-set-seq this))
-
-  ResultSet
-  (^java.sql.Statement getStatement [_]
-   (or (:_statement opts)
-       (.getStatement rs))))
-
-(defn reducible-result-set
-  "Wrap `ResultSet` in a `ProxyResultSet`, if it is not already wrapped."
-  ^ProxyResultSet [rs & [options]]
-  (u/proxy-wrap ProxyResultSet ->ProxyResultSet rs options))
