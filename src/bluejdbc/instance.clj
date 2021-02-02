@@ -72,3 +72,25 @@
   (^bluejdbc.instance.Instance [table k v & more]
    (let [m (into {} (cons [k v] (partition-all 2 more)))]
      (Instance. table m m nil))))
+
+(extend-protocol IInstance
+  nil
+  (table [_]
+    nil)
+  (original [_]
+    nil)
+  (changes [_]
+    nil)
+  (with-table [_ new-table]
+    (instance new-table))
+
+  ;; TODO -- not sure what the default behavior for something like a normal map should be for original/changes
+  Object
+  (table [_]
+    nil)
+
+  clojure.lang.IPersistentMap
+  (table [_]
+    nil)
+  (with-table [m new-table]
+    (instance table m)))

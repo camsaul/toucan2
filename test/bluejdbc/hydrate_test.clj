@@ -1,5 +1,6 @@
 (ns bluejdbc.hydrate-test
   (:require [bluejdbc.hydrate :as hydrate]
+            [bluejdbc.instance :as instance]
             [clojure.test :refer :all]
             [methodical.core :as m]))
 
@@ -22,9 +23,11 @@
     (is (= false
            (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{:a_id 1} {:a_id 2}] :a))))
   (testing "should work for known keys if k_id present in every map"
-    (is (= (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{::user_id 1} {::user_id 2}] ::user))))
+    (is (= true
+           (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{::user_id 1} {::user_id 2}] ::user))))
   (testing "should work for both k_id and k-id style keys"
-    (is (= (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{::user-id 1} {::user-id 2}] ::user))))
+    (is (= true
+           (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{::user-id 1} {::user-id 2}] ::user))))
   (testing "should fail for known keys if k_id isn't present in every map"
     (is (= false
            (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{::user_id 1} {::user_id 2} {:some-other-key 3}] ::user)))))
@@ -54,15 +57,15 @@
 (deftest valid-form-test
   (testing "invalid forms"
     (doseq [form ["k"
-                          'k
-                          ['k :k2]
-                          [:k 'k2]
-                          [:k [:k2 [:k3]] :k4]
-                          [:k [:k2] :k3]
-                          [:k [:k2]]
-                          [:k [[:k2]]]
-                          [:k]
-                          [[:k]]]]
+                  'k
+                  ['k :k2]
+                  [:k 'k2]
+                  [:k [:k2 [:k3]] :k4]
+                  [:k [:k2] :k3]
+                  [:k [:k2]]
+                  [:k [[:k2]]]
+                  [:k]
+                  [[:k]]]]
       (is (= false
              (valid-form? form)))))
   (testing "valid forms"
@@ -268,13 +271,13 @@
   (testing "Check that batched hydration doesn't try to hydrate fields that already exist and are not delays"
     (is (= {:user_id 1
             :user    "OK <3"}
-           (hydrate/hydrate {:user_id 1
-                             :user    "OK <3"}
+           (hydrate/hydrate (instance/instance :user {:user_id 1
+                                                      :user    "OK <3"})
                             :user))))
   (is (= [{:type :toucan, ::is-bird? true}
           {:type :pigeon, ::is-bird? true}]
-         (hydrate/hydrate [{:type :toucan}
-                           {:type :pigeon}]
+         (hydrate/hydrate [(instance/instance :bird {:type :toucan})
+                           (instance/instance :bird {:type :pigeon})]
                           ::is-bird?))))
 
-;TODO add test for selecting hydration for where (not= pk :id)
+;; TODO add test for selecting hydration for where (not= pk :id)
