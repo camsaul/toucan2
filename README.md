@@ -52,6 +52,27 @@ complete documentation.
  :venues/price       2}
 ```
 
+#### Maps keep track of their changes!
+
+```clj
+
+(def m (db/select-one :people))
+m
+;; -> (bluejdbc.instance/instance :people {:first-name "Cam", :last-name "Era"})
+
+(def m (assoc m :last-name "Era"))
+m
+;; -> (bluejdbc.instance/instance :people {:first-name "Cam", :last-name "Era"})
+
+(original m)
+;; -> {:first-name "Cam", :last-name "Saul"}
+
+(changes m)
+;; -> {:last-name "Era"}
+
+(save! m)
+```
+
 ### Rationale
 
 One might wonder whether the world needs another Clojure JDBC library. For many years,

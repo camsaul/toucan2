@@ -5,7 +5,10 @@
             [methodical.core :as m]))
 
 ;; TODO - consider whether there's any possible reason in the whole world to have this also dispatch on connection
+;;
 ;; TODO -- this should work with objects as well
+;;
+;; TODO -- is this supposed to return a String or a Keyword? Need to document.
 (m/defmulti table-name
   {:arglists '([table])}
   u/dispatch-on-first-arg)
@@ -30,14 +33,20 @@
   {:arglists '([connectable table query options])}
   u/dispatch-on-first-three-args)
 
+(m/defmethod select* [:default :default nil]
+  [connectable table _ options]
+  (select* connectable table {} options))
+
 (m/defmethod select* [:default :default clojure.lang.IPersistentMap]
   [connectable table honeysql-form options]
-  (let [honeysql-form (merge {:select [(table-name table)]}
+  (let [honeysql-form (merge {:select [:*]
+                              :from   [(table-name table)]}
                              honeysql-form)]
     (query/query connectable honeysql-form options)))
 
 ;; TODO -- what about stuff like (db/select Table :id 100)?
 (defn select
+  ([table]                           (select* :default    table nil   nil))
   ([table query]                     (select* :default    table query nil))
   ([connectable table query]         (select* connectable table query nil))
   ([connectable table query options] (select* connectable table query options)))
@@ -46,13 +55,19 @@
   {:arglists '([connectable table query options])}
   u/dispatch-on-first-three-args)
 
+(m/defmethod select-one* [:default :default nil]
+  [connectable table _ options]
+  (select-one* connectable table {} options))
+
 (m/defmethod select-one* [:default :default clojure.lang.IPersistentMap]
   [connectable table honeysql-form options]
-  (let [honeysql-form (merge {:select [(table-name table)]}
+  (let [honeysql-form (merge {:select [:*]
+                              :from   [(table-name table)]}
                              honeysql-form)]
     (query/query-one connectable honeysql-form options)))
 
 (defn select-one
+  ([table]                           (select-one* :default    table nil   nil))
   ([table query]                     (select-one* :default    table query nil))
   ([connectable table query]         (select-one* connectable table query nil))
   ([connectable table query options] (select-one* connectable table query options)))

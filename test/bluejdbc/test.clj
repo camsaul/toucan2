@@ -3,9 +3,9 @@
             [clojure.test :refer :all]
             [java-time :as t]))
 
-;; (jdbc/defmethod jdbc/named-connectable :h2
-;;   [_]
-;;   "jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1")
+(jdbc/defmethod jdbc/connection* :test-connection/h2
+  [_ options]
+  (jdbc/connection* "jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1" options))
 
 ;; (jdbc/defmethod jdbc/named-connectable :postgres
 ;;   [_]
@@ -29,7 +29,7 @@
 (defn do-with-test-data [conn thunk]
   (jdbc/with-connection [conn conn]
     (try
-      (jdbc/execute! conn "CREATE TABLE people (id INTEGER NOT NULL, name TEXT NOT NULL, created_at TIMESTAMP NOT NULL);")
+      (jdbc/execute! conn "CREATE TABLE \"people\" (\"id\" INTEGER NOT NULL, \"name\" TEXT NOT NULL, \"created_at\" TIMESTAMP NOT NULL);")
       (t/with-clock (t/mock-clock (t/instant (t/offset-date-time "2020-04-21T16:56:00.000-07:00")) (t/zone-id "America/Los_Angeles"))
         (jdbc/insert! conn :people [:id :name :created_at]
                       [[1 "Cam" (t/offset-date-time "2020-04-21T16:56:00.000-07:00")]
@@ -38,7 +38,7 @@
                        [4 "Tam" (t/offset-date-time "2020-05-25T12:56:00.000-07:00")]]))
       (thunk)
       (finally
-        (jdbc/execute! conn "DROP TABLE IF EXISTS people;")))))
+        (jdbc/execute! conn "DROP TABLE IF EXISTS \"people\";")))))
 
 (defmacro with-test-data
   "Execute `body` with some rows loaded into a `people` table."
