@@ -7,11 +7,11 @@
 
 (m/defmulti can-hydrate-with-strategy?
   {:arglists '([strategy results k])}
-  (fn [strategy _ _] strategy))
+  u/dispatch-on-first-arg)
 
 (m/defmulti hydrate-with-strategy
   {:arglists '([strategy results k])}
-  (fn [strategy _ _] strategy))
+  u/dispatch-on-first-arg)
 
 ;;;                                  Automagic Batched Hydration (via :table-keys)
 ;;; ==================================================================================================================
@@ -26,7 +26,7 @@
 (m/defmulti automagic-hydration-key-table
   {:arglists '([k])}
   identity
-  :default ::default)
+  :default-value ::default)
 
 (m/defmethod automagic-hydration-key-table ::default
   [_]
@@ -76,22 +76,14 @@
 ;;;                         Method-Based Batched Hydration (using impls of `batched-hydrate`)
 ;;; ==================================================================================================================
 
-(declare batched-hydrate)
-
-(defn- batched-hydrate-dispatch-value [[first-result] k]
-  (let [result-dispatch-val (instance/table first-result)]
-    [(if (get-method batched-hydrate [result-dispatch-val k])
-        result-dispatch-val
-        :default)
-     k]))
-
 (m/defmulti batched-hydrate
   {:arglists '([results k])}
-  batched-hydrate-dispatch-value)
+  (fn [[first-result] k]
+    [(some-> first-result instance/table) k]))
 
 (m/defmethod can-hydrate-with-strategy? ::multimethod-batched
   [_ results k]
-  (boolean (get-method batched-hydrate (batched-hydrate-dispatch-value results k))))
+  (boolean (m/effective-primary-method batched-hydrate (m/dispatch-value batched-hydrate results k))))
 
 (m/defmethod hydrate-with-strategy ::multimethod-batched
   [_ results k]
@@ -103,26 +95,21 @@
 
 (declare simple-hydrate)
 
-(defn- simple-hydrate-dispatch-value [result k]
-  (let [result-dispatch-val (instance/table result)]
-    [(if (get-method simple-hydrate [result-dispatch-val k])
-       result-dispatch-val
-       :default)
-     k]))
-
 (m/defmulti simple-hydrate
   {:arglists '([result k])}
-  simple-hydrate-dispatch-value)
+  (fn [result k]
+    [(some-> result instance/table) k]))
 
 (m/defmethod can-hydrate-with-strategy? ::multimethod-simple
   [_ results k]
-  (boolean (get-method simple-hydrate (simple-hydrate-dispatch-value results k))))
+  (boolean (m/effective-primary-method simple-hydrate (m/dispatch-value simple-hydrate (first results) k))))
 
 (m/defmethod hydrate-with-strategy ::multimethod-simple
   [_ [first-result :as results] k]
   ;; TODO - explain this
   (for [[first-result :as chunk] (partition-by instance/table results)
-        :let                     [method (get-method simple-hydrate (simple-hydrate-dispatch-value first-result k))]
+        :let                     [method (m/effective-primary-method simple-hydrate
+                                                                     (m/dispatch-value simple-hydrate first-result k))]
         result                   chunk]
     (when result
       (if (some? (get result k))
