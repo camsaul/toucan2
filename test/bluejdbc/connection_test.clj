@@ -124,11 +124,6 @@
                               :driver     TestDriver2}}]]
         (testing description
           (jdbc/with-connection [conn url options]
-            ;; FIXME
-            #_(testing "Options should be set; :connection/type should be added"
-                (is (= (assoc options :connection/type :bluejdbc-test-driver)
-                       conn)))
-
             (let [unwrapped (.unwrap conn MockConnection)]
               (testing "Should be able to unwrap"
                 (is (= "bluejdbc.connection_test.MockConnection"

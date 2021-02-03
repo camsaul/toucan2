@@ -3,7 +3,7 @@
             [bluejdbc.util :as u]
             [clojure.string :as str]
             [methodical.core :as m])
-  (:import [java.sql Connection Driver DriverManager]
+  (:import [java.sql Connection Driver DriverManager ResultSet Statement]
            javax.sql.DataSource))
 
 (def ^:dynamic *include-connection-info-in-exceptions* false) ; EXPERIMENTAL
@@ -174,7 +174,33 @@
   `(do-with-connection ~connectable ~options (fn [~(vary-meta conn-binding assoc :tag 'java.sql.Connection)]
                                                ~@body)))
 
-;; NOCOMMIT
-(defn connectable? [x]
-  (or (keyword? x)
-      (boolean (m/effective-method (m/remove-primary-method connection* :default) (class x)))))
+(m/defmulti db-type
+  {:arglists '([x])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod db-type Connection
+  [^Connection conn]
+  (keyword (str/lower-case (.. conn getMetaData getDatabaseProductName))))
+
+(m/defmethod db-type Statement
+  [^Statement statement]
+  (db-type (.getConnection statement)))
+
+(m/defmethod db-type ResultSet
+  [^ResultSet result-set]
+  (db-type (.getStatement result-set)))
+
+(def ^:private ^{:arglists '([db-type])} load-integrations-if-needed!
+  (memoize
+   (fn [db-type]
+     (try
+       (locking clojure.lang.RT/REQUIRE_LOCK
+         (let [ns-symb (symbol (str (format "bluejdbc.integrations.%s" (name db-type))))]
+           (log/trace (pr-str (list 'require ns-symb)))
+           (require ns-symb)))
+       (catch Throwable _)))))
+
+(m/defmethod db-type :after :default
+  [db-type]
+  (load-integrations-if-needed! db-type)
+  db-type)

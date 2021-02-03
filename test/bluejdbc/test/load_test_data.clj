@@ -1,7 +1,7 @@
 (ns bluejdbc.test.load-test-data
-  ;; TODO - rename namespace to `test.load`?
   "Code for creating DBs and loading up test data to facilitate testing."
-  (:require [bluejdbc.core :as jdbc]
+  (:require [bluejdbc.connection :as connection]
+            [bluejdbc.core :as jdbc]
             [bluejdbc.util :as u]
             [clojure.string :as str]
             [clojure.tools.reader.edn :as edn]
@@ -9,8 +9,8 @@
             [methodical.core :as m]))
 
 (m/defmulti create-database-with-test-data!
-  {:arglists '([db-type conn data])}
-  u/dispatch-on-first-arg)
+  {:arglists '([conn data])}
+  (u/dispatch-on-first-arg-with connection/db-type))
 
 (m/defmulti quote-identifier
   {:arglists '([db-type s])}
@@ -63,12 +63,12 @@
   (format "DROP TABLE IF EXISTS %s;" (quote-identifier db-type table-name)))
 
 (m/defmulti drop-table-if-exists!
-  {:arglists '([db-type conn table])}
-  u/dispatch-on-first-arg)
+  {:arglists '([conn table])}
+  (u/dispatch-on-first-arg-with connection/db-type))
 
 (m/defmethod drop-table-if-exists! :default
-  [db-type conn {table-name :name, :as table}]
-  (let [ddl (drop-table-if-exists-ddl db-type table)]
+  [conn {table-name :name, :as table}]
+  (let [ddl (drop-table-if-exists-ddl (connection/db-type conn) table)]
     (try
       (jdbc/execute! conn ddl)
       (catch Throwable e
@@ -77,9 +77,9 @@
                         e))))))
 
 (m/defmethod drop-table-if-exists! :around :default
-  [db-type conn {table-name :name, :as table}]
+  [conn {table-name :name, :as table}]
   (try
-    (next-method db-type conn table)
+    (next-method conn table)
     (catch Throwable e
       (throw (ex-info (format "Error dropping table %s" (pr-str table-name))
                       {}
@@ -103,61 +103,61 @@
                           (quote-identifier db-type k))))])))))
 
 (m/defmulti insert-rows!
-  {:arglists '([db-type conn table])}
-  u/dispatch-on-first-arg)
+  {:arglists '([conn table])}
+  (u/dispatch-on-first-arg-with connection/db-type))
 
 (m/defmethod insert-rows! :default
-  [db-type conn {table-name :name, :keys [columns rows]}]
+  [conn {table-name :name, :keys [columns rows]}]
   (when (seq rows)
     (jdbc/insert! conn table-name (map :name columns) rows)))
 
 (m/defmethod insert-rows! :around :default
-  [db-type conn {table-name :name, :as table}]
+  [conn {table-name :name, :as table}]
   (try
-    (next-method db-type conn table)
+    (next-method conn table)
     (catch Throwable e
       (throw (ex-info (format "Error inserting rows into table %s" (pr-str table-name))
                       {}
                       e)))))
 
 (m/defmulti create-table-and-insert-rows!
-  {:arglists '([db-type conn table])}
-  u/dispatch-on-first-arg)
+  {:arglists '([conn table])}
+  (u/dispatch-on-first-arg-with connection/db-type))
 
 (m/defmethod create-table-and-insert-rows! :default
-  [db-type conn {table-name :name, :as table}]
-  (drop-table-if-exists! db-type conn table)
-  (let [ddl (create-table-ddl db-type table)]
+  [conn {table-name :name, :as table}]
+  (drop-table-if-exists! conn table)
+  (let [ddl (create-table-ddl (connection/db-type conn) table)]
     (try
       (jdbc/execute! conn ddl)
       (catch Throwable e
         (throw (ex-info (format "Error executing CREATE TABLE DDL statement for %s" (pr-str table-name))
                         {:ddl ddl}
                         e)))))
-  (insert-rows! db-type conn table))
+  (insert-rows! conn table))
 
 (m/defmethod create-table-and-insert-rows! :around :default
-  [db-type conn {table-name :name, :as table}]
+  [conn {table-name :name, :as table}]
   (try
-    (next-method db-type conn table)
+    (next-method conn table)
     (catch Throwable e
       (throw (ex-info (format "Error creating table %s" (pr-str table-name))
                       {:table (update table :rows (partial take 10))}
                       e)))))
 
 (m/defmethod create-database-with-test-data! :default
-  [db-type conn tables]
+  [conn tables]
   (doseq [table tables]
-    (create-table-and-insert-rows! db-type conn table)))
+    (create-table-and-insert-rows! conn table)))
 
 (m/defmulti destroy-all-tables!
-  {:arglists '([db-type conn data-source])}
-  u/dispatch-on-first-arg)
+  {:arglists '([conn data-source])}
+  (u/dispatch-on-first-arg-with connection/db-type))
 
 (m/defmethod destroy-all-tables! :default
-  [db-type conn tables]
+  [conn tables]
   (doseq [table tables]
-    (drop-table-if-exists! db-type conn table)))
+    (drop-table-if-exists! conn table)))
 
 (m/defmulti data
   {:arglists '([data-source])}

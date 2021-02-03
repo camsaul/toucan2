@@ -8,7 +8,7 @@
 (deftest alternative-row-transforms-test
   (jdbc/with-connection [conn (test/connection)]
     (testing "Should be able to return rows as"
-      (test/with-test-data-2 [conn :people]
+      (test/with-test-data [conn :people]
         (with-open [stmt (jdbc/prepare! conn "SELECT * FROM people ORDER BY id ASC;")]
           (doseq [[description {:keys [xform expected]}]
                   {"none (vectors)"
@@ -42,14 +42,12 @@
             (testing description
               (is (= expected
                      (with-open [rs (.executeQuery stmt)]
-                       (transduce (take 2) conj [] (rs/reducible-result-set rs {:connection/type (test/db-type)
-                                                                                :results/xform   xform})))))
+                       (transduce (take 2) conj [] (rs/reducible-result-set rs {:results/xform xform})))))
 
               (testing "with-prepared-statement"
                 (is (= expected
                        (with-open [rs (.executeQuery stmt)]
-                         (transduce (take 2) conj [] (rs/reducible-result-set rs {:connection/type (test/db-type)
-                                                                                  :results/xform   xform})))))))))))))
+                         (transduce (take 2) conj [] (rs/reducible-result-set rs {:results/xform xform})))))))))))))
 
 (deftest transform-column-names-test
   (jdbc/with-connection [conn (test/connection)]
