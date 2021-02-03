@@ -1,5 +1,6 @@
 (ns bluejdbc.table-aware-test
-  (:require [bluejdbc.core :as jdbc]
+  (:require [bluejdbc.connection :as connection]
+            [bluejdbc.core :as jdbc]
             [bluejdbc.table-aware :as table-aware]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]))
@@ -26,7 +27,7 @@
                          {:id 2, :name "Sam"}]}}]
       (testing description
         (jdbc/with-connection [conn (test/connection)]
-          (test/with-test-data-2 [conn [{:name         "insert_test_table"
+          (test/with-test-data [conn [{:name         "insert_test_table"
                                          :columns      [{:name "id", :class Long, :not-null? true}
                                                         {:name "name", :class String, :not-null? true}]
                                          :primary-keys ["id"]}]]
@@ -39,12 +40,12 @@
 
 (deftest insert-returning-keys!-test
   (jdbc/with-connection [conn (test/connection)]
-    (test/with-test-data-2 [conn [{:name         "returning_keys_test"
+    (test/with-test-data [conn [{:name         "returning_keys_test"
                                    :columns      [{:name "id", :class ::test/autoincrement}
                                                   {:name "name", :class String, :not-null? true}]
                                    :primary-keys ["id"]}]]
       (testing "If return-generated-keys is true, just return whatever the DB returns"
-        (is (= (case (test/db-type)
+        (is (= (case (connection/db-type (test/connection))
                  ;; H2 only returns the keys that were actually generated
                  :h2    [{:id 1}]
                  :mysql [{:insert_id 1}]
@@ -53,7 +54,7 @@
                                             :returning_keys_test
                                             nil
                                             {:name "Cam"}))))
-      (let [generated-key (case (test/db-type)
+      (let [generated-key (case (connection/db-type (test/connection))
                             :h2    :ID
                             :mysql :insert_id
                             :id)]
@@ -95,7 +96,7 @@
 
 (deftest update!-test
   (jdbc/with-connection [conn (test/connection)]
-    (test/with-test-data-2 [conn [{:name    :venues
+    (test/with-test-data [conn [{:name    :venues
                                    :columns [{:name "id", :class Long, :not-null? true}
                                              {:name "price", :class Long, :not-null? true}
                                              {:name "name", :class String, :not-null? true}
@@ -154,7 +155,7 @@
 
 (deftest delete!-test
   (jdbc/with-connection [conn (test/connection)]
-    (test/with-test-data-2 [conn [{:name    :venues
+    (test/with-test-data [conn [{:name    :venues
                                    :columns [{:name "id", :class Long, :not-null? true}
                                              {:name "price", :class Long, :not-null? true}
                                              {:name "name", :class String, :not-null? true}]

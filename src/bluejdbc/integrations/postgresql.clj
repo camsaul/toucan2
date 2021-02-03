@@ -1,4 +1,5 @@
-(ns bluejdbc.integrations.postgres
+(ns bluejdbc.integrations.postgresql
+  ;; TODO -- rename to integrations.postgresql
   (:require [bluejdbc.log :as log]
             [bluejdbc.result-set :as rs]
             [bluejdbc.statement :as stmt]

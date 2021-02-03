@@ -38,6 +38,7 @@
   compile]
 
  [connection
+  db-type
   driver
   connection*
   connection

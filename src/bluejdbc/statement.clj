@@ -1,6 +1,7 @@
 (ns bluejdbc.statement
   "Protocols, methods, functions, macros, etc. for working with `java.sql.PreparedStatement`s."
-  (:require [bluejdbc.log :as log]
+  (:require [bluejdbc.connection :as connection]
+            [bluejdbc.log :as log]
             [java-time :as t]
             [methodical.core :as m])
   (:import [java.sql Connection PreparedStatement ResultSet Statement Types]
@@ -23,11 +24,11 @@
    (.setObject stmt i object target-sql-type)))
 
 (m/defmulti set-parameter!
-  "Set `PreparedStatement` parameter at index `i` to `object`. Dispatches on `:connection/type`, if present, in
-  `options`; and by the class of `Object`. The default implementation calls `set-object!`."
+  "Set `PreparedStatement` parameter at index `i` to `object`. Dispatches by the class of `Object`. The default
+  implementation calls `set-object!`."
   {:arglists '([^PreparedStatement stmt ^Integer i object options])}
-  (fn [_ _ object options]
-    [(:connection/type options) (class object)]))
+  (fn [stmt _ object options]
+    [(connection/db-type stmt) (class object)]))
 
 (m/defmethod set-parameter! :default
   [stmt i object options]

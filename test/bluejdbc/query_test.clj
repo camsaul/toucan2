@@ -26,7 +26,7 @@
       (testing "(query"
         (testing "conn query)"
           (is (= [{:t t}]
-                 (jdbc/query conn [sql t] {:connection/type (test/db-type)}))))
+                 (jdbc/query conn [sql t]))))
 
         (doseq [[options expected] {nil
                                     [{:t t}]
@@ -35,8 +35,7 @@
                                     [[t]]
 
                                     {:results/xform wacky-row-xform}
-                                    [[:row t]]}
-                :let [options (assoc options :connection/type (test/db-type))]]
+                                    [[:row t]]}]
           (testing (format "conn query %s)" (pr-str options))
             (is (= expected
                    (jdbc/query conn [sql t] options)))))))))
@@ -50,7 +49,7 @@
            (jdbc/query-one (test/connection) "SELECT 'abc' AS abc;" {:results/xform nil}))))
 
   ;; this doesn't work on MySQL
-  (when-not (#{:mysql} (test/db-type))
+  (when-not (#{:mysql} (connection/db-type (test/connection)))
     (testing "query that returns no columns should still work"
       (is (= nil
              (jdbc/query-one (test/connection) "SELECT;")))
@@ -77,7 +76,7 @@
 
 (deftest transaction-test
   (jdbc/with-connection [conn (test/connection)]
-    (test/with-test-data-2 [conn transaction-test-data]
+    (test/with-test-data [conn transaction-test-data]
       (testing "Test that `transaction` rolls back changes"
         (let [inserted-rows? (atom false)]
           (binding [connection/*include-connection-info-in-exceptions* false]
@@ -100,7 +99,7 @@
 
 (deftest nested-transaction-test
   (jdbc/with-connection [conn (test/connection)]
-    (test/with-test-data-2 [conn transaction-test-data]
+    (test/with-test-data [conn transaction-test-data]
       (binding [connection/*include-connection-info-in-exceptions* false]
         (testing "Test that we can nest transactions"
           (let [inserted-rows? (atom false)]

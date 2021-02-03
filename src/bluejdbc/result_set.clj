@@ -1,5 +1,6 @@
 (ns bluejdbc.result-set
-  (:require [bluejdbc.log :as log]
+  (:require [bluejdbc.connection :as connection]
+            [bluejdbc.log :as log]
             [bluejdbc.util :as u]
             [clojure.string :as str]
             [methodical.core :as m])
@@ -7,7 +8,6 @@
 
 ;;;; Reading Results
 
-;; TODO -- should this be exposed in `core`?
 (def type-name
   "Map of `java.sql.Types` enum integers (e.g. `java.sql.Types/FLOAT`, whose value is `6`) to the string type name e.g.
   `FLOAT`.
@@ -24,7 +24,7 @@
     (let [col-type (.getColumnType rsmeta i)]
       (log/tracef "Column %d %s is of JDBC type %s, native type %s"
                   i (pr-str (.getColumnLabel rsmeta i)) (type-name col-type) (.getColumnTypeName rsmeta i))
-      [(:connection/type options) col-type])))
+      [(connection/db-type rs) col-type])))
 
 (m/defmethod read-column-thunk :default
   [^ResultSet rs rsmeta ^Integer i options]
