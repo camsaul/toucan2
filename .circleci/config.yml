@@ -100,7 +100,7 @@ executors:
       - image: circleci/clojure:lein-2.9.1
         environment:
           JDBC_URL_H2: jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1
-          JDBC_URL_SQL_SERVER: jdbc:sqlserver://localhost:1433/?user=SA&password=123456
+          # JDBC_URL_SQL_SERVER: jdbc:sqlserver://localhost:1433/?user=SA&password=123456
           JDBC_URL_POSTGRES: jdbc:postgresql://localhost:5432/circle_test?user=circle_test
           JDBC_URL_MYSQL: jdbc:mysql://localhost:3306/circle_test?user=root
       - image: postgres:latest

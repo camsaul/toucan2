@@ -105,7 +105,7 @@
   (boolean (m/effective-primary-method simple-hydrate (m/dispatch-value simple-hydrate (first results) k))))
 
 (m/defmethod hydrate-with-strategy ::multimethod-simple
-  [_ [first-result :as results] k]
+  [_ results k]
   ;; TODO - explain this
   (for [[first-result :as chunk] (partition-by instance/table results)
         :let                     [method (m/effective-primary-method simple-hydrate

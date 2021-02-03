@@ -10,7 +10,10 @@
    "deploy"                    ["with-profile" "+deploy" "deploy"]
    "test"                      ["with-profile" "+test" "test"]
    "repl"                      ["with-profile" "+repl" "repl"]
-   "bikeshed"                  ["with-profile" "+bikeshed" "bikeshed" "--max-line-length" "180"]
+   "bikeshed"                  ["with-profile" "+bikeshed" "bikeshed"
+                                "--max-line-length" "180"
+                                ;; see https://github.com/dakrone/lein-bikeshed/issues/41
+                                "--exclude-profiles" "check-namespace-decls,cloverage,deploy,deps,dev,docstring-checker,eastwood,h2,jdbc-drivers,mysql,postgres,reflection-warnings,repl,test"]
    "check-namespace-decls"     ["with-profile" "+check-namespace-decls" "check-namespace-decls"]
    "cloverage"                 ["with-profile" "+cloverage" "cloverage"]
    "eastwood"                  ["with-profile" "+eastwood" "eastwood"]
@@ -35,11 +38,11 @@
 
    :postgres
    {:dependencies
-    [[org.postgresql/postgresql "42.2.16"]]}
+    [[org.postgresql/postgresql "42.2.18"]]}
 
    :mysql
    {:dependencies
-    [[org.mariadb.jdbc/mariadb-java-client "2.7.0"]]}
+    [[org.mariadb.jdbc/mariadb-java-client "2.7.2"]]}
 
    :jdbc-drivers
    [:h2 :postgres :mysql]
@@ -47,7 +50,7 @@
    :dev
    [:jdbc-drivers
     {:dependencies
-     [[org.clojure/clojure "1.10.1"]
+     [[org.clojure/clojure "1.10.2"]
       [org.clojure/tools.reader "1.3.4"]
       [environ "1.2.0"]
       [pjstadig/humane-test-output "0.10.0"]]
@@ -147,7 +150,7 @@
     :source-paths ^:replace ["src" "test"]}
 
    :deploy
-   {:dependencies [[org.clojure/clojure "1.10.1"]]}}
+   {:dependencies [[org.clojure/clojure "1.10.2"]]}}
 
   :deploy-repositories
   [["clojars"

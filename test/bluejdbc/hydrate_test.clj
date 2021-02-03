@@ -43,9 +43,6 @@
            (for [result (hydrate/hydrate [{::venue_id 1} {::venue-id 2}] ::venue)]
              (update result ::venue #(dissoc % :updated-at :created-at)))))))
 
-
-
-
 (defn- valid-form? [form]
   (try
     (with-redefs [hydrate/hydrate-key (fn [results k]
@@ -121,7 +118,7 @@
            {:id 2}
            {:id 3}] ::x))))
 
-(deftest hydrate-test
+(deftest hydrate-test-2
   (testing "make sure we can do basic hydration"
     (is (= {:a 1, :id 2, ::x 2}
            (hydrate/hydrate {:a 1, :id 2}

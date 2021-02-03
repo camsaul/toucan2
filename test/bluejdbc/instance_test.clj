@@ -34,7 +34,7 @@
       (is (= {:a 100}
              (jdbc/instance :wow {:a 100}))))))
 
-(deftest instance-test
+(deftest instance-test-2
   (is (= {}
          (instance/instance ::MyModel)))
   (is (= {}
