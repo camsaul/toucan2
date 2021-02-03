@@ -1,0 +1,9 @@
+[{:name         "people"
+  :columns      [{:name "id", :class Long, :not-null? true}
+                 {:name "name", :class String, :not-null? true}
+                 {:name "created_at", :class java.time.OffsetDateTime, :not-null? true}]
+  :primary-keys [:id]
+  :rows         [[1 "Cam" #offset-date-time "2020-04-21T16:56:00.000-07:00"]
+                 [2 "Sam" #offset-date-time "2019-01-11T15:56:00.000-08:00"]
+                 [3 "Pam" #offset-date-time "2020-01-01T13:56:00.000-08:00"]
+                 [4 "Tam" #offset-date-time "2020-05-25T12:56:00.000-07:00"]]}]

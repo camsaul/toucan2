@@ -1,5 +1,6 @@
 (ns bluejdbc.query-test
-  (:require [bluejdbc.core :as jdbc]
+  (:require [bluejdbc.connection :as connection]
+            [bluejdbc.core :as jdbc]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [java-time :as t]))
@@ -25,7 +26,7 @@
       (testing "(query"
         (testing "conn query)"
           (is (= [{:t t}]
-                 (jdbc/query conn [sql t]))))
+                 (jdbc/query conn [sql t] {:connection/type (test/db-type)}))))
 
         (doseq [[options expected] {nil
                                     [{:t t}]
@@ -34,7 +35,8 @@
                                     [[t]]
 
                                     {:results/xform wacky-row-xform}
-                                    [[:row t]]}]
+                                    [[:row t]]}
+                :let [options (assoc options :connection/type (test/db-type))]]
           (testing (format "conn query %s)" (pr-str options))
             (is (= expected
                    (jdbc/query conn [sql t] options)))))))))
@@ -69,22 +71,27 @@
 (defn- transaction-test-names [conn]
   (jdbc/query conn "SELECT * FROM transaction_test_table ORDER BY name ASC;" {:results/xform nil}))
 
+(def ^:private transaction-test-data
+  [{:name    "transaction_test_table"
+    :columns [{:name "name", :class String, :not-null? true}]}])
+
 (deftest transaction-test
   (jdbc/with-connection [conn (test/connection)]
-    (test/with-test-table conn :transaction_test_table "(name TEXT NOT NULL)"
+    (test/with-test-data-2 [conn transaction-test-data]
       (testing "Test that `transaction` rolls back changes"
         (let [inserted-rows? (atom false)]
-          (try
-            (jdbc/transaction conn
-              (jdbc/insert! conn :transaction_test_table [{:name "Cam"}])
-              (is (= [["Cam"]]
-                     (transaction-test-names conn)))
-              (reset! inserted-rows? true)
-              (throw (ex-info "Whoops!" {})))
-            (catch Throwable e
-              (is (= "Whoops!"
-                     (.getMessage e))
-                  "expected exception should have been thrown")))
+          (binding [connection/*include-connection-info-in-exceptions* false]
+            (try
+              (jdbc/transaction conn
+                (jdbc/insert! conn :transaction_test_table nil [{:name "Cam"}])
+                (is (= [["Cam"]]
+                       (transaction-test-names conn)))
+                (reset! inserted-rows? true)
+                (throw (ex-info "Whoops!" {})))
+              (catch Throwable e
+                (is (= "Whoops!"
+                       (.getMessage e))
+                    "expected exception should have been thrown"))))
           (is (= true
                  @inserted-rows?)
               "Rows should have been inserted"))
@@ -93,30 +100,29 @@
 
 (deftest nested-transaction-test
   (jdbc/with-connection [conn (test/connection)]
-    (test/with-test-table conn :transaction_test_table "(name TEXT NOT NULL)"
-      (testing "Test that we can nest transactions"
-        (let [inserted-rows? (atom false)]
-          (try
-            (jdbc/transaction conn
-                (jdbc/insert! conn :transaction_test_table [{:name "Cam"}])
-                (try
-                  (jdbc/transaction conn
-                      (jdbc/insert! conn :transaction_test_table [{:name "Sam"}])
-                      (is (= [["Cam"] ["Sam"]]
-                             (transaction-test-names conn)))
-                      (reset! inserted-rows? true)
-                      (throw (ex-info "Whoops!" {})))
-                  (catch Throwable e
-                    (is (= "Whoops!"
-                           (.getMessage e)))))
-                (is (= [["Cam"]]
-                       (transaction-test-names conn)))
-                (throw (ex-info "Oh no!" {})))
-            (catch Throwable e
-              (is (= "Oh no!"
-                     (.getMessage e)))))
-          (is (= true
-                 @inserted-rows?)
-              "Has inserted rows?"))
-        (is (= []
-               (transaction-test-names conn)))))))
+    (test/with-test-data-2 [conn transaction-test-data]
+      (binding [connection/*include-connection-info-in-exceptions* false]
+        (testing "Test that we can nest transactions"
+          (let [inserted-rows? (atom false)]
+            (is (thrown-with-msg?
+                 clojure.lang.ExceptionInfo
+                 #"Oh no!"
+                 (jdbc/transaction conn
+                   (jdbc/insert! conn :transaction_test_table nil [{:name "Cam"}])
+                   (is (thrown-with-msg?
+                        clojure.lang.ExceptionInfo
+                        #"Whoops!"
+                        (jdbc/transaction conn
+                          (jdbc/insert! conn :transaction_test_table nil [{:name "Sam"}])
+                          (is (= [["Cam"] ["Sam"]]
+                                 (transaction-test-names conn)))
+                          (reset! inserted-rows? true)
+                          (throw (ex-info "Whoops!" {})))))
+                   (is (= [["Cam"]]
+                          (transaction-test-names conn)))
+                   (throw (ex-info "Oh no!" {})))))
+            (is (= true
+                   @inserted-rows?)
+                "Has inserted rows?"))
+          (is (= []
+                 (transaction-test-names conn))))))))

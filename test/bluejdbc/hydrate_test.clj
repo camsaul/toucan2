@@ -30,7 +30,9 @@
            (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{::user-id 1} {::user-id 2}] ::user))))
   (testing "should fail for known keys if k_id isn't present in every map"
     (is (= false
-           (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{::user_id 1} {::user_id 2} {:some-other-key 3}] ::user)))))
+           (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched
+                                               [{::user_id 1} {::user_id 2} {:some-other-key 3}]
+                                               ::user)))))
 
 (deftest hydrate-test
   (testing "it should correctly hydrate"

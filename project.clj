@@ -48,6 +48,7 @@
    [:jdbc-drivers
     {:dependencies
      [[org.clojure/clojure "1.10.1"]
+      [org.clojure/tools.reader "1.3.4"]
       [environ "1.2.0"]
       [pjstadig/humane-test-output "0.10.0"]]
 

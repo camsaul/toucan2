@@ -8,46 +8,48 @@
 (deftest alternative-row-transforms-test
   (jdbc/with-connection [conn (test/connection)]
     (testing "Should be able to return rows as"
-      (test/with-test-data conn
+      (test/with-test-data-2 [conn :people]
         (with-open [stmt (jdbc/prepare! conn "SELECT * FROM people ORDER BY id ASC;")]
           (doseq [[description {:keys [xform expected]}]
                   {"none (vectors)"
                    {:xform    nil
-                    :expected [[1 "Cam" (t/local-date-time "2020-04-21T23:56")]
-                               [2 "Sam" (t/local-date-time "2019-01-11T23:56")]]}
+                    :expected [[1 "Cam" (t/offset-date-time "2020-04-21T23:56Z")]
+                               [2 "Sam" (t/offset-date-time "2019-01-11T23:56Z")]]}
 
                    "namespaced maps"
                    {:xform    (rs/maps :namespaced)
                     :expected [{:people/id         1
                                 :people/name       "Cam"
-                                :people/created_at (t/local-date-time "2020-04-21T23:56")}
+                                :people/created_at (t/offset-date-time "2020-04-21T23:56Z")}
                                {:people/id         2
                                 :people/name       "Sam"
-                                :people/created_at (t/local-date-time "2019-01-11T23:56" )}]}
+                                :people/created_at (t/offset-date-time "2019-01-11T23:56Z")}]}
 
                    "namespaced lisp-case maps"
                    {:xform    (rs/maps :namespaced :lisp-case)
                     :expected [{:people/id         1
                                 :people/name       "Cam"
-                                :people/created-at (t/local-date-time "2020-04-21T23:56")}
+                                :people/created-at (t/offset-date-time "2020-04-21T23:56Z")}
                                {:people/id         2
                                 :people/name       "Sam"
-                                :people/created-at (t/local-date-time "2019-01-11T23:56" )}]}
+                                :people/created-at (t/offset-date-time "2019-01-11T23:56Z")}]}
 
                    "results-xform should be comp-able"
-                   {:xform (fn [rs]
-                             (comp ((rs/maps :namespaced :lisp-case) rs)
-                                   (map :people/id)))
+                   {:xform    (fn [rs]
+                                (comp ((rs/maps :namespaced :lisp-case) rs)
+                                      (map :people/id)))
                     :expected [1 2]}}]
             (testing description
               (is (= expected
                      (with-open [rs (.executeQuery stmt)]
-                       (transduce (take 2) conj [] (rs/reducible-result-set rs {:results/xform xform})))))
+                       (transduce (take 2) conj [] (rs/reducible-result-set rs {:connection/type (test/db-type)
+                                                                                :results/xform   xform})))))
 
               (testing "with-prepared-statement"
                 (is (= expected
                        (with-open [rs (.executeQuery stmt)]
-                         (transduce (take 2) conj [] (rs/reducible-result-set rs {:results/xform xform})))))))))))))
+                         (transduce (take 2) conj [] (rs/reducible-result-set rs {:connection/type (test/db-type)
+                                                                                  :results/xform   xform})))))))))))))
 
 (deftest transform-column-names-test
   (jdbc/with-connection [conn (test/connection)]

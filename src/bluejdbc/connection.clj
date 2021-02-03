@@ -6,6 +6,20 @@
   (:import [java.sql Connection Driver DriverManager]
            javax.sql.DataSource))
 
+(def ^:dynamic *include-connection-info-in-exceptions* false) ; EXPERIMENTAL
+
+(defmacro ^:private try-catch-when-include-connection-info-in-exceptions-enabled
+  {:style/indent 0}
+  [& args]
+  (let [body       (butlast args)
+        catch-form (last args)]
+    `(let [thunk# (fn [] ~@body)]
+       (if *include-connection-info-in-exceptions*
+         (try
+           (thunk#)
+           ~catch-form)
+         (thunk#)))))
+
 (m/defmulti driver
   "Coerce something to a `java.sql.Driver`."
   {:arglists '(^java.sql.Driver [driverable])}
@@ -35,7 +49,8 @@
     (assert (and (sequential? conn)
                  (#{:new :existing} (first conn))
                  (instance? java.sql.Connection (second conn)))
-            (str "connection* should return a pair like [new-or-existing connection]. Got: " (pr-str conn) " Input: " (pr-str connectable)))
+            (str "connection* should return a pair like [new-or-existing connection]. Got: " (pr-str conn)
+                 " Input: " (pr-str connectable)))
     conn))
 
 (defn connection
@@ -130,11 +145,21 @@
 (defn do-with-connection
   "Impl for `with-connection`."
   [connectable options f]
-  (let [[new-or-existing ^Connection conn] (connection connectable options)]
-    (case new-or-existing
-      :new      (with-open [conn conn]
-                  (f conn))
-      :existing (f conn))))
+  (let [[new-or-existing ^Connection conn] (try-catch-when-include-connection-info-in-exceptions-enabled
+                                             (connection connectable options)
+                                             (catch Throwable e
+                                               (throw (ex-info "Error getting Connection"
+                                                               {:connectable connectable}
+                                                               e))))]
+    (try-catch-when-include-connection-info-in-exceptions-enabled
+      (case new-or-existing
+        :new      (with-open [conn conn]
+                    (f conn))
+        :existing (f conn))
+      (catch Throwable e
+        (throw (ex-info "Error executing body of with-connection"
+                        {:connectable connectable, :connection conn, :options options}
+                        e))))))
 
 (defmacro with-connection
   "Execute `body` with `conn-binding` bound to a `Connection`. If `connectable` is already a `Connection`, `body` is
@@ -148,3 +173,8 @@
   (u/assert-no-recurs "with-connection" body)
   `(do-with-connection ~connectable ~options (fn [~(vary-meta conn-binding assoc :tag 'java.sql.Connection)]
                                                ~@body)))
+
+;; NOCOMMIT
+(defn connectable? [x]
+  (or (keyword? x)
+      (boolean (m/effective-method (m/remove-primary-method connection* :default) (class x)))))

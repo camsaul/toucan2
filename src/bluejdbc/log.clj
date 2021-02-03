@@ -5,6 +5,8 @@
   "Whether to print log messages to stdout. Useful for debugging things from the REPL."
   false)
 
+;; TODO -- with-debug-logging should enable `*include-queries-in-exceptions*` and
+;; `*include-connection-info-in-exceptions*` as well
 (defmacro with-debug-logging
   "Execute `body` and print all Blue JDBC log messages to stdout. Useful for debugging things from the REPL."
   [& body]

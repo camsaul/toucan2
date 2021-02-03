@@ -9,23 +9,35 @@
     x
     (class x)))
 
-(defn dispatch-on-first-arg
-  ([x]         (keyword-or-class x))
-  ([x _]       (keyword-or-class x))
-  ([x _ _]     (keyword-or-class x))
-  ([x _ _ _]   (keyword-or-class x))
-  ([x _ _ _ _] (keyword-or-class x)))
+(defn dispatch-on-first-arg-with [f]
+  (fn dispatch-on-first-arg-with*
+    ([x]         (f x))
+    ([x _]       (f x))
+    ([x _ _]     (f x))
+    ([x _ _ _]   (f x))
+    ([x _ _ _ _] (f x))))
 
-(defn dispatch-on-first-two-args
-  ([x y]       [(keyword-or-class x) (keyword-or-class y)])
-  ([x y _]     [(keyword-or-class x) (keyword-or-class y)])
-  ([x y _ _]   [(keyword-or-class x) (keyword-or-class y)])
-  ([x y _ _ _] [(keyword-or-class x) (keyword-or-class y)]))
+(def ^{:arglists '([a] [a b] [a b c] [a b c d] [a b c d e])} dispatch-on-first-arg
+  (dispatch-on-first-arg-with keyword-or-class))
 
-(defn dispatch-on-first-three-args
-  ([x y z]     [(keyword-or-class x) (keyword-or-class y) (keyword-or-class z)])
-  ([x y z _]   [(keyword-or-class x) (keyword-or-class y) (keyword-or-class z)])
-  ([x y z _ _] [(keyword-or-class x) (keyword-or-class y) (keyword-or-class z)]))
+(defn dispatch-on-first-two-args-with [f]
+  (fn dispatch-on-first-two-args-with*
+    ([x y]       [(f x) (f y)])
+    ([x y _]     [(f x) (f y)])
+    ([x y _ _]   [(f x) (f y)])
+    ([x y _ _ _] [(f x) (f y)])))
+
+(def ^{:arglists '([a b] [a b c] [a b c d] [a b c d e])} dispatch-on-first-two-args
+  (dispatch-on-first-two-args-with keyword-or-class))
+
+(defn dispatch-on-first-three-args-with [f]
+  (fn dispatch-on-first-three-args-with*
+    ([x y z]     [(f x) (f y) (f z)])
+    ([x y z _]   [(f x) (f y) (f z)])
+    ([x y z _ _] [(f x) (f y) (f z)])))
+
+(def ^{:arglists '([a b] [a b c] [a b c d] [a b c d e])} dispatch-on-first-three-args
+  (dispatch-on-first-three-args-with keyword-or-class))
 
 (p/defprotocol+ CoerceToProperties
   "Protocol for anything that can be coerced to an instance of `java.util.Properties`."

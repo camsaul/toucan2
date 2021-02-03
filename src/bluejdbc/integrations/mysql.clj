@@ -2,7 +2,8 @@
   (:require [bluejdbc.result-set :as rs]
             [bluejdbc.statement :as stmt]
             [java-time :as t]
-            [methodical.core :as m]))
+            [methodical.core :as m])
+  (:import java.sql.Types))
 
 ;; MySQL doesn't support OffsetTime, so convert to UTC
 (m/defmethod stmt/set-parameter! [:mysql java.time.OffsetTime]
@@ -23,12 +24,10 @@
 ;;
 ;; TODO IS THIS ALL WRONG ????
 ;;
-(m/defmethod rs/read-column-thunk [:mysql :type/timestamp]
+(m/defmethod rs/read-column-thunk [:mysql Types/TIMESTAMP]
   [^java.sql.ResultSet rs ^java.sql.ResultSetMetaData rsmeta ^Integer i options]
-  (println ".. rs getStatement getConnection):" (.. rs getStatement getConnection)) ; NOCOMMIT
-  (fn []
-    (when-let [t (.getObject rs i java.time.LocalDateTime)]
-      (println "t:" t) ; NOCOMMIT
-      (if (= (.getColumnTypeName rsmeta i) "TIMESTAMP")
-        (t/with-offset-same-instant (t/offset-date-time t (t/zone-id "UTC")) (t/zone-offset 0))
-        t))))
+  (if (= (.getColumnTypeName rsmeta i) "TIMESTAMP")
+    (fn []
+      (when-let [t (.getObject rs i java.time.LocalDateTime)]
+        (t/with-offset-same-instant (t/offset-date-time t (t/zone-id "UTC")) (t/zone-offset 0))))
+    (rs/get-object-of-class-thunk rs i java.time.LocalDateTime)))
