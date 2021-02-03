@@ -1,53 +1,57 @@
 (ns bluejdbc.result-set-test
-  (:require [bluejdbc.core :as jdbc]
+  (:require [bluejdbc.connection :as connection]
+            [bluejdbc.core :as jdbc]
             [bluejdbc.result-set :as rs]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [java-time :as t]))
 
+(use-fixtures :each (fn [thunk]
+                      (test/with-every-test-connection
+                        (thunk))))
+
 (deftest alternative-row-transforms-test
   (jdbc/with-connection [conn (test/connection)]
     (testing "Should be able to return rows as"
       (test/with-test-data [conn :people]
-        (with-open [stmt (jdbc/prepare! conn "SELECT * FROM people ORDER BY id ASC;")]
-          (doseq [[description {:keys [xform expected]}]
-                  {"none (vectors)"
-                   {:xform    nil
-                    :expected [[1 "Cam" (t/offset-date-time "2020-04-21T23:56Z")]
-                               [2 "Sam" (t/offset-date-time "2019-01-11T23:56Z")]]}
+        (with-open [stmt (jdbc/prepare! conn "SELECT * FROM \"people\" ORDER BY \"id\" ASC;")]
+          (let [expected-rows (case (connection/db-type &conn)
+                                :h2
+                                [[1 "Cam" (t/offset-date-time "2020-04-21T16:56-07:00")]
+                                 [2 "Sam" (t/offset-date-time "2019-01-11T15:56-08:00")]]
 
-                   "namespaced maps"
-                   {:xform    (rs/maps :namespaced)
-                    :expected [{:people/id         1
-                                :people/name       "Cam"
-                                :people/created_at (t/offset-date-time "2020-04-21T23:56Z")}
-                               {:people/id         2
-                                :people/name       "Sam"
-                                :people/created_at (t/offset-date-time "2019-01-11T23:56Z")}]}
+                                :postgresql
+                                [[1 "Cam" (t/offset-date-time "2020-04-21T23:56Z")]
+                                 [2 "Sam" (t/offset-date-time "2019-01-11T23:56Z")]])]
+            (doseq [[description {:keys [xform expected]}]
+                    {"none (vectors)"
+                     {:xform    nil
+                      :expected expected-rows}
 
-                   "namespaced lisp-case maps"
-                   {:xform    (rs/maps :namespaced :lisp-case)
-                    :expected [{:people/id         1
-                                :people/name       "Cam"
-                                :people/created-at (t/offset-date-time "2020-04-21T23:56Z")}
-                               {:people/id         2
-                                :people/name       "Sam"
-                                :people/created-at (t/offset-date-time "2019-01-11T23:56Z")}]}
+                     "namespaced maps"
+                     {:xform    (rs/maps :namespaced)
+                      :expected (for [row expected-rows]
+                                  (zipmap [:people/id :people/name :people/created_at] row))}
 
-                   "results-xform should be comp-able"
-                   {:xform    (fn [rs]
-                                (comp ((rs/maps :namespaced :lisp-case) rs)
-                                      (map :people/id)))
-                    :expected [1 2]}}]
-            (testing description
-              (is (= expected
-                     (with-open [rs (.executeQuery stmt)]
-                       (transduce (take 2) conj [] (rs/reducible-result-set rs {:results/xform xform})))))
+                     "namespaced lisp-case maps"
+                     {:xform    (rs/maps :namespaced :lisp-case)
+                      :expected (for [row expected-rows]
+                                  (zipmap [:people/id :people/name :people/created-at] row))}
 
-              (testing "with-prepared-statement"
+                     "results-xform should be comp-able"
+                     {:xform    (fn [rs]
+                                  (comp ((rs/maps :namespaced :lisp-case) rs)
+                                        (map :people/id)))
+                      :expected [1 2]}}]
+              (testing description
                 (is (= expected
                        (with-open [rs (.executeQuery stmt)]
-                         (transduce (take 2) conj [] (rs/reducible-result-set rs {:results/xform xform})))))))))))))
+                         (transduce (take 2) conj [] (rs/reducible-result-set rs {:results/xform xform})))))
+
+                (testing "with-prepared-statement"
+                  (is (= expected
+                         (with-open [rs (.executeQuery stmt)]
+                           (transduce (take 2) conj [] (rs/reducible-result-set rs {:results/xform xform}))))))))))))))
 
 (deftest transform-column-names-test
   (jdbc/with-connection [conn (test/connection)]

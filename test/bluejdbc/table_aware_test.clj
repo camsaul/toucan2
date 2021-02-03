@@ -5,6 +5,10 @@
             [bluejdbc.test :as test]
             [clojure.test :refer :all]))
 
+(use-fixtures :each (fn [thunk]
+                      (test/with-every-test-connection
+                        (thunk))))
+
 (deftest insert!-test
   (testing "insert!"
     (doseq [[description {:keys [f expected]}]
@@ -28,9 +32,9 @@
       (testing description
         (jdbc/with-connection [conn (test/connection)]
           (test/with-test-data [conn [{:name         "insert_test_table"
-                                         :columns      [{:name "id", :class Long, :not-null? true}
-                                                        {:name "name", :class String, :not-null? true}]
-                                         :primary-keys ["id"]}]]
+                                       :columns      [{:name "id", :class Long, :not-null? true}
+                                                      {:name "name", :class String, :not-null? true}]
+                                       :primary-keys ["id"]}]]
             (is (= (count expected)
                    (f conn)))
             (is (= expected
@@ -45,7 +49,7 @@
                                                   {:name "name", :class String, :not-null? true}]
                                    :primary-keys ["id"]}]]
       (testing "If return-generated-keys is true, just return whatever the DB returns"
-        (is (= (case (connection/db-type (test/connection))
+        (is (= (case (connection/db-type &conn)
                  ;; H2 only returns the keys that were actually generated
                  :h2    [{:id 1}]
                  :mysql [{:insert_id 1}]
@@ -54,8 +58,8 @@
                                             :returning_keys_test
                                             nil
                                             {:name "Cam"}))))
-      (let [generated-key (case (connection/db-type (test/connection))
-                            :h2    :ID
+      (let [generated-key (case (connection/db-type &conn)
+                            :h2    :id
                             :mysql :insert_id
                             :id)]
         (testing "Should be able to specify *which* keys get returned"
