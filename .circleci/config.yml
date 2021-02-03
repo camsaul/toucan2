@@ -94,6 +94,30 @@ executors:
           ACCEPT_EULA: Y
           SA_PASSWORD: 123456
 
+  everything:
+    working_directory: /home/circleci/camsaul/bluejdbc/
+    docker:
+      - image: circleci/clojure:lein-2.9.1
+        environment:
+          JDBC_URL_H2: jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1
+          JDBC_URL_SQL_SERVER: jdbc:sqlserver://localhost:1433/?user=SA&password=123456
+          JDBC_URL_POSTGRES: jdbc:postgresql://localhost:5432/circle_test?user=circle_test
+          JDBC_URL_MYSQL: jdbc:mysql://localhost:3306/circle_test?user=root
+      - image: postgres:latest
+        environment:
+          POSTGRES_USER: circle_test
+          POSTGRES_DB: circle_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+      - image: mariadb:latest
+        environment:
+          MYSQL_DATABASE: circle_test
+          MYSQL_USER: root
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+      - image: mcr.microsoft.com/mssql/server:2017-latest
+        environment:
+          ACCEPT_EULA: Y
+          SA_PASSWORD: 123456
+
 
 ########################################################################################################################
 #                                                       COMMANDS                                                       #
@@ -280,7 +304,7 @@ workflows:
           name: cloverage
           requires:
             - deps
-          e: postgres-latest
+          e: everything
           lein-command: cloverage --codecov
           after-steps:
             - run:

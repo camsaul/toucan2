@@ -55,6 +55,8 @@
        (distinct
         [(env/env :jdbc-url-postgres)
          (env/env :jdbc-url-h2)
+         (env/env :jdbc-url-sql-server)
+         (env/env :jdbc-url-mysql)
          (env/env :jdbc-url)]))))
 
 (println "Testing against:" (pr-str (test-connections)))
