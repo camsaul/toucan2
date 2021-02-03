@@ -45,10 +45,16 @@
 (m/defmethod class->equivalent-column-type [:default java.time.OffsetDateTime] [_ _] "TIMESTAMP WITH TIME ZONE")
 (m/defmethod class->equivalent-column-type [:default java.time.OffsetDateTime] [_ _] "TIMESTAMP WITH TIME ZONE")
 
+;; TODO -- these should probably go in test-integration namespaces
 (m/defmethod class->equivalent-column-type
   [:postgresql :bluejdbc.test/autoincrement]
   [_ _]
   "SERIAL")
+
+(m/defmethod class->equivalent-column-type
+  [:h2 :bluejdbc.test/autoincrement]
+  [_ _]
+  "BIGINT AUTO_INCREMENT")
 
 (m/defmulti create-table-ddl
   {:arglists '([db-type table])}
