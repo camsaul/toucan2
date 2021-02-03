@@ -79,13 +79,20 @@
   (with-table [_ new-table]
     (instance new-table))
 
-  ;; TODO -- not sure what the default behavior for something like a normal map should be for original/changes
   Object
   (table [_]
+    nil)
+  (original [_]
+    nil)
+  (changes [_]
     nil)
 
   clojure.lang.IPersistentMap
   (table [_]
     nil)
   (with-table [m new-table]
-    (instance table m)))
+    (instance table m))
+  (original [_]
+    nil)
+  (changes [_]
+    nil))

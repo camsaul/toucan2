@@ -2,7 +2,7 @@
   (:require [bluejdbc.connection :as connection]
             [bluejdbc.core :as jdbc]
             [bluejdbc.query :as query]
-            [bluejdbc.test.load-test-data :as load]
+            [bluejdbc.test.load :as load]
             [bluejdbc.util :as u]
             [clojure.test :refer :all]
             [java-time :as t]
