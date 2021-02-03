@@ -57,11 +57,6 @@
   [m]
   (print-method m *out*))
 
-#_(defn instance?
-  "True if `x` is a BlueJDBC `Instance` or similar."
-  [x]
-  (satisfies? IInstance x))
-
 (defn instance
   (^bluejdbc.instance.Instance [table]
    (Instance. table {} {} nil))

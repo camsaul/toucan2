@@ -120,15 +120,15 @@
 ;;;                                           Hydration Using All Strategies
 ;;; ==================================================================================================================
 
-(def strategies
-  (atom [::automagic-batched ::multimethod-batched ::multimethod-simple]))
+(defn- strategies []
+  (keys (m/primary-methods hydrate-with-strategy)))
 
 (defn hydration-strategy [results k]
   (some
    (fn [strategy]
      (when (can-hydrate-with-strategy? strategy results k)
        strategy))
-   @strategies))
+   (strategies)))
 
 
 ;;;                                               Primary Hydration Fns
