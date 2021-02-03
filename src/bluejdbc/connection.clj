@@ -71,8 +71,7 @@
   ^Connection [^String s {driverable       :connection/driver
                           ^String user     :connection/user
                           ^String password :connection/password
-                          properties       :connection/properties
-                          :as              options}]
+                          properties       :connection/properties}]
   (log/trace "Creating new Connection from JDBC connection string")
   (cond
     driverable         (.connect (driver driverable) s (u/->Properties properties))
@@ -131,8 +130,7 @@
   "Create a new JDBC connection from a DataSource."
   ^Connection [^DataSource data-source
                {^String user     :connection/user
-                ^String password :connection/password
-                :as              options}]
+                ^String password :connection/password}]
   (log/trace "Getting new Connection from DataSource")
   (if (or user password)
     (.getConnection data-source user password)

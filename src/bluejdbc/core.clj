@@ -25,8 +25,7 @@
          stmt/keep-me
          table-aware/keep-me)
 
-;; NOCOMMIT
-(defn- public-symbols [ns-alias]
+#_(defn- public-symbols [ns-alias]
   (sort (keys (ns-publics (get (ns-aliases *ns*) ns-alias)))))
 
 (p/import-vars

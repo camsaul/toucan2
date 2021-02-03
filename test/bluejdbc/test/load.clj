@@ -43,7 +43,6 @@
 (m/defmethod class->equivalent-column-type [:default Long]                     [_ _] "INTEGER")
 (m/defmethod class->equivalent-column-type [:default Boolean]                  [_ _] "BOOLEAN")
 (m/defmethod class->equivalent-column-type [:default java.time.OffsetDateTime] [_ _] "TIMESTAMP WITH TIME ZONE")
-(m/defmethod class->equivalent-column-type [:default java.time.OffsetDateTime] [_ _] "TIMESTAMP WITH TIME ZONE")
 
 ;; TODO -- these should probably go in test-integration namespaces
 (m/defmethod class->equivalent-column-type
