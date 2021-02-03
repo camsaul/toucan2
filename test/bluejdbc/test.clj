@@ -1,7 +1,16 @@
 (ns bluejdbc.test
-  (:require [bluejdbc.core :as jdbc]
+  (:require [bluejdbc.connection :as connection]
+            [bluejdbc.core :as jdbc]
+            [bluejdbc.integrations.postgres :as postgres]
+            [bluejdbc.query :as query]
+            [bluejdbc.test.load-test-data :as load]
+            [bluejdbc.util :as u]
             [clojure.test :refer :all]
-            [java-time :as t]))
+            [java-time :as t]
+            [methodical.core :as m]))
+
+;; TODO -- load integrations automatically based on Connection type.
+(comment postgres/keep-me)
 
 (jdbc/defmethod jdbc/connection* :test-connection/h2
   [_ options]
@@ -21,12 +30,12 @@
 
 (defn connection [& _] :test-connection/postgres)
 
-(defn db-type [] :postgres)
+(defn db-type [] :postgresql)
 
-(defn autoincrement-type []
+(defn ^:deprecated autoincrement-type []
   "SERIAL")
 
-(defn do-with-test-data [conn thunk]
+(defn ^:deprecated do-with-test-data [conn thunk]
   (jdbc/with-connection [conn conn]
     (try
       (jdbc/execute! conn "CREATE TABLE \"people\" (\"id\" INTEGER NOT NULL, \"name\" TEXT NOT NULL, \"created_at\" TIMESTAMP NOT NULL);")
@@ -40,17 +49,52 @@
       (finally
         (jdbc/execute! conn "DROP TABLE IF EXISTS \"people\";")))))
 
-(defmacro with-test-data
+(defmacro ^:deprecated with-test-data
   "Execute `body` with some rows loaded into a `people` table."
   [conn & body]
   `(do-with-test-data ~conn (fn [] ~@body)))
 
-(defmacro with-test-table {:style/indent 3} [conn table-name fields & body]
-  `(let [conn# ~conn]
-     (try
-       (jdbc/execute! conn# ~(format "DROP TABLE IF EXISTS %s;" (name table-name)))
-       (is (= 0
-              (jdbc/execute! conn# (format "CREATE TABLE %s %s;" ~(name table-name) ~fields))))
-       ~@body
-       (finally
-         (jdbc/execute! conn# ~(format "DROP TABLE IF EXISTS %s;" (name table-name)))))))
+(m/defmulti db-type*
+  {:arglists '([connectable])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod db-type* :test-connection/postgres
+  [_]
+  :postgresql)
+
+(when-let [klass (try
+                   (Class/forName "org.postgresql.jdbc.PgConnection")
+                   (catch Throwable _))]
+  (m/defmethod db-type* klass
+    [_]
+    :postgresql))
+
+(defn ^:deprecated db-type
+  ([]
+   (db-type* (connection)))
+  ([connectable]
+   (db-type* connectable)))
+
+(defn do-with-test-data-2 [db-type connectable data-source thunk]
+  (let [data (load/data data-source)]
+    (jdbc/with-connection [conn connectable]
+      (binding [query/*include-queries-in-exceptions*              true
+                connection/*include-connection-info-in-exceptions* true]
+        (try
+          (load/create-database-with-test-data! db-type conn data)
+          (thunk)
+          (finally
+            (load/destroy-all-tables! db-type conn data)))))))
+
+(defmacro with-test-data-2
+  [[connectable data-source] & body]
+  `(let [connectable# ~connectable]
+     (do-with-test-data-2 (db-type connectable#) connectable# ~data-source (fn [] ~@body))))
+
+(deftest with-test-data-2-test
+  (with-test-data-2 [(connection) :people]
+    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
+            {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56Z")}
+            {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56Z")}
+            {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56Z")}]
+           (jdbc/query (connection) "SELECT * FROM people;" {:connection/type (db-type)})))))

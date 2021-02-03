@@ -9,6 +9,20 @@
             [pretty.core :as pretty])
   (:import java.sql.PreparedStatement))
 
+(def ^:dynamic *include-queries-in-exceptions* false) ; EXPERIMENTAL
+
+(defmacro try-catch-when-include-queries-in-exceptions-enabled
+  {:style/indent 0}
+  [& args]
+  (let [body       (butlast args)
+        catch-form (last args)]
+    `(let [thunk# (fn [] ~@body)]
+       (if *include-queries-in-exceptions*
+         (try
+           (thunk#)
+           ~catch-form)
+         (thunk#)))))
+
 (m/defmulti reducible-query*
   {:arglists '([connectable query options])}
   u/dispatch-on-first-two-args)
@@ -24,9 +38,19 @@
     (reduce [_ rf init]
       (conn/with-connection [conn connectable options]
         (let [sql-args (compile/compile conn query options)]
-          (with-open [stmt (stmt/prepare! conn sql-args options)
-                      rs   (.executeQuery stmt)]
-            (rs/reduce-result-set rs options rf init)))))
+          (try-catch-when-include-queries-in-exceptions-enabled
+            (with-open [stmt (stmt/prepare! conn sql-args options)
+                        rs   (.executeQuery stmt)]
+              (try
+                (rs/reduce-result-set rs options rf init)
+                (catch Throwable e
+                  (throw (ex-info "Error reducing results"
+                                  {:result-set rs, :rf rf, :init init, :options options}
+                                  e)))))
+            (catch Throwable e
+              (throw (ex-info "Error executing query"
+                              {:query query, :sql-args sql-args, :options options}
+                              e)))))))
 
     clojure.lang.IReduce
     (reduce [this rf]
@@ -76,15 +100,21 @@
     (generated-keys stmt) -> [1 2 3]"
   [^PreparedStatement stmt options]
   (log/trace "Fetching generated keys")
-  (let [ks (:statement/return-generated-keys options)]
-    (with-open [rs (.getGeneratedKeys stmt)]
-      (let [result (into []
-                         (cond
-                           (keyword? ks)    (map ks)
-                           (sequential? ks) (map #(select-keys % ks))
-                           :else            identity)
-                         rs)]
-        result))))
+  (try
+    (let [ks (:statement/return-generated-keys options)]
+      (try
+        (with-open [rs (.getGeneratedKeys stmt)]
+          (let [result (into []
+                             (cond
+                               (keyword? ks)    (map ks)
+                               (sequential? ks) (map #(select-keys % ks))
+                               :else            identity)
+                             (rs/reducible-result-set rs options))]
+            result))
+        (catch Throwable e
+          (throw (ex-info "Error fetching generated keys"
+                          {:keys ks, :options options}
+                          e)))))))
 
 (m/defmulti execute!*
   {:arglists '([connectable query options])}
@@ -94,12 +124,17 @@
   [connectable query options]
   (conn/with-connection [conn connectable options]
     (let [sql-args (compile/compile conn query options)]
-      (with-open [stmt (stmt/prepare! conn sql-args options)]
-        (let [affected-rows (.executeUpdate stmt)]
-          (if (:statement/return-generated-keys options)
-            (when (pos? affected-rows)
-              (generated-keys stmt options))
-            affected-rows))))))
+      (try-catch-when-include-queries-in-exceptions-enabled
+        (with-open [stmt (stmt/prepare! conn sql-args options)]
+          (let [affected-rows (.executeUpdate stmt)]
+            (if (:statement/return-generated-keys options)
+              (when (pos? affected-rows)
+                (generated-keys stmt options))
+              affected-rows)))
+        (catch Throwable e
+          (throw (ex-info "Error executing statement"
+                          {:query query, :sql-args sql-args, :options options}
+                          e)))))))
 
 (defn execute!
   ([query]                     (execute!* :default    query nil))

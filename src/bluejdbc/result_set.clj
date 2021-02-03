@@ -7,25 +7,41 @@
 
 ;;;; Reading Results
 
+;; TODO -- should this be exposed in `core`?
+(def type-name
+  "Map of `java.sql.Types` enum integers (e.g. `java.sql.Types/FLOAT`, whose value is `6`) to the string type name e.g.
+  `FLOAT`.
+
+    (type-name java.sql.Types/FLOAT) -> (type-name 6) -> \"FLOAT\""
+  (into {} (for [^java.lang.reflect.Field field (.getDeclaredFields Types)]
+             [(.getLong field Types) (.getName field)])))
+
+;; TODO -- we should determine connection type based on the Connection (via ResultSet?) rather than by looking for
+;; `:connection/type`
+
 (m/defmulti read-column-thunk
   "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
   {:arglists '([^java.sql.ResultSet rs ^java.sql.ResultSetMetaData rsmeta ^Integer i options])}
   (fn [rs ^ResultSetMetaData rsmeta ^Integer i options]
     ;; TODO - log nice name for col type
     (let [col-type (.getColumnType rsmeta i)]
-      (log/tracef "Column %d %s is of type %s" i (pr-str (.getColumnLabel rsmeta i)) col-type)
+      (log/tracef "Column %d %s is of JDBC type %s, native type %s"
+                  i (pr-str (.getColumnLabel rsmeta i)) (type-name col-type) (.getColumnTypeName rsmeta i))
       [(:connection/type options) col-type])))
 
 (m/defmethod read-column-thunk :default
   [^ResultSet rs rsmeta ^Integer i options]
-  (do
-    (log/tracef "Fetching values in column %d with (.getObject rs %d)" i i)
-    (fn []
-      (.getObject rs i))))
+  (fn default-read-column-thunk []
+    (.getObject rs i)))
 
-(defn- get-object-of-class-thunk [^ResultSet rs, ^Integer i, ^Class klass]
+(m/defmethod read-column-thunk :around :default
+  [rs rsmeta i options]
+  (log/tracef "Fetching values in column %d with (.getObject rs %d) and options %s" i i (pr-str options))
+  (next-method rs rsmeta i options))
+
+(defn get-object-of-class-thunk [^ResultSet rs ^Integer i ^Class klass]
   (log/tracef "Fetching values in column %d with (.getObject rs %d %s)" i i (.getCanonicalName klass))
-  (fn []
+  (fn get-object-of-class-thunk* []
     (.getObject rs i klass)))
 
 (m/defmethod read-column-thunk [:default Types/TIMESTAMP]
@@ -174,12 +190,12 @@
   ([rs rf init]
    (reduce-result-set rs nil rf init))
 
-  ([rs {xform :results/xform, :or {xform maps}} rf init]
+  ([rs {xform :results/xform, :or {xform maps}, :as options} rf init]
    (let [xform (comp (take-while some?)
                      (if xform
                        (xform rs)
                        identity))
-         thunk (row-thunk rs)]
+         thunk (row-thunk rs options)]
      (reduce
       (xform rf)
       init

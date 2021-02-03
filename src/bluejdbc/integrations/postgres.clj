@@ -1,13 +1,13 @@
 (ns bluejdbc.integrations.postgres
-  (:require [bluejdbc.result-set :as rs]
+  (:require [bluejdbc.log :as log]
+            [bluejdbc.result-set :as rs]
             [bluejdbc.statement :as stmt]
             [bluejdbc.util :as u]
-            [bluejdbc.util.log :as log]
             [clojure.string :as str]
             [java-time :as t]
             [methodical.core :as m]
             [second-date.core :as second-date])
-  (:import [java.sql ResultSet ResultSetMetaData]))
+  (:import [java.sql ResultSet ResultSetMetaData Types]))
 
 ;; Postgres doesn't support OffsetTime, so convert to a LocalTime in the system timezone
 (m/defmethod stmt/set-parameter! [:postgresql java.time.OffsetTime]
@@ -19,17 +19,16 @@
 ;; bug with the JDBC driver?
 ;;
 ;; We can look at the actual column type name to distinguish between the two
-(m/defmethod rs/read-column-thunk [:postgresql :type/timestamp]
+(m/defmethod rs/read-column-thunk [:postgresql Types/TIMESTAMP]
   [^ResultSet rs ^ResultSetMetaData rsmeta ^Integer i _]
   (let [^Class klass (if (= (str/lower-case (.getColumnTypeName rsmeta i)) "timestamptz")
                        java.time.OffsetDateTime
                        java.time.LocalDateTime)]
-    (fn []
-      (.getObject rs i klass))))
+    (rs/get-object-of-class-thunk rs i klass)))
 
 ;; Sometimes Postgres times come back as strings like `07:23:18.331+00` (no minute in offset) and there's a bug in the
 ;; JDBC driver where it can't parse those correctly. We can do it ourselves in that case.
-(m/defmethod rs/read-column-thunk [:postgresql :type/time]
+(m/defmethod rs/read-column-thunk [:postgresql Types/TIME]
   [^ResultSet rs rsmeta ^Integer i options]
   (let [parent-thunk (next-method rs rsmeta i options)]
     (fn []
@@ -43,7 +42,7 @@
 ;; The postgres JDBC driver cannot properly read MONEY columns — see https://github.com/pgjdbc/pgjdbc/issues/425. Work
 ;; around this by checking whether the column type name is `money`, and reading it out as a String and parsing to a
 ;; BigDecimal if so; otherwise, proceeding as normal
-(m/defmethod rs/read-column-thunk [:postgresql :type/double]
+(m/defmethod rs/read-column-thunk [:postgresql Types/DOUBLE]
   [^ResultSet rs ^ResultSetMetaData rsmeta ^Integer i _]
   (if (= (.getColumnTypeName rsmeta i) "money")
     (fn []

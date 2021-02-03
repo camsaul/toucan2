@@ -9,14 +9,14 @@
     (doseq [[description {:keys [f expected]}]
             {"with row maps"
              {:f        (fn [conn]
-                          (jdbc/insert! conn :insert_test_table [{:id 1, :name "Cam"}
-                                                                 {:id 2, :name "Sam"}]))
+                          (jdbc/insert! conn :insert_test_table nil [{:id 1, :name "Cam"}
+                                                                     {:id 2, :name "Sam"}]))
               :expected [{:id 1, :name "Cam"}
                          {:id 2, :name "Sam"}]}
 
              "with a single row map"
              {:f        (fn [conn]
-                          (jdbc/insert! conn :insert_test_table {:id 1, :name "Cam"}))
+                          (jdbc/insert! conn :insert_test_table nil {:id 1, :name "Cam"}))
               :expected [{:id 1, :name "Cam"}]}
 
              "with row vectors"
@@ -26,7 +26,10 @@
                          {:id 2, :name "Sam"}]}}]
       (testing description
         (jdbc/with-connection [conn (test/connection)]
-          (test/with-test-table conn :insert_test_table "(id INTEGER NOT NULL, name TEXT NOT NULL)"
+          (test/with-test-data-2 [conn [{:name         "insert_test_table"
+                                         :columns      [{:name "id", :class Long, :not-null? true}
+                                                        {:name "name", :class String, :not-null? true}]
+                                         :primary-keys ["id"]}]]
             (is (= (count expected)
                    (f conn)))
             (is (= expected
@@ -36,7 +39,10 @@
 
 (deftest insert-returning-keys!-test
   (jdbc/with-connection [conn (test/connection)]
-    (test/with-test-table conn :returning_keys_test (format "(id %s PRIMARY KEY, name TEXT NOT NULL)" (test/autoincrement-type))
+    (test/with-test-data-2 [conn [{:name         "returning_keys_test"
+                                   :columns      [{:name "id", :class ::test/autoincrement}
+                                                  {:name "name", :class String, :not-null? true}]
+                                   :primary-keys ["id"]}]]
       (testing "If return-generated-keys is true, just return whatever the DB returns"
         (is (= (case (test/db-type)
                  ;; H2 only returns the keys that were actually generated
@@ -45,8 +51,8 @@
                  [{:id 1, :name "Cam"}])
                (jdbc/insert-returning-keys! conn
                                             :returning_keys_test
-                                            {:name "Cam"}
-                                            {:statement/return-generated-keys true}))))
+                                            nil
+                                            {:name "Cam"}))))
       (let [generated-key (case (test/db-type)
                             :h2    :ID
                             :mysql :insert_id
@@ -55,11 +61,13 @@
           (is (= [2]
                  (jdbc/insert-returning-keys! conn
                                               :returning_keys_test
+                                              nil
                                               {:name "Cam"}
                                               {:statement/return-generated-keys generated-key})))
           (is (= [{generated-key 3}]
                  (jdbc/insert-returning-keys! conn
                                               :returning_keys_test
+                                              nil
                                               {:name "Cam"}
                                               {:statement/return-generated-keys [generated-key]}))))))))
 
@@ -87,11 +95,16 @@
 
 (deftest update!-test
   (jdbc/with-connection [conn (test/connection)]
-    (test/with-test-table conn :venues "(id INTEGER NOT NULL, price INTEGER NOT NULL, name TEXT NOT NULL, expensive BOOLEAN)"
+    (test/with-test-data-2 [conn [{:name    :venues
+                                   :columns [{:name "id", :class Long, :not-null? true}
+                                             {:name "price", :class Long, :not-null? true}
+                                             {:name "name", :class String, :not-null? true}
+                                             {:name "expensive", :class Boolean}]
+                                   :primary-keys ["id"]}]]
       (is (= 3
-             (jdbc/insert! conn :venues [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
-                                         {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
-                                         {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}])))
+             (jdbc/insert! conn :venues nil [{:id 1, :price 1, :name "Cheap Burgers", :expensive nil}
+                                             {:id 2, :price 2, :name "Cheap Pizza", :expensive nil}
+                                             {:id 3, :price 4, :name "Expensive Sushi", :expensive nil}])))
       (letfn [(venues []
                 (jdbc/query conn {:select   [:*]
                                   :from     [:venues]
@@ -141,7 +154,11 @@
 
 (deftest delete!-test
   (jdbc/with-connection [conn (test/connection)]
-    (test/with-test-table conn :venues "(id INTEGER NOT NULL, price INTEGER NOT NULL, name TEXT NOT NULL)"
+    (test/with-test-data-2 [conn [{:name    :venues
+                                   :columns [{:name "id", :class Long, :not-null? true}
+                                             {:name "price", :class Long, :not-null? true}
+                                             {:name "name", :class String, :not-null? true}]
+                                   :primary-keys ["id"]}]]
       (is (= 3
              (jdbc/insert! conn :venues nil [{:id 1, :price 1, :name "Cheap Burgers"}
                                              {:id 2, :price 2, :name "Cheap Pizza"}

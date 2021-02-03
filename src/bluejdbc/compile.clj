@@ -1,9 +1,9 @@
 (ns bluejdbc.compile
   (:refer-clojure :exclude [compile])
-  (:require [bluejdbc.util :as u]
+  (:require [bluejdbc.log :as log]
+            [bluejdbc.util :as u]
             [honeysql.core :as hsql]
-            [methodical.core :as m]
-            [bluejdbc.log :as log])
+            [methodical.core :as m])
   (:import java.sql.Connection))
 
 (m/defmulti compile*
@@ -18,12 +18,12 @@
 
 (m/defmethod compile* :around :default
   [conn table query options]
-  (log/tracef "Compile query\n^%s %s\noptions: %s"
+  (log/tracef "Compile query with options %s\n^%s %s"
+              (u/pprint-to-str options)
               (some-> query class .getCanonicalName)
-              (u/pprint-to-str query)
-              (u/pprint-to-str options))
+              (u/pprint-to-str query))
   (let [sql-args (next-method conn table query options)]
-    (log/tracef "->\n%s" (u/pprint-to-str sql-args))
+    (log/tracef "-> %s" (u/pprint-to-str sql-args))
     (assert (and (sequential? sql-args) (string? (first sql-args)))
             (str "compile* should return [sql & args], got " (pr-str sql-args)))
     sql-args))
@@ -60,3 +60,7 @@
                   (and conn (not (:honeysql/quoting options)))
                   (assoc :honeysql/quoting (quoting-strategy conn)))]
     (format-honeysql honeysql-form options)))
+
+(defn quote-identifier [identifier options]
+  (hsql/quote-identifier identifier :style (or (:honeysql/quoting options)
+                                               :ansi)))

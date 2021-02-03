@@ -1,7 +1,9 @@
 (ns bluejdbc.table-aware
-  (:require [bluejdbc.instance :as instance]
+  (:require [bluejdbc.compile :as compile]
+            [bluejdbc.instance :as instance]
             [bluejdbc.query :as query]
             [bluejdbc.util :as u]
+            [honeysql.core :as hsql]
             [methodical.core :as m]))
 
 ;; TODO - consider whether there's any possible reason in the whole world to have this also dispatch on connection
@@ -9,6 +11,8 @@
 ;; TODO -- this should work with objects as well
 ;;
 ;; TODO -- is this supposed to return a String or a Keyword? Need to document.
+;;
+;; TODO -- rename to tableable (?)
 (m/defmulti table-name
   {:arglists '([table])}
   u/dispatch-on-first-arg)
@@ -16,6 +20,18 @@
 (m/defmethod table-name :default
   [this]
   this)
+
+(m/defmethod table-name String
+  [s]
+  s)
+
+;; NOCOMMIT
+(defn tableable? [x]
+  (or (keyword? x)
+      (boolean (m/effective-method (m/remove-primary-method table-name :default) (class x)))))
+
+(defn- raw-identifier [identifier options]
+  (hsql/raw (compile/quote-identifier identifier options)))
 
 (m/defmulti primary-key*
   {:arglists '([table object])}
@@ -80,16 +96,30 @@
 
 (m/defmethod insert!* :default
   [connectable table columns rows options]
-  (let [honeysql-form (merge {:insert-into (table-name table)
-                              :values      rows}
-                             (when (seq columns)
-                               {:columns columns}))]
-    (query/execute! connectable honeysql-form options)))
+  (query/try-catch-when-include-queries-in-exceptions-enabled
+    (let [honeysql-form (merge {:insert-into (raw-identifier (table-name table) options)
+                                :values      rows}
+                               (when (seq columns)
+                                 {:columns (mapv #(raw-identifier % options)
+                                                 columns)}))]
+      (query/try-catch-when-include-queries-in-exceptions-enabled
+        (query/execute! connectable honeysql-form options)
+        (catch Throwable e
+          (throw (ex-info "Error inserting rows"
+                          {:honeysql-form honeysql-form}
+                          e)))))
+    (catch Throwable e
+      (throw (ex-info "Error inserting rows"
+                      {:table table, :columns columns, :rows (take 10 rows), :options options}
+                      e)))))
 
 (defn- one-or-many [row-or-rows]
-  (if (sequential? row-or-rows)
-    row-or-rows
-    [row-or-rows]))
+  (cond
+    (sequential? row-or-rows) row-or-rows
+    (nil? row-or-rows)        nil
+    :else                     [row-or-rows]))
+
+;; TODO - can we make this argslist [connectable? table columns? row-or-rows options?]
 
 (defn insert!
   ([table row-or-rows]                             (insert!* :default    table nil     (one-or-many row-or-rows) nil))
@@ -98,7 +128,7 @@
   ([connectable table columns row-or-rows options] (insert!* connectable table columns (one-or-many row-or-rows) options)))
 
 (m/defmulti insert-returning-keys!*
-  {:arglists '([connectable table columns rows options])}
+  {:arglists '([connectable table columns row-or-rows options])}
   u/dispatch-on-first-three-args)
 
 (defn insert-returning-keys!
@@ -106,6 +136,11 @@
   ([table columns row-or-rows]                     (insert-returning-keys!* :default    table columns row-or-rows nil))
   ([connectable table columns row-or-rows]         (insert-returning-keys!* connectable table columns row-or-rows nil))
   ([connectable table columns row-or-rows options] (insert-returning-keys!* connectable table columns row-or-rows options)))
+
+(m/defmethod insert-returning-keys!* :default
+  [connectable table columns row-or-rows options]
+  (insert! connectable table columns row-or-rows (merge {:statement/return-generated-keys true}
+                                                        options)))
 
 (defn conditions->where-clause
   "Convert `conditions` to a HoneySQL-style WHERE clause vector if it is not already one (e.g., if it is a map)."
