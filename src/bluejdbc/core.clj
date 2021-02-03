@@ -1,10 +1,11 @@
 (ns bluejdbc.core
-  (:refer-clojure :exclude [compile defmethod #_instance?])
+  (:refer-clojure :exclude [compile defmethod])
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connection :as connection]
             [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
+            [bluejdbc.metadata :as metadata]
             [bluejdbc.query :as query]
             [bluejdbc.result-set :as rs]
             [bluejdbc.statement :as stmt]
@@ -18,10 +19,15 @@
          hydrate/keep-me
          log/keep-me
          instance/keep-me
+         metadata/keep-me
          query/keep-me
          rs/keep-me
          stmt/keep-me
          table-aware/keep-me)
+
+;; NOCOMMIT
+(defn- public-symbols [ns-alias]
+  (sort (keys (ns-publics (get (ns-aliases *ns*) ns-alias)))))
 
 (p/import-vars
  [methodical
@@ -38,12 +44,17 @@
   with-connection]
 
  [hydrate
-  ;; TODO -- need to import other stuff
-  hydrate]
+  automagic-hydration-key-table
+  batched-hydrate
+  #_can-hydrate-with-strategy?          ; TODO <- include this?
+  hydrate
+  #_hydrate-with-strategy               ; TODO <- include this?
+  hydration-keys
+  #_hydration-strategy                  ; TODO <- include this?
+  #_simple-hydrate]                     ; TODO <- include this?
 
  [instance
   instance
-  #_instance?
   original
   changes
   table
@@ -52,8 +63,15 @@
  [log
   with-debug-logging]
 
- ;; TODO
- #_[metadata with-metadata database-info driver-info catalogs schemas table-types tables columns]
+ [metadata
+  catalogs
+  columns
+  database-info
+  driver-info
+  schemas
+  table-types
+  tables
+  with-metadata]
 
  [query
   reducible-query*
@@ -67,8 +85,13 @@
   transaction]
 
  ;; TODO
- [rs read-column-thunk maps]
- [stmt prepare!]
+ [rs
+  maps
+  read-column-thunk
+  type-name]
+
+ [stmt
+  prepare!]
 
  [table-aware
   table-name

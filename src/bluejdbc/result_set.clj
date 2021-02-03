@@ -16,9 +16,6 @@
   (into {} (for [^java.lang.reflect.Field field (.getDeclaredFields Types)]
              [(.getLong field Types) (.getName field)])))
 
-;; TODO -- we should determine connection type based on the Connection (via ResultSet?) rather than by looking for
-;; `:connection/type`
-
 (m/defmulti read-column-thunk
   "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
   {:arglists '([^java.sql.ResultSet rs ^java.sql.ResultSetMetaData rsmeta ^Integer i options])}
