@@ -1,4 +1,4 @@
-(ns bluejdbc.test.load-test-data
+(ns bluejdbc.test.load
   "Code for creating DBs and loading up test data to facilitate testing."
   (:require [bluejdbc.connection :as connection]
             [bluejdbc.core :as jdbc]
