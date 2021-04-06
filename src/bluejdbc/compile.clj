@@ -11,13 +11,13 @@
   u/dispatch-on-first-three-args)
 
 (defn compile
-  ([query]                           (compile  :current    nil   query nil))
-  ([query options]                   (compile  :current    nil   query options))
+  ([query]                           (compile  conn/*current-connectable*    nil   query nil))
+  ([query options]                   (compile  conn/*current-connectable*    nil   query options))
   ([table query options]             (compile  nil         table query options))
   ([connectable table query options] (compile* connectable table query (merge (conn/default-options connectable)
                                                                               options))))
 
-(m/defmethod compile* :around :current
+(m/defmethod compile* :around :default
   [connectable table query options]
   (log/tracef "Compile query with options %s\n^%s %s"
               (u/pprint-to-str options)
@@ -53,10 +53,10 @@
 
 (defn quote-identifier
   ([identifier]
-   (quote-identifier :current identifier nil))
+   (quote-identifier conn/*current-connectable* identifier nil))
 
   ([identifier options]
-   (quote-identifier :current identifier options))
+   (quote-identifier conn/*current-connectable* identifier options))
 
   ([connectable identifier options]
    (let [options (merge (conn/default-options connectable) options)]

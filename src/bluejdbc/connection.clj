@@ -1,5 +1,6 @@
 (ns bluejdbc.connection
-  (:require [bluejdbc.util :as u]
+  (:require [bluejdbc.connection :as conn]
+            [bluejdbc.util :as u]
             [methodical.core :as m]
             [next.jdbc :as next.jdbc])
   (:import java.sql.Connection))
@@ -9,8 +10,22 @@
   default, this is false, to avoid leaking sensitive information like passwords. You can this for debugging purposes."
   false)
 
+;; TODO -- can we consolidate these dynamic variables (?)
+
+#_(def ^:dynamic *current*
+  :default)
+
+(def ^:dynamic ^:deprecated  *connectable-for-new-connections*
+  "Connectable to use to create new connections, overriding `:default`. Not bound by default; override this if you'd
+  rather bind connectable dynamically instead of providing a `:default` implementation."
+  nil)
+
+(def ^:dynamic *current-connectable*
+  "Connectable that was used to bound the current connection."
+  nil)
+
 (def ^:dynamic ^java.sql.Connection *connection*
-  "Connection that was bound by `with-connection`, used by default when connection is unspecified."
+  "Current Connection that was bound by `with-connection`, used by default when connection is unspecified."
   nil)
 
 (def ^:dynamic ^java.sql.Connection *options*
@@ -21,24 +36,34 @@
   "Connection that was bound by `transaction`, used by default inside a transaction when connection is unspecified."
   nil)
 
+#_(defn- default-connectable-for-new-connections []
+  (or *connectable-for-new-connections*
+      :default))
+
+(m/defmulti connectable
+  {:arglists '([connectable options])}
+  u/dispatch-on-first-arg
+  :default-value ::default)
+
+(m/defmethod connectable ::default
+  [connectable _]
+  connectable)
+
 (m/defmulti default-options
   {:arglists '([connectable])}
-  u/dispatch-on-first-arg)
+  u/dispatch-on-first-arg
+  :default-value ::default)
 
-(m/defmethod default-options :default
+(m/defmethod default-options ::default
   [_]
   nil)
 
-(m/defmethod default-options :current
-  [_]
-  (or *options*
-      (default-options :default)))
-
 (m/defmulti connection*
   {:arglists '([connectable options])}
-  u/dispatch-on-first-arg)
+  u/dispatch-on-first-arg
+  :default-value ::default)
 
-(m/defmethod connection* :around :default
+(m/defmethod connection* :around ::default
   [connectable options]
   (let [conn (try
                (next-method connectable options)
@@ -56,17 +81,18 @@
                  " Input: " (pr-str connectable)))
     conn))
 
-(m/defmethod connection* :default
-  [connectable options]
-  [:new (next.jdbc/get-connection connectable (:connection options))])
+(m/defmethod connection* ::default
+  [a-connectable options]
+  (println "(connectable a-connectable options):" (connectable a-connectable options)) ; NOCOMMIT
+  [:new (next.jdbc/get-connection (connectable a-connectable options) (:connection options))])
 
-(m/defmethod connection* :current
-  [connectable options]
+#_(m/defmethod connection* :current
+  [a-connectable options]
   (or (when *transaction-connection*
         [:existing *transaction-connection*])
       (when *connection*
         [:existing *connection*])
-      (connection* :default options)))
+      (next-method a-connectable options)))
 
 (m/defmethod connection* Connection
   [conn _]
@@ -82,8 +108,9 @@
   [connectable options f]
   (let [options                            (merge (default-options connectable) options)
         [new-or-existing ^Connection conn] (connection connectable options)]
-    (binding [*connection* conn
-              *options*    options]
+    (binding [*current-connectable* connectable
+              *connection*          conn
+              *options*             options]
       (case new-or-existing
         :existing (f conn)
         :new      (with-open [conn conn]
@@ -103,7 +130,7 @@
                                               ~@body)))
 
 (defn do-transaction [connectable options f]
-  (let [connectable (or connectable :current)
+  (let [connectable (or connectable conn/*transaction-connection* conn/*connection* conn/*current-connectable*)
         options     (merge (default-options connectable)
                            options)]
     (with-connection [conn connectable options]
