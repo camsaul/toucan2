@@ -24,9 +24,10 @@
 
   :dependencies
   [[clojure.java-time "0.3.2"]
-   [honeysql "1.0.444" :exclusions [org.clojure/clojurescript]]
+   [com.github.seancorfield/next.jdbc "1.1.646"]
+   [honeysql "1.0.461" :exclusions [org.clojure/clojurescript]]
    [metabase/second-date "1.0.0"]
-   [methodical "0.10.0-alpha"]
+   [methodical "0.10.1-alpha"]
    [org.clojure/tools.logging "1.1.0"]
    [potemkin "0.4.5"]
    [pretty "1.0.4"]]
@@ -38,7 +39,7 @@
 
    :postgres
    {:dependencies
-    [[org.postgresql/postgresql "42.2.18"]]}
+    [[org.postgresql/postgresql "42.2.19"]]}
 
    :mysql
    {:dependencies
@@ -50,10 +51,10 @@
    :dev
    [:jdbc-drivers
     {:dependencies
-     [[org.clojure/clojure "1.10.1"]
-      [org.clojure/tools.reader "1.3.4"]
+     [[org.clojure/clojure "1.10.3"]
+      [org.clojure/tools.reader "1.3.5"]
       [environ "1.2.0"]
-      [pjstadig/humane-test-output "0.10.0"]]
+      [pjstadig/humane-test-output "0.11.0"]]
 
      :plugins
      [[lein-environ "1.2.0"]]
@@ -150,7 +151,7 @@
     :source-paths ^:replace ["src" "test"]}
 
    :deploy
-   {:dependencies [[org.clojure/clojure "1.10.1"]]}}
+   {:dependencies [[org.clojure/clojure "1.10.3"]]}}
 
   :deploy-repositories
   [["clojars"

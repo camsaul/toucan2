@@ -1,6 +1,7 @@
 *.class
 *.jar
 .\#*
+.cpcache
 /*.iml
 /.eastwood
 /.env

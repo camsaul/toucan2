@@ -73,21 +73,12 @@ m
 (save! m)
 ```
 
-### Rationale
+### Options (TODO)
 
-One might wonder whether the world needs another Clojure JDBC library. For many years,
-[`clojure.java.jdbc`](https://github.com/clojure/java.jdbc) was the go-to Clojure JDBC library. I've personally spent
-hundreds if not thousands of hours working with it as part of [Metabase](https://github.com/metabase/metabase).
-
-Sean Corfield's successor library, [`next.jdbc`](https://github.com/seancorfield/next-jdbc), [fixes some of the
-shortcomings of `clojure.java.jdbc` and makes some big improvements](https://corfield.org/blog/2019/07/04/next-jdbc/).
-
-Blue JDBC shares a similar role as `next.jdbc` as a successor to `clojure.java.jdbc`, but with slightly different aims:
-
-*  Blue JDBC aims to be REPL-friendly and "batteries included". Feature like being able to use HoneySQL anywhere you
-   can use SQL and out-of-the-box support for `java.time`, currency types, Postgres JSON columns, and more mean the
-   low-level boilerplate is part of the library and not your part of your project.
-*  Blue JDBC aims to be more flexible and customizable and is fully database-aware
+- `:connection` -- passed to `next.jdbc/get-connection` when getting a Connection from a connectable
+- `:execute` -- passed to `next.jdbc/plan` and `next.jdbc/execute!` when executing a query
+- `:honeysql` -- passed to HoneySQL when compiling a query
+- `:transaction` -- passed to `next.jdbc/with-transaction` inside of `transaction`
 
 ### Development & Tests
 

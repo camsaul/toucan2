@@ -1,7 +1,6 @@
 (ns bluejdbc.test.load
   "Code for creating DBs and loading up test data to facilitate testing."
-  (:require [bluejdbc.connection :as connection]
-            [bluejdbc.core :as jdbc]
+  (:require [bluejdbc.core :as bluejdbc]
             [bluejdbc.util :as u]
             [clojure.string :as str]
             [clojure.tools.reader.edn :as edn]
@@ -9,8 +8,8 @@
             [methodical.core :as m]))
 
 (m/defmulti create-database-with-test-data!
-  {:arglists '([conn data])}
-  (u/dispatch-on-first-arg-with connection/db-type))
+  {:arglists '([connectable data])}
+  u/dispatch-on-first-arg)
 
 (m/defmulti quote-identifier
   {:arglists '([db-type s])}
@@ -68,23 +67,23 @@
   (format "DROP TABLE IF EXISTS %s;" (quote-identifier db-type table-name)))
 
 (m/defmulti drop-table-if-exists!
-  {:arglists '([conn table])}
-  (u/dispatch-on-first-arg-with connection/db-type))
+  {:arglists '([connectable table])}
+  u/dispatch-on-first-arg)
 
 (m/defmethod drop-table-if-exists! :default
-  [conn {table-name :name, :as table}]
-  (let [ddl (drop-table-if-exists-ddl (connection/db-type conn) table)]
+  [connectable {table-name :name, :as table}]
+  (let [ddl (drop-table-if-exists-ddl connectable table)]
     (try
-      (jdbc/execute! conn ddl)
+      (bluejdbc/execute! connectable ddl)
       (catch Throwable e
         (throw (ex-info (format "Error executing DROP TABLE DDL statement for %s" (pr-str table-name))
                         {:ddl ddl}
                         e))))))
 
 (m/defmethod drop-table-if-exists! :around :default
-  [conn {table-name :name, :as table}]
+  [connectable {table-name :name, :as table}]
   (try
-    (next-method conn table)
+    (next-method connectable table)
     (catch Throwable e
       (throw (ex-info (format "Error dropping table %s" (pr-str table-name))
                       {}
@@ -108,61 +107,61 @@
                           (quote-identifier db-type k))))])))))
 
 (m/defmulti insert-rows!
-  {:arglists '([conn table])}
-  (u/dispatch-on-first-arg-with connection/db-type))
+  {:arglists '([connectable table])}
+  u/dispatch-on-first-arg)
 
 (m/defmethod insert-rows! :default
-  [conn {table-name :name, :keys [columns rows]}]
+  [connectable {table-name :name, :keys [columns rows]}]
   (when (seq rows)
-    (jdbc/insert! conn table-name (map :name columns) rows)))
+    (bluejdbc/insert! connectable table-name (map :name columns) rows)))
 
 (m/defmethod insert-rows! :around :default
-  [conn {table-name :name, :as table}]
+  [connectable {table-name :name, :as table}]
   (try
-    (next-method conn table)
+    (next-method connectable table)
     (catch Throwable e
       (throw (ex-info (format "Error inserting rows into table %s" (pr-str table-name))
                       {}
                       e)))))
 
 (m/defmulti create-table-and-insert-rows!
-  {:arglists '([conn table])}
-  (u/dispatch-on-first-arg-with connection/db-type))
+  {:arglists '([connectable table])}
+  u/dispatch-on-first-arg)
 
 (m/defmethod create-table-and-insert-rows! :default
-  [conn {table-name :name, :as table}]
-  (drop-table-if-exists! conn table)
-  (let [ddl (create-table-ddl (connection/db-type conn) table)]
+  [connectable {table-name :name, :as table}]
+  (drop-table-if-exists! connectable table)
+  (let [ddl (create-table-ddl connectable table)]
     (try
-      (jdbc/execute! conn ddl)
+      (bluejdbc/execute! connectable ddl)
       (catch Throwable e
         (throw (ex-info (format "Error executing CREATE TABLE DDL statement for %s" (pr-str table-name))
                         {:ddl ddl}
                         e)))))
-  (insert-rows! conn table))
+  (insert-rows! connectable table))
 
 (m/defmethod create-table-and-insert-rows! :around :default
-  [conn {table-name :name, :as table}]
+  [connectable {table-name :name, :as table}]
   (try
-    (next-method conn table)
+    (next-method connectable table)
     (catch Throwable e
       (throw (ex-info (format "Error creating table %s" (pr-str table-name))
                       {:table (update table :rows (partial take 10))}
                       e)))))
 
 (m/defmethod create-database-with-test-data! :default
-  [conn tables]
+  [connectable tables]
   (doseq [table tables]
-    (create-table-and-insert-rows! conn table)))
+    (create-table-and-insert-rows! connectable table)))
 
 (m/defmulti destroy-all-tables!
-  {:arglists '([conn data-source])}
-  (u/dispatch-on-first-arg-with connection/db-type))
+  {:arglists '([connectable data-source])}
+  u/dispatch-on-first-arg)
 
 (m/defmethod destroy-all-tables! :default
-  [conn tables]
+  [connectable tables]
   (doseq [table tables]
-    (drop-table-if-exists! conn table)))
+    (drop-table-if-exists! connectable table)))
 
 (m/defmulti data
   {:arglists '([data-source])}
@@ -170,7 +169,7 @@
 
 (m/defmethod data String
   [^String filename]
-  (with-open [r (java.io.PushbackReader. (java.io.FileReader. "test/bluejdbc/test/people.edn"))]
+  (with-open [r (java.io.PushbackReader. (java.io.FileReader. filename))]
     (edn/read
      {:eof nil, :readers {'offset-date-time t/offset-date-time}}
      r)))

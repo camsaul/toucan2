@@ -2,7 +2,8 @@
   (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
             [clojure.walk :as walk]
-            [potemkin :as p]))
+            [potemkin :as p]
+            [pretty.core :refer [PrettyPrintable]]))
 
 (defn keyword-or-class [x]
   (if (keyword? x)
@@ -118,3 +119,16 @@
                         (namespace k))]
       (str namespac "/" (name k))
       (name k))))
+
+(defn pretty-printable-fn [pretty-representation f]
+  (reify
+    PrettyPrintable
+    (pretty [_]
+      (pretty-representation))
+    clojure.lang.IFn
+    (invoke [_]           (f))
+    (invoke [_ a]         (f a))
+    (invoke [_ a b]       (f a b))
+    (invoke [_ a b c]     (f a b c))
+    (invoke [_ a b c d]   (f a b c d))
+    (invoke [_ a b c d e] (f a b c d e))))

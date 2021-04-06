@@ -67,3 +67,15 @@
              (instance/original {})))
       (is (= nil
              (instance/original nil))))))
+
+(deftest transient-test
+  (let [m  (transient (instance/instance :wow {:a 100}))
+        m' (-> m
+               (assoc! :b 200)
+               (assoc! :c 300)
+               (dissoc! :a)
+               persistent!)]
+    (is (= {:b 200, :c 300}
+           m'))
+    (is (= {:a 100}
+           (instance/original m')))))

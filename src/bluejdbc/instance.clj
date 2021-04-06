@@ -1,5 +1,4 @@
 (ns bluejdbc.instance
-  #_(:refer-clojure :exclude [instance?])
   (:require [clojure.data :as data]
             [clojure.pprint :as pprint]
             [potemkin :as p]))
@@ -9,6 +8,8 @@
   (changes [this])
   (table [this])
   (with-table [this new-table]))
+
+(declare ->TransientInstance)
 
 (p/def-map-type Instance [tbl orig m mta]
   (get [_ k default-value]
@@ -30,6 +31,10 @@
            (= m   x))
       (= m x)))
 
+  clojure.lang.IEditableCollection
+  (asTransient [_]
+    (->TransientInstance tbl orig (transient m) mta))
+
   IInstance
   (original [_]
     orig)
@@ -40,14 +45,24 @@
   (with-table [_ new-table]
     (Instance. new-table orig m mta)))
 
+(deftype ^:private TransientInstance [tbl orig ^clojure.lang.ITransientMap m mta]
+  clojure.lang.ITransientMap
+  (conj [this v]
+    (.conj m v)
+    this)
+  (persistent [_]
+    (Instance. tbl orig (persistent! m) mta))
+  (assoc [this k v]
+    (.assoc m k v)
+    this)
+  (without [this k]
+    (.without m k)
+    this))
+
 (defmethod print-method Instance
   [^Instance m ^java.io.Writer writer]
-  (doseq [^String s ["(bluejdbc.instance/instance "
-                     (pr-str (.table m))
-                     " "
-                     (pr-str (.m m))
-                     ")"]]
-    (.write writer s)))
+  (binding [*out* writer]
+    (pr (list `instance (.table m) (.m m)))))
 
 (defmethod print-dup Instance
   [m writer]
