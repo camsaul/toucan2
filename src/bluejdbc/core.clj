@@ -30,6 +30,7 @@
  [connection
   *connection*
   *transaction-connection*
+  connectable
   connection
   connection*
   transaction

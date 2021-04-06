@@ -1,4 +1,5 @@
 (ns bluejdbc.table-aware
+  (:refer-clojure :exclude [count])
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connection :as conn]
             [bluejdbc.instance :as instance]
@@ -52,12 +53,12 @@
   (let [honeysql-form (merge {:select [:*]
                               :from   [(table-name connectable tableable)]}
                              honeysql-form)]
-    (query/query connectable tableable honeysql-form options)))
+    (query/query-all connectable tableable honeysql-form options)))
 
 ;; TODO -- what about stuff like (db/select Table :id 100)?
 (defn select
-  ([tableable]                           (select* :default    tableable nil   nil))
-  ([tableable query]                     (select* :default    tableable query nil))
+  ([tableable]                           (select* conn/*current-connectable*    tableable nil   nil))
+  ([tableable query]                     (select* conn/*current-connectable*    tableable query nil))
   ([connectable tableable query]         (select* connectable tableable query nil))
   ([connectable tableable query options] (select* connectable tableable query options)))
 
@@ -77,8 +78,8 @@
     (query/query-one connectable tableable honeysql-form options)))
 
 (defn select-one
-  ([tableable]                           (select-one* :current    tableable nil   nil))
-  ([tableable query]                     (select-one* :current    tableable query nil))
+  ([tableable]                           (select-one* conn/*current-connectable*    tableable nil   nil))
+  ([tableable query]                     (select-one* conn/*current-connectable*    tableable query nil))
   ([connectable tableable query]         (select-one* connectable tableable query nil))
   ([connectable tableable query options] (select-one* connectable tableable query options)))
 
@@ -116,8 +117,8 @@
 ;; TODO - can we make this argslist [connectable? tableable columns? row-or-rows options?]
 
 (defn insert!
-  ([tableable row-or-rows]                             (insert!* :current    tableable nil     (one-or-many row-or-rows) nil))
-  ([tableable columns row-or-rows]                     (insert!* :current    tableable columns (one-or-many row-or-rows) nil))
+  ([tableable row-or-rows]                             (insert!* conn/*current-connectable*    tableable nil     (one-or-many row-or-rows) nil))
+  ([tableable columns row-or-rows]                     (insert!* conn/*current-connectable*    tableable columns (one-or-many row-or-rows) nil))
   ([connectable tableable columns row-or-rows]         (insert!* connectable tableable columns (one-or-many row-or-rows) nil))
   ([connectable tableable columns row-or-rows options] (insert!* connectable tableable columns (one-or-many row-or-rows) (merge (conn/default-options connectable)
                                                                                                                                 options))))
@@ -127,8 +128,8 @@
   u/dispatch-on-first-three-args)
 
 (defn insert-returning-keys!
-  ([tableable row-or-rows]                             (insert-returning-keys!* :current    tableable nil     row-or-rows nil))
-  ([tableable columns row-or-rows]                     (insert-returning-keys!* :current    tableable columns row-or-rows nil))
+  ([tableable row-or-rows]                             (insert-returning-keys!* conn/*current-connectable*    tableable nil     row-or-rows nil))
+  ([tableable columns row-or-rows]                     (insert-returning-keys!* conn/*current-connectable*    tableable columns row-or-rows nil))
   ([connectable tableable columns row-or-rows]         (insert-returning-keys!* connectable tableable columns row-or-rows nil))
   ([connectable tableable columns row-or-rows options] (insert-returning-keys!* connectable tableable columns row-or-rows options)))
 
@@ -178,7 +179,7 @@
     ;; To use an operator other than `:=`, wrap the value in a vector e.g. `[:operator & values]`
     ;; UPDATE venues SET expensive = false WHERE price BETWEEN 1 AND 2
     (jdbc/update! conn :venues {:price [:between 1 2]} {:expensive false})"
-  ([tableable conditions changes]                     (update!* :default    tableable conditions changes nil))
+  ([tableable conditions changes]                     (update!* conn/*current-connectable*    tableable conditions changes nil))
   ([connectable tableable conditions changes]         (update!* connectable tableable conditions changes nil))
   ([connectable tableable conditions changes options] (update!* connectable tableable conditions changes options)))
 
@@ -194,8 +195,8 @@
     (query/execute! connectable tableable honeysql-form options)))
 
 (defn delete!
-  ([object]                                   (delete!* :current    (instance/table object) (primary-key object) nil))
-  ([tableable conditions]                     (delete!* :current    tableable               conditions           nil))
+  ([object]                                   (delete!* conn/*current-connectable*    (instance/table object) (primary-key object) nil))
+  ([tableable conditions]                     (delete!* conn/*current-connectable*    tableable               conditions           nil))
   ([connectable tableable conditions]         (delete!* connectable tableable               conditions           nil))
   ([connectable tableable conditions options] (delete!* connectable tableable               conditions           options)))
 
@@ -206,7 +207,7 @@
 ;; TODO
 
 (defn upsert!
-  ([tableable conditions row]                     (upsert!* :current    tableable conditions row nil))
+  ([tableable conditions row]                     (upsert!* conn/*current-connectable*    tableable conditions row nil))
   ([connectable tableable conditions row]         (upsert!* connectable tableable conditions row nil))
   ([connectable tableable conditions row options] (upsert!* connectable tableable conditions row options)))
 
@@ -217,7 +218,93 @@
 ;; TODO
 
 (defn save!
-  ([object]                               (save!* :current    (instance/table object) object nil))
+  ([object]                               (save!* conn/*current-connectable*    (instance/table object) object nil))
   ([connectable object]                   (save!* connectable (instance/table object) object nil))
   ([connectable object options]           (save!* connectable (instance/table object) object options))
   ([connectable tableable object options] (save!* connectable tableable               object options)))
+
+;; TODO -- from Toucan
+
+(defn select-one-field
+  "Select a single `field` of a single object from the database.
+
+     (select-one-field :name 'Database :id 1) -> \"Sample Dataset\""
+  {:style/indent 2}
+  [field model & options]
+  {:pre [(keyword? field)]}
+  #_(field (apply select-one [model field] options)))
+
+(defn select-one-id
+  "Select the `:id` of a single object from the database.
+
+     (select-one-id 'Database :name \"Sample Dataset\") -> 1"
+  {:style/indent 1}
+  [model & options]
+  #_(let [model (resolve-model model)]
+    (apply select-one-field (models/primary-key model) model options)))
+
+(defn select-field
+  "Select values of a single field for multiple objects. These are returned as a set if any matching fields
+   were returned, otherwise `nil`.
+
+     (select-field :name 'Database) -> #{\"Sample Dataset\", \"test-data\"}"
+  {:style/indent 2}
+  [field model & options]
+  {:pre [(keyword? field)]}
+  #_(when-let [results (seq (map field (apply select [model field] options)))]
+    (set results)))
+
+(defn select-ids
+  "Select IDs for multiple objects. These are returned as a set if any matching IDs were returned, otherwise `nil`.
+
+     (select-ids 'Table :db_id 1) -> #{1 2 3 4}"
+  {:style/indent 1}
+  [model & options]
+  #_(let [model (resolve-model model)]
+    (apply select-field (models/primary-key model) model options)))
+
+(defn select-field->field
+  "Select fields `k` and `v` from objects in the database, and return them as a map from `k` to `v`.
+
+     (select-field->field :id :name 'Database) -> {1 \"Sample Dataset\", 2 \"test-data\"}"
+  {:style/indent 3}
+  [k v model & options]
+  {:pre [(keyword? k) (keyword? v)]}
+  #_(into {} (for [result (apply select [model k v] options)]
+             {(k result) (v result)})))
+
+(defn select-field->id
+  "Select FIELD and `:id` from objects in the database, and return them as a map from `field` to `:id`.
+
+     (select-field->id :name 'Database) -> {\"Sample Dataset\" 1, \"test-data\" 2}"
+  {:style/indent 2}
+  [field model & options]
+  #_(let [model (resolve-model model)]
+    (apply select-field->field field (models/primary-key model) model options)))
+
+(defn select-id->field
+  "Select `field` and `:id` from objects in the database, and return them as a map from `:id` to `field`.
+
+     (select-id->field :name 'Database) -> {1 \"Sample Dataset\", 2 \"test-data\"}"
+  {:style/indent 2}
+  [field model & options]
+  #_(let [model (resolve-model model)]
+    (apply select-field->field (models/primary-key model) field model options)))
+
+(defn count
+  "Select the count of objects matching some condition.
+
+     ;; Get all Users whose email is non-nil
+     (count 'User :email [:not= nil]) -> 12"
+  {:style/indent 1}
+  [model & options]
+  #_(:count (apply select-one [model [:%count.* :count]] options)))
+
+(defn exists?
+  "Easy way to see if something exists in the DB.
+
+    (db/exists? User :id 100)"
+  {:style/indent 1}
+  ^Boolean [model & kvs]
+  #_(let [model (resolve-model model)]
+    (boolean (select-one-id model (apply where (h/select {} (models/primary-key model)) kvs)))))

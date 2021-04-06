@@ -16,42 +16,42 @@
 
 (m/defmethod query* :default
   [connectable tableable query options]
-  (reify
-    pretty/PrettyPrintable
-    (pretty [_]
-      (list `query connectable tableable query options))
+  (let [options (merge-with merge {:execute {:builder-fn (rs/row-builder-fn connectable tableable)}} options)]
+    (reify
+      pretty/PrettyPrintable
+      (pretty [_]
+        (list `query connectable tableable query options))
 
-    clojure.lang.IReduceInit
-    (reduce [_ rf init]
-      (conn/with-connection [conn connectable options]
-        (let [sql-params (compile/compile connectable tableable query options)]
-          (try
-            (log/tracef "executing query %s with options %s" (pr-str sql-params) (pr-str (:execute options)))
-            (let [results (jdbc/plan conn sql-params (:execute options))]
-              (try
-                (reduce rf init results)
-                (catch Throwable e
-                  (throw (ex-info "Error reducing results"
-                                  {:rf rf, :init init, :options options}
-                                  e)))))
-            (catch Throwable e
-              (throw (ex-info "Error executing query"
-                              (merge
-                               {:options options}
-                               (when *include-queries-in-exceptions*
-                                 {:query query, :sql-params sql-params}))
-                              e)))))))
+      clojure.lang.IReduceInit
+      (reduce [_ rf init]
+        (conn/with-connection [conn connectable options]
+          (let [sql-params (compile/compile connectable tableable query options)]
+            (try
+              (log/tracef "executing query %s with options %s" (pr-str sql-params) (pr-str (:execute options)))
+              (let [results (jdbc/plan conn sql-params (:execute options))]
+                (try
+                  (reduce rf init results)
+                  (catch Throwable e
+                    (throw (ex-info "Error reducing results"
+                                    {:rf rf, :init init, :options options}
+                                    e)))))
+              (catch Throwable e
+                (throw (ex-info "Error executing query"
+                                (merge
+                                 {:options options}
+                                 (when *include-queries-in-exceptions*
+                                   {:query query, :sql-params sql-params}))
+                                e)))))))
 
-    clojure.lang.IReduce
-    (reduce [this rf]
-      (reduce rf [] this))))
+      clojure.lang.IReduce
+      (reduce [this rf]
+        (reduce rf [] this)))))
 
 (defn query
   ([qury]                                (query  :default    nil       qury nil))
   ([connectable qury]                    (query  connectable nil       qury nil))
   ([connectable qury options]            (query  connectable nil       qury options))
   ([connectable tableable qury options]  (query* connectable tableable qury (merge (conn/default-options connectable)
-                                                                                   {:execute {:builder-fn (rs/row-builder-fn connectable tableable)}}
                                                                                    options))))
 
 (defn- ^:deprecated default-rf

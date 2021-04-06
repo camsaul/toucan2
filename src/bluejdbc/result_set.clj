@@ -22,6 +22,7 @@
     (let [col-type (.getColumnType rsmeta i)]
       (log/tracef "Column %d %s is of JDBC type %s, native type %s"
                   i (pr-str (.getColumnLabel rsmeta i)) (type-name col-type) (.getColumnTypeName rsmeta i))
+      (println "[connectable tableable col-type]:" [connectable tableable col-type]) ; NOCOMMIT
       [connectable tableable col-type])))
 
 (m/defmethod read-column-thunk :default

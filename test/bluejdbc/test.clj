@@ -1,6 +1,6 @@
 (ns bluejdbc.test
   (:require [bluejdbc.connection :as connection]
-            [bluejdbc.core :as jdbc]
+            [bluejdbc.core :as bluejdbc]
             bluejdbc.integrations.postgresql
             [bluejdbc.query :as query]
             [bluejdbc.test.load :as load]
@@ -14,13 +14,13 @@
 (derive :test-connection/postgres ::connection)
 (derive :test-connection/postgres :bluejdbc.integrations/postgres)
 
-(jdbc/defmethod jdbc/connection* :test-connection/h2
+(bluejdbc/defmethod bluejdbc/connectable :test-connection/h2
   [_ options]
-  (jdbc/connection* (env/env :jdbc-url-h2 "jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1") options))
+  (env/env :jdbc-url-h2 "jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1"))
 
-(jdbc/defmethod jdbc/connection* :test-connection/postgres
-  [_ options]
-  (jdbc/connection* (env/env :jdbc-url-postgres "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam") options))
+(bluejdbc/defmethod bluejdbc/connectable :test-connection/postgres
+  [_ env]
+  (env/env :jdbc-url-postgres "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam"))
 
 (defn do-with-test-data [connectable data thunk]
   (binding [query/*include-queries-in-exceptions*              true
@@ -35,7 +35,7 @@
   [[connectable data-source] & body]
   `(let [data#        (load/data ~data-source)
          connectable# ~connectable]
-     (jdbc/with-connection [~'&conn connectable#]
+     (bluejdbc/with-connection [~'&conn connectable#]
        (do-with-test-data ~'&conn data# (fn [] ~@body)))))
 
 (defonce ^:private test-connectables* (atom nil))
@@ -49,10 +49,13 @@
 
 (println "Testing against:" (pr-str (test-connectables)))
 
+(def ^:dynamic *connectable* nil)
+
 (defn do-with-every-test-connectable [f]
   (doseq [connectable (test-connectables)]
-    (testing (format "connection = %s\n" (pr-str connectable))
-      (f connectable))))
+    (binding [*connectable* connectable]
+      (testing (format "connection = %s\n" (pr-str connectable))
+        (f connectable)))))
 
 (defmacro with-every-test-connectable [[connectable-binding] & body]
   `(do-with-every-test-connectable (fn [~connectable-binding] ~@body)))
@@ -72,4 +75,4 @@
                 {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56Z")}
                 {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56Z")}
                 {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56Z")}])
-             (jdbc/query-all connectable "SELECT * FROM \"people\";"))))))
+             (bluejdbc/query-all connectable "SELECT * FROM \"people\";"))))))
