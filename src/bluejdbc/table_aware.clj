@@ -1,9 +1,9 @@
 (ns bluejdbc.table-aware
   (:require [bluejdbc.compile :as compile]
+            [bluejdbc.connection :as conn]
             [bluejdbc.instance :as instance]
             [bluejdbc.query :as query]
             [bluejdbc.util :as u]
-            [honeysql.core :as hsql]
             [methodical.core :as m]))
 
 ;; TODO - consider whether there's any possible reason in the whole world to have this also dispatch on connection
@@ -12,26 +12,20 @@
 ;;
 ;; TODO -- is this supposed to return a String or a Keyword? Need to document.
 ;;
-;; TODO -- rename to tableable (?)
 (m/defmulti table-name
-  {:arglists '([table])}
-  u/dispatch-on-first-arg)
+  {:arglists '([connectable tableable])}
+  u/dispatch-on-first-two-args)
 
 (m/defmethod table-name :default
-  [this]
+  [_ this]
   this)
 
-(m/defmethod table-name String
-  [s]
+(m/defmethod table-name [:default String]
+  [_ s]
   s)
 
-;; NOCOMMIT
-(defn tableable? [x]
-  (or (keyword? x)
-      (boolean (m/effective-method (m/remove-primary-method table-name :default) (class x)))))
-
-(defn- raw-identifier [identifier options]
-  (hsql/raw (compile/quote-identifier identifier options)))
+(defn- raw-identifier [connectable identifier options]
+  (compile/quote-identifier connectable identifier options))
 
 (m/defmulti primary-key*
   {:arglists '([table object])}
@@ -46,71 +40,71 @@
   ([table object] (primary-key* table                   object)))
 
 (m/defmulti select*
-  {:arglists '([connectable table query options])}
+  {:arglists '([connectable tableable query options])}
   u/dispatch-on-first-three-args)
 
 (m/defmethod select* [:default :default nil]
-  [connectable table _ options]
-  (select* connectable table {} options))
+  [connectable tableable _ options]
+  (select* connectable tableable {} options))
 
 (m/defmethod select* [:default :default clojure.lang.IPersistentMap]
-  [connectable table honeysql-form options]
+  [connectable tableable honeysql-form options]
   (let [honeysql-form (merge {:select [:*]
-                              :from   [(table-name table)]}
+                              :from   [(table-name connectable tableable)]}
                              honeysql-form)]
-    (query/query connectable honeysql-form options)))
+    (query/query connectable tableable honeysql-form options)))
 
 ;; TODO -- what about stuff like (db/select Table :id 100)?
 (defn select
-  ([table]                           (select* :default    table nil   nil))
-  ([table query]                     (select* :default    table query nil))
-  ([connectable table query]         (select* connectable table query nil))
-  ([connectable table query options] (select* connectable table query options)))
+  ([tableable]                           (select* :default    tableable nil   nil))
+  ([tableable query]                     (select* :default    tableable query nil))
+  ([connectable tableable query]         (select* connectable tableable query nil))
+  ([connectable tableable query options] (select* connectable tableable query options)))
 
 (m/defmulti select-one*
-  {:arglists '([connectable table query options])}
+  {:arglists '([connectable tableable query options])}
   u/dispatch-on-first-three-args)
 
 (m/defmethod select-one* [:default :default nil]
-  [connectable table _ options]
-  (select-one* connectable table {} options))
+  [connectable tableable _ options]
+  (select-one* connectable tableable {} options))
 
 (m/defmethod select-one* [:default :default clojure.lang.IPersistentMap]
-  [connectable table honeysql-form options]
+  [connectable tableable honeysql-form options]
   (let [honeysql-form (merge {:select [:*]
-                              :from   [(table-name table)]}
+                              :from   [(table-name connectable tableable)]}
                              honeysql-form)]
-    (query/query-one connectable honeysql-form options)))
+    (query/query-one connectable tableable honeysql-form options)))
 
 (defn select-one
-  ([table]                           (select-one* :default    table nil   nil))
-  ([table query]                     (select-one* :default    table query nil))
-  ([connectable table query]         (select-one* connectable table query nil))
-  ([connectable table query options] (select-one* connectable table query options)))
+  ([tableable]                           (select-one* :current    tableable nil   nil))
+  ([tableable query]                     (select-one* :current    tableable query nil))
+  ([connectable tableable query]         (select-one* connectable tableable query nil))
+  ([connectable tableable query options] (select-one* connectable tableable query options)))
 
 ;; TODO -- a common method for saving or inserting stuff?
 
 (m/defmulti insert!*
-  {:arglists '([connectable table columns rows options])}
+  {:arglists '([connectable tableable columns rows options])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod insert!* :default
-  [connectable table columns rows options]
-  (query/try-catch-when-include-queries-in-exceptions-enabled
-    (let [honeysql-form (merge {:insert-into (raw-identifier (table-name table) options)
+  [connectable tableable columns rows options]
+  (try
+    (let [honeysql-form (merge {:insert-into (raw-identifier connectable (table-name connectable tableable) options)
                                 :values      rows}
                                (when (seq columns)
-                                 {:columns (mapv #(raw-identifier % options)
+                                 {:columns (mapv #(raw-identifier connectable % options)
                                                  columns)}))]
-      (query/try-catch-when-include-queries-in-exceptions-enabled
-        (query/execute! connectable honeysql-form options)
+      (try
+        (query/execute! connectable tableable honeysql-form options)
         (catch Throwable e
           (throw (ex-info "Error inserting rows"
                           {:honeysql-form honeysql-form}
                           e)))))
     (catch Throwable e
       (throw (ex-info "Error inserting rows"
-                      {:table table, :columns columns, :rows (take 10 rows), :options options}
+                      {:table tableable, :columns columns, :rows (take 10 rows), :options options}
                       e)))))
 
 (defn- one-or-many [row-or-rows]
@@ -119,27 +113,28 @@
     (nil? row-or-rows)        nil
     :else                     [row-or-rows]))
 
-;; TODO - can we make this argslist [connectable? table columns? row-or-rows options?]
+;; TODO - can we make this argslist [connectable? tableable columns? row-or-rows options?]
 
 (defn insert!
-  ([table row-or-rows]                             (insert!* :default    table nil     (one-or-many row-or-rows) nil))
-  ([table columns row-or-rows]                     (insert!* :default    table columns (one-or-many row-or-rows) nil))
-  ([connectable table columns row-or-rows]         (insert!* connectable table columns (one-or-many row-or-rows) nil))
-  ([connectable table columns row-or-rows options] (insert!* connectable table columns (one-or-many row-or-rows) options)))
+  ([tableable row-or-rows]                             (insert!* :current    tableable nil     (one-or-many row-or-rows) nil))
+  ([tableable columns row-or-rows]                     (insert!* :current    tableable columns (one-or-many row-or-rows) nil))
+  ([connectable tableable columns row-or-rows]         (insert!* connectable tableable columns (one-or-many row-or-rows) nil))
+  ([connectable tableable columns row-or-rows options] (insert!* connectable tableable columns (one-or-many row-or-rows) (merge (conn/default-options connectable)
+                                                                                                                                options))))
 
 (m/defmulti insert-returning-keys!*
-  {:arglists '([connectable table columns row-or-rows options])}
+  {:arglists '([connectable tableable columns row-or-rows options])}
   u/dispatch-on-first-three-args)
 
 (defn insert-returning-keys!
-  ([table row-or-rows]                             (insert-returning-keys!* :default    table nil     row-or-rows nil))
-  ([table columns row-or-rows]                     (insert-returning-keys!* :default    table columns row-or-rows nil))
-  ([connectable table columns row-or-rows]         (insert-returning-keys!* connectable table columns row-or-rows nil))
-  ([connectable table columns row-or-rows options] (insert-returning-keys!* connectable table columns row-or-rows options)))
+  ([tableable row-or-rows]                             (insert-returning-keys!* :current    tableable nil     row-or-rows nil))
+  ([tableable columns row-or-rows]                     (insert-returning-keys!* :current    tableable columns row-or-rows nil))
+  ([connectable tableable columns row-or-rows]         (insert-returning-keys!* connectable tableable columns row-or-rows nil))
+  ([connectable tableable columns row-or-rows options] (insert-returning-keys!* connectable tableable columns row-or-rows options)))
 
 (m/defmethod insert-returning-keys!* :default
-  [connectable table columns row-or-rows options]
-  (insert! connectable table columns row-or-rows (merge {:statement/return-generated-keys true}
+  [connectable tableable columns row-or-rows options]
+  (insert! connectable tableable columns row-or-rows (merge {:statement/return-generated-keys true}
                                                         options)))
 
 (defn conditions->where-clause
@@ -159,16 +154,16 @@
     conditions))
 
 (m/defmulti update!*
-  {:arglists '([connectable table conditions changes options])}
+  {:arglists '([connectable tableable conditions changes options])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod update!* :default
-  [connectable table conditions changes options]
-  (let [honeysql-form (merge {:update (table-name table)
+  [connectable tableable conditions changes options]
+  (let [honeysql-form (merge {:update (table-name connectable tableable)
                               :set    changes}
                              (when-let [where-clause (conditions->where-clause conditions)]
                                {:where where-clause}))]
-    (query/execute! connectable honeysql-form options)))
+    (query/execute! connectable tableable honeysql-form options)))
 
 (defn update!
   "Convenience for updating row(s). `conditions` can be either a map of `{field value}` or a HoneySQL-style vector where
@@ -183,46 +178,46 @@
     ;; To use an operator other than `:=`, wrap the value in a vector e.g. `[:operator & values]`
     ;; UPDATE venues SET expensive = false WHERE price BETWEEN 1 AND 2
     (jdbc/update! conn :venues {:price [:between 1 2]} {:expensive false})"
-  ([table conditions changes]                     (update!* :default    table conditions changes nil))
-  ([connectable table conditions changes]         (update!* connectable table conditions changes nil))
-  ([connectable table conditions changes options] (update!* connectable table conditions changes options)))
+  ([tableable conditions changes]                     (update!* :default    tableable conditions changes nil))
+  ([connectable tableable conditions changes]         (update!* connectable tableable conditions changes nil))
+  ([connectable tableable conditions changes options] (update!* connectable tableable conditions changes options)))
 
 (m/defmulti delete!*
-  {:arglists '([connectable table conditions options])}
+  {:arglists '([connectable tableable conditions options])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod delete!* :default
-  [connectable table conditions options]
-  (let [honeysql-form (merge {:delete-from (table-name table)}
+  [connectable tableable conditions options]
+  (let [honeysql-form (merge {:delete-from (table-name connectable tableable)}
                              (when-let [where-clause (conditions->where-clause conditions)]
                                {:where where-clause}))]
-    (query/execute! connectable honeysql-form options)))
+    (query/execute! connectable tableable honeysql-form options)))
 
 (defn delete!
-  ([object]                               (delete!* :default    (instance/table object) (primary-key object) nil))
-  ([table conditions]                     (delete!* :default    table                   conditions           nil))
-  ([connectable table conditions]         (delete!* connectable table                   conditions           nil))
-  ([connectable table conditions options] (delete!* connectable table                   conditions           options)))
+  ([object]                                   (delete!* :current    (instance/table object) (primary-key object) nil))
+  ([tableable conditions]                     (delete!* :current    tableable               conditions           nil))
+  ([connectable tableable conditions]         (delete!* connectable tableable               conditions           nil))
+  ([connectable tableable conditions options] (delete!* connectable tableable               conditions           options)))
 
 (m/defmulti upsert!*
-  {:arglists '([connectable table conditions row options])}
+  {:arglists '([connectable tableable conditions row options])}
   u/dispatch-on-first-two-args)
 
 ;; TODO
 
 (defn upsert!
-  ([table conditions row]                     (upsert!* :default    table conditions row nil))
-  ([connectable table conditions row]         (upsert!* connectable table conditions row nil))
-  ([connectable table conditions row options] (upsert!* connectable table conditions row options)))
+  ([tableable conditions row]                     (upsert!* :current    tableable conditions row nil))
+  ([connectable tableable conditions row]         (upsert!* connectable tableable conditions row nil))
+  ([connectable tableable conditions row options] (upsert!* connectable tableable conditions row options)))
 
 (m/defmulti save!*
-  {:arglists '([connectable object options])}
-  (fn [connectable object _]
-    [(u/keyword-or-class connectable) (instance/table object)]))
+  {:arglists '([connectable tableable object options])}
+  u/dispatch-on-first-two-args)
 
 ;; TODO
 
 (defn save!
-  ([object])
-  ([connectable object])
-  ([connectable object options]))
+  ([object]                               (save!* :current    (instance/table object) object nil))
+  ([connectable object]                   (save!* connectable (instance/table object) object nil))
+  ([connectable object options]           (save!* connectable (instance/table object) object options))
+  ([connectable tableable object options] (save!* connectable tableable               object options)))

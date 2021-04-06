@@ -5,10 +5,7 @@
             [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
-            [bluejdbc.metadata :as metadata]
             [bluejdbc.query :as query]
-            [bluejdbc.result-set :as rs]
-            [bluejdbc.statement :as stmt]
             [bluejdbc.table-aware :as table-aware]
             [methodical.core :as methodical]
             [potemkin :as p]))
@@ -19,14 +16,8 @@
          hydrate/keep-me
          log/keep-me
          instance/keep-me
-         metadata/keep-me
          query/keep-me
-         rs/keep-me
-         stmt/keep-me
          table-aware/keep-me)
-
-#_(defn- public-symbols [ns-alias]
-  (sort (keys (ns-publics (get (ns-aliases *ns*) ns-alias)))))
 
 (p/import-vars
  [methodical
@@ -37,10 +28,11 @@
   compile]
 
  [connection
-  db-type
-  driver
-  connection*
+  *connection*
+  *transaction-connection*
   connection
+  connection*
+  transaction
   with-connection]
 
  [hydrate
@@ -63,35 +55,16 @@
  [log
   with-debug-logging]
 
- [metadata
-  catalogs
-  columns
-  database-info
-  driver-info
-  schemas
-  table-types
-  tables
-  with-metadata]
-
  [query
-  reducible-query*
-  reducible-query
+  *include-queries-in-exceptions*
   query*
   query
+  query-all*
+  query-all
   query-one*
   query-one
   execute!*
-  execute!
-  transaction]
-
- ;; TODO
- [rs
-  maps
-  read-column-thunk
-  type-name]
-
- [stmt
-  prepare!]
+  execute!]
 
  [table-aware
   table-name
