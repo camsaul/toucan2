@@ -62,6 +62,7 @@
 (def ^:dynamic *options*
   nil)
 
+;; TODO -- maybe this belongs somewhere more visible e.g. util
 (def default-options
   {:execute {:builder-fn jdbc.rs/as-unqualified-maps}
    :rf      u/default-rf
