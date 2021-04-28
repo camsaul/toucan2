@@ -5,14 +5,20 @@
 
 (comment bluejdbc.integrations.postgresql/keep-me)
 
-(m/defmethod connectable/connection* :test/postgres
-  [_ options]
-  (next-method "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam" (merge {:default-options true} options)))
-
 (derive :test/postgres :bluejdbc.integrations/postgres)
 
+(m/defmethod connectable/connection* :test/postgres
+  [_ options]
+  (next-method "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam" options))
+
+(derive :test/postgres-with-quoting :test/postgres)
+
+(m/defmethod connectable/default-options :test/postgres-with-quoting
+  [_]
+  {:honeysql {:quoting :ansi}})
+
 (defn- table-names [connectable]
-  (connectable/with-connection [[conn] :test/postgres]
+  (connectable/with-connection [conn :test/postgres]
     (with-open [rs (.getTables (.getMetaData conn) nil nil nil (into-array String ["TABLE"]))]
       (into #{} (take-while some? (repeatedly (fn []
                                                 (when (.next rs)
@@ -23,7 +29,7 @@
 
 (defn- load-test-data-if-needed! [connectable]
   (when-not (has-test-data? connectable)
-    (connectable/with-connection [[conn] connectable]
+    (connectable/with-connection [conn connectable]
       (with-open [stmt (.createStatement conn)]
         (doseq [sql ["CREATE TABLE IF NOT EXISTS people (id serial PRIMARY KEY NOT NULL, name text, created_at timestamp with time zone);"
                      (str "INSERT INTO people (id, name, created_at) "
