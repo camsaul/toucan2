@@ -1,5 +1,4 @@
-(ns dev
-  (:require [environ.core :as env]))
+(ns dev)
 
 (defn ns-unmap-all
   "Unmap all interned vars in a namespace. Reset the namespace to a blank slate! Perfect for when you rename everything
@@ -12,9 +11,3 @@
   ([a-namespace]
    (doseq [[symb] (ns-interns a-namespace)]
      (ns-unmap a-namespace symb))))
-
-(defn set-jdbc-url!
-  "Set the JDBC URL used for testing."
-  [url]
-  (alter-var-root #'env/env assoc :jdbc-url url)
-  nil)

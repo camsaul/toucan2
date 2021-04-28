@@ -41,3 +41,16 @@
   (testing "we shouldn't ignore non-nil values -- `u/qualified-name` should throw an Exception if `name` would"
     (is (thrown? ClassCastException
                  (u/qualified-name false)))))
+
+(deftest recursive-merge-test
+  (is (= {:a 10, :b {:c 2, :d 3}, :d 3}
+         (u/recursive-merge {:a 1, :b {:c 2}, :d 3}
+                            {:a 10, :b {:d 3}})))
+  (testing "recursively nested"
+    (is (= {:a {:b {:c 3, :d 2, :e 4}}}
+           (u/recursive-merge {:a {:b {:c 1, :d 2}}}
+                              {:a {:b {:c 3, :e 4}}}))))
+  (testing "vector value"
+    (is (= {:a 10, :b {:c 2, :d 3}, :d 3}
+           (u/recursive-merge {:a [1], :b {:c 2}, :d 3}
+                              {:a 10, :b {:d 3}})))))

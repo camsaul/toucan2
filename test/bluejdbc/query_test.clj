@@ -2,6 +2,7 @@
   (:require [bluejdbc.connectable :as conn]
             [bluejdbc.query :as query]
             [bluejdbc.test :as test]
+            [bluejdbc.util :as u]
             [clojure.test :refer :all]
             [methodical.core :as m]))
 
@@ -9,12 +10,12 @@
 
 (deftest reducible-query-test
   (is (= [{:count 4}]
-         (reduce query/default-rf [] (query/reducible-query :test/postgres "SELECT count(*) FROM people;"))))
+         (reduce u/default-rf [] (query/reducible-query :test/postgres "SELECT count(*) FROM people;"))))
 
   (testing "with current connection"
     (conn/with-connection :test/postgres
       (is (= [{:count 4}]
-             (reduce query/default-rf [] (query/reducible-query "SELECT count(*) FROM people;")))))))
+             (reduce u/default-rf [] (query/reducible-query "SELECT count(*) FROM people;")))))))
 
 (deftest query-test
   (is (= [{:count 4}]
@@ -23,7 +24,22 @@
   (testing "with current connection"
     (conn/with-connection :test/postgres
       (is (= [{:count 4}]
-             (query/query "SELECT count(*) FROM people;"))))))
+             (query/query "SELECT count(*) FROM people;")))))
+
+  (testing "HoneySQL query"
+    (is (= [{:id         1
+             :name       "Cam"
+             :created_at #inst "2020-04-21T23:56:00.000000000-00:00"}
+            {:id         2
+             :name       "Sam"
+             :created_at #inst "2019-01-11T23:56:00.000000000-00:00"}
+            {:id         3
+             :name       "Pam"
+             :created_at #inst "2020-01-01T21:56:00.000000000-00:00"}
+            {:id         4
+             :name       "Tam"
+             :created_at #inst "2020-05-25T19:56:00.000000000-00:00"}]
+           (query/query :test/postgres {:select [:*], :from [:people]})))))
 
 (deftest query-one-test
   (is (= {:count 4}
