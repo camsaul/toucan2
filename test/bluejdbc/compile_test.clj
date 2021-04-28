@@ -1,15 +1,36 @@
 (ns bluejdbc.compile-test
-  (:require [bluejdbc.core :as bluejdbc]
-            [bluejdbc.test :as test]
+  (:require [bluejdbc.compile :as compile]
             [clojure.test :refer :all]
-            [java-time :as t]))
+            [methodical.core :as m]))
+
+(deftest string-test
+  (testing "Compiling a plain string should no-op"
+    (is (= ["SELECT 1 AS one;"]
+           (compile/compile :test/postgres "SELECT 1 AS one;")))
+    (is (= ["SELECT ?, ?, ?;" 1 2 3]
+           (compile/compile :test/postgres ["SELECT ?, ?, ?;" 1 2 3])))))
+
+(deftest honeysql-test
+  (is (= ["SELECT * FROM people WHERE id = ?" 1]
+         (compile/compile :test/postgres {:select [:*], :from [:people], :where [:= :id 1]})))
+  (testing "Should be able to pass a HoneySQL map as first arg in a query-params vector"
+    (is (= ["SELECT * FROM people WHERE id = ?" 1 2]
+           (compile/compile :test/postgres [{:select [:*], :from [:people], :where [:= :id 1]} 2])))))
+
+(m/defmethod compile/compile* [:default ::people-count]
+  [connectable _ options]
+  (compile/compile connectable {:select [:%count.*], :from [:people]} options))
+
+(deftest named-query-test
+  (is (= ["SELECT count(*) FROM people"]
+         (compile/compile :test/postgres ::people-count))))
 
 (deftest honeysql-options-test
-  (testing "Make sure HoneySQL options are applied"
-    (let [options {:honeysql {:quoting             :ansi
-                              :allow-dashed-names? true}}]
-      (test/with-every-test-connectable [connectable]
-        (is (= ["SELECT ? AS \"my-date\""
-                (t/offset-date-time "2020-04-15T07:04:02.465161Z")]
-               (bluejdbc/compile connectable {:select [[(t/offset-date-time "2020-04-15T07:04:02.465161Z") :my-date]]}
-                                 options)))))))
+  (testing "Should be able to pass `:honeysql` options"
+    (is (= ["SELECT * FROM \"people\" WHERE \"my-id\" = ?" 1]
+           (compile/compile :test/postgres
+                            {:select [:*]
+                             :from   [:people]
+                             :where  [:= :my-id 1]}
+                            {:honeysql {:quoting             :ansi
+                                        :allow-dashed-names? true}})))))
