@@ -1,10 +1,15 @@
 (ns bluejdbc.test
   (:require [bluejdbc.connectable :as connectable]
+            bluejdbc.integrations.postgresql
             [methodical.core :as m]))
+
+(comment bluejdbc.integrations.postgresql/keep-me)
 
 (m/defmethod connectable/connection* :test/postgres
   [_ options]
   (next-method "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam" (merge {:default-options true} options)))
+
+(derive :test/postgres :bluejdbc.integrations/postgres)
 
 (defn- table-names [connectable]
   (connectable/with-connection [[conn] :test/postgres]
