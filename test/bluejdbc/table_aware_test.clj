@@ -21,10 +21,16 @@
            results))))
 
 (deftest basic-select-test
-  (let [results (table-aware/basic-select :test/postgres :people {:select [:id]} nil)]
-    (test-people-instances? results)
-    (is (= [{:id 1}
-            {:id 2}
-            {:id 3}
-            {:id 4}]
-           results))))
+  (doseq [[message thunk] {"should be able to do a HoneySQL query"
+                           #(table-aware/basic-select :test/postgres :people {:select [:id]} nil)
+
+                           "should be able to do a plain SQL query"
+                           #(table-aware/basic-select :test/postgres :people "SELECT id FROM people" nil)}]
+    (testing message
+      (let [results (thunk)]
+        (test-people-instances? results)
+        (is (= [{:id 1}
+                {:id 2}
+                {:id 3}
+                {:id 4}]
+               results))))))
