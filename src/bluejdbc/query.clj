@@ -7,6 +7,8 @@
             [next.jdbc :as next.jdbc]
             [potemkin :as p]))
 
+;; TODO -- I think this and other functions here should probably take tableable as an arg as well so we can pass it
+;; along to compile
 (defn reduce-query
   [connectable
    query
@@ -16,21 +18,26 @@
    rf
    init]
   (conn/with-connection [conn connectable options]
-    (let [sql-params (compile/compile connectable query options)]
+    (let [sql-params (compile/compile connectable nil query options)]
       (try
         (log/tracef "executing query %s with options %s" (pr-str sql-params) (pr-str (:execute options)))
         (let [results (next.jdbc/plan conn sql-params (:execute options))]
           (try
             (reduce rf init results)
             (catch Throwable e
-              (throw (ex-info "Error reducing results" {:rf rf, :init init} e)))))
+              (let [message (or (:message (ex-data e)) (ex-message e))]
+                (throw (ex-info (format "Error reducing results: %s" message)
+                                {:rf rf, :init init, :message message}
+                                e))))))
         (catch Throwable e
-          (throw (ex-info "Error executing query"
-                          (merge
-                           {:options options}
-                           (when include-queries-in-exceptions?
-                             {:query query, :sql-params sql-params, :options options}))
-                          e)))))))
+          (let [message (or (:message (ex-data e)) (ex-message e))]
+            (throw (ex-info (format "Error executing query: %s" message)
+                            (merge
+                             {:options options
+                              :message message}
+                             (when include-queries-in-exceptions?
+                               {:query query, :sql-params sql-params, :options options}))
+                            e))))))))
 
 (p/defrecord+ ReducibleQuery [connectable query options]
   clojure.lang.IReduceInit
