@@ -1,5 +1,6 @@
 (ns bluejdbc.table-aware
-  (:require [bluejdbc.connectable :as conn]
+  (:require [bluejdbc.compile :as compile]
+            [bluejdbc.connectable :as conn]
             [bluejdbc.instance :as instance]
             [bluejdbc.query :as query]
             [bluejdbc.result-set :as rs]
@@ -13,5 +14,5 @@
                                    options)]
     (query/query connectable query options)))
 
-#_(defn basic-select [connectable tableable query options]
-  (query-as connectable ))
+(defn basic-select [connectable tableable query options]
+  (query-as connectable tableable (compile/from connectable tableable query options) options))
