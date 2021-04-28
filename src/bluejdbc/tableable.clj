@@ -1,5 +1,6 @@
 (ns bluejdbc.tableable
-  (:require [bluejdbc.util :as u]
+  (:require [bluejdbc.connectable :as conn]
+            [bluejdbc.util :as u]
             [methodical.core :as m]))
 
 (m/defmulti table-name*
@@ -23,3 +24,15 @@
   ([tableable]                     (table-name* :current    tableable nil))
   ([connectable tableable]         (table-name* connectable tableable nil))
   ([connectable tableable options] (table-name* connectable tableable options)))
+
+(m/defmulti primary-key* :default
+  {:arglists '([connectable tableable])}
+  u/dispatch-on-first-two-args)
+
+(m/defmethod primary-key* :default
+  [_ _]
+  :id)
+
+(defn primary-key
+  ([tableable]             (primary-key* conn/*connectable* tableable))
+  ([connectable tableable] (primary-key* connectable        tableable)))
