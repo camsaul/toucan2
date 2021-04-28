@@ -4,9 +4,23 @@
             [next.jdbc :as next.jdbc]
             [next.jdbc.result-set :as jdbc.rs]))
 
+;; TODO -- consider whether this should end with a `*` so it's consistent with the other multimethods.
+(m/defmulti default-options
+  {:arglists '([connectable])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod default-options :default
+  [_]
+  {:execute {:builder-fn jdbc.rs/as-unqualified-maps}
+   :rf      u/default-rf
+   :init    []})
+
 (m/defmulti connection*
   {:arglists '([connectable options])}
   u/dispatch-on-first-arg)
+
+;; TODO -- not sure if `include-connection-info-in-exceptions?` should be something in the options map or be its own
+;; dynamic variable for debug purposes.
 
 (m/defmethod connection* :around :default
   [connectable {:keys [include-connection-info-in-exceptions?]
@@ -59,54 +73,27 @@
 (def ^:dynamic ^java.sql.Connection *connection*
   nil)
 
-(def ^:dynamic *options*
-  nil)
-
-;; TODO -- maybe this belongs somewhere more visible e.g. util
-(def default-options
-  {:execute {:builder-fn jdbc.rs/as-unqualified-maps}
-   :rf      u/default-rf
-   :init    []})
-
 (defn do-with-connection [connectable options f]
   (if (= connectable *connectable*)
-    (let [options (u/recursive-merge default-options *options* options)]
-      (binding [*options* options]
-        (f *connection* options)))
-    (let [options                                                (u/recursive-merge default-options options)
+    (f *connection*)
+    (let [options                                                (u/recursive-merge (default-options connectable) options)
           {:keys [^java.sql.Connection connection new? options]} (connection connectable options)]
       (binding [*connectable* connectable
-                *connection*  connection
-                *options*     options]
+                *connection*  connection]
         (if new?
           (with-open [connection connection]
-            (f connection options))
-          (f connection options))))))
+            (f connection))
+          (f connection))))))
 
 ;; TODO -- not sure about this syntax.
 (defmacro with-connection
-  {:arglists '([[[conn-binding options-binding] connectable options] & body]
-               [[_ connectable options] & body]
-               [_ & body])}
+  {:arglists '([[conn-binding connectable options] & body]
+               [connectable & body])}
   [x & body]
-  (let [[conn-options-bindings connectable options] (if (sequential? x)
-                                                      x
-                                                      [nil x nil])]
+  (let [[conn-binding connectable options] (if (sequential? x)
+                                             x
+                                             [nil x nil])]
     `(do-with-connection
       ~connectable ~options
-      ~(cond
-         (sequential? conn-options-bindings)
-         (let [[conn-binding options-binding] conn-options-bindings]
-           `(fn [~(vary-meta (or conn-binding '_) assoc :tag 'java.sql.Connection)
-                 ~(or options-binding '_)]
-              ~@body))
-
-         (and conn-options-bindings
-              (not= conn-options-bindings '_))
-         `(fn [conn# options#]
-            (let [~conn-options-bindings [conn# options#]]
-              ~@body))
-
-         :else
-         `(fn [~'_ ~'_]
-            ~@body)))))
+      (fn [~(vary-meta (or conn-binding '_) assoc :tag 'java.sql.Connection)]
+        ~@body))))

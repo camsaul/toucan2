@@ -15,7 +15,7 @@
     :as   options}
    rf
    init]
-  (conn/with-connection [[conn options] connectable options]
+  (conn/with-connection [conn connectable options]
     (let [sql-params (compile/compile connectable query options)]
       (try
         (log/tracef "executing query %s with options %s" (pr-str sql-params) (pr-str (:execute options)))
@@ -51,37 +51,41 @@
 
 (defn reducible-query
   ([query]
-   (reducible-query* conn/*connectable* query conn/*options*))
+   (reducible-query* conn/*connectable* query (conn/default-options conn/*connectable*)))
 
   ([connectable query]
-   (reducible-query* connectable query nil))
+   (reducible-query* connectable query (conn/default-options connectable)))
 
   ([connectable query options]
-   (reducible-query* connectable query options)))
+   (reducible-query* connectable query (u/recursive-merge (conn/default-options connectable) options))))
 
-(defn- query* [connectable query options]
-  (conn/with-connection [[conn {:keys [rf init include-queries-in-exceptions?]
-                                :or   {include-queries-in-exceptions? true}
-                                :as   options}] connectable options]
-    (assert rf)
-    (assert init)
-    (let [reducible (reducible-query connectable query options)]
-      (reduce rf init reducible))))
+(m/defmulti query*
+  {:arglists '([connectable query options])}
+  u/dispatch-on-first-two-args)
+
+(m/defmethod query* :default
+  [connectable query {:keys [rf init include-queries-in-exceptions?]
+                      :or   {include-queries-in-exceptions? true}
+                      :as   options}]
+  (assert rf)
+  (assert init)
+  (let [reducible (reducible-query connectable query options)]
+    (reduce rf init reducible)))
 
 (defn query
-  ([a-query]                     (query* conn/*connectable* a-query conn/*options*))
-  ([connectable a-query]         (query* connectable        a-query nil))
-  ([connectable a-query options] (query* connectable        a-query options)))
+  ([a-query]                     (query* conn/*connectable* a-query (conn/default-options conn/*connectable*)))
+  ([connectable a-query]         (query* connectable        a-query (conn/default-options connectable)))
+  ([connectable a-query options] (query* connectable        a-query (merge (conn/default-options connectable) options))))
 
 (defn query-one
   ([query]
-   (query-one conn/*connectable* query conn/*options*))
+   (query-one conn/*connectable* query (conn/default-options conn/*connectable*)))
 
   ([connectable query]
-   (query-one connectable query nil))
+   (query-one connectable query (conn/default-options conn/*connectable*)))
 
   ([connectable query options]
-   (conn/with-connection [[conn {:keys [rf], :as options}] connectable options]
+   (let [{:keys [rf], :as options} (u/recursive-merge (conn/default-options conn/*connectable*) options)]
      (assert rf)
      (transduce
       (take 1)
@@ -91,6 +95,6 @@
 
 ;; TODO -- execute
 #_(defn execute! [connectable query options]
-    (conn/with-connection [[conn options] connectable options]
+    (conn/with-connection [conn connectable options]
       (let [sql-params (compile-query)])
       ))
