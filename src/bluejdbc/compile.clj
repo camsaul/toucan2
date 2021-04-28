@@ -1,7 +1,9 @@
 (ns bluejdbc.compile
   (:refer-clojure :exclude [compile])
-  (:require [bluejdbc.connectable :as conn]
+  (:require [bluejdbc.compile :as compile]
+            [bluejdbc.connectable :as conn]
             [bluejdbc.log :as log]
+            [bluejdbc.queryable :as queryable]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
             [honeysql.core :as hsql]
@@ -11,41 +13,49 @@
             [pretty.core :as pretty]))
 
 (m/defmulti compile*
-  {:arglists '([connectable query options])}
-  u/dispatch-on-first-two-args)
+  {:arglists '([connectable tableable query options])}
+  u/dispatch-on-first-three-args)
 
 ;; TODO -- not sure if `include-queries-in-exceptions?` should be something that goes in the options map or its own
 ;; dynamic variable.
 
 (m/defmethod compile* :around :default
-  [connectable query {:keys [include-queries-in-exceptions?]
-                      :or   {include-queries-in-exceptions? true}
-                      :as   options}]
-  (log/tracef "Compile query with options %s\n^%s %s"
+  [connectable tableable query {:keys [include-queries-in-exceptions?]
+                                :or   {include-queries-in-exceptions? true}
+                                :as   options}]
+  (log/tracef "Compile query with table %s and options %s\n^%s %s"
+              (pr-str tableable)
               (u/pprint-to-str options)
               (some-> query class .getCanonicalName)
               (u/pprint-to-str query))
   (try
-    (let [sql-params (next-method connectable query options)]
+    (let [sql-params (next-method connectable tableable query options)]
       (log/tracef "-> %s" (u/pprint-to-str sql-params))
       (assert (and (sequential? sql-params) (string? (first sql-params)))
               (str "compile* should return [sql & params], got " (pr-str sql-params)))
       sql-params)
     (catch Throwable e
-      (throw (ex-info "Error compiling query"
+      (throw (ex-info (format "Error compiling query: %s" (ex-message e))
                       (if include-queries-in-exceptions?
                         {:query query}
                         {})
                       e)))))
 
-(m/defmethod compile* [:default String]
-  [_ sql _]
+(m/defmethod compile* :default
+  [_ tableable query options]
+  (throw (ex-info (format "Don't know how to compile %s" (pr-str query))
+                  {:tableable tableable
+                   :query     query
+                   :options   options})))
+
+(m/defmethod compile* [:default :default String]
+  [_ _ sql _]
   [sql])
 
 ;; [sql & params] or [honeysql & params] vector
-(m/defmethod compile* [:default clojure.lang.Sequential]
-  [connectable [query & args] options]
-  (into (compile* connectable query options) args))
+(m/defmethod compile* [:default :default clojure.lang.Sequential]
+  [connectable tableable [query & args] options]
+  (into (compile* connectable tableable query options) args))
 
 ;; TODO -- I'm not 100% sure what the best way to pass conn/options information to HoneySQL stuff like
 ;; TableIdentifier is. Should we just use whatever is in place when we compile the HoneySQL form? Should a Table
@@ -53,8 +63,8 @@
 (def ^:private ^:dynamic *compile-connectable* nil)
 (def ^:private ^:dynamic *compile-options* nil)
 
-(m/defmethod compile* [:default clojure.lang.IPersistentMap]
-  [connectable honeysql-form {options :honeysql}]
+(m/defmethod compile* [:default :default clojure.lang.IPersistentMap]
+  [connectable _ honeysql-form {options :honeysql}]
   (log/tracef "Compile HoneySQL form\n%s\noptions: %s" (u/pprint-to-str honeysql-form) (u/pprint-to-str options))
   (binding [*compile-connectable* connectable
             *compile-options*     options]
@@ -63,9 +73,19 @@
       sql-params)))
 
 (defn compile
-  ([query]                     (compile* conn/*connectable* query (conn/default-options conn/*connectable*)))
-  ([connectable query]         (compile* connectable        query (conn/default-options connectable)))
-  ([connectable query options] (compile* connectable        query (u/recursive-merge (conn/default-options connectable) options))))
+  ([queryable]
+   (compile conn/*connectable* nil queryable nil))
+
+  ([tableable queryable]
+   (compile conn/*connectable* tableable queryable nil))
+
+  ([connectable tableable queryable]
+   (compile connectable tableable queryable nil))
+
+  ([connectable tableable queryable options]
+   (let [options (u/recursive-merge (conn/default-options connectable) options)
+         query   (queryable/queryable connectable tableable queryable options)]
+     (compile* connectable tableable query options))))
 
 (p/defrecord+ TableIdentifier [tableable options]
   pretty/PrettyPrintable
@@ -89,9 +109,22 @@
   {:arglists '([connectable tableable query options])}
   u/dispatch-on-first-three-args)
 
-;; default method is a no-op
+(m/defmethod from* :around :default
+  [connectable tableable query options]
+  (log/tracef "Adding :from %s to %s" tableable (pr-str query))
+  (try
+    (let [result (next-method connectable tableable query options)]
+      (log/tracef "-> %s" (pr-str result))
+      result)
+    (catch Throwable e
+      (throw (ex-info (format "Error adding FROM %s to %s" (pr-str tableable) (pr-str query))
+                      {:tableable tableable, :query query, :options options}
+                      e)))))
+
+;; default impl is a no-op
 (m/defmethod from* :default
-  [_ _ query _]
+  [_ tableable query _]
+  (log/tracef (format "Query %s isn't a map, not adding FROM %s" (pr-str query) (pr-str tableable)))
   query)
 
 ;; method for HoneySQL maps
@@ -104,6 +137,12 @@
   ;; to facilitate threading, but I thought this would used in a threading context relatively rarely and it's not
   ;; worth the added cognitive load of having the arguments appear in a different order in this place and nowhere
   ;; else.
-  ([tableable query]                     (from* conn/*connectable* tableable query (conn/default-options conn/*connectable*)))
-  ([connectable tableable query]         (from* connectable        tableable query (conn/default-options connectable)))
-  ([connectable tableable query options] (from* connectable        tableable query (u/recursive-merge (conn/default-options connectable) options))))
+  ([tableable queryable]
+   (from conn/*connectable* tableable queryable))
+
+  ([connectable tableable queryable]
+   (from connectable tableable queryable nil))
+
+  ([connectable tableable queryable options]
+   (let [options (u/recursive-merge (conn/default-options connectable) options)]
+     (from* connectable tableable (queryable/queryable connectable tableable queryable options) options))))

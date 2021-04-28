@@ -1,35 +1,37 @@
 (ns bluejdbc.compile-test
   (:require [bluejdbc.compile :as compile]
+            [bluejdbc.queryable :as queryable]
             [bluejdbc.tableable :as tableable]
             [clojure.test :refer :all]
             [methodical.core :as m]))
 
-(deftest string-test
+(deftest compile-string-test
   (testing "Compiling a plain string should no-op"
     (is (= ["SELECT 1 AS one;"]
-           (compile/compile :test/postgres "SELECT 1 AS one;")))
+           (compile/compile :test/postgres nil "SELECT 1 AS one;")))
     (is (= ["SELECT ?, ?, ?;" 1 2 3]
-           (compile/compile :test/postgres ["SELECT ?, ?, ?;" 1 2 3])))))
+           (compile/compile :test/postgres nil ["SELECT ?, ?, ?;" 1 2 3])))))
 
-(deftest honeysql-test
+(deftest compile-honeysql-test
   (is (= ["SELECT * FROM people WHERE id = ?" 1]
-         (compile/compile :test/postgres {:select [:*], :from [:people], :where [:= :id 1]})))
+         (compile/compile :test/postgres nil {:select [:*], :from [:people], :where [:= :id 1]})))
   (testing "Should be able to pass a HoneySQL map as first arg in a query-params vector"
     (is (= ["SELECT * FROM people WHERE id = ?" 1 2]
-           (compile/compile :test/postgres [{:select [:*], :from [:people], :where [:= :id 1]} 2])))))
+           (compile/compile :test/postgres nil [{:select [:*], :from [:people], :where [:= :id 1]} 2])))))
 
-(m/defmethod compile/compile* [:default ::people-count]
-  [connectable _ options]
-  (compile/compile connectable {:select [:%count.*], :from [:people]} options))
+(m/defmethod queryable/queryable* [:default :default ::named-query]
+  [_ _ _ _]
+  {:select [:%count.*], :from [:people]})
 
 (deftest compile-named-query-test
   (is (= ["SELECT count(*) FROM people"]
-         (compile/compile :test/postgres ::people-count))))
+         (compile/compile :test/postgres nil ::named-query))))
 
 (deftest compile-honeysql-options-test
   (testing "Should be able to pass `:honeysql` options"
     (is (= ["SELECT * FROM \"people\" WHERE \"my-id\" = ?" 1]
            (compile/compile :test/postgres
+                            nil
                             {:select [:*]
                              :from   [:people]
                              :where  [:= :my-id 1]}
@@ -37,10 +39,10 @@
                                         :allow-dashed-names? true}}))))
   (testing "Should pick up options from the connectable"
     (is (= ["SELECT * FROM \"people\""]
-           (compile/compile :test/postgres-with-quoting {:select [:*] :from [:people]}))))
+           (compile/compile :test/postgres-with-quoting nil {:select [:*] :from [:people]}))))
   (testing "Options passed directly to `compile` should override those from the connectable"
     (is (= ["SELECT * FROM `people`"]
-           (compile/compile :test/postgres-with-quoting {:select [:*] :from [:people]} {:honeysql {:quoting :mysql}})))))
+           (compile/compile :test/postgres-with-quoting nil {:select [:*] :from [:people]} {:honeysql {:quoting :mysql}})))))
 
 (m/defmethod tableable/table-name* [:default ::my-amazing-table]
   [_ _ _]
@@ -59,11 +61,11 @@
 
   (testing "Should use options passed directly to `compile`"
     (is (= ["SELECT \"field\" FROM \"people\""]
-           (compile/compile nil (compile/from :people {:select [:field]}) {:honeysql {:quoting :ansi}}))))
+           (compile/compile nil nil (compile/from :people {:select [:field]}) {:honeysql {:quoting :ansi}}))))
 
   (testing "Should use options from the `connnectable` passed to `compile`"
     (is (= ["SELECT \"field\" FROM \"people\""]
-           (compile/compile :test/postgres-with-quoting (compile/from :people {:select [:field]})))))
+           (compile/compile :test/postgres-with-quoting nil (compile/from :people {:select [:field]})))))
 
   (testing "Should be able to pass options to the TableIdentifier itself"
     (is (= {:select [:field]
@@ -83,4 +85,8 @@
             :from   [(compile/table-identifier ::my-amazing-table)]}
            (compile/from ::my-amazing-table {:select [:*]})))
     (is (= ["SELECT * FROM wow"]
-           (compile/compile (compile/from ::my-amazing-table {:select [:*]}))))))
+           (compile/compile (compile/from ::my-amazing-table {:select [:*]})))))
+
+  (testing "named query"
+      (is (= ["SELECT count(*) FROM wow"]
+             (compile/compile (compile/from ::my-amazing-table ::named-query))))))

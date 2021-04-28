@@ -1,6 +1,7 @@
 (ns bluejdbc.query-test
   (:require [bluejdbc.connectable :as conn]
             [bluejdbc.query :as query]
+            [bluejdbc.queryable :as queryable]
             [bluejdbc.test :as test]
             [bluejdbc.util :as u]
             [clojure.test :refer :all]
@@ -16,6 +17,10 @@
     (conn/with-connection :test/postgres
       (is (= [{:count 4}]
              (reduce u/default-rf [] (query/reducible-query "SELECT count(*) FROM people;")))))))
+
+(m/defmethod queryable/queryable* [:default :default ::named-query]
+  [_ _ _ _]
+  "SELECT count(*) FROM people;")
 
 (deftest query-test
   (is (= [{:count 4}]
@@ -39,7 +44,11 @@
             {:id         4
              :name       "Tam"
              :created_at #inst "2020-05-25T19:56:00.000000000-00:00"}]
-           (query/query :test/postgres {:select [:*], :from [:people]})))))
+           (query/query :test/postgres {:select [:*], :from [:people]}))))
+
+  (testing "named query"
+    (is (= [{:count 4}]
+           (query/query :test/postgres ::named-query)))))
 
 (deftest query-one-test
   (is (= {:count 4}
