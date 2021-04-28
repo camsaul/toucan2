@@ -1,7 +1,8 @@
 (ns bluejdbc.connectable
   (:require [bluejdbc.util :as u]
             [methodical.core :as m]
-            [next.jdbc :as next.jdbc]))
+            [next.jdbc :as next.jdbc]
+            [next.jdbc.result-set :as jdbc.rs]))
 
 (m/defmulti connection*
   {:arglists '([connectable options])}
@@ -61,12 +62,18 @@
 (def ^:dynamic *options*
   nil)
 
+(def default-options
+  {:execute {:builder-fn jdbc.rs/as-unqualified-maps}
+   :rf      u/default-rf
+   :init    []})
+
 (defn do-with-connection [connectable options f]
   (if (= connectable *connectable*)
-    (let [options (merge *options* options)]
+    (let [options (u/recursive-merge default-options *options* options)]
       (binding [*options* options]
         (f *connection* options)))
-    (let [{:keys [^java.sql.Connection connection new? options]} (connection connectable options)]
+    (let [options                                                (u/recursive-merge default-options options)
+          {:keys [^java.sql.Connection connection new? options]} (connection connectable options)]
       (binding [*connectable* connectable
                 *connection*  connection
                 *options*     options]

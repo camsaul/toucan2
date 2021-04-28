@@ -2,8 +2,7 @@
   (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
             [clojure.walk :as walk]
-            [potemkin :as p]
-            [pretty.core :refer [PrettyPrintable]]))
+            [potemkin :as p]))
 
 (defn keyword-or-class [x]
   (if (keyword? x)
@@ -116,11 +115,11 @@
   [k]
   (when (some? k)
     (if-let [namespac (when (instance? clojure.lang.Named k)
-                        (namespace k))]
+                       (namespace k))]
       (str namespac "/" (name k))
       (name k))))
 
-(defn pretty-printable-fn [pretty-representation f]
+#_(defn pretty-printable-fn [pretty-representation f]
   (reify
     PrettyPrintable
     (pretty [_]
@@ -132,3 +131,20 @@
     (invoke [_ a b c]     (f a b c))
     (invoke [_ a b c d]   (f a b c d))
     (invoke [_ a b c d e] (f a b c d e))))
+
+(defn recursive-merge
+  ([m]
+   m)
+
+  ([m1 m2]
+   (merge-with (fn [x y]
+                 (if (map? x)
+                   (recursive-merge x y)
+                   y))
+               m1 m2))
+
+  ([m1 m2 & more]
+   (apply recursive-merge (recursive-merge m1 m2) more)))
+
+(def default-rf
+  ((map (partial into {})) conj))

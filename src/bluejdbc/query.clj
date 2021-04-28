@@ -1,14 +1,11 @@
 (ns bluejdbc.query
-  (:require [bluejdbc.log :as log]
-            [bluejdbc.util :as u]
-            [bluejdbc.compile :as compile]
+  (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as conn]
+            [bluejdbc.log :as log]
+            [bluejdbc.util :as u]
             [methodical.core :as m]
             [next.jdbc :as next.jdbc]
             [potemkin :as p]))
-
-(def default-rf
-  ((map (partial into {})) conj))
 
 (defn reduce-query
   [connectable
@@ -64,10 +61,10 @@
 
 (defn- query* [connectable query options]
   (conn/with-connection [[conn {:keys [rf init include-queries-in-exceptions?]
-                                :or   {rf                             default-rf
-                                       init                           []
-                                       include-queries-in-exceptions? true}
+                                :or   {include-queries-in-exceptions? true}
                                 :as   options}] connectable options]
+    (assert rf)
+    (assert init)
     (let [reducible (reducible-query connectable query options)]
       (reduce rf init reducible))))
 
@@ -84,13 +81,13 @@
    (query-one connectable query nil))
 
   ([connectable query options]
-   (conn/with-connection [[conn options] connectable options]
-     (let [rf (:rf options default-rf)]
-       (transduce
-        (take 1)
-        (completing rf first)
-        nil
-        (reducible-query connectable query options))))))
+   (conn/with-connection [[conn {:keys [rf], :as options}] connectable options]
+     (assert rf)
+     (transduce
+      (take 1)
+      (completing rf first)
+      nil
+      (reducible-query connectable query options)))))
 
 ;; TODO -- execute
 #_(defn execute! [connectable query options]
