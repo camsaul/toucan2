@@ -190,3 +190,28 @@
 (deftest select-one-test
   (is (= {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
          (select/select-one [:test/postgres :people]))))
+
+(deftest select-fn-test
+  (testing "Equivalent of Toucan select-field"
+    (is (= #{1 2 3 4}
+           (select/select-fn-set :id [:test/postgres :people]))))
+  (testing "Return vector instead of a set"
+    (is (= [1 2 3 4]
+           (select/select-fn-vec :id [:test/postgres :people]))))
+  (testing "Arbitrary function instead of a key"
+    (is (= [2 3 4 5]
+           (select/select-fn-vec (comp inc :id) [:test/postgres :people])))))
+
+(deftest select-one-fn-test
+  (is (= 1
+         (select/select-one-fn :id [:test/postgres :people] :name "Cam"))))
+
+(deftest select-one-pk-test
+  (is (= 1
+         (select/select-one-pk [:test/postgres :people] :name "Cam")))
+  (testing "non-integer PK"
+    (is (= "Cam"
+           (select/select-one-pk [:test/postgres :people/name-is-pk] :id 1))))
+  (testing "Composite PK -- should return vector"
+    (is (= [1 "Cam"]
+           (select/select-one-pk [:test/postgres :people/composite-pk] :id 1)))))

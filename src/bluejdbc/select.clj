@@ -10,6 +10,7 @@
             [bluejdbc.queryable :as queryable]
             [bluejdbc.result-set :as rs]
             [bluejdbc.specs :as specs]
+            [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
             [clojure.spec.alpha :as s]
             [methodical.core :as m]
@@ -79,13 +80,11 @@
        :query   query
        :options options})))
 
+;; TODO -- should this be a multimethod?
 (defn select-reducible
-  {:arglists '([tableable id? conditions? queryable? options?]
-               [[connectable tableable] id? conditions? queryable? options?])}
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
   [connectable-tableable & args]
-  (let [[connectable tableable]        (if (sequential? connectable-tableable)
-                                         connectable-tableable
-                                         [conn/*connectable* connectable-tableable])
+  (let [[connectable tableable]        (conn/parse-connectable-tableable connectable-tableable)
         {:keys [id kvs query options]} (parse-select-args connectable tableable args)
         options                        (u/recursive-merge (conn/default-options connectable) options)
         kvs                            (cond-> kvs
@@ -97,35 +96,59 @@
                                          (seq kvs) (honeysql-util/merge-kvs kvs))]
     (select* connectable tableable query options)))
 
-(def ^{:arglists '([tableable id? conditions? queryable? options?]
-                   [[connectable tableable] id? conditions? queryable? options?])} select
-  (comp query/all select-reducible))
+(defn select
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  [& args]
+  (query/all (apply select-reducible args)))
 
-(def ^{:arglists '([tableable id? conditions? queryable? options?]
-                   [[connectable tableable] id? conditions? queryable? options?])} select-one
-  (comp (partial transduce
-                 (comp (map query/realize-row)
-                       (take 1))
-                 (completing (fn [_ row] row))
-                 nil)
-        select-reducible))
+(defn select-one
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  [& args]
+  (query/reduce-first (map query/realize-row) (apply select-reducible args)))
 
-(defn select-field [field connectable-tableable & args]
-  (let [args (parse-select-args args)]
-    args
-    ))
+(defn select-fn-reducible
+  {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
+  [f & args]
+  (eduction
+   (map f)
+   (apply select-reducible args)))
 
-;; TODO
+(defn select-fn-set
+  {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
+  [& args]
+  (reduce
+   conj
+   #{}
+   (apply select-fn-reducible args)))
 
-(defn select-one-field [])
+(defn select-fn-vec
+  {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
+  [& args]
+  (reduce
+   conj
+   []
+   (apply select-fn-reducible args)))
 
-(defn select-one-id [])
+(defn select-one-fn
+  {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
+  [& args]
+  (query/reduce-first (apply select-fn-reducible args)))
 
-(defn select-ids [])
+(defn select-one-pk
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  [connectable-tableable & args]
+  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+        pk-keys                 (tableable/primary-key-keys connectable tableable)
+        f                       (if (= (clojure.core/count pk-keys) 1)
+                                  (first pk-keys)
+                                  (apply juxt pk-keys))]
+    (apply select-one-fn f [connectable tableable] args)))
 
-(defn select-field->field [])
+(defn select-pks [])
 
-(defn select-field->id [])
+(defn select-fn->fn [])
+
+(defn select-fn->pk [])
 
 (defn count [])
 

@@ -23,12 +23,11 @@
           (update :conditions merge (when (seq kv-conditions)
                                       (zipmap (map :k kv-conditions) (map :v kv-conditions))))))))
 
+;; TODO -- need an `update!*` method
 (defn update!
   {:arglists '([tableable id? conditions? changes options?])}
   [connectable-tableable & args]
-  (let [[connectable tableable]                 (if (sequential? connectable-tableable)
-                                                  connectable-tableable
-                                                  [conn/*connectable* connectable-tableable])
+  (let [[connectable tableable]                 (conn/parse-connectable-tableable connectable-tableable)
         {:keys [id conditions changes options]} (parse-update!-args args)
         conditions                              (cond-> conditions
                                                   id (honeysql-util/merge-primary-key connectable tableable id))
@@ -39,22 +38,16 @@
     (query/execute! connectable tableable honeysql-form options)))
 
 ;; TODO -- Move to tableable
-(defn primary-key-values [connectable obj]
-  (let [pk-keys (tableable/primary-key connectable (instance/table obj))
-        pk-keys (if (sequential? pk-keys)
-                  pk-keys
-                  [pk-keys])]
-    (zipmap pk-keys (map obj pk-keys))))
 
+
+;; TODO -- need a `save!*` method
 (defn save!
   ([obj]
    (save! conn/*connectable* obj))
 
   ([connectable obj]
    (when-let [changes (not-empty (instance/changes obj))]
-     (update! (instance/table obj) (primary-key-values connectable obj) changes))))
-
-
+     (update! (instance/table obj) (tableable/primary-key-values connectable obj) changes))))
 
 (defn insert! [])
 
