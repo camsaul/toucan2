@@ -186,3 +186,7 @@
   (is (= [(instance/instance :people/no-timestamps-limit-2 {:id 1, :name "Cam"})
           (instance/instance :people/no-timestamps-limit-2 {:id 2, :name "Sam"})]
          (table-aware/select [:test/postgres :people/no-timestamps-limit-2]))))
+
+(deftest select-one-test
+  (is (= {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
+         (table-aware/select-one [:test/postgres :people]))))
