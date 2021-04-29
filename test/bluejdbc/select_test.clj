@@ -1,10 +1,10 @@
-(ns bluejdbc.table-aware-test
+(ns bluejdbc.select-test
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as conn]
             [bluejdbc.instance :as instance]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
-            [bluejdbc.table-aware :as table-aware]
+            [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
@@ -19,7 +19,7 @@
 
 (deftest query-as-test
   (let [results (query/all
-                 (table-aware/reducible-query-as :test/postgres :people {:select [:*], :from [:people]} nil))]
+                 (select/reducible-query-as :test/postgres :people {:select [:*], :from [:people]} nil))]
     (test-people-instances? results)
     (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
             {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56Z")}
@@ -75,7 +75,7 @@
               :kvs     expected-kvs
               :query   expected-query
               :options expected-options}
-             (table-aware/parse-select-args :connectable :tableable args))))))
+             (select/parse-select-args :connectable :tableable args))))))
 
 (deftest select-test
   (testing "no args"
@@ -83,8 +83,8 @@
             {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56:00Z")}
             {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56:00Z")}
             {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56:00Z")}]
-           (table-aware/select [:test/postgres :people])))
-    (test-people-instances? (table-aware/select [:test/postgres :people])))
+           (select/select [:test/postgres :people])))
+    (test-people-instances? (select/select [:test/postgres :people])))
 
   (testing "using current connection (dynamic binding)"
     (binding [conn/*connectable* :test/postgres]
@@ -92,7 +92,7 @@
               {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56:00Z")}
               {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56:00Z")}
               {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56:00Z")}]
-             (table-aware/select :people)))))
+             (select/select :people)))))
 
   (testing "using default connection"
     (test/with-default-connection
@@ -100,22 +100,22 @@
               {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56:00Z")}
               {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56:00Z")}
               {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56:00Z")}]
-             (table-aware/select :people)))))
+             (select/select :people)))))
 
   (testing "one arg (id)"
     (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (table-aware/select [:test/postgres :people] 1))))
+           (select/select [:test/postgres :people] 1))))
 
   (testing "one arg (query)"
     (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (table-aware/select [:test/postgres :people] {:where [:= :id 1]}))))
+           (select/select [:test/postgres :people] {:where [:= :id 1]}))))
 
   (testing "two args (k v)"
     (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (table-aware/select [:test/postgres :people] :id 1)))
+           (select/select [:test/postgres :people] :id 1)))
     (testing "sequential v"
       (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-             (table-aware/select [:test/postgres :people] :id [:= 1]))))))
+             (select/select [:test/postgres :people] :id [:= 1]))))))
 
 (m/defmethod tableable/primary-key* [:default :people/name-is-pk]
   [_ _]
@@ -128,17 +128,17 @@
 (deftest select-non-integer-pks-test
   (testing "non-integer PK"
     (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (table-aware/select [:test/postgres :people/name-is-pk] "Cam"))))
+           (select/select [:test/postgres :people/name-is-pk] "Cam"))))
 
   (testing "composite PK"
     (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (table-aware/select [:test/postgres :people/composite-pk] [1 "Cam"])))
+           (select/select [:test/postgres :people/composite-pk] [1 "Cam"])))
     (is (= []
-           (table-aware/select [:test/postgres :people/composite-pk] [2 "Cam"])
-           (table-aware/select [:test/postgres :people/composite-pk] [1 "Sam"])))))
+           (select/select [:test/postgres :people/composite-pk] [2 "Cam"])
+           (select/select [:test/postgres :people/composite-pk] [1 "Sam"])))))
 
 ;; this could also be done as part a `:before` method.
-(m/defmethod table-aware/select* [:default :people/no-timestamps clojure.lang.IPersistentMap]
+(m/defmethod select/select* [:default :people/no-timestamps clojure.lang.IPersistentMap]
   [connectable tableable query options]
   (let [query (merge {:select [:id :name]}
                      query)]
@@ -148,9 +148,9 @@
   (testing "Should be able to set some defaults by implementing `select*`"
     (test/with-default-connection
       (is (= [(instance/instance :people/no-timestamps {:id 1, :name "Cam"})]
-             (table-aware/select :people/no-timestamps 1))))))
+             (select/select :people/no-timestamps 1))))))
 
-(m/defmethod table-aware/select* :before [:default :people/limit-2 clojure.lang.IPersistentMap]
+(m/defmethod select/select* :before [:default :people/limit-2 clojure.lang.IPersistentMap]
   [connectable tableable query options]
   (assoc query :limit 2))
 
@@ -159,9 +159,9 @@
     (test/with-default-connection
       (is (= [(instance/instance :people/limit-2 {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")})
               (instance/instance :people/limit-2 {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56Z")})]
-             (table-aware/select :people/limit-2))))))
+             (select/select :people/limit-2))))))
 
-(m/defmethod table-aware/select* :after [:default :people/no-timestamps :default]
+(m/defmethod select/select* :after [:default :people/no-timestamps :default]
   [connectable tableable reducible-query options]
   (testing "should not be an eduction yet -- if it is it means this method is getting called more than once"
     (is (not (instance? clojure.core.Eduction reducible-query))))
@@ -177,7 +177,7 @@
               (instance/instance :people/no-timestamps {:id 2, :name "Sam"})
               (instance/instance :people/no-timestamps {:id 3, :name "Pam"})
               (instance/instance :people/no-timestamps {:id 4, :name "Tam"})]
-             (table-aware/select :people/no-timestamps))))))
+             (select/select :people/no-timestamps))))))
 
 (derive :people/no-timestamps-limit-2 :people/no-timestamps)
 (derive :people/no-timestamps-limit-2 :people/limit-2)
@@ -185,42 +185,8 @@
 (deftest combine-aux-methods-test
   (is (= [(instance/instance :people/no-timestamps-limit-2 {:id 1, :name "Cam"})
           (instance/instance :people/no-timestamps-limit-2 {:id 2, :name "Sam"})]
-         (table-aware/select [:test/postgres :people/no-timestamps-limit-2]))))
+         (select/select [:test/postgres :people/no-timestamps-limit-2]))))
 
 (deftest select-one-test
   (is (= {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
-         (table-aware/select-one [:test/postgres :people]))))
-
-(deftest parse-update-args-test
-  (is (= {:id 1, :changes {:a 1}, :conditions nil}
-         (table-aware/parse-update!-args [1 {:a 1}])))
-  (is (= {:conditions {:id 1}, :changes {:a 1}}
-         (table-aware/parse-update!-args [:id 1 {:a 1}])))
-  (is (= {:id 1, :conditions {:name "Cam"}, :changes {:a 1}}
-         (table-aware/parse-update!-args [1 :name "Cam" {:a 1}])))
-  (is (= {:changes {:name "Hi-Dive"}, :conditions {:id 1}}
-         (table-aware/parse-update!-args [{:id 1} {:name "Hi-Dive"}]))))
-
-(deftest update!-test
-  (test/with-venues-reset
-    (is (= [{:next.jdbc/update-count 1}]
-           (table-aware/update! [:test/postgres :venues] 1 {:name "Hi-Dive"})))
-    (is (= (instance/instance :venues {:id         1
-                                       :name       "Hi-Dive"
-                                       :category   "bar"
-                                       :created-at (t/local-date-time "2017-01-01T00:00")
-                                       :updated-at (t/local-date-time "2017-01-01T00:00")})
-           (table-aware/select-one [:test/postgres :venues] 1)))))
-
-(deftest save!-test
-  (test/with-venues-reset
-    (test/with-default-connection
-      (let [venue (table-aware/select-one :venues 1)]
-        (is (= [{:next.jdbc/update-count 1}]
-               (table-aware/save! (assoc venue :name "Hi-Dive"))))
-        (is (= (instance/instance :venues {:id         1
-                                           :name       "Hi-Dive"
-                                           :category   "bar"
-                                           :created-at (t/local-date-time "2017-01-01T00:00")
-                                           :updated-at (t/local-date-time "2017-01-01T00:00")})
-               (table-aware/select-one :venues 1)))))))
+         (select/select-one [:test/postgres :people]))))

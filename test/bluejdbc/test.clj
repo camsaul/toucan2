@@ -5,6 +5,7 @@
             [bluejdbc.query :as query]
             [bluejdbc.util :as u]
             [clojure.test :refer :all]
+            [environ.core :as env]
             [methodical.core :as m]))
 
 (comment bluejdbc.integrations.postgresql/keep-me)
@@ -13,7 +14,9 @@
 
 (m/defmethod conn/connection* :test/postgres
   [_ options]
-  (next-method "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam" options))
+  (next-method
+   (env/env :jdbc-url-postgres "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam")
+   options))
 
 (derive :test/postgres-with-quoting :test/postgres)
 

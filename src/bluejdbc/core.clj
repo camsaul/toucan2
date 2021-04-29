@@ -5,8 +5,9 @@
             [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
+            [bluejdbc.mutative :as mutative]
             [bluejdbc.query :as query]
-            [bluejdbc.table-aware :as table-aware]
+            [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [methodical.core :as m]
             [potemkin :as p]))
@@ -18,8 +19,9 @@
   instance/keep-me
   log/keep-me
   m/keep-me
+  mutative/keep-me
   query/keep-me
-  table-aware/keep-me
+  select/keep-me
   tableable/keep-me)
 
 (p/import-vars
@@ -61,6 +63,15 @@
  [log
   with-debug-logging]
 
+ [mutative
+  delete!
+  insert!
+  insert-returning-keys!
+  #_primary-key-values ;; TODO -- move to tableable
+  save!
+  update!
+  upsert!]
+
  [query
   all
   execute!
@@ -71,15 +82,10 @@
   reducible-query
   reducible-query*]
 
- [table-aware
+ [select
   count
-  delete!
   exists?
-  insert!
-  insert-returning-keys!
-  #_parse-select-args
-  #_query-as
-  save!
+  reducible-query-as
   select
   select*
   select-field
@@ -89,9 +95,7 @@
   select-one
   select-one-field
   select-one-id
-  select-reducible
-  update!
-  upsert!]
+  select-reducible]
 
  [tableable
   primary-key
