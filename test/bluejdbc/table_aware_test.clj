@@ -1,8 +1,10 @@
 (ns bluejdbc.table-aware-test
   (:require [bluejdbc.compile :as compile]
+            [bluejdbc.connectable :as conn]
             [bluejdbc.instance :as instance]
             [bluejdbc.queryable :as queryable]
             [bluejdbc.table-aware :as table-aware]
+            [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [java-time :as t]
@@ -87,3 +89,65 @@
               :query   expected-query
               :options expected-options}
              (table-aware/parse-select-args :connectable :tableable args))))))
+
+(deftest select-test
+  (testing "no args"
+    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}
+            {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56:00Z")}
+            {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56:00Z")}
+            {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56:00Z")}]
+           (table-aware/select [:test/postgres :people])))
+    (test-people-instances? (table-aware/select [:test/postgres :people])))
+
+  (testing "using current connection (dynamic binding)"
+    (binding [conn/*connectable* :test/postgres]
+      (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}
+              {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56:00Z")}
+              {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56:00Z")}
+              {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56:00Z")}]
+             (table-aware/select :people)))))
+
+  (testing "using default connection"
+    (test/with-default-connection
+      (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}
+              {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56:00Z")}
+              {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56:00Z")}
+              {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56:00Z")}]
+             (table-aware/select :people)))))
+
+  (testing "one arg (id)"
+    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+           (table-aware/select [:test/postgres :people] 1))))
+
+  (testing "one arg (query)"
+    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+           (table-aware/select [:test/postgres :people] {:where [:= :id 1]}))))
+
+  (testing "two args (k v)"
+    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+           (table-aware/select [:test/postgres :people] :id 1)))
+    (testing "sequential v"
+      (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+             (table-aware/select [:test/postgres :people] :id [:= 1]))))))
+
+(m/defmethod tableable/primary-key* [:default :people/name-is-pk]
+  [_ _]
+  :name)
+
+(m/defmethod tableable/primary-key* [:default :people/composite-pk]
+  [_ _]
+  [:id :name])
+
+(deftest select-non-integer-pks-test
+  (testing "non-integer PK"
+    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+           (table-aware/select [:test/postgres :people/name-is-pk] "Cam"))))
+
+  (testing "composite PK"
+    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+           (table-aware/select [:test/postgres :people/composite-pk] [1 "Cam"])))
+    (is (= nil
+           (table-aware/select [:test/postgres :people/composite-pk] [2 "Cam"])
+           (table-aware/select [:test/postgres :people/composite-pk] [1 "Sam"])))))
+
+;; TODO -- default query

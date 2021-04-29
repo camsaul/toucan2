@@ -1,4 +1,5 @@
 (ns bluejdbc.table-aware
+  (:refer-clojure :exclude [count])
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as conn]
             [bluejdbc.instance :as instance]
@@ -6,18 +7,26 @@
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
             [bluejdbc.result-set :as rs]
+            [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
             [clojure.spec.alpha :as s]
+            [honeysql.helpers :as hsql.helpers]
             [methodical.core :as m]
             [potemkin :as p]
             [pretty.core :as pretty]))
 
+(defn- table-rf [tableable]
+  (u/pretty-printable-fn
+   #(list `table-rf tableable)
+   ((map (partial into (instance/instance tableable))) conj)))
+
 (defn query-as [connectable tableable query options]
   (let [options (u/recursive-merge (conn/default-options connectable)
-                                   {:execute {:builder-fn (rs/row-builder-fn connectable tableable)}
-                                    ;; TODO -- not sure why we need to do *both* ???
-                                    :rf      ((map (partial into (instance/instance tableable))) conj)}
-                                   options)]
+                                   options
+                                   {:execute {:builder-fn (rs/row-builder-fn connectable tableable)}}
+                                   (when (or (not (:rf options))
+                                             (= (:rf options) u/default-rf))
+                                     {:rf (table-rf tableable)}))]
     (query/query connectable query options)))
 
 (m/defmulti select*
@@ -26,7 +35,9 @@
 
 (m/defmethod select* :default
   [connectable tableable query options]
-  (query-as connectable tableable (compile/from connectable tableable query options) options))
+  (let [query (cond->> query
+                ((some-fn map? nil?) query) (merge {:select [:*]}))]
+    (query-as connectable tableable (compile/from connectable tableable query options) options)))
 
 (p/defrecord+ ID [vs]
   pretty/PrettyPrintable
@@ -79,9 +90,29 @@
        :query   query
        :options options})))
 
-(defn- merge-primary-key [kvs connectable tableable id])
+(defn- merge-primary-key [kvs connectable tableable pk-vals]
+  (log/tracef "Adding primary key values %s" (pr-str pk-vals))
+  (let [pk-cols (tableable/primary-key connectable tableable)
+        _       (log/tracef "Primary key(s) for %s is %s" (pr-str tableable) (pr-str pk-cols))
+        pk-cols (if (sequential? pk-cols)
+                  pk-cols
+                  [pk-cols])
+        pk-vals (if (sequential? pk-vals)
+                  pk-vals
+                  [pk-vals])
+        pk-map  (zipmap pk-cols pk-vals)
+        result  (merge kvs pk-map)]
+    (log/tracef "-> %s" (pr-str result))
+    result))
 
-(defn- merge-kvs [query kvs])
+(defn- merge-kvs [query kvs]
+  (log/tracef "Adding key-values %s" (pr-str kvs))
+  (let [query (apply hsql.helpers/merge-where query (for [[k v] kvs]
+                                                      (if (sequential? v)
+                                                        (into [(first v) k] (rest v))
+                                                        [:= k v])))]
+    (log/tracef "-> %s" (pr-str query))
+    query))
 
 (defn select
   {:arglists '([tableable id? kvs? queryable? options?]
@@ -94,7 +125,42 @@
         options                        (u/recursive-merge (conn/default-options connectable) options)
         kvs                            (cond-> kvs
                                          id (merge-primary-key connectable tableable id))
-        query                          (queryable/queryable connectable tableable query options)
+        query                          (when query
+                                         (queryable/queryable connectable tableable query options))
         query                          (cond-> query
                                          (seq kvs) (merge-kvs kvs))]
     (select* connectable tableable query options)))
+
+;; TODO
+
+(defn select-reducible [])
+
+(defn select-one [])
+
+(defn select-one-field [])
+
+(defn select-one-id [])
+
+(defn select-field [])
+
+(defn select-ids [])
+
+(defn select-field->field [])
+
+(defn select-field->id [])
+
+(defn insert! [])
+
+(defn insert-returning-keys! [])
+
+(defn update! [])
+
+(defn delete! [])
+
+(defn upsert! [])
+
+(defn save! [])
+
+(defn count [])
+
+(defn exists? [])

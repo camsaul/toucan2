@@ -25,7 +25,8 @@
   ([connectable tableable]         (table-name* connectable tableable nil))
   ([connectable tableable options] (table-name* connectable tableable options)))
 
-(m/defmulti primary-key* :default
+;; TODO -- shouldn't this take options as well?
+(m/defmulti primary-key*
   {:arglists '([connectable tableable])}
   u/dispatch-on-first-two-args)
 

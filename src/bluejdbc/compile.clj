@@ -84,7 +84,8 @@
 
   ([connectable tableable queryable options]
    (let [options (u/recursive-merge (conn/default-options connectable) options)
-         query   (queryable/queryable connectable tableable queryable options)]
+         query   (when queryable
+                   (queryable/queryable connectable tableable queryable options))]
      (compile* connectable tableable query options))))
 
 (p/defrecord+ TableIdentifier [tableable options]
@@ -144,5 +145,7 @@
    (from connectable tableable queryable nil))
 
   ([connectable tableable queryable options]
-   (let [options (u/recursive-merge (conn/default-options connectable) options)]
-     (from* connectable tableable (queryable/queryable connectable tableable queryable options) options))))
+   (let [options (u/recursive-merge (conn/default-options connectable) options)
+         query   (when queryable
+                   (queryable/queryable connectable tableable queryable options))]
+     (from* connectable tableable query options))))

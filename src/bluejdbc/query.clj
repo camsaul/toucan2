@@ -20,9 +20,10 @@
   (conn/with-connection [conn connectable options]
     (let [sql-params (compile/compile connectable nil query options)]
       (try
-        (log/tracef "executing query %s with options %s" (pr-str sql-params) (pr-str (:execute options)))
+        (log/tracef "Executing query %s with options %s" (pr-str sql-params) (pr-str (:execute options)))
         (let [results (next.jdbc/plan conn sql-params (:execute options))]
           (try
+            (log/tracef "Reducing results with rf %s and init %s" (pr-str rf) (pr-str init))
             (reduce rf init results)
             (catch Throwable e
               (let [message (or (:message (ex-data e)) (ex-message e))]
@@ -77,12 +78,19 @@
   (assert rf)
   (assert init)
   (let [reducible (reducible-query connectable query options)]
-    (reduce rf init reducible)))
+    (not-empty (reduce rf init reducible))))
 
 (defn query
-  ([a-query]                     (query* conn/*connectable* a-query (conn/default-options conn/*connectable*)))
-  ([connectable a-query]         (query* connectable        a-query (conn/default-options connectable)))
-  ([connectable a-query options] (query* connectable        a-query (merge (conn/default-options connectable) options))))
+  ([a-query]
+   (query conn/*connectable* a-query nil))
+
+  ([connectable a-query]
+   (query connectable a-query nil))
+
+  ([connectable a-query options]
+   (query* connectable a-query (u/recursive-merge (conn/default-options connectable) options))))
+
+;; TODO -- I wish it was easier to compose this with `query`
 
 (defn query-one
   ([query]

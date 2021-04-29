@@ -47,6 +47,11 @@
 
 (m/defmethod connection* :default
   [connectable options]
+  (when (nil? connectable)
+    (throw (ex-info "Connectable cannot be nil" {})))
+  (when (= connectable :bluejdbc/default)
+    (throw (ex-info (format "No default connectable is defined. Define an implementation of connection* for :bluejdbc/default")
+                    {})))
   (when (keyword? connectable)
     (throw (ex-info (format "Unknown connectable %s. Did you define a connection* method for it?" connectable)
                     {:k connectable})))
@@ -68,22 +73,24 @@
    (connection* k options)))
 
 (def ^:dynamic *connectable*
-  :default-connectable)
+  :bluejdbc/default)
 
 (def ^:dynamic ^java.sql.Connection *connection*
   nil)
 
 (defn do-with-connection [connectable options f]
-  (if (= connectable *connectable*)
-    (f *connection*)
-    (let [options                                                (u/recursive-merge (default-options connectable) options)
-          {:keys [^java.sql.Connection connection new? options]} (connection connectable options)]
-      (binding [*connectable* connectable
-                *connection*  connection]
-        (if new?
-          (with-open [connection connection]
-            (f connection))
-          (f connection))))))
+  (let [connectable (or connectable :bluejdbc/default)]
+    (if (and *connection*
+             (= connectable *connectable*))
+      (f *connection*)
+      (let [options                                                (u/recursive-merge (default-options connectable) options)
+            {:keys [^java.sql.Connection connection new? options]} (connection connectable options)]
+        (binding [*connectable* connectable
+                  *connection*  connection]
+          (if new?
+            (with-open [connection connection]
+              (f connection))
+            (f connection)))))))
 
 ;; TODO -- not sure about this syntax.
 (defmacro with-connection
