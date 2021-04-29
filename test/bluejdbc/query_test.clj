@@ -65,11 +65,19 @@
    :new?       false
    :options    options})
 
-(m/defmethod query/reducible-query* [::not-even-jdbc :default]
-  [connectable k options]
-  (reify clojure.lang.IReduceInit
+(m/defmethod query/reducible-query* [::not-even-jdbc :default :default]
+  [connectable _ k options]
+  (reify
+    clojure.lang.IReduceInit
     (reduce [_ rf init]
-      (reduce rf init [{k 1} {k 2} {k 3}]))))
+      (reduce rf init [{k 1} {k 2} {k 3}]))
+
+    bluejdbc.query.IReducibleQuery
+    (options [_]
+      options)
+
+    (with-options [this _]
+      this)))
 
 (deftest wow-dont-even-need-to-use-jdbc-test
   (is (= [{:a 1} {:a 2} {:a 3}]

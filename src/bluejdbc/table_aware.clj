@@ -19,14 +19,14 @@
    #(list `table-rf tableable)
    ((map (partial into (instance/instance tableable))) conj)))
 
-(defn query-as [connectable tableable query options]
+(defn query-as [connectable tableable queryable options]
   (let [options (u/recursive-merge (conn/default-options connectable)
                                    options
                                    {:execute {:builder-fn (rs/row-builder-fn connectable tableable)}}
                                    (when (or (not (:rf options))
                                              (= (:rf options) u/default-rf))
                                      {:rf (table-rf tableable)}))]
-    (query/query connectable query options)))
+    (query/query connectable tableable queryable options)))
 
 (m/defmulti select*
   {:arglists '([connectable tableable query options])}
