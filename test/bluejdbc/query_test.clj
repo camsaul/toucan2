@@ -78,3 +78,13 @@
 (deftest wow-dont-even-need-to-use-jdbc-test
   (is (= [{:a 1} {:a 2} {:a 3}]
          (query/query ::not-even-jdbc :a))))
+
+(deftest execute!-test
+  (try
+    ;; TODO -- should `update!` just return `0` instead of the `:update-count` key?
+    (is (= [{:next.jdbc/update-count 0}]
+           (query/execute! :test/postgres "CREATE TABLE \"execute_test_table\" (\"id\" INTEGER NOT NULL);")))
+    (is (= []
+           (query/query :test/postgres "SELECT * FROM \"execute_test_table\";")))
+    (finally
+      (query/execute! :test/postgres "DROP TABLE IF EXISTS \"execute_test_table\";"))))

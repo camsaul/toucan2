@@ -1,6 +1,7 @@
 (ns bluejdbc.test
   (:require [bluejdbc.connectable :as conn]
             bluejdbc.integrations.postgresql
+            [bluejdbc.query :as query]
             [bluejdbc.util :as u]
             [clojure.test :refer :all]
             [methodical.core :as m]))
@@ -85,3 +86,13 @@
 
 (defmacro with-default-connection [& body]
   `(do-with-default-connection (fn [] ~@body)))
+
+(defn do-with-venues-reset [thunk]
+  (try
+    (thunk)
+    (finally
+      (query/execute! :test/postgres "DROP TABLE venues;")
+      (load-test-data-if-needed! :test/postgres :venues))))
+
+(defmacro with-venues-reset [& body]
+  `(do-with-venues-reset (fn [] ~@body)))

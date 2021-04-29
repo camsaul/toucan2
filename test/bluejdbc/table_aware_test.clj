@@ -190,3 +190,37 @@
 (deftest select-one-test
   (is (= {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
          (table-aware/select-one [:test/postgres :people]))))
+
+(deftest parse-update-args-test
+  (is (= {:id 1, :changes {:a 1}, :conditions nil}
+         (table-aware/parse-update!-args [1 {:a 1}])))
+  (is (= {:conditions {:id 1}, :changes {:a 1}}
+         (table-aware/parse-update!-args [:id 1 {:a 1}])))
+  (is (= {:id 1, :conditions {:name "Cam"}, :changes {:a 1}}
+         (table-aware/parse-update!-args [1 :name "Cam" {:a 1}])))
+  (is (= {:changes {:name "Hi-Dive"}, :conditions {:id 1}}
+         (table-aware/parse-update!-args [{:id 1} {:name "Hi-Dive"}]))))
+
+(deftest update!-test
+  (test/with-venues-reset
+    (is (= [{:next.jdbc/update-count 1}]
+           (table-aware/update! [:test/postgres :venues] 1 {:name "Hi-Dive"})))
+    (is (= (instance/instance :venues {:id         1
+                                       :name       "Hi-Dive"
+                                       :category   "bar"
+                                       :created-at (t/local-date-time "2017-01-01T00:00")
+                                       :updated-at (t/local-date-time "2017-01-01T00:00")})
+           (table-aware/select-one [:test/postgres :venues] 1)))))
+
+(deftest save!-test
+  (test/with-venues-reset
+    (test/with-default-connection
+      (let [venue (table-aware/select-one :venues 1)]
+        (is (= [{:next.jdbc/update-count 1}]
+               (table-aware/save! (assoc venue :name "Hi-Dive"))))
+        (is (= (instance/instance :venues {:id         1
+                                           :name       "Hi-Dive"
+                                           :category   "bar"
+                                           :created-at (t/local-date-time "2017-01-01T00:00")
+                                           :updated-at (t/local-date-time "2017-01-01T00:00")})
+               (table-aware/select-one :venues 1)))))))

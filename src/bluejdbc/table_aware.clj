@@ -7,6 +7,7 @@
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
             [bluejdbc.result-set :as rs]
+            [bluejdbc.table-aware.specs :as specs]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
             [clojure.spec.alpha :as s]
@@ -54,24 +55,12 @@
     (log/tracef "-> %s" (u/pprint-to-str parsed))
     parsed))
 
-(defn- select-args-spec [connectable tableable]
-  (letfn [(query? [x]
-            (or (map? x)
-                (queryable/queryable? connectable tableable x)))]
-    (s/cat :query   (s/alt :map     (s/cat :id    (s/? (every-pred (complement map?) (complement keyword?)))
-                                           :kvs   (s/* (s/cat
-                                                        :k keyword?
-                                                        :v (complement map?)))
-                                           :query (s/? query?))
-
-                           :non-map (s/cat :query (s/? (complement query?))))
-           :options (s/? map?))))
-
 (m/defmethod parse-select-args :default
   [connectable tableable args]
-  (let [parsed (s/conform (select-args-spec connectable tableable) args)]
+  (let [spec   (specs/select-args-spec connectable tableable)
+        parsed (s/conform spec args)]
     (when (= parsed :clojure.spec.alpha/invalid)
-      (throw (ex-info (format "Don't know how to interpret select args: %s" (s/explain ::select-args args))
+      (throw (ex-info (format "Don't know how to interpret select args: %s" (s/explain spec args))
                       {:args args})))
     (log/tracef "-> %s" (u/pprint-to-str parsed))
     (let [{[_ {:keys [id query kvs]}] :query, :keys [options]} parsed]
@@ -107,8 +96,8 @@
     query))
 
 (defn select-reducible
-  {:arglists '([tableable id? kvs? queryable? options?]
-               [[connectable tableable] id? kvs? queryable? options?])}
+  {:arglists '([tableable id? conditions? queryable? options?]
+               [[connectable tableable] id? conditions? queryable? options?])}
   [connectable-tableable & args]
   (let [[connectable tableable]        (if (sequential? connectable-tableable)
                                          connectable-tableable
@@ -124,18 +113,64 @@
                                          (seq kvs) (merge-kvs kvs))]
     (select* connectable tableable query options)))
 
-(def ^{:arglists '([tableable id? kvs? queryable? options?]
-                   [[connectable tableable] id? kvs? queryable? options?])} select
+(def ^{:arglists '([tableable id? conditions? queryable? options?]
+                   [[connectable tableable] id? conditions? queryable? options?])} select
   (comp query/all select-reducible))
 
-(def ^{:arglists '([tableable id? kvs? queryable? options?]
-                   [[connectable tableable] id? kvs? queryable? options?])} select-one
+(def ^{:arglists '([tableable id? conditions? queryable? options?]
+                   [[connectable tableable] id? conditions? queryable? options?])} select-one
   (comp (partial transduce
                  (comp (map query/realize-row)
                        (take 1))
                  (completing (fn [_ row] row))
                  nil)
         select-reducible))
+
+(defn parse-update!-args [args]
+  (let [parsed (s/conform ::specs/update!-args args)]
+    (when (= parsed :clojure.spec.alpha/invalid)
+      (throw (ex-info (format "Don't know how to interpret update! args: %s" (s/explain ::specs/update!-args args))
+                      {:args args})))
+    (log/tracef "-> %s" (u/pprint-to-str parsed))
+    (let [{:keys [kv-conditions]} parsed]
+      (-> parsed
+          (dissoc :kv-conditions)
+          (update :conditions merge (when (seq kv-conditions)
+                                      (zipmap (map :k kv-conditions) (map :v kv-conditions))))))))
+
+(defn update!
+  {:arglists '([tableable id? conditions? changes options?])}
+  [connectable-tableable & args]
+  (let [[connectable tableable]                 (if (sequential? connectable-tableable)
+                                                  connectable-tableable
+                                                  [conn/*connectable* connectable-tableable])
+        {:keys [id conditions changes options]} (parse-update!-args args)
+        conditions                              (cond-> conditions
+                                                  id (merge-primary-key connectable tableable id))
+        honeysql-form                           (cond-> {:update (compile/table-identifier tableable options)
+                                                         :set    changes}
+                                                  (seq conditions) (merge-kvs conditions))]
+    (log/tracef "UPDATE %s SET %s WHERE %s" (pr-str tableable) (pr-str changes) (pr-str conditions))
+    (query/execute! connectable tableable honeysql-form options)))
+
+(defn primary-key-values [connectable obj]
+  (let [pk-keys (tableable/primary-key connectable (instance/table obj))
+        pk-keys (if (sequential? pk-keys)
+                  pk-keys
+                  [pk-keys])]
+    (zipmap pk-keys (map obj pk-keys))))
+
+(defn save!
+  ([obj]
+   (save! conn/*connectable* obj))
+
+  ([connectable obj]
+   (println "obj:" obj) ; NOCOMMIT
+   (when-let [changes (not-empty (instance/changes obj))]
+     (println "(primary-key-values connectable obj):" (primary-key-values connectable obj)) ; NOCOMMIT
+     (println "changes:" changes)                                                           ; NOCOMMIT
+     (println "UPDATE!" (instance/table obj) (primary-key-values connectable obj) changes)
+     (update! (instance/table obj) (primary-key-values connectable obj) changes))))
 
 ;; TODO
 
@@ -155,13 +190,9 @@
 
 (defn insert-returning-keys! [])
 
-(defn update! [])
-
 (defn delete! [])
 
 (defn upsert! [])
-
-(defn save! [])
 
 (defn count [])
 
