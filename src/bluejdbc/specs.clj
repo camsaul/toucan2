@@ -1,4 +1,4 @@
-(ns bluejdbc.table-aware.specs
+(ns bluejdbc.specs
   (:require [bluejdbc.queryable :as queryable]
             [clojure.spec.alpha :as s]))
 

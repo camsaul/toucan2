@@ -1,7 +1,7 @@
 (ns bluejdbc.hydrate-test
   (:require [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
-            [bluejdbc.table-aware :as table-aware]
+            [bluejdbc.select :as select]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [methodical.core :as m]))
@@ -19,7 +19,7 @@
   [_]
   :user)
 
-(m/defmethod table-aware/select* :after [:default :venues/category-keyword :default]
+(m/defmethod select/select* :after [:default :venues/category-keyword :default]
   [_ _ reducible-query _]
   (eduction
    (map (fn [venue]

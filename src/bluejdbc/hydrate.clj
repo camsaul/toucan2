@@ -1,10 +1,10 @@
 (ns bluejdbc.hydrate
   (:require [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
-            [bluejdbc.table-aware :as table-aware]
+            [bluejdbc.select :as select]
+            [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
-            [methodical.core :as m]
-            [bluejdbc.tableable :as tableable]))
+            [methodical.core :as m]))
 
 (m/defmulti can-hydrate-with-strategy?
   {:arglists '([strategy results k])}
@@ -64,7 +64,7 @@
                            k))
         primary-key (tableable/primary-key table)
         objs        (if (seq ids)
-                      (into {} (for [item (table-aware/select table, primary-key [:in ids])]
+                      (into {} (for [item (select/select table, primary-key [:in ids])]
                                  {(primary-key item) item}))
                       (constantly nil))]
     (for [result results
