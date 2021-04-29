@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [count compile defmethod])
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as connectable]
+            [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
             [bluejdbc.table-aware :as table-aware]
@@ -12,6 +13,7 @@
 (comment
   compile/keep-me
   connectable/keep-me
+  hydrate/keep-me
   instance/keep-me
   log/keep-me
   m/keep-me
@@ -36,6 +38,16 @@
   connection*
   default-options
   with-connection]
+
+ [hydrate
+  automagic-hydration-key-table
+  batched-hydrate
+  can-hydrate-with-strategy?
+  hydrate
+  hydrate-with-strategy
+  hydration-keys
+  hydration-strategy
+  simple-hydrate]
 
  [instance
   changes
