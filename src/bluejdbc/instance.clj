@@ -26,7 +26,7 @@
     (Instance. tbl orig m new-meta))
 
   (equiv [_ x]
-    (if (satisfies? IInstance x)
+    (if (instance? Instance x)
       (and (= tbl (table x))
            (= m   x))
       (= m x)))
