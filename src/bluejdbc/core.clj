@@ -88,14 +88,18 @@
   reducible-query-as
   select
   select*
-  select-fn-set
-  select-fn-vec
   select-fn->fn
   select-fn->pk
-  select-pks
+  select-fn-reducible
+  select-fn-set
+  select-fn-vec
   select-one
   select-one-fn
   select-one-pk
+  select-pk->fn
+  select-pks-reducible
+  select-pks-set
+  select-pks-vec
   select-reducible]
 
  [tableable
