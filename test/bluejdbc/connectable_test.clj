@@ -60,4 +60,13 @@
     (testing "Connection should not get closed if it was not newly created"
       (is (not @(:closed? conn-1))))))
 
-;; TODO - `:default-connection` test
+(deftest default-connection-test
+  (try
+    (m/add-primary-method! conn/connection* :bluejdbc/default (fn [_ _ options]
+                                                                (conn/connection* ::mock-connection options)))
+    (conn/with-connection [conn]
+      (is (instance? java.sql.Connection conn))
+      (is (= ::mock-connection
+             (:connectable conn))))
+    (finally
+      (m/remove-primary-method! conn/connection* :bluejdbc/default))))

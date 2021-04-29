@@ -1,6 +1,7 @@
 (ns bluejdbc.result-set
   (:require [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
+            [bluejdbc.util :as u]
             [methodical.core :as m]
             [next.jdbc.result-set :as jdbc.rs])
   (:import [java.sql ResultSet ResultSetMetaData Types]))
@@ -81,30 +82,32 @@
 ;;       (apply juxt fns))))
 
 (defn row-builder-fn [connectable tableable]
-  (fn [rs options]
-    (let [^ResultSet rs rs
-          rsmeta        (.getMetaData rs)
-          cols          (jdbc.rs/get-unqualified-column-names rsmeta options)
-          i->col-thunk  (into {} (for [i (index-range rsmeta)]
-                                   [i (read-column-thunk connectable tableable rs rsmeta i options)]))]
-      (reify
-        jdbc.rs/RowBuilder
-        (->row [this]
-          (transient (instance/instance tableable)))
-        (column-count [this]
-          (count cols))
-        (with-column [this row i]
-          (let [col-thunk (get i->col-thunk i)]
-            (jdbc.rs/with-column-value this row (nth cols (dec i)) (col-thunk))))
-        (with-column-value [this row col v]
-          (assoc! row col v))
-        (row! [this row]
-          (persistent! row))
+  (u/pretty-printable-fn
+   #(list `row-builder-fn 'connectable tableable)
+   (fn [rs options]
+     (let [^ResultSet rs rs
+           rsmeta        (.getMetaData rs)
+           cols          (jdbc.rs/get-unqualified-column-names rsmeta options)
+           i->col-thunk  (into {} (for [i (index-range rsmeta)]
+                                    [i (read-column-thunk connectable tableable rs rsmeta i options)]))]
+       (reify
+         jdbc.rs/RowBuilder
+         (->row [this]
+           (transient (instance/instance tableable)))
+         (column-count [this]
+           (count cols))
+         (with-column [this row i]
+           (let [col-thunk (get i->col-thunk i)]
+             (jdbc.rs/with-column-value this row (nth cols (dec i)) (col-thunk))))
+         (with-column-value [this row col v]
+           (assoc! row col v))
+         (row! [this row]
+           (persistent! row))
 
-        jdbc.rs/ResultSetBuilder
-        (->rs [this]
-          (transient []))
-        (with-row [this mrs row]
-          (conj! mrs row))
-        (rs! [this mrs]
-          (persistent! mrs))))))
+         jdbc.rs/ResultSetBuilder
+         (->rs [this]
+           (transient []))
+         (with-row [this mrs row]
+           (conj! mrs row))
+         (rs! [this mrs]
+           (persistent! mrs)))))))
