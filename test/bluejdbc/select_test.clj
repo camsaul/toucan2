@@ -206,6 +206,22 @@
   (is (= 1
          (select/select-one-fn :id [:test/postgres :people] :name "Cam"))))
 
+(deftest select-pks-test
+  (is (= #{1 2 3 4}
+         (select/select-pks-set [:test/postgres :people])))
+  (is (= [1 2 3 4]
+         (select/select-pks-vec [:test/postgres :people])))
+  (testing "non-integer PK"
+    (is (= #{"Cam" "Sam" "Pam" "Tam"}
+           (select/select-pks-set [:test/postgres :people/name-is-pk])))
+    (is (= ["Cam" "Sam" "Pam" "Tam"]
+           (select/select-pks-vec [:test/postgres :people/name-is-pk]))))
+  (testing "Composite PK -- should return vectors"
+    (is (= #{[1 "Cam"] [2 "Sam"] [3 "Pam"] [4 "Tam"]}
+           (select/select-pks-set [:test/postgres :people/composite-pk])))
+    (is (= [[1 "Cam"] [2 "Sam"] [3 "Pam"] [4 "Tam"]]
+           (select/select-pks-vec [:test/postgres :people/composite-pk])))))
+
 (deftest select-one-pk-test
   (is (= 1
          (select/select-one-pk [:test/postgres :people] :name "Cam")))

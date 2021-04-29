@@ -116,25 +116,19 @@
 (defn select-fn-set
   {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
   [& args]
-  (reduce
-   conj
-   #{}
-   (apply select-fn-reducible args)))
+  (reduce conj #{} (apply select-fn-reducible args)))
 
 (defn select-fn-vec
   {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
   [& args]
-  (reduce
-   conj
-   []
-   (apply select-fn-reducible args)))
+  (reduce conj [] (apply select-fn-reducible args)))
 
 (defn select-one-fn
   {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
   [& args]
   (query/reduce-first (apply select-fn-reducible args)))
 
-(defn select-one-pk
+(defn select-pks-reducible
   {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
   [connectable-tableable & args]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
@@ -142,13 +136,28 @@
         f                       (if (= (clojure.core/count pk-keys) 1)
                                   (first pk-keys)
                                   (apply juxt pk-keys))]
-    (apply select-one-fn f [connectable tableable] args)))
+    (apply select-fn-reducible f [connectable tableable] args)))
 
-(defn select-pks [])
+(defn select-pks-set
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  [& args]
+  (reduce conj #{} (apply select-pks-reducible args)))
+
+(defn select-pks-vec
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  [& args]
+  (reduce conj [] (apply select-pks-reducible args)))
+
+(defn select-one-pk
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  [& args]
+  (query/reduce-first (apply select-pks-reducible args)))
 
 (defn select-fn->fn [])
 
 (defn select-fn->pk [])
+
+(defn select-pk->fn [])
 
 (defn count [])
 
