@@ -56,8 +56,8 @@ complete documentation.
 
 ```clj
 (blue/defmethod blue/connection* :bluejdbc/default
-  [_ _]
-  "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam")
+  [_ options]
+  (blue/connection* ::pg-connection options))
 ```
 
 ##### Some basic queries with the default connection.
