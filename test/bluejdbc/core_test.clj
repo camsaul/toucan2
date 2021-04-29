@@ -70,9 +70,11 @@
 
 ;; create a new version of "people" that converts :name to lowercase.
 (blue/defmethod blue/select* :after [::pg-connection :people/lower-case-names :default]
-  [_ _ results _]
-  (for [result results]
-    (update result :name str/lower-case)))
+  [_ _ reducible-query _]
+  (eduction
+   (map (fn [result]
+          (update result :name str/lower-case)))
+   reducible-query))
 
 (deftest post-select-test
   (is (= [(blue/instance :people/lower-case-names {:id 1, :name "cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")})

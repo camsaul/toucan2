@@ -155,8 +155,3 @@
 
   ([m1 m2 & more]
    (apply recursive-merge (recursive-merge m1 m2) more)))
-
-(defonce default-rf
-  (pretty-printable-fn
-   (constantly `default-rf)
-   ((map (partial into {})) (comp conj))))

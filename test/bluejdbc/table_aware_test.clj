@@ -2,6 +2,7 @@
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as conn]
             [bluejdbc.instance :as instance]
+            [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
             [bluejdbc.table-aware :as table-aware]
             [bluejdbc.tableable :as tableable]
@@ -17,7 +18,8 @@
     (is (every? (partial = :people) (map instance/table results)))))
 
 (deftest query-as-test
-  (let [results (table-aware/query-as :test/postgres :people {:select [:*], :from [:people]} nil)]
+  (let [results (query/all
+                 (table-aware/reducible-query-as :test/postgres :people {:select [:*], :from [:people]} nil))]
     (test-people-instances? results)
     (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
             {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56Z")}
@@ -28,21 +30,6 @@
 (m/defmethod compile/compile* [:default ::ids]
   [connectable _ options]
   (compile/compile* connectable {:select [:id]} options))
-
-(deftest select*-test
-  (doseq [[message thunk] {"should be able to do a HoneySQL query"
-                           #(table-aware/select* :test/postgres :people {:select [:id]} nil)
-
-                           "should be able to do a plain SQL query"
-                           #(table-aware/select* :test/postgres :people "SELECT id FROM people" nil)}]
-    (testing message
-      (let [results (thunk)]
-        (test-people-instances? results)
-        (is (= [{:id 1}
-                {:id 2}
-                {:id 3}
-                {:id 4}]
-               results))))))
 
 (m/defmethod queryable/queryable* [:default :default ::named-query]
   [_ _ _ _]
@@ -175,9 +162,13 @@
              (table-aware/select :people/limit-2))))))
 
 (m/defmethod table-aware/select* :after [:default :people/no-timestamps :default]
-  [connectable tableable results options]
-  (for [result results]
-    (dissoc result :timestamp)))
+  [connectable tableable reducible-query options]
+  (testing "should not be an eduction yet -- if it is it means this method is getting called more than once"
+    (is (not (instance? clojure.core.Eduction reducible-query))))
+  (assert (not (instance? clojure.core.Eduction reducible-query)))
+  (eduction
+   (map #(dissoc % :timestamp))
+   reducible-query))
 
 (deftest post-select-test
   (testing "Should be able to do cool stuff in (select* :after)"

@@ -66,7 +66,7 @@
   insert!
   insert-returning-keys!
   parse-select-args
-  query-as
+  #_query-as
   save!
   select
   select*

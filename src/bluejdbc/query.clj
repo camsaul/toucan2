@@ -5,14 +5,12 @@
             [bluejdbc.util :as u]
             [methodical.core :as m]
             [next.jdbc :as next.jdbc]
-            [potemkin :as p]))
+            [next.jdbc.result-set :as next.jdbc.rs]
+            [potemkin :as p]
+            [pretty.core :as pretty]))
 
 ;; TODO -- should this be off by default?
 (def ^:dynamic *include-queries-in-exceptions?* true)
-
-(p/defprotocol+ IReducibleQuery
-  (options [this])
-  (with-options [this new-options]))
 
 (defn- reduce-query
   [connectable tableable queryable options rf init]
@@ -41,24 +39,13 @@
                             e))))))))
 
 (p/deftype+ ReducibleQuery [connectable tableable queryable options]
+  pretty/PrettyPrintable
+  (pretty [_]
+    (list `reducible-query connectable tableable queryable options))
+
   clojure.lang.IReduceInit
   (reduce [_ rf init]
-    (reduce-query connectable tableable queryable options rf init))
-
-  IReducibleQuery
-  (options [_]
-    (u/recursive-merge (conn/default-options connectable) options))
-
-  (with-options [_ new-options]
-    (ReducibleQuery. connectable tableable queryable new-options)))
-
-(defn all [reducible-query]
-  (let [options (options reducible-query)]
-    (transduce
-     (:xform options identity)
-     (:rf options u/default-rf)
-     (:init options [])
-     reducible-query)))
+    (reduce-query connectable tableable queryable options rf init)))
 
 (m/defmulti reducible-query*
   {:arglists '([connectable tableable queryable options])}
@@ -81,17 +68,14 @@
   ([connectable tableable queryable options]
    (reducible-query* connectable tableable queryable (u/recursive-merge (conn/default-options connectable) options))))
 
-(defn compose-xform
-  ([reducible-query new-xform]
-   (let [opts (-> (options reducible-query)
-                  (update :xform (fn [xform]
-                                   (if xform
-                                     (comp xform new-xform)
-                                     new-xform))))]
-     (with-options reducible-query opts)))
+(defn realize-row [row]
+  (next.jdbc.rs/datafiable-row row conn/*connection* nil))
 
-  ([reducible-query new-xform & more]
-   (apply compose-xform (compose-xform reducible-query new-xform) more)))
+(defn all [reducible-query]
+  (into
+   []
+   (map realize-row)
+   reducible-query))
 
 (def ^{:arglists '([queryable]
                    [connectable queryable]
@@ -106,9 +90,13 @@
                    [connectable tableable queryable options])}
   query-one
   (comp
-   all
-   (fn [query]
-     (compose-xform query (take 1) #(completing % first)))
+   (fn [reducible-query]
+     (transduce
+      (comp (map realize-row)
+            (take 1))
+      (completing conj first)
+      []
+      reducible-query))
    reducible-query))
 
 ;; TODO -- execute

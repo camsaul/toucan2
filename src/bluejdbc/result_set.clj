@@ -83,7 +83,7 @@
 
 (defn row-builder-fn [connectable tableable]
   (u/pretty-printable-fn
-   #(list `row-builder-fn 'connectable tableable)
+   #(list `row-builder-fn (if (keyword? connectable) connectable 'connectable) tableable)
    (fn [rs options]
      (let [^ResultSet rs rs
            rsmeta        (.getMetaData rs)
