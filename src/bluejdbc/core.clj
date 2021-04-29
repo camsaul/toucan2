@@ -65,7 +65,7 @@
   exists?
   insert!
   insert-returning-keys!
-  parse-select-args
+  #_parse-select-args
   #_query-as
   save!
   select

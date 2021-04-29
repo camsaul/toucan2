@@ -45,13 +45,15 @@
   (with-table [_ new-table]
     (Instance. new-table orig m mta)))
 
+;; TODO -- TransientInstance shouldn't have `orig` since it's not used
 (deftype ^:private TransientInstance [tbl orig ^clojure.lang.ITransientMap m mta]
   clojure.lang.ITransientMap
   (conj [this v]
     (.conj m v)
     this)
   (persistent [_]
-    (Instance. tbl orig (persistent! m) mta))
+    (let [m (persistent! m)]
+      (Instance. tbl m m mta)))
   (assoc [this k v]
     (.assoc m k v)
     this)
@@ -63,7 +65,7 @@
 (defmethod print-method Instance
   [^Instance m ^java.io.Writer writer]
   (binding [*out* writer]
-    (pr (list 'blue/instance (.table m) (.m m)))))
+    (pr (list `instance (.table m) (.m m)))))
 
 (defmethod print-dup Instance
   [m writer]

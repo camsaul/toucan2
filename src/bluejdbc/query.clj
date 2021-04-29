@@ -99,8 +99,27 @@
       reducible-query))
    reducible-query))
 
-;; TODO -- execute
-#_(defn execute! [connectable query options]
-    (conn/with-connection [conn connectable options]
-      (let [sql-params (compile-query)])
-      ))
+(m/defmulti execute!*
+  {:arglists '([connectable tableable query options])}
+  u/dispatch-on-first-three-args)
+
+(m/defmethod execute!* :default
+  [connectable tableable query options]
+  (conn/with-connection [conn connectable options]
+    (let [sql-params (compile/compile connectable tableable query options)]
+      (try
+        (next.jdbc/execute! conn sql-params (:execute options))
+        (catch Throwable e
+          (throw (ex-info "Error executing statement"
+                          (merge
+                           {:options options}
+                           (when *include-queries-in-exceptions?*
+                             {:query query, :sql-params sql-params}))
+                          e)))))))
+
+(defn execute!
+  ([query]                               (execute!  :default    nil       query nil))
+  ([connectable query]                   (execute!  connectable nil       query nil))
+  ([connectable query options]           (execute!  connectable nil       query nil))
+  ([connectable tableable query options] (execute!* connectable tableable query (merge (conn/default-options connectable)
+                                                                                       options))))
