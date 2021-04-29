@@ -24,11 +24,13 @@
             (log/tracef "Reducing results with rf %s and init %s" (pr-str rf) (pr-str init))
             (reduce rf init results)
             (catch Throwable e
+              (println "e:" e) ; NOCOMMIT
               (let [message (or (:message (ex-data e)) (ex-message e))]
                 (throw (ex-info (format "Error reducing results: %s" message)
                                 {:rf rf, :init init, :message message}
                                 e))))))
         (catch Throwable e
+          (println "e [2]:" e) ; NOCOMMIT
           (let [message (or (:message (ex-data e)) (ex-message e))]
             (throw (ex-info (format "Error executing query: %s" message)
                             (merge
@@ -38,6 +40,8 @@
                                {:query queryable, :sql-params sql-params, :options options}))
                             e))))))))
 
+(declare all)
+
 (p/deftype+ ReducibleQuery [connectable tableable queryable options]
   pretty/PrettyPrintable
   (pretty [_]
@@ -45,7 +49,11 @@
 
   clojure.lang.IReduceInit
   (reduce [_ rf init]
-    (reduce-query connectable tableable queryable options rf init)))
+    (reduce-query connectable tableable queryable options rf init))
+
+  #_clojure.lang.ISeq
+  #_(seq [this]
+    (seq (all this))))
 
 (m/defmulti reducible-query*
   {:arglists '([connectable tableable queryable options])}
@@ -77,27 +85,32 @@
    (map realize-row)
    reducible-query))
 
-(def ^{:arglists '([queryable]
-                   [connectable queryable]
-                   [connectable tableable queryable]
-                   [connectable tableable queryable options])}
-  query
-  (comp all reducible-query))
+(defn query
+  [& args]
+  {:arglists '([queryable]
+               [connectable queryable]
+               [connectable tableable queryable]
+               [connectable tableable queryable options])}
+  (all (apply reducible-query args)))
 
-(def ^{:arglists '([queryable]
-                   [connectable queryable]
-                   [connectable tableable queryable]
-                   [connectable tableable queryable options])}
-  query-one
-  (comp
-   (fn [reducible-query]
-     (transduce
-      (comp (map realize-row)
-            (take 1))
-      (completing conj first)
-      []
-      reducible-query))
-   reducible-query))
+(defn reduce-first
+  ([reducible]
+   (reduce-first identity reducible))
+
+  ([xform reducible]
+   (transduce
+    (comp xform (take 1))
+    (completing conj first)
+    []
+    reducible)))
+
+(defn query-one
+  {:arglists '([queryable]
+               [connectable queryable]
+               [connectable tableable queryable]
+               [connectable tableable queryable options])}
+  [& args]
+  (reduce-first (map realize-row) (apply reducible-query args)))
 
 (m/defmulti execute!*
   {:arglists '([connectable tableable query options])}

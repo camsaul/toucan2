@@ -1,5 +1,5 @@
 (ns bluejdbc.tableable
-  (:require [bluejdbc.connectable :as conn]
+  (:require [bluejdbc.instance :as instance]
             [bluejdbc.util :as u]
             [methodical.core :as m]))
 
@@ -34,6 +34,16 @@
   [_ _]
   :id)
 
-(defn primary-key
-  ([tableable]             (primary-key* conn/*connectable* tableable))
-  ([connectable tableable] (primary-key* connectable        tableable)))
+(defn primary-key-keys [connectable tableable]
+  (let [pk-keys (primary-key* connectable tableable)]
+    (if (sequential? pk-keys)
+      pk-keys
+      [pk-keys])))
+
+(defn primary-key-values
+  ([connectable obj]
+   (primary-key-values connectable (instance/table obj) obj))
+
+  ([connectable tableable m]
+   (let [pk-keys (primary-key-keys connectable tableable)]
+     (zipmap pk-keys (map m pk-keys)))))

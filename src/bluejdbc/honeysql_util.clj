@@ -5,11 +5,8 @@
 
 (defn merge-primary-key [kvs connectable tableable pk-vals]
   (log/tracef "Adding primary key values %s" (pr-str pk-vals))
-  (let [pk-cols (tableable/primary-key connectable tableable)
+  (let [pk-cols (tableable/primary-key-keys connectable tableable)
         _       (log/tracef "Primary key(s) for %s is %s" (pr-str tableable) (pr-str pk-cols))
-        pk-cols (if (sequential? pk-cols)
-                  pk-cols
-                  [pk-cols])
         pk-vals (if (sequential? pk-vals)
                   pk-vals
                   [pk-vals])

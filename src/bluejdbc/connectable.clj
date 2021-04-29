@@ -103,3 +103,8 @@
       ~connectable ~options
       (fn [~(vary-meta (or conn-binding '_) assoc :tag 'java.sql.Connection)]
         ~@body))))
+
+(defn parse-connectable-tableable [connectable-tableable]
+  (if (sequential? connectable-tableable)
+    connectable-tableable
+    [*connectable* connectable-tableable]))

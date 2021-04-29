@@ -62,13 +62,14 @@
                                :let   [k (some result source-keys)]
                                :when  k]
                            k))
-        primary-key (tableable/primary-key table)
+        ;; TODO -- this doesn't work with composite PKs (yet)
+        primary-key (tableable/primary-key* nil table)
         objs        (if (seq ids)
                       (into {} (for [item (select/select table, primary-key [:in ids])]
                                  {(primary-key item) item}))
                       (constantly nil))]
     (for [result results
-          :let [source-id (some result source-keys)]]
+          :let   [source-id (some result source-keys)]]
       (if (get result dest-key)
         result
         (assoc result dest-key (objs source-id))))))

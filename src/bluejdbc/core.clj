@@ -88,17 +88,17 @@
   reducible-query-as
   select
   select*
-  select-field
-  select-field->field
-  select-field->id
-  select-ids
+  select-fn-set
+  select-fn-vec
+  select-fn->fn
+  select-fn->pk
+  select-pks
   select-one
-  select-one-field
-  select-one-id
+  select-one-fn
+  select-one-pk
   select-reducible]
 
  [tableable
-  primary-key
   primary-key*
   table-name
   table-name*])
