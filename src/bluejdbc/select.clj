@@ -53,19 +53,20 @@
   (let [query (merge {:select [:*]} query)]
     (next-method connectable tableable query options)))
 
-(m/defmulti parse-select-args
-  {:arglists '([connectable tableable args])}
-  u/dispatch-on-first-two-args)
+(m/defmulti parse-select-args*
+  {:arglists '([connectable tableable args options])}
+  u/dispatch-on-first-two-args
+  :combo (m.combo.threaded/threading-method-combination :third))
 
-(m/defmethod parse-select-args :around :default
-  [connectable tableable args]
+(m/defmethod parse-select-args* :around :default
+  [connectable tableable args options]
   (log/tracef "Parsing select args for %s %s" tableable (pr-str args))
-  (let [parsed (next-method connectable tableable args)]
+  (let [parsed (next-method connectable tableable args options)]
     (log/tracef "-> %s" (u/pprint-to-str parsed))
     parsed))
 
-(m/defmethod parse-select-args :default
-  [connectable tableable args]
+(m/defmethod parse-select-args* :default
+  [connectable tableable args _]
   (let [spec   (specs/select-args-spec connectable tableable)
         parsed (s/conform spec args)]
     (when (= parsed :clojure.spec.alpha/invalid)
@@ -85,7 +86,7 @@
   {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
   [connectable-tableable & args]
   (let [[connectable tableable]        (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [id kvs query options]} (parse-select-args connectable tableable args)
+        {:keys [id kvs query options]} (parse-select-args* connectable tableable args (conn/default-options connectable))
         options                        (u/recursive-merge (conn/default-options connectable) options)
         kvs                            (cond-> kvs
                                          id (honeysql-util/merge-primary-key connectable tableable id))

@@ -70,12 +70,12 @@
                                         [{}]              {}
                                         [{:options true}] {:options true}})
           :let                       [args (vec (concat id kvs query options))]]
-    (testing (pr-str (list `parse-select-args args))
+    (testing (pr-str (list `parse-select-args* args))
       (is (= {:id      expected-id
               :kvs     expected-kvs
               :query   expected-query
               :options expected-options}
-             (select/parse-select-args :connectable :tableable args))))))
+             (select/parse-select-args* :connectable :tableable args nil))))))
 
 (deftest select-test
   (testing "no args"
@@ -108,7 +108,9 @@
 
   (testing "one arg (query)"
     (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (select/select [:test/postgres :people] {:where [:= :id 1]}))))
+           (select/select [:test/postgres :people] {:where [:= :id 1]})))
+    (is (= [{:id 1, :name "Tempest", :category "bar"}]
+           (select/select [:test/postgres :venues] {:select [:id :name :category], :limit 1, :where [:= :id 1]}))))
 
   (testing "two args (k v)"
     (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]

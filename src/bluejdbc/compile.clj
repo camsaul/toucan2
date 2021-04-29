@@ -98,8 +98,12 @@
   hformat/ToSql
   (to-sql [_]
     (let [options (u/recursive-merge *compile-options* options)]
-      (-> (tableable/table-name *compile-connectable* tableable options)
-          (hsql/quote-identifier :style (get-in options [:honeysql :quoting]))))))
+      ;; TODO -- `:row-builder-fn` is present in `:honeysql` options in this log statement, but it shouldn't be. FIXME
+      (log/tracef "Convert table identifier %s to table name with options %s" (pr-str tableable) (pr-str (:honeysql options)))
+      (let [result (-> (tableable/table-name *compile-connectable* tableable options)
+                       (hsql/quote-identifier :style (get-in options [:honeysql :quoting])))]
+        (log/tracef "-> %s" (pr-str result))
+        result))))
 
 (defn table-identifier
   ([tableable]         (->TableIdentifier tableable nil))
