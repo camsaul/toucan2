@@ -2,8 +2,17 @@
   (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
             [clojure.walk :as walk]
+            [methodical.impl.combo.threaded :as m.combo.threaded]
             [potemkin :as p]
             [pretty.core :as pretty]))
+
+;; threads the third arg.
+(defmethod m.combo.threaded/threading-invoker :third
+  [_]
+  (fn
+    ([a b c]          [c (fn [method c*] (method a b c*))])
+    ([a b c d]        [c (fn [method c*] (method a b c* d))])
+    ([a b c d & more] [c (fn [method c*] (apply method a b c* d more))])))
 
 (defn keyword-or-class [x]
   (if (keyword? x)
