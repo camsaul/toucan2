@@ -59,10 +59,11 @@
     (.without m k)
     this))
 
+;; TODO -- why don't we use `pretty/PrettyPrintable` here?
 (defmethod print-method Instance
   [^Instance m ^java.io.Writer writer]
   (binding [*out* writer]
-    (pr (list `instance (.table m) (.m m)))))
+    (pr (list 'blue/instance (.table m) (.m m)))))
 
 (defmethod print-dup Instance
   [m writer]

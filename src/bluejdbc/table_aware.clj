@@ -12,9 +12,7 @@
             [clojure.spec.alpha :as s]
             [honeysql.helpers :as hsql.helpers]
             [methodical.core :as m]
-            [methodical.impl.combo.threaded :as m.combo.threaded]
-            [potemkin :as p]
-            [pretty.core :as pretty]))
+            [methodical.impl.combo.threaded :as m.combo.threaded]))
 
 (defn- table-rf [tableable]
   (u/pretty-printable-fn
@@ -47,18 +45,6 @@
   [connectable tableable query options]
   (let [query (merge {:select [:*]} query)]
     (next-method connectable tableable query options)))
-
-(p/defrecord+ ID [vs]
-  pretty/PrettyPrintable
-  (pretty [_]
-    (list* `id vs)))
-
-(defn id [& vs]
-  (->ID (vec vs)))
-
-(defn id? [x]
-  (or (integer? x)
-      (instance? ID x)))
 
 (m/defmulti parse-select-args
   {:arglists '([connectable tableable args])}
