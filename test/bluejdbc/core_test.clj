@@ -6,7 +6,7 @@
             [java-time :as t]))
 
 (use-fixtures :once test/do-with-test-data)
-(use-fixtures :each test/do-with-default-connection)
+(use-fixtures :each test/do-with-default-connection test/do-with-venues-reset )
 
 ;; Examples
 
@@ -113,4 +113,33 @@
   (is (= [(blue/instance :people/composite-pk {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")})]
          (blue/select [::pg-connection :people/composite-pk] [1 "Cam"]))))
 
-;; TODO -- maps keep track of their changes!
+;; maps keep track of their changes!
+(deftest changes-test
+  (let [cam (blue/select-one :people 1)]
+    (is (= (blue/instance :people {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")})
+           cam))
+
+    (let [cam-2 (assoc cam :name "Cam 2.0")]
+      (is (= {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}
+             (blue/original cam-2)))
+      (is (= {:name "Cam 2.0"}
+             (blue/changes cam-2))))))
+
+;; save something!
+
+(deftest save!-test
+  (let [venue (blue/select-one :venues 1)]
+    (is (= (blue/instance :venues {:id         1
+                                   :name       "Tempest"
+                                   :category   "bar"
+                                   :created-at (t/local-date-time "2017-01-01T00:00")
+                                   :updated-at (t/local-date-time "2017-01-01T00:00")})
+           venue))
+    (let [venue (assoc venue :name "Hi-Dive")]
+      (blue/save! venue)
+      (is (= (blue/instance :venues {:id         1
+                                     :name       "Hi-Dive"
+                                     :category   "bar"
+                                     :created-at (t/local-date-time "2017-01-01T00:00")
+                                     :updated-at (t/local-date-time "2017-01-01T00:00")})
+             (blue/select-one :venues 1))))))

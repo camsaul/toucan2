@@ -1,6 +1,7 @@
 (ns bluejdbc.test
   (:require [bluejdbc.connectable :as conn]
             bluejdbc.integrations.postgresql
+            [bluejdbc.log :as log]
             [bluejdbc.query :as query]
             [bluejdbc.util :as u]
             [clojure.test :refer :all]
@@ -37,7 +38,7 @@
 (m/defmethod load-test-data-if-needed! :around :default
   [connectable table-name]
   (when-not (has-test-data? connectable table-name)
-    (println (format "creating %s table for %s" table-name connectable))
+    (log/tracef "creating %s table for %s" table-name connectable)
     (conn/with-connection [conn connectable]
       (with-open [stmt (.createStatement conn)]
         (doseq [sql (next-method connectable table-name)]

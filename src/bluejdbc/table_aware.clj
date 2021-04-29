@@ -165,11 +165,7 @@
    (save! conn/*connectable* obj))
 
   ([connectable obj]
-   (println "obj:" obj) ; NOCOMMIT
    (when-let [changes (not-empty (instance/changes obj))]
-     (println "(primary-key-values connectable obj):" (primary-key-values connectable obj)) ; NOCOMMIT
-     (println "changes:" changes)                                                           ; NOCOMMIT
-     (println "UPDATE!" (instance/table obj) (primary-key-values connectable obj) changes)
      (update! (instance/table obj) (primary-key-values connectable obj) changes))))
 
 ;; TODO
