@@ -20,10 +20,12 @@
   :user)
 
 (m/defmethod table-aware/select* :after [:default :venues/category-keyword :default]
-  [_ _ venues _]
-  (for [venue venues]
-    (cond-> venue
-      (:category venue) (update :category keyword))))
+  [_ _ reducible-query _]
+  (eduction
+   (map (fn [venue]
+          (cond-> venue
+            (:category venue) (update :category keyword))))
+   reducible-query))
 
 (m/defmethod hydrate/automagic-hydration-key-table ::venue
   [_]

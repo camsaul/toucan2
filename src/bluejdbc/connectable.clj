@@ -1,8 +1,8 @@
 (ns bluejdbc.connectable
-  (:require [bluejdbc.util :as u]
+  (:require [bluejdbc.result-set :as rs]
+            [bluejdbc.util :as u]
             [methodical.core :as m]
-            [next.jdbc :as next.jdbc]
-            [next.jdbc.result-set :as jdbc.rs]))
+            [next.jdbc :as next.jdbc]))
 
 ;; TODO -- consider whether this should end with a `*` so it's consistent with the other multimethods.
 (m/defmulti default-options
@@ -10,10 +10,9 @@
   u/dispatch-on-first-arg)
 
 (m/defmethod default-options :default
-  [_]
-  {:execute {:builder-fn jdbc.rs/as-unqualified-maps}
-   :rf      u/default-rf
-   :init    []})
+  [connectable]
+  next.jdbc/execute-one!
+  {:execute {:builder-fn (rs/row-builder-fn connectable nil)}})
 
 (m/defmulti connection*
   {:arglists '([connectable options])}

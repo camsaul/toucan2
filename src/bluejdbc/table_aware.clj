@@ -19,14 +19,11 @@
    #(list `table-rf tableable)
    ((map (partial into (instance/instance tableable))) conj)))
 
-(defn query-as [connectable tableable queryable options]
+(defn reducible-query-as [connectable tableable queryable options]
   (let [options (u/recursive-merge (conn/default-options connectable)
                                    options
-                                   {:execute {:builder-fn (rs/row-builder-fn connectable tableable)}}
-                                   (when (or (not (:rf options))
-                                             (= (:rf options) u/default-rf))
-                                     {:rf (table-rf tableable)}))]
-    (query/query connectable tableable queryable options)))
+                                   {:execute {:builder-fn (rs/row-builder-fn connectable tableable)}})]
+    (query/reducible-query connectable tableable queryable options)))
 
 (m/defmulti select*
   {:arglists '([connectable tableable query options])}
@@ -35,11 +32,11 @@
 
 (m/defmethod select* :default
   [connectable tableable query options]
-  (query-as connectable tableable (compile/from connectable tableable query options) options))
+  (reducible-query-as connectable tableable (compile/from connectable tableable query options) options))
 
 (m/defmethod select* [:default :default nil]
   [connectable tableable _ options]
-  (select* connectable tableable {} options))
+  (next-method connectable tableable {} options))
 
 (m/defmethod select* [:default :default clojure.lang.IPersistentMap]
   [connectable tableable query options]
@@ -109,7 +106,7 @@
     (log/tracef "-> %s" (pr-str query))
     query))
 
-(defn select
+(defn select-reducible
   {:arglists '([tableable id? kvs? queryable? options?]
                [[connectable tableable] id? kvs? queryable? options?])}
   [connectable-tableable & args]
@@ -120,15 +117,18 @@
         options                        (u/recursive-merge (conn/default-options connectable) options)
         kvs                            (cond-> kvs
                                          id (merge-primary-key connectable tableable id))
-        query                          (when query
-                                         (queryable/queryable connectable tableable query options))
+        query                          (if query
+                                         (queryable/queryable connectable tableable query options)
+                                         {})
         query                          (cond-> query
                                          (seq kvs) (merge-kvs kvs))]
     (select* connectable tableable query options)))
 
-;; TODO
+(def ^{:arglists '([tableable id? kvs? queryable? options?]
+                   [[connectable tableable] id? kvs? queryable? options?])} select
+  (comp query/all select-reducible))
 
-(defn select-reducible [])
+;; TODO
 
 (defn select-one [])
 
