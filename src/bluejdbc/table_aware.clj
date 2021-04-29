@@ -12,6 +12,7 @@
             [clojure.spec.alpha :as s]
             [honeysql.helpers :as hsql.helpers]
             [methodical.core :as m]
+            [methodical.impl.combo.threaded :as m.combo.threaded]
             [potemkin :as p]
             [pretty.core :as pretty]))
 
@@ -31,13 +32,21 @@
 
 (m/defmulti select*
   {:arglists '([connectable tableable query options])}
-  u/dispatch-on-first-three-args)
+  u/dispatch-on-first-three-args
+  :combo (m.combo.threaded/threading-method-combination :third))
 
 (m/defmethod select* :default
   [connectable tableable query options]
-  (let [query (cond->> query
-                ((some-fn map? nil?) query) (merge {:select [:*]}))]
-    (query-as connectable tableable (compile/from connectable tableable query options) options)))
+  (query-as connectable tableable (compile/from connectable tableable query options) options))
+
+(m/defmethod select* [:default :default nil]
+  [connectable tableable _ options]
+  (select* connectable tableable {} options))
+
+(m/defmethod select* [:default :default clojure.lang.IPersistentMap]
+  [connectable tableable query options]
+  (let [query (merge {:select [:*]} query)]
+    (next-method connectable tableable query options)))
 
 (p/defrecord+ ID [vs]
   pretty/PrettyPrintable

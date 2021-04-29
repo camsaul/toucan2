@@ -150,4 +150,48 @@
            (table-aware/select [:test/postgres :people/composite-pk] [2 "Cam"])
            (table-aware/select [:test/postgres :people/composite-pk] [1 "Sam"])))))
 
-;; TODO -- default query
+;; this could also be done as part a `:before` method.
+(m/defmethod table-aware/select* [:default :people/no-timestamps clojure.lang.IPersistentMap]
+  [connectable tableable query options]
+  (let [query (merge {:select [:id :name]}
+                     query)]
+    (next-method connectable tableable query options)))
+
+(deftest default-query-test
+  (testing "Should be able to set some defaults by implementing `select*`"
+    (test/with-default-connection
+      (is (= [(instance/instance :people/no-timestamps {:id 1, :name "Cam"})]
+             (table-aware/select :people/no-timestamps 1))))))
+
+(m/defmethod table-aware/select* :before [:default :people/limit-2 clojure.lang.IPersistentMap]
+  [connectable tableable query options]
+  (assoc query :limit 2))
+
+(deftest pre-select-test
+  (testing "Should be able to do cool stuff in pre-select (select* :before)"
+    (test/with-default-connection
+      (is (= [(instance/instance :people/limit-2 {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")})
+              (instance/instance :people/limit-2 {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56Z")})]
+             (table-aware/select :people/limit-2))))))
+
+(m/defmethod table-aware/select* :after [:default :people/no-timestamps :default]
+  [connectable tableable results options]
+  (for [result results]
+    (dissoc result :timestamp)))
+
+(deftest post-select-test
+  (testing "Should be able to do cool stuff in (select* :after)"
+    (test/with-default-connection
+      (is (= [(instance/instance :people/no-timestamps {:id 1, :name "Cam"})
+              (instance/instance :people/no-timestamps {:id 2, :name "Sam"})
+              (instance/instance :people/no-timestamps {:id 3, :name "Pam"})
+              (instance/instance :people/no-timestamps {:id 4, :name "Tam"})]
+             (table-aware/select :people/no-timestamps))))))
+
+(derive :people/no-timestamps-limit-2 :people/no-timestamps)
+(derive :people/no-timestamps-limit-2 :people/limit-2)
+
+(deftest combine-aux-methods-test
+  (is (= [(instance/instance :people/no-timestamps-limit-2 {:id 1, :name "Cam"})
+          (instance/instance :people/no-timestamps-limit-2 {:id 2, :name "Sam"})]
+         (table-aware/select [:test/postgres :people/no-timestamps-limit-2]))))
