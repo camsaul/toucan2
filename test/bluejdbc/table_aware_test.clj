@@ -146,7 +146,7 @@
   (testing "composite PK"
     (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
            (table-aware/select [:test/postgres :people/composite-pk] [1 "Cam"])))
-    (is (= nil
+    (is (= []
            (table-aware/select [:test/postgres :people/composite-pk] [2 "Cam"])
            (table-aware/select [:test/postgres :people/composite-pk] [1 "Sam"])))))
 

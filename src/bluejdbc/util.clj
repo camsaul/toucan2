@@ -159,4 +159,4 @@
 (defonce default-rf
   (pretty-printable-fn
    (constantly `default-rf)
-   ((map (partial into {})) conj)))
+   ((map (partial into {})) (comp conj))))
