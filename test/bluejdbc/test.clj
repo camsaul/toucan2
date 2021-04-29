@@ -1,6 +1,7 @@
 (ns bluejdbc.test
   (:require [bluejdbc.connectable :as conn]
             bluejdbc.integrations.postgresql
+            [bluejdbc.util :as u]
             [clojure.test :refer :all]
             [methodical.core :as m]))
 
@@ -25,24 +26,50 @@
                                                 (when (.next rs)
                                                   (.getString rs "TABLE_NAME")))))))))
 
-(defn- has-test-data? [connectable]
-  (contains? (table-names connectable) "people"))
+(defn- has-test-data? [connectable table-name]
+  (contains? (table-names connectable) (name table-name)))
 
-(defn- load-test-data-if-needed! [connectable]
-  (when-not (has-test-data? connectable)
+(m/defmulti load-test-data-if-needed!
+  {:arglists '([connectable table-name])}
+  u/dispatch-on-first-two-args)
+
+(m/defmethod load-test-data-if-needed! :around :default
+  [connectable table-name]
+  (when-not (has-test-data? connectable table-name)
+    (println (format "creating %s table for %s" table-name connectable))
     (conn/with-connection [conn connectable]
       (with-open [stmt (.createStatement conn)]
-        (doseq [sql ["CREATE TABLE IF NOT EXISTS people (id serial PRIMARY KEY NOT NULL, name text, created_at timestamp with time zone);"
-                     (str "INSERT INTO people (id, name, created_at) "
-                          "VALUES "
-                          "(1, 'Cam', '2020-04-21T16:56:00.000-07:00'::timestamptz), "
-                          "(2, 'Sam', '2019-01-11T15:56:00.000-08:00'::timestamptz), "
-                          "(3, 'Pam', '2020-01-01T13:56:00.000-08:00'::timestamptz), "
-                          "(4, 'Tam', '2020-05-25T12:56:00.000-07:00'::timestamptz)")]]
+        (doseq [sql (next-method connectable table-name)]
           (.execute stmt sql))))))
 
+(m/defmethod load-test-data-if-needed! [:default :people]
+  [_ _]
+  ["CREATE TABLE IF NOT EXISTS people (id serial PRIMARY KEY NOT NULL, name text, created_at timestamp with time zone);"
+   "INSERT INTO people (id, name, created_at)
+    VALUES
+    (1, 'Cam', '2020-04-21T16:56:00.000-07:00'::timestamptz),
+    (2, 'Sam', '2019-01-11T15:56:00.000-08:00'::timestamptz),
+    (3, 'Pam', '2020-01-01T13:56:00.000-08:00'::timestamptz),
+    (4, 'Tam', '2020-05-25T12:56:00.000-07:00'::timestamptz)"])
+
+(m/defmethod load-test-data-if-needed! [:default :venues]
+  [_ _]
+  ["CREATE TABLE IF NOT EXISTS venues (
+     id SERIAL PRIMARY KEY,
+     name VARCHAR(256) UNIQUE NOT NULL,
+     category VARCHAR(256) NOT NULL,
+     \"created-at\" TIMESTAMP NOT NULL DEFAULT '2017-01-01T00:00:00Z'::timestamptz,
+     \"updated-at\" TIMESTAMP NOT NULL DEFAULT '2017-01-01T00:00:00Z'::timestamptz
+    );"
+   "INSERT INTO venues (name, category)
+    VALUES
+    ('Tempest', 'bar'),
+    ('Ho''s Tavern', 'bar'),
+    ('BevMo', 'store')"])
+
 (defn do-with-test-data [thunk]
-  (load-test-data-if-needed! :test/postgres)
+  (doseq [table [:people :venues]]
+    (load-test-data-if-needed! :test/postgres table))
   (thunk))
 
 (defn do-with-default-connection [thunk]
