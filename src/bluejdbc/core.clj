@@ -5,6 +5,7 @@
             [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
+            [bluejdbc.query :as query]
             [bluejdbc.table-aware :as table-aware]
             [bluejdbc.tableable :as tableable]
             [methodical.core :as m]
@@ -17,6 +18,7 @@
   instance/keep-me
   log/keep-me
   m/keep-me
+  query/keep-me
   table-aware/keep-me
   tableable/keep-me)
 
@@ -58,6 +60,16 @@
 
  [log
   with-debug-logging]
+
+ [query
+  all
+  execute!
+  execute!*
+  query
+  query-one
+  realize-row
+  reducible-query
+  reducible-query*]
 
  [table-aware
   count
