@@ -128,9 +128,16 @@
                    [[connectable tableable] id? kvs? queryable? options?])} select
   (comp query/all select-reducible))
 
-;; TODO
+(def ^{:arglists '([tableable id? kvs? queryable? options?]
+                   [[connectable tableable] id? kvs? queryable? options?])} select-one
+  (comp (partial transduce
+                 (comp (map query/realize-row)
+                       (take 1))
+                 (completing (fn [_ row] row))
+                 nil)
+        select-reducible))
 
-(defn select-one [])
+;; TODO
 
 (defn select-one-field [])
 
