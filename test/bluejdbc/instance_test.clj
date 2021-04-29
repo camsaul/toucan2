@@ -32,8 +32,7 @@
     (testing "An Instance should be considered equal to a plain map for convenience purposes"
       (is (= {:a 100}
              (instance/instance :wow {:a 100})))
-      ;; TODO -- equality not currently working both ways
-      #_(is (= (instance/instance :wow {:a 100})
+      (is (= (instance/instance :wow {:a 100})
              {:a 100})))))
 
 (deftest instance-test-2
