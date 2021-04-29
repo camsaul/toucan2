@@ -34,7 +34,7 @@
 (defn- has-test-data? [connectable table-name]
   (contains? (table-names connectable) (name table-name)))
 
-(m/defmulti load-test-data-if-needed!
+(m/defmulti ^:private load-test-data-if-needed!
   {:arglists '([connectable table-name])}
   u/dispatch-on-first-two-args)
 

@@ -24,13 +24,11 @@
             (log/tracef "Reducing results with rf %s and init %s" (pr-str rf) (pr-str init))
             (reduce rf init results)
             (catch Throwable e
-              (println "e:" e) ; NOCOMMIT
               (let [message (or (:message (ex-data e)) (ex-message e))]
                 (throw (ex-info (format "Error reducing results: %s" message)
                                 {:rf rf, :init init, :message message}
                                 e))))))
         (catch Throwable e
-          (println "e [2]:" e) ; NOCOMMIT
           (let [message (or (:message (ex-data e)) (ex-message e))]
             (throw (ex-info (format "Error executing query: %s" message)
                             (merge
