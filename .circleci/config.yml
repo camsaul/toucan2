@@ -29,7 +29,7 @@ executors:
     docker:
       - image: circleci/clojure:lein-2.9.1
         environment:
-          JDBC_URL: jdbc:postgresql://localhost:5432/circle_test?user=circle_test
+          JDBC_URL_POSTGRES: jdbc:postgresql://localhost:5432/circle_test?user=circle_test
       - image: circleci/postgres:9.6-alpine
         environment:
           POSTGRES_USER: circle_test
