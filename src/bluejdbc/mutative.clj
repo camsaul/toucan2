@@ -37,8 +37,6 @@
     (log/tracef "UPDATE %s SET %s WHERE %s" (pr-str tableable) (pr-str changes) (pr-str conditions))
     (query/execute! connectable tableable honeysql-form options)))
 
-;; TODO -- Move to tableable
-
 
 ;; TODO -- need a `save!*` method
 (defn save!

@@ -32,9 +32,18 @@
     (testing "two instances with the same Table should be equal"
       (is (= (instance/instance :wow {:a 100})
              (instance/instance :wow {:a 100}))))
+    (testing "Two instances with the same Connectable should be equal"
+      (is (= (instance/instance :connectable nil {:a 100})
+             (instance/instance :connectable nil {:a 100}))))
+    (testing "Two instances with the same Connectable *and* Table should be equal"
+      (is (= (instance/instance :connectable :table {:a 100})
+             (instance/instance :connectable :table {:a 100}))))
     (testing "Two instances with different Tables are not equal"
       (is (not= (instance/instance :other {:a 100})
                 (instance/instance :wow {:a 100}))))
+    (testing "Two instances with different Connectables ARE equal"
+      (is (= (instance/instance :connectable :table {:a 100})
+             (instance/instance :different-connectable :table {:a 100}))))
     (testing "An Instance should be considered equal to a plain map for convenience purposes"
       (is (= {:a 100}
              (instance/instance :wow {:a 100})))
@@ -83,7 +92,15 @@
                (dissoc! :a)
                persistent!)]
     (is (= {:b 200, :c 300}
-           m'))
-    ;; TODO -- not sure transient needs to implement original
-    #_(is (= {:a 100}
-             (instance/original m')))))
+           m'))))
+
+(deftest connectable-test
+  (let [m (instance/instance :connectable :table {:a 1})]
+    (is (= :connectable
+           (instance/connectable m)))
+    (let [m2 (instance/with-connectable m :different-connectable)]
+      (testing "shouldn't modify original"
+        (is (= :connectable
+               (instance/connectable m))))
+      (is (= :different-connectable
+             (instance/connectable m2))))))

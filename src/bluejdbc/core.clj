@@ -57,8 +57,7 @@
   changes
   instance
   original
-  table
-  with-table]
+  table]
 
  [log
   with-debug-logging]
@@ -67,7 +66,6 @@
   delete!
   insert!
   insert-returning-keys!
-  #_primary-key-values ;; TODO -- move to tableable
   save!
   update!
   upsert!]

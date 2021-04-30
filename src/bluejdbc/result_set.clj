@@ -93,7 +93,7 @@
        (reify
          jdbc.rs/RowBuilder
          (->row [this]
-           (transient (instance/instance tableable)))
+           (transient (instance/instance connectable tableable {})))
          (column-count [this]
            (count cols))
          (with-column [this row i]
