@@ -67,7 +67,9 @@
   insert!
   insert-returning-keys!
   save!
+  save!*
   update!
+  update!*
   upsert!]
 
  [query
@@ -78,7 +80,8 @@
   query-one
   realize-row
   reducible-query
-  reducible-query*]
+  reducible-query*
+  with-call-count]
 
  [select
   count

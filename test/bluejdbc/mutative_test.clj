@@ -10,13 +10,13 @@
 
 (deftest parse-update-args-test
   (is (= {:id 1, :changes {:a 1}, :conditions nil}
-         (mutative/parse-update!-args [1 {:a 1}])))
+         (mutative/parse-update!-args* nil nil [1 {:a 1}])))
   (is (= {:conditions {:id 1}, :changes {:a 1}}
-         (mutative/parse-update!-args [:id 1 {:a 1}])))
+         (mutative/parse-update!-args* nil nil [:id 1 {:a 1}])))
   (is (= {:id 1, :conditions {:name "Cam"}, :changes {:a 1}}
-         (mutative/parse-update!-args [1 :name "Cam" {:a 1}])))
+         (mutative/parse-update!-args* nil nil [1 :name "Cam" {:a 1}])))
   (is (= {:changes {:name "Hi-Dive"}, :conditions {:id 1}}
-         (mutative/parse-update!-args [{:id 1} {:name "Hi-Dive"}]))))
+         (mutative/parse-update!-args* nil nil [{:id 1} {:name "Hi-Dive"}]))))
 
 (deftest update!-test
   (test/with-venues-reset

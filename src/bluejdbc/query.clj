@@ -12,6 +12,8 @@
 ;; TODO -- should this be off by default?
 (def ^:dynamic *include-queries-in-exceptions?* true)
 
+(def ^:dynamic ^:private *call-count-thunk* (fn [])) ; no-op
+
 (defn- reduce-query
   [connectable tableable queryable options rf init]
   (let [options    (u/recursive-merge (conn/default-options connectable) options)
@@ -22,6 +24,7 @@
         (let [results (next.jdbc/plan conn sql-params (:execute options))]
           (try
             (log/tracef "Reducing results with rf %s and init %s" (pr-str rf) (pr-str init))
+            (*call-count-thunk*)
             (reduce rf init results)
             (catch Throwable e
               (let [message (or (:message (ex-data e)) (ex-message e))]
@@ -119,6 +122,7 @@
   (conn/with-connection [conn connectable options]
     (let [sql-params (compile/compile connectable tableable query options)]
       (try
+        (*call-count-thunk*)
         (next.jdbc/execute! conn sql-params (:execute options))
         (catch Throwable e
           (throw (ex-info "Error executing statement"
@@ -134,3 +138,14 @@
   ([connectable query options]           (execute!  connectable nil       query nil))
   ([connectable tableable query options] (execute!* connectable tableable query (merge (conn/default-options connectable)
                                                                                        options))))
+
+(defn do-with-call-counts [f]
+  (let [call-count (atom 0)
+        old-thunk  *call-count-thunk*]
+    (binding [*call-count-thunk* #(do
+                                    (old-thunk)
+                                    (swap! call-count inc))]
+      (f (fn [] @call-count)))))
+
+(defmacro with-call-count [[call-count-fn-binding] & body]
+  `(do-with-call-counts (fn [~call-count-fn-binding] ~@body)))
