@@ -81,12 +81,12 @@
        :query   query
        :options options})))
 
-(defn select-reducible
-  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
-  [connectable-tableable & args]
-  (let [[connectable tableable]        (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [id kvs query options]} (parse-select-args* connectable tableable args (conn/default-options connectable))
-        options                        (u/recursive-merge (conn/default-options connectable) options)
+(defn parse-select-args
+  "Parse args to the `select` family of functions. Returns a map with the parsed/combined `:query` and parsed
+  `:options`."
+  [connectable tableable args options-1]
+  (let [{:keys [id kvs query options]} (parse-select-args* connectable tableable args (conn/default-options connectable))
+        options                        (u/recursive-merge options-1 options)
         kvs                            (cond-> kvs
                                          id (honeysql-util/merge-primary-key connectable tableable id))
         query                          (if query
@@ -94,6 +94,13 @@
                                          {})
         query                          (cond-> query
                                          (seq kvs) (honeysql-util/merge-kvs kvs))]
+    {:query query, :options options}))
+
+(defn select-reducible
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  [connectable-tableable & args]
+  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+        {:keys [query options]} (parse-select-args connectable tableable args (conn/default-options connectable))]
     (select* connectable tableable query options)))
 
 (defn select
@@ -175,9 +182,27 @@
   {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
   [f connectable-tableable & args]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        pks-fn                       (select-pks-fn connectable tableable)]
+        pks-fn                  (select-pks-fn connectable tableable)]
     (apply select-fn->fn pks-fn f [connectable tableable] args)))
 
-(defn count [])
+(m/defmulti count*
+  {:arglists '([connectable tableable queryable options])}
+  u/dispatch-on-first-three-args
+  :combo (m.combo.threaded/threading-method-combination :third))
 
-(defn exists? [])
+(m/defmethod count* [:default :default clojure.lang.IPersistentMap]
+  [connectable tableable honeysql-form options]
+  (query/reduce-first
+   (map :count)
+   (select* connectable tableable (assoc honeysql-form :select [[:%count.* :count]]) options)))
+
+(defn count
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  [connectable-tableable & args]
+  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+        {:keys [query options]} (parse-select-args connectable tableable args (conn/default-options connectable))]
+    (count* connectable tableable query options)))
+
+(defn exists?
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  [])

@@ -258,3 +258,13 @@
   (testing "Composite PKs"
     {"Cam" [1 "Cam"], "Sam" [2 "Sam"], "Pam" [3 "Pam"], "Tam" [4 "Tam"]}
     (select/select-fn->pk :name [:test/postgres :people/composite-pk])))
+
+(deftest count-test
+  (is (= 4
+         (select/count [:test/postgres :people])))
+  (is (= 1
+         (select/count [:test/postgres :people] 1)))
+  (is (= 3
+         (select/count [:test/postgres :venues])))
+  (is (= 2
+         (select/count [:test/postgres :venues] :category "bar"))))

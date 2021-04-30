@@ -81,6 +81,7 @@
 
  [select
   count
+  count*
   exists?
   reducible-query-as
   select

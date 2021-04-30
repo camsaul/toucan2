@@ -13,6 +13,8 @@
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]))
 
+;; TODO -- should this have an `options` arg (we can get the default options for the `connectable`) -- this is what we
+;; do for `parse-select-args`
 (m/defmulti parse-update!-args*
   {:arglists '([connectable tableable args])}
   u/dispatch-on-first-two-args

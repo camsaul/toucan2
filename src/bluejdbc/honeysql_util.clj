@@ -15,6 +15,7 @@
     (log/tracef "-> %s" (pr-str result))
     result))
 
+;; TODO -- this should probably be a multimethod, to support theoretical non-HoneySQL queries
 (defn merge-kvs [query kvs]
   (log/tracef "Adding key-values %s" (pr-str kvs))
   (let [query (apply hsql.helpers/merge-where query (for [[k v] kvs]
