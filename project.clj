@@ -101,16 +101,18 @@
    :cloverage
    {:dependencies
     ;; using my fork until the next release of the main repo is out.
-    [[camsaul/cloverage "1.2.1.1"]]
+    [[cloverage "1.2.2"]]
 
     :plugins
-    [[camsaul/lein-cloverage  "1.2.1.1"]]
+    [[lein-cloverage  "1.2.2"]]
 
     ;; don't count ./dev stuff for code coverage calcualations.
     :source-paths ^:replace ["src"]
 
     :cloverage
-    {:fail-threshold 50}}
+    {:fail-threshold 70
+     :exclude-call [bluejdbc.log/logf
+                    bluejdbc.log/logp]}}
 
    :eastwood
    {:plugins
