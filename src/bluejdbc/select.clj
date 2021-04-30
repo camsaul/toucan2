@@ -203,6 +203,25 @@
         {:keys [query options]} (parse-select-args connectable tableable args (conn/default-options connectable))]
     (count* connectable tableable query options)))
 
+(m/defmulti exists?*
+  {:arglists '([connectable tableable queryable options])}
+  u/dispatch-on-first-three-args
+  :combo (m.combo.threaded/threading-method-combination :third))
+
+;; TODO -- it seems like it would be a lot more efficient if we could use some bespoke JDBC code here e.g. for example
+;; simply checking whether the `ResultSet` returns next (rather than fetching the row in the first place)
+;;
+;; At least we're avoiding the overhead of creating an actual row map since we're only fetching a single column.
+(m/defmethod exists?* [:default :default clojure.lang.IPersistentMap]
+  [connectable tableable honeysql-form options]
+  (boolean
+   (query/reduce-first
+    (map :one)
+    (select* connectable tableable (assoc honeysql-form :select [[1 :one]], :limit 1) options))))
+
 (defn exists?
   {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
-  [])
+  [connectable-tableable & args]
+  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+        {:keys [query options]} (parse-select-args connectable tableable args (conn/default-options connectable))]
+    (exists?* connectable tableable query options)))

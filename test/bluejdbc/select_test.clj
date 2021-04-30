@@ -192,7 +192,9 @@
 
 (deftest select-one-test
   (is (= {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
-         (select/select-one [:test/postgres :people]))))
+         (select/select-one [:test/postgres :people])))
+  (is (= nil
+         (select/select-one [:test/postgres :people] :id 1000))))
 
 (deftest select-fn-test
   (testing "Equivalent of Toucan select-field"
@@ -268,3 +270,9 @@
          (select/count [:test/postgres :venues])))
   (is (= 2
          (select/count [:test/postgres :venues] :category "bar"))))
+
+(deftest exists?-test
+  (is (= true
+         (select/exists? [:test/postgres :people] :name "Cam")))
+  (is (= false
+         (select/exists? [:test/postgres :people] :name "Cam Era"))))

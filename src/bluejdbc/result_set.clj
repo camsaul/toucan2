@@ -70,17 +70,6 @@
   [^ResultSetMetaData rsmeta]
   (range 1 (inc (.getColumnCount rsmeta))))
 
-;; (defn row-thunk
-;;   "Returns a thunk that can be called repeatedly to get the next row in the result set, using appropriate methods to
-;;   fetch each value in the row. Returns `nil` when the result set has no more rows."
-;;   [connectable tableable ^ResultSet rs options]
-;;   (let [rsmeta (.getMetaData rs)
-;;         fns    (for [i (index-range rsmeta)]
-;;                  (read-column-thunk connectable tableable rs rsmeta (int i) options))]
-;;     (if (empty? fns)
-;;       (constantly nil)
-;;       (apply juxt fns))))
-
 (defn row-builder-fn [connectable tableable]
   (u/pretty-printable-fn
    #(list `row-builder-fn (if (keyword? connectable) connectable 'connectable) tableable)
