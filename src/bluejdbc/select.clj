@@ -128,14 +128,17 @@
   [& args]
   (query/reduce-first (apply select-fn-reducible args)))
 
+(defn- select-pks-fn [connectable tableable]
+  (let [pk-keys (tableable/primary-key-keys connectable tableable)]
+    (if (= (clojure.core/count pk-keys) 1)
+      (first pk-keys)
+      (apply juxt pk-keys))))
+
 (defn select-pks-reducible
   {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
   [connectable-tableable & args]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        pk-keys                 (tableable/primary-key-keys connectable tableable)
-        f                       (if (= (clojure.core/count pk-keys) 1)
-                                  (first pk-keys)
-                                  (apply juxt pk-keys))]
+        f                       (select-pks-fn connectable tableable)]
     (apply select-fn-reducible f [connectable tableable] args)))
 
 (defn select-pks-set
@@ -153,11 +156,27 @@
   [& args]
   (query/reduce-first (apply select-pks-reducible args)))
 
-(defn select-fn->fn [])
+(defn select-fn->fn
+  {:arglists '([f1 f2 connectable-tableable pk? conditions? queryable? options?])}
+  [f1 f2 & args]
+  (into
+   {}
+   (map (juxt f1 f2))
+   (apply select-reducible args)))
 
-(defn select-fn->pk [])
+(defn select-fn->pk
+  {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
+  [f connectable-tableable & args]
+  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+        pks-fn                       (select-pks-fn connectable tableable)]
+    (apply select-fn->fn f pks-fn [connectable tableable] args)))
 
-(defn select-pk->fn [])
+(defn select-pk->fn
+  {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
+  [f connectable-tableable & args]
+  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+        pks-fn                       (select-pks-fn connectable tableable)]
+    (apply select-fn->fn pks-fn f [connectable tableable] args)))
 
 (defn count [])
 

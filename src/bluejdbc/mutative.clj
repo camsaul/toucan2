@@ -63,7 +63,7 @@
 (m/defmethod save!* :default
   [connectable tableable obj _]
   (when-let [changes (not-empty (instance/changes obj))]
-    (update! [connectable tableable] (tableable/primary-key-values connectable obj) changes)))
+    (update! [connectable tableable] (tableable/primary-key-values connectable tableable obj) changes)))
 
 (defn save!
   [obj]

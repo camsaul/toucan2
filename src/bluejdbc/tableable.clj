@@ -34,15 +34,23 @@
   [_ _]
   :id)
 
-(defn primary-key-keys [connectable tableable]
+(defn primary-key-keys
+  "Return the primary key fields names, as a keywords, for a `tableable`.
+
+    (primary-key-keys :my-connection :user) ;-> [:id]"
+  [connectable tableable]
   (let [pk-keys (primary-key* connectable tableable)]
     (if (sequential? pk-keys)
       pk-keys
       [pk-keys])))
 
 (defn primary-key-values
-  ([connectable obj]
-   (primary-key-values connectable (instance/table obj) obj))
+  "Return the values of the primary key(s) of `obj` as a map.
+
+    (primary-key-values a-user) ;-> {:id 1}"
+
+  ([obj]
+   (primary-key-values (instance/connectable obj) (instance/table obj) obj))
 
   ([connectable tableable m]
    (let [pk-keys (primary-key-keys connectable tableable)]
