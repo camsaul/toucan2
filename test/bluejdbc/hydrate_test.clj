@@ -1,13 +1,25 @@
 (ns bluejdbc.hydrate-test
   (:require [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
-            [bluejdbc.select :as select]
+            [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
+            [bluejdbc.transformed :as transformed]
             [clojure.test :refer :all]
             [methodical.core :as m]))
 
 (use-fixtures :once test/do-with-test-data)
 (use-fixtures :each test/do-with-default-connection)
+
+(m/defmethod tableable/table-name* [:default ::venues-with-category-keyword]
+  [_ _ _]
+  "venues")
+
+(derive ::venues-with-category-keyword :bluejdbc/transformed)
+
+(m/defmethod transformed/transforms* [:default ::venues-with-category-keyword]
+  [_ _ _]
+  {:category {:in  name
+              :out keyword}})
 
 (deftest kw-append-test
   (is (= :user_id
@@ -15,37 +27,18 @@
   (is (= :toucan-id
          (#'hydrate/kw-append :toucan "-id"))))
 
-(m/defmethod hydrate/automagic-hydration-key-table ::user
-  [_]
+(m/defmethod hydrate/automagic-hydration-key-table* [:default ::user]
+  [_ _]
   :user)
 
-(m/defmethod select/select* :after [:default :venues/category-keyword :default]
-  [_ _ reducible-query _]
-  (eduction
-   (map (fn [venue]
-          (cond-> venue
-            (:category venue) (update :category keyword))))
-   reducible-query))
-
-(m/defmethod hydrate/automagic-hydration-key-table ::venue
-  [_]
-  :venues/category-keyword)
+(m/defmethod hydrate/automagic-hydration-key-table* [:default ::venue]
+  [_ _]
+  ::venues-with-category-keyword)
 
 (deftest can-hydrate-with-strategy-test
   (testing "should fail for unknown keys"
     (is (= false
-           (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{:a_id 1} {:a_id 2}] :a))))
-  (testing "should work for known keys if k_id present in every map"
-    (is (= true
-           (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{::user_id 1} {::user_id 2}] ::user))))
-  (testing "should work for both k_id and k-id style keys"
-    (is (= true
-           (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched [{::user-id 1} {::user-id 2}] ::user))))
-  (testing "should fail for known keys if k_id isn't present in every map"
-    (is (= false
-           (hydrate/can-hydrate-with-strategy? ::hydrate/automagic-batched
-                                               [{::user_id 1} {::user_id 2} {:some-other-key 3}]
-                                               ::user)))))
+           (hydrate/can-hydrate-with-strategy?* nil nil ::hydrate/automagic-batched :a)))))
 
 (deftest hydrate-test
   (testing "it should correctly hydrate"
@@ -58,7 +51,7 @@
 
 (defn- valid-form? [form]
   (try
-    (with-redefs [hydrate/hydrate-key (fn [results k]
+    (with-redefs [hydrate/hydrate-key (fn [_ _ results k]
                                         (for [result results]
                                           (assoc result k {})))]
       (hydrate/hydrate [{}] form))
@@ -87,18 +80,18 @@
       (is (= true
              (valid-form? form))))))
 
-(m/defmethod hydrate/simple-hydrate [:default ::x]
-  [{:keys [id]} _]
-  id)
+(m/defmethod hydrate/simple-hydrate* [:default :default ::x]
+  [_ _ _ {:keys [id], :as row}]
+  (assoc row ::x id))
 
-(m/defmethod hydrate/simple-hydrate [:default ::y]
-  [{:keys [id2]} _]
-  id2)
+(m/defmethod hydrate/simple-hydrate* [:default :default ::y]
+  [_ _ _ {:keys [id2], :as row}]
+  (assoc row ::y id2))
 
-(m/defmethod hydrate/simple-hydrate [:default ::z]
-  [{:keys [n]} _]
-  (vec (for [i (range n)]
-         {:id i})))
+(m/defmethod hydrate/simple-hydrate* [:default :default ::z]
+  [_ _ _ {:keys [n], :as row}]
+  (assoc row ::z (vec (for [i (range n)]
+                        {:id i}))))
 
 (deftest hydrate-key-seq-test
   (testing "check with a nested hydration that returns one result"
@@ -127,6 +120,8 @@
           {:id 2, ::x 2}
           {:id 3, ::x 3}]
          (#'hydrate/hydrate-key
+          nil
+          nil
           [{:id 1}
            {:id 2}
            {:id 3}] ::x))))
@@ -274,10 +269,10 @@
     (is (= {:f [:a 100]}
            (hydrate/hydrate {:f [:a 100]} :p)))))
 
-(m/defmethod hydrate/batched-hydrate [:default ::is-bird?]
-  [objects _]
-  (for [object objects]
-    (assoc object ::is-bird? true)))
+(m/defmethod hydrate/batched-hydrate* [:default :default ::is-bird?]
+  [_ _ _ rows]
+  (for [row rows]
+    (assoc row ::is-bird? true)))
 
 (deftest batched-hydration-test
   (testing "Check that batched hydration doesn't try to hydrate fields that already exist and are not delays"
