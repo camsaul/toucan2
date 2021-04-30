@@ -81,7 +81,6 @@
        :query   query
        :options options})))
 
-;; TODO -- should this be a multimethod?
 (defn select-reducible
   {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
   [connectable-tableable & args]

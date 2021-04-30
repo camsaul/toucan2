@@ -9,9 +9,17 @@
             [bluejdbc.specs :as specs]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
-            [clojure.spec.alpha :as s]))
+            [clojure.spec.alpha :as s]
+            [methodical.core :as m]
+            [methodical.impl.combo.threaded :as m.combo.threaded]))
 
-(defn parse-update!-args [args]
+(m/defmulti parse-update!-args*
+  {:arglists '([connectable tableable args])}
+  u/dispatch-on-first-two-args
+  :combo (m.combo.threaded/threading-method-combination :third))
+
+(m/defmethod parse-update!-args* :default
+  [_ _ args]
   (let [parsed (s/conform ::specs/update!-args args)]
     (when (= parsed :clojure.spec.alpha/invalid)
       (throw (ex-info (format "Don't know how to interpret update! args: %s" (s/explain ::specs/update!-args args))
@@ -23,29 +31,46 @@
           (update :conditions merge (when (seq kv-conditions)
                                       (zipmap (map :k kv-conditions) (map :v kv-conditions))))))))
 
-;; TODO -- need an `update!*` method
+(m/defmulti update!*
+  {:arglists '([connectable tableable query options])}
+  u/dispatch-on-first-three-args
+  :combo (m.combo.threaded/threading-method-combination :third))
+
+(m/defmethod update!* :default
+  [connectable tableable query options]
+  (query/execute! connectable tableable query options))
+
 (defn update!
-  {:arglists '([tableable id? conditions? changes options?])}
+  {:arglists '([connectable-tableable id? conditions? changes options?])}
   [connectable-tableable & args]
   (let [[connectable tableable]                 (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [id conditions changes options]} (parse-update!-args args)
+        {:keys [id conditions changes options]} (parse-update!-args* connectable tableable args)
         conditions                              (cond-> conditions
                                                   id (honeysql-util/merge-primary-key connectable tableable id))
         honeysql-form                           (cond-> {:update (compile/table-identifier tableable options)
                                                          :set    changes}
                                                   (seq conditions) (honeysql-util/merge-kvs conditions))]
     (log/tracef "UPDATE %s SET %s WHERE %s" (pr-str tableable) (pr-str changes) (pr-str conditions))
-    (query/execute! connectable tableable honeysql-form options)))
+    (update!* connectable tableable honeysql-form (merge (conn/default-options connectable)
+                                                         options))))
 
 
-;; TODO -- need a `save!*` method
+(m/defmulti save!*
+  {:arglists '([connectable tableable obj options])}
+  u/dispatch-on-first-three-args
+  :combo (m.combo.threaded/threading-method-combination :third))
+
+(m/defmethod save!* :default
+  [connectable tableable obj _]
+  (when-let [changes (not-empty (instance/changes obj))]
+    (update! [connectable tableable] (tableable/primary-key-values connectable obj) changes)))
+
 (defn save!
-  ([obj]
-   (save! conn/*connectable* obj))
-
-  ([connectable obj]
-   (when-let [changes (not-empty (instance/changes obj))]
-     (update! (instance/table obj) (tableable/primary-key-values connectable obj) changes))))
+  [obj]
+  (let [connectable (or (instance/connectable obj) conn/*connectable*)
+        tableable   (instance/table obj)
+        options     (conn/default-options connectable)]
+    (save!* connectable tableable obj options)))
 
 (defn insert! [])
 

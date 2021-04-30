@@ -88,3 +88,27 @@
            (query/query :test/postgres "SELECT * FROM \"execute_test_table\";")))
     (finally
       (query/execute! :test/postgres "DROP TABLE IF EXISTS \"execute_test_table\";"))))
+
+(deftest with-call-counts-test
+  (query/with-call-count [call-count]
+    (is (= 0
+           (call-count)))
+    (query/query :test/postgres "SELECT 1;")
+    (is (= 1
+           (call-count)))
+    (query/execute! :test/postgres "SELECT 1;")
+    (is (= 2
+           (call-count)))
+    (testing "Should be able to do nested calls to with-call-count"
+      (query/with-call-count [nested-call-count]
+        (is (= 2
+               (call-count)))
+        (is (= 0
+               (nested-call-count)))
+        (query/query :test/postgres "SELECT 1;")
+        (is (= 3
+               (call-count)))
+        (is (= 1
+               (nested-call-count)))))
+    (is (= 3
+           (call-count)))))
