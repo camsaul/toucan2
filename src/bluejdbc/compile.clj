@@ -1,7 +1,6 @@
 (ns bluejdbc.compile
   (:refer-clojure :exclude [compile])
-  (:require [bluejdbc.compile :as compile]
-            [bluejdbc.connectable :as conn]
+  (:require [bluejdbc.connectable :as conn]
             [bluejdbc.log :as log]
             [bluejdbc.queryable :as queryable]
             [bluejdbc.tableable :as tableable]
