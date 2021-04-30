@@ -7,6 +7,7 @@
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
+            [clojure.string :as str]
             [clojure.test :refer :all]
             [java-time :as t]
             [methodical.core :as m]))
@@ -233,3 +234,27 @@
   (testing "Composite PK -- should return vector"
     (is (= [1 "Cam"]
            (select/select-one-pk [:test/postgres :people/composite-pk] :id 1)))))
+
+(deftest select-fn->fn-test
+  (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
+         (select/select-fn->fn :id :name [:test/postgres :people])))
+  (is (= {2 "cam", 3 "sam", 4 "pam", 5 "tam"}
+         (select/select-fn->fn (comp inc :id) (comp str/lower-case :name) [:test/postgres :people]))))
+
+(deftest select-pk->fn-test
+  (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
+         (select/select-pk->fn :name [:test/postgres :people])))
+  (is (= {1 "cam", 2 "sam", 3 "pam", 4 "tam"}
+         (select/select-pk->fn (comp str/lower-case :name) [:test/postgres :people])))
+  (testing "Composite PKs"
+    {[1 "Cam"] "Cam", [2 "Sam"] "Sam", [3 "Pam"] "Pam", [4 "Tam"] "Tam"}
+    (select/select-pk->fn :name [:test/postgres :people/composite-pk])))
+
+(deftest select-fn->pk-test
+  (is (= {"Cam" 1, "Sam" 2, "Pam" 3, "Tam" 4}
+         (select/select-fn->pk :name [:test/postgres :people])))
+  (is (= {"cam" 1, "sam" 2, "pam" 3, "tam" 4}
+         (select/select-fn->pk (comp str/lower-case :name) [:test/postgres :people])))
+  (testing "Composite PKs"
+    {"Cam" [1 "Cam"], "Sam" [2 "Sam"], "Pam" [3 "Pam"], "Tam" [4 "Tam"]}
+    (select/select-fn->pk :name [:test/postgres :people/composite-pk])))
