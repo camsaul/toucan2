@@ -46,8 +46,16 @@
     ([x y z _]   [(f x) (f y) (f z)])
     ([x y z _ _] [(f x) (f y) (f z)])))
 
-(def ^{:arglists '([a b] [a b c] [a b c d] [a b c d e])} dispatch-on-first-three-args
+(def ^{:arglists '([a b c] [a b c d] [a b c d e])} dispatch-on-first-three-args
   (dispatch-on-first-three-args-with keyword-or-class))
+
+(defn dispatch-on-first-four-args-with [f]
+  (fn dispatch-on-first-four-args-with*
+    ([a b c d]   [(f a) (f b) (f c) (f d)])
+    ([a b c d _] [(f a) (f b) (f c) (f d)])))
+
+(def ^{:arglists '([a b c d] [a b c d e])} dispatch-on-first-four-args
+  (dispatch-on-first-four-args-with keyword-or-class))
 
 (p/defprotocol+ CoerceToProperties
   "Protocol for anything that can be coerced to an instance of `java.util.Properties`."

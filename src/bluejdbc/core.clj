@@ -44,14 +44,10 @@
   with-connection]
 
  [hydrate
-  automagic-hydration-key-table
-  batched-hydrate
-  can-hydrate-with-strategy?
+  automagic-hydration-key-table*
+  batched-hydrate*
   hydrate
-  hydrate-with-strategy
-  hydration-keys
-  hydration-strategy
-  simple-hydrate]
+  simple-hydrate*]
 
  [instance
   changes
