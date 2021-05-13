@@ -30,3 +30,11 @@
          :kv-conditions ::kvs
          :changes       map?
          :options       (s/? ::options)))
+
+(s/def ::insert!-args
+  (s/cat :rows (s/alt :single-row-map    map?
+                      :multiple-row-maps (s/spec (s/+ map?))
+                      :kv-pairs          ::kvs
+                      :columns-rows      (s/cat :columns (s/spec (s/+ keyword?))
+                                                :rows    (s/spec (s/+ vector?))))
+         :options (s/? ::options)))

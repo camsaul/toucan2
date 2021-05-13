@@ -4,7 +4,6 @@
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as conn]
             [bluejdbc.honeysql-util :as honeysql-util]
-            [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
@@ -15,11 +14,6 @@
             [clojure.spec.alpha :as s]
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]))
-
-(defn- table-rf [tableable]
-  (u/pretty-printable-fn
-   #(list `table-rf tableable)
-   ((map (partial into (instance/instance tableable))) conj)))
 
 ;; TODO -- consider whether this should be moved to `query`
 (defn reducible-query-as
@@ -70,7 +64,7 @@
   (let [spec   (specs/select-args-spec connectable tableable)
         parsed (s/conform spec args)]
     (when (= parsed :clojure.spec.alpha/invalid)
-      (throw (ex-info (format "Don't know how to interpret select args: %s" (s/explain spec args))
+      (throw (ex-info (format "Don't know how to interpret select args: %s" (s/explain-str spec args))
                       {:args args})))
     (log/tracef "-> %s" (u/pprint-to-str parsed))
     (let [{[_ {:keys [id query kvs]}] :query, :keys [options]} parsed]

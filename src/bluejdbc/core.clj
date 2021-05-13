@@ -60,6 +60,7 @@
 
  [mutative
   delete!
+  insert!*
   insert!
   insert-returning-keys!
   save!

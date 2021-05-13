@@ -288,11 +288,11 @@ workflows:
             - deps
           lein-command: docstring-checker
 
-      - lein:
-          name: namespace-decls
-          requires:
-            - deps
-          lein-command: check-namespace-decls
+      # - lein:
+      #     name: namespace-decls
+      #     requires:
+      #       - deps
+      #     lein-command: check-namespace-decls
 
       - lein:
           name: bikeshed
@@ -320,7 +320,7 @@ workflows:
             - bikeshed
             - docstring-checker
             - eastwood
-            - namespace-decls
+            # - namespace-decls
             - cloverage
             - reflection-warnings
             - postgres-9-6
