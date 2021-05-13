@@ -24,7 +24,7 @@
 
   :dependencies
   [[clojure.java-time "0.3.2"]
-   [com.github.seancorfield/next.jdbc "1.1.646"]
+   [com.github.seancorfield/next.jdbc "1.2.659"]
    [honeysql "1.0.461" :exclusions [org.clojure/clojurescript]]
    [metabase/second-date "1.0.0"]
    [methodical "0.10.1-alpha"]

@@ -13,6 +13,8 @@
 (s/def ::options
   map?)
 
+;; TODO -- consider whether it makes sense for these to go here as opposed to next to where they're actually used.
+
 (defn select-args-spec [connectable tableable]
   (letfn [(query? [x]
             (or (map? x)
@@ -33,8 +35,8 @@
 
 (s/def ::insert!-args
   (s/cat :rows (s/alt :single-row-map    map?
-                      :multiple-row-maps (s/spec (s/+ map?))
+                      :multiple-row-maps (s/coll-of map?)
                       :kv-pairs          ::kvs
-                      :columns-rows      (s/cat :columns (s/spec (s/+ keyword?))
-                                                :rows    (s/spec (s/+ vector?))))
+                      :columns-rows      (s/cat :columns (s/coll-of keyword?)
+                                                :rows    (s/coll-of vector?)))
          :options (s/? ::options)))
