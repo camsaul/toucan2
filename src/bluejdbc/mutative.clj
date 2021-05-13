@@ -6,6 +6,7 @@
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
             [bluejdbc.query :as query]
+            [bluejdbc.result-set :as rs]
             [bluejdbc.specs :as specs]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
@@ -36,9 +37,15 @@
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
+(defn- insert-update-results [results options]
+  (if (get-in options [:execute :return-keys])
+    results
+    (first results)))
+
 (m/defmethod update!* :default
   [connectable tableable honeysql-form options]
-  (first (query/execute! connectable tableable honeysql-form options)))
+  (-> (query/execute! connectable tableable honeysql-form options)
+      (insert-update-results options)))
 
 (defn update!
   {:arglists '([connectable-tableable id? conditions? changes options?])}
@@ -79,7 +86,8 @@
 
 (m/defmethod insert!* :default
   [connectable tableable honeysql-form options]
-  (first (query/execute! connectable tableable honeysql-form options)))
+  (-> (query/execute! connectable tableable honeysql-form options)
+      (insert-update-results options)))
 
 (m/defmulti parse-insert!-args*
   {:arglists '([connectable tableable args options])}
@@ -114,10 +122,26 @@
     (log/tracef "INSERT %d %s rows:\n%s" (count rows) (pr-str tableable) (u/pprint-to-str rows))
     (insert!* connectable tableable honeysql-form options)))
 
-#_(m/defmulti insert-returning-keys!* [])
+(defn insert-returning-keys!
+  {:arglists '([connectable-tableable row-or-rows options?]
+               [connectable-tableable k v & more options?]
+               [connectable-tableable columns row-vectors options?])}
+  [connectable-tableable & args]
+  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+        {:keys [rows options]}  (parse-insert!-args* connectable tableable args (conn/default-options connectable))
+        pks                     (tableable/primary-key-keys connectable tableable)
+        get-pks                 (if (= (count pks) 1)
+                                  (first pks)
+                                  (apply juxt pks))
+        options                 (u/recursive-merge
+                                 options
+                                 {:execute {:return-keys true
+                                            :builder-fn  (rs/row-builder-fn connectable tableable)}})
+        results                 (insert! [connectable tableable] rows options)]
+    (map get-pks results)))
 
-(defn insert-returning-keys! [])
+;; TODO
+#_(defn delete! [])
 
-(defn delete! [])
-
-(defn upsert! [])
+;; TODO
+#_(defn upsert! [])

@@ -2,9 +2,11 @@
   (:require [bluejdbc.instance :as instance]
             [bluejdbc.mutative :as mutative]
             [bluejdbc.select :as select]
+            [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
-            [java-time :as t]))
+            [java-time :as t]
+            [methodical.core :as m]))
 
 (use-fixtures :once test/do-with-test-data)
 
@@ -71,50 +73,71 @@
            (mutative/parse-insert!-args* nil nil [[:a :b :c] [[1 2 3] [4 5 6]] {:options? true}] nil)))))
 
 (deftest insert!-test
-  (test/with-venues-reset
-    (test/with-default-connection
-      (is (= nil
-             (select/select-one :venues 4)))
-      (testing "Insert a single row"
-        (is (= {:next.jdbc/update-count 1}
-               (mutative/insert! :venues {:name "Grant & Green", :category "bar"})))
-        (is (= (instance/instance :venues {:id         4
-                                           :name       "Grant & Green"
-                                           :category   "bar"
-                                           :created-at (t/local-date-time "2017-01-01T00:00")
-                                           :updated-at (t/local-date-time "2017-01-01T00:00")})
-               (select/select-one :venues 4))))
+  (doseq [returning-keys? [true false]
+          :let            [insert! (if returning-keys?
+                                     mutative/insert-returning-keys!
+                                     mutative/insert!)]]
+    (testing (if returning-keys? "insert-returning-keys!" "insert!")
+      (test/with-venues-reset
+        (test/with-default-connection
+          (is (= nil
+                 (select/select-one :venues 4)))
+          (testing "Insert a single row"
+            (is (= (if returning-keys?
+                     [4]
+                     {:next.jdbc/update-count 1})
+                   (insert! :venues {:name "Grant & Green", :category "bar"})))
+            (is (= (instance/instance :venues {:id         4
+                                               :name       "Grant & Green"
+                                               :category   "bar"
+                                               :created-at (t/local-date-time "2017-01-01T00:00")
+                                               :updated-at (t/local-date-time "2017-01-01T00:00")})
+                   (select/select-one :venues 4))))
 
-      (testing "Insert multiple rows"
-        (is (= {:next.jdbc/update-count 2}
-               (mutative/insert! :venues [{:name "Black Horse London Pub", :category "bar"}
-                                          {:name "Nick's Crispy Tacos", :category "bar"}])))
-        (is (= [(instance/instance :venues {:id         5
-                                            :name       "Black Horse London Pub"
-                                            :category   "bar"
-                                            :created-at (t/local-date-time "2017-01-01T00:00")
-                                            :updated-at (t/local-date-time "2017-01-01T00:00")})
-                (instance/instance :venues {:id         6
-                                            :name       "Nick's Crispy Tacos"
-                                            :category   "bar"
-                                            :created-at (t/local-date-time "2017-01-01T00:00")
-                                            :updated-at (t/local-date-time "2017-01-01T00:00")})]
-               (select/select :venues :id [:> 4] {:order-by [[:id :asc]]}))))
+          (testing "Insert multiple rows"
+            (is (= (if returning-keys?
+                     [5 6]
+                     {:next.jdbc/update-count 2})
+                   (insert! :venues [{:name "Black Horse London Pub", :category "bar"}
+                                              {:name "Nick's Crispy Tacos", :category "bar"}])))
+            (is (= [(instance/instance :venues {:id         5
+                                                :name       "Black Horse London Pub"
+                                                :category   "bar"
+                                                :created-at (t/local-date-time "2017-01-01T00:00")
+                                                :updated-at (t/local-date-time "2017-01-01T00:00")})
+                    (instance/instance :venues {:id         6
+                                                :name       "Nick's Crispy Tacos"
+                                                :category   "bar"
+                                                :created-at (t/local-date-time "2017-01-01T00:00")
+                                                :updated-at (t/local-date-time "2017-01-01T00:00")})]
+                   (select/select :venues :id [:> 4] {:order-by [[:id :asc]]}))))
 
-      (testing "Insert with key/values"
-        (is (= {:next.jdbc/update-count 1}
-               (mutative/insert! :venues :name "HiDive SF", :category "bar")))
-        (is (= (instance/instance :venues {:id         7
-                                           :name       "HiDive SF"
-                                           :category   "bar"
-                                           :created-at (t/local-date-time "2017-01-01T00:00")
-                                           :updated-at (t/local-date-time "2017-01-01T00:00")})
-               (select/select-one :venues :id 7))))
+          (testing "Insert with key/values"
+            (is (= (if returning-keys?
+                     [7]
+                     {:next.jdbc/update-count 1})
+                   (insert! :venues :name "HiDive SF", :category "bar")))
+            (is (= (instance/instance :venues {:id         7
+                                               :name       "HiDive SF"
+                                               :category   "bar"
+                                               :created-at (t/local-date-time "2017-01-01T00:00")
+                                               :updated-at (t/local-date-time "2017-01-01T00:00")})
+                   (select/select-one :venues :id 7))))
 
-      (testing "Insert with column names"
-        (is (= {:next.jdbc/update-count 2}
-               (mutative/insert! "venues" [:name :category] [["The Ramp" "bar"]
-                                                             ["Louie's" "bar"]])))
-        (is (= [(instance/instance "venues" {:id 8, :name "The Ramp"})
-                (instance/instance "venues" {:id 9, :name "Louie's"})]
-               (select/select "venues" :id [:> 7] {:select [:id :name], :order-by [[:id :asc]]})))))))
+          (testing "Insert with column names"
+            (is (= (if returning-keys?
+                     [8 9]
+                     {:next.jdbc/update-count 2})
+                   (insert! "venues" [:name :category] [["The Ramp" "bar"]
+                                                                 ["Louie's" "bar"]])))
+            (is (= [(instance/instance "venues" {:id 8, :name "The Ramp"})
+                    (instance/instance "venues" {:id 9, :name "Louie's"})]
+                   (select/select "venues" :id [:> 7] {:select [:id :name], :order-by [[:id :asc]]})))))))))
+
+(m/defmethod tableable/primary-key* [:default :venues/composite-pk]
+  [_ _]
+  [:id :name])
+
+(deftest insert-returning-keys!-composite-pk-test
+  ;; TODO
+  )

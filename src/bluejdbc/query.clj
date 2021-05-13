@@ -50,11 +50,7 @@
 
   clojure.lang.IReduceInit
   (reduce [_ rf init]
-    (reduce-query connectable tableable queryable options rf init))
-
-  #_clojure.lang.ISeq
-  #_(seq [this]
-    (seq (all this))))
+    (reduce-query connectable tableable queryable options rf init)))
 
 (m/defmulti reducible-query*
   {:arglists '([connectable tableable queryable options])}

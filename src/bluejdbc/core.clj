@@ -59,7 +59,7 @@
   with-debug-logging]
 
  [mutative
-  delete!
+  #_delete!
   insert!*
   insert!
   insert-returning-keys!
@@ -67,7 +67,7 @@
   save!*
   update!
   update!*
-  upsert!]
+  #_upsert!]
 
  [query
   all

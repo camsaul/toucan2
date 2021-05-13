@@ -35,7 +35,7 @@
   :id)
 
 (defn primary-key-keys
-  "Return the primary key fields names, as a keywords, for a `tableable`.
+  "Return the primary key fields names, as a keywords, for a `tableable`. Always returns a sequence of keywords.
 
     (primary-key-keys :my-connection :user) ;-> [:id]"
   [connectable tableable]
