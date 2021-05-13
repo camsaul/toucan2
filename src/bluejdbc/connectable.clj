@@ -11,7 +11,6 @@
 
 (m/defmethod default-options :default
   [connectable]
-  next.jdbc/execute-one!
   {:execute {:builder-fn (rs/row-builder-fn connectable nil)}})
 
 (m/defmulti connection*
@@ -82,8 +81,8 @@
     (if (and *connection*
              (= connectable *connectable*))
       (f *connection*)
-      (let [options                                                (u/recursive-merge (default-options connectable) options)
-            {:keys [^java.sql.Connection connection new? options]} (connection connectable options)]
+      (let [options                                        (u/recursive-merge (default-options connectable) options)
+            {:keys [^java.sql.Connection connection new?]} (connection connectable options)]
         (binding [*connectable* connectable
                   *connection*  connection]
           (if new?

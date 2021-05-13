@@ -1,6 +1,5 @@
 (ns bluejdbc.select-test
-  (:require [bluejdbc.compile :as compile]
-            [bluejdbc.connectable :as conn]
+  (:require [bluejdbc.connectable :as conn]
             [bluejdbc.instance :as instance]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
@@ -27,10 +26,6 @@
             {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56Z")}
             {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56Z")}]
            results))))
-
-(m/defmethod compile/compile* [:default ::ids]
-  [connectable _ options]
-  (compile/compile* connectable {:select [:id]} options))
 
 (m/defmethod queryable/queryable* [:default :default ::named-query]
   [_ _ _ _]
@@ -249,8 +244,8 @@
   (is (= {1 "cam", 2 "sam", 3 "pam", 4 "tam"}
          (select/select-pk->fn (comp str/lower-case :name) [:test/postgres :people])))
   (testing "Composite PKs"
-    {[1 "Cam"] "Cam", [2 "Sam"] "Sam", [3 "Pam"] "Pam", [4 "Tam"] "Tam"}
-    (select/select-pk->fn :name [:test/postgres :people/composite-pk])))
+    (is (= {[1 "Cam"] "Cam", [2 "Sam"] "Sam", [3 "Pam"] "Pam", [4 "Tam"] "Tam"}
+           (select/select-pk->fn :name [:test/postgres :people/composite-pk])))))
 
 (deftest select-fn->pk-test
   (is (= {"Cam" 1, "Sam" 2, "Pam" 3, "Tam" 4}
@@ -258,8 +253,8 @@
   (is (= {"cam" 1, "sam" 2, "pam" 3, "tam" 4}
          (select/select-fn->pk (comp str/lower-case :name) [:test/postgres :people])))
   (testing "Composite PKs"
-    {"Cam" [1 "Cam"], "Sam" [2 "Sam"], "Pam" [3 "Pam"], "Tam" [4 "Tam"]}
-    (select/select-fn->pk :name [:test/postgres :people/composite-pk])))
+    (is (= {"Cam" [1 "Cam"], "Sam" [2 "Sam"], "Pam" [3 "Pam"], "Tam" [4 "Tam"]}
+           (select/select-fn->pk :name [:test/postgres :people/composite-pk])))))
 
 (deftest count-test
   (is (= 4
