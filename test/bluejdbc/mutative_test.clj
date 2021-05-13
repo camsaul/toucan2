@@ -139,5 +139,7 @@
   [:id :name])
 
 (deftest insert-returning-keys!-composite-pk-test
-  ;; TODO
-  )
+  (test/with-venues-reset
+    (test/with-default-connection
+      (is (= [[4 "Grant & Green"]]
+             (mutative/insert-returning-keys! :venues/composite-pk {:name "Grant & Green", :category "bar"}))))))
