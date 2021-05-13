@@ -1,11 +1,33 @@
 (ns bluejdbc.connectable-test
   (:require [bluejdbc.connectable :as conn]
+            [bluejdbc.mutative :as mutative]
+            [bluejdbc.select :as select]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [methodical.core :as m]
             [potemkin :as p]))
 
+(use-fixtures :once test/do-with-test-data)
+
 (comment test/keep-me)
+
+(deftest parse-with-connection-arg-test
+  (is (= {:binding '_, :connectable `conn/*connectable*}
+         (#'conn/parse-with-connection-arg '[_])))
+  (is (= {:connectable `conn/*connectable*, :binding '_}
+         (#'conn/parse-with-connection-arg '[])))
+  (is (= {:binding '_, :connectable `conn/*connectable*}
+         (#'conn/parse-with-connection-arg '[_ _])))
+  (is (= {:binding '_, :connectable `conn/*connectable*}
+         (#'conn/parse-with-connection-arg '[_ nil])))
+  (is (= {:binding '_, :connectable `conn/*connectable*}
+         (#'conn/parse-with-connection-arg '[nil])))
+  (is (= {:connectable `conn/*connectable*, :binding '_}
+         (#'conn/parse-with-connection-arg nil)))
+  (is (= {:connectable `conn/*connectable*, :binding '_}
+         (#'conn/parse-with-connection-arg '_)))
+  (is (= '{:binding a, :connectable b, :options c}
+         (#'conn/parse-with-connection-arg '[a b c]))))
 
 (p/defrecord+ ^:private MockConnection [connectable options closed?]
   java.sql.Connection
@@ -70,3 +92,105 @@
              (:connectable conn))))
     (finally
       (m/remove-primary-method! conn/connection* :bluejdbc/default))))
+
+(deftest with-transaction-test
+  (test/with-venues-reset
+    (test/with-default-connection
+      (testing "should commit if no exception is thrown"
+        (testing "_ = use current connection"
+          (is (= {:next.jdbc/update-count 1}
+                 (conn/with-transaction _
+                   (mutative/insert! :venues {:name "Venue 4", :category "place"})))))
+        (is (select/exists? :venues :name "Venue 4"))))
+
+    (testing "should rollback if exception is thrown"
+      (is (thrown-with-msg?
+           Exception
+           #"Oops"
+           (conn/with-transaction :test/postgres
+             (mutative/insert! :venues :name "Venue 5", :category "place")
+             (mutative/insert! :venues :name "Venue 6", :category "place")
+             (testing "uncommitted objects should be visible inside transaction"
+               (is (select/exists? [:test/postgres :venues] :name "Venue 5"))
+               (is (select/exists? [:test/postgres :venues] :name "Venue 6")))
+             (throw (Exception. "Oops!")))))
+      (is (not (select/exists? [:test/postgres :venues] :name "Venue 5")))
+      (is (not (select/exists? [:test/postgres :venues] :name "Venue 6"))))
+
+    (testing "conn binding -- should not create a new Connection"
+      (test/with-default-connection
+        (conn/with-connection [conn]
+          (conn/with-transaction [t-conn]
+            (is (identical? conn t-conn))
+            (testing "nested transactions"
+              (conn/with-transaction [t-conn-2]
+                (is (identical? conn t-conn-2)))))
+          (conn/with-transaction [t-conn _]
+            (is (identical? conn t-conn)))
+          (conn/with-transaction [t-conn conn]
+            (is (identical? conn t-conn))))))))
+
+(deftest nested-transaction-test
+  (test/with-venues-reset
+    (test/with-default-connection
+      (letfn [(venue-visible? [id]
+                (select/exists? :venues :name (format "Venue %d" id)))
+              (venue-visible-outside? []
+                (select/exists? [:test/postgres :venues] :name "Venue 6"))
+              (f [top-level-fails?]
+                (conn/with-transaction [t-conn]
+                  (mutative/insert! :venues :name "Venue 6", :category "place")
+                  (testing "uncommitted object"
+                    (testing "should be visible inside transaction"
+                      (is (venue-visible? 6)))
+                    (testing "should not be visible outside transaction"
+                      (is (not (venue-visible-outside?)))))
+
+                  (testing "nested transaction that commits\n"
+                    (conn/with-transaction _
+                      (mutative/insert! :venues :name "Venue 7", :category "place"))
+                    (testing "committing a nested transaction should not commit its parent transaction"
+                      (is (venue-visible? 6))
+                      (is (not (venue-visible-outside?))))
+                    (testing "object from committed nested transaction"
+                      (testing "should be visible inside parent transaction"
+                        (is (venue-visible? 7)))
+                      (testing "should not be visible outside"
+                        (is (not (select/exists? [:test/postgres :venues] :name "Venue 7"))))))
+
+                  (testing "nested transaction that throws an Exception\n"
+                    (is (thrown-with-msg?
+                         Exception
+                         #"Oops"
+                         (conn/with-transaction _
+                           (is (venue-visible? 6))
+                           (testing "Object created in parent transaction (not committed) should be visible"
+                             (mutative/insert! :venues :name "Venue 8", :category "place"))
+                           (throw (Exception. "Oops!")))))
+                    (testing "Object from top-level transaction should still exist"
+                      (is (venue-visible? 6)))
+                    (testing "Object from nested transaction that threw an Exception should have been rolled back"
+                      (is (not (venue-visible? 8))))
+                    (when top-level-fails?
+                      (throw (Exception. "Oh no!"))))))]
+        (testing "top-level transaction fails"
+          (is (thrown-with-msg?
+               Exception
+               #"Oh no"
+               (f true)))
+          (testing "after roll back:"
+            (testing "object inserted at top-level should not exist"
+              (is (not (venue-visible? 6))))
+            (testing "object inserted by nested transaction (committed) should not exist"
+              (is (not (venue-visible? 7))))
+            (testing "object inserted by nested transaction (failed) should not exist"
+              (is (not (venue-visible? 8))))))
+
+        (testing "top-level transaction succeeds"
+          (f false)
+          (testing "object inserted at top-level should exist"
+            (is (venue-visible? 6)))
+          (testing "object inserted by nested transaction (committed) should exist"
+            (is (venue-visible? 7)))
+          (testing "object inserted by nested transaction (failed) should not exist"
+            (is (not (venue-visible? 8)))))))))

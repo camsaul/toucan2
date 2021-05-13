@@ -1,8 +1,10 @@
 (ns bluejdbc.connectable
   (:require [bluejdbc.result-set :as rs]
             [bluejdbc.util :as u]
+            [clojure.spec.alpha :as s]
             [methodical.core :as m]
-            [next.jdbc :as next.jdbc]))
+            [next.jdbc :as next.jdbc]
+            [next.jdbc.transaction :as next.jdbc.transaction]))
 
 ;; TODO -- consider whether this should end with a `*` so it's consistent with the other multimethods.
 (m/defmulti default-options
@@ -70,9 +72,11 @@
   ([k options]
    (connection* k options)))
 
+;; TODO -- consider renaming to `*current-connectable*`
 (def ^:dynamic *connectable*
   :bluejdbc/default)
 
+;; TODO -- consider renaming to `*current-connection*`
 (def ^:dynamic ^java.sql.Connection *connection*
   nil)
 
@@ -90,20 +94,69 @@
               (f connection))
             (f connection)))))))
 
+;; this can't go in the specs namespace with everything else because it creates a circular reference.
+(s/def ::with-connection-arg
+  (s/or :connectable (complement vector?)
+        :vector      (s/cat :binding     (s/? any?)
+                            :connectable (s/? any?)
+                            :options     (s/? any?))))
+
+(defn- parse-with-connection-arg [arg]
+  (let [parsed (s/conform ::with-connection-arg arg)]
+    (when (= parsed :clojure.spec.alpha/invalid)
+      (throw (ex-info (format "Don't know how to interpret with-connection arg: %s"
+                              (s/explain-str ::with-connection-arg arg))
+                      {:arg arg})))
+    (let [[arg-type arg] parsed]
+      (-> (if (= arg-type :connectable)
+            {:connectable arg}
+            arg)
+          (update :connectable (fn [connectable]
+                                 (if (or (= connectable '_)
+                                         (not connectable))
+                                   `*connectable*
+                                   connectable)))
+          (update :binding #(or % '_))))))
+
 ;; TODO -- not sure about this syntax.
 (defmacro with-connection
-  {:arglists '([[conn-binding connectable options] & body]
-               [connectable & body])}
+  {:style/indent 1
+   :arglists     '([[conn-binding connectable options] & body]
+                   [connectable & body])}
   [x & body]
-  (let [[conn-binding connectable options] (if (sequential? x)
-                                             x
-                                             [nil x nil])]
+  (let [{:keys [binding connectable options]} (parse-with-connection-arg x)]
     `(do-with-connection
-      ~connectable ~options
-      (fn [~(vary-meta (or conn-binding '_) assoc :tag 'java.sql.Connection)]
+      ~connectable
+      ~options
+      (fn [~(vary-meta (or binding '_) assoc :tag 'java.sql.Connection)]
         ~@body))))
 
 (defn parse-connectable-tableable [connectable-tableable]
   (if (sequential? connectable-tableable)
     connectable-tableable
     [*connectable* connectable-tableable]))
+
+(defn do-with-transaction [connectable options f]
+  (with-connection [conn connectable options]
+    ;; "ignore" nested transactions -- we'll make it work ourselves.
+    (binding [next.jdbc.transaction/*nested-tx* :ignore]
+      (next.jdbc/with-transaction [tx-connection conn]
+        (let [save-point (.setSavepoint tx-connection)]
+          (try
+            (binding [*connection* tx-connection]
+              (f *connection*))
+            (catch Throwable e
+              (.rollback tx-connection save-point)
+              (throw e))))))))
+
+(defmacro with-transaction
+  {:style/indent 1
+   :arglists     '([[conn-binding connectable options] & body]
+                   [connectable & body])}
+  [x & body]
+  (let [{:keys [binding connectable options]} (parse-with-connection-arg x)]
+    `(do-with-transaction
+      ~connectable
+      ~options
+      (fn [~(vary-meta (or binding '_) assoc :tag 'java.sql.Connection)]
+        ~@body))))
