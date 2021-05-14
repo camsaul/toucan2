@@ -83,3 +83,8 @@
  {:linter :wrong-arity
   :function-symbol 'bluejdbc.mutative/insert!
   :arglists-for-linting '([connectable-tableable & args])})
+
+(disable-warning
+ {:linter :wrong-arity
+  :function-symbol 'bluejdbc.mutative/insert-returning-keys!
+  :arglists-for-linting '([connectable-tableable & args])})

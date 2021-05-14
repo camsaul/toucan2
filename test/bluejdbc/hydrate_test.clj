@@ -5,6 +5,7 @@
             [bluejdbc.test :as test]
             [bluejdbc.transformed :as transformed]
             [clojure.test :refer :all]
+            [java-time :as t]
             [methodical.core :as m]))
 
 (use-fixtures :once test/do-with-test-data)
@@ -21,19 +22,21 @@
   {:category {:in  name
               :out keyword}})
 
-(deftest kw-append-test
-  (is (= :user_id
-         (#'hydrate/kw-append :user "_id")))
-  (is (= :toucan-id
-         (#'hydrate/kw-append :toucan "-id"))))
-
-(m/defmethod hydrate/automagic-hydration-key-table* [:default ::user]
+(m/defmethod hydrate/table-for-automagic-hydration* [:default ::user]
   [_ _]
   :user)
 
-(m/defmethod hydrate/automagic-hydration-key-table* [:default ::venue]
+(m/defmethod hydrate/table-for-automagic-hydration* [:default ::venue]
   [_ _]
   ::venues-with-category-keyword)
+
+(deftest fk-keys-for-automagic-hydration*-test
+  (testing "Should use hydrated key + `-id` by default"
+    (is (= [:user-id]
+           (hydrate/fk-keys-for-automagic-hydration* nil :checkins :user :users)))
+    (testing "Should ignore keyword namespaces"
+      (is (= [:venue-id]
+             (hydrate/fk-keys-for-automagic-hydration* nil :checkins ::venue :venues))))))
 
 (deftest can-hydrate-with-strategy-test
   (testing "should fail for unknown keys"
@@ -41,13 +44,14 @@
            (hydrate/can-hydrate-with-strategy?* nil nil ::hydrate/automagic-batched :a)))))
 
 (deftest hydrate-test
-  (testing "it should correctly hydrate"
-    (is (= [{::venue_id 1
-             ::venue    {:category :bar, :name "Tempest", :id 1}}
-            {::venue-id 2
-             ::venue    {:category :bar, :name "Ho's Tavern", :id 2}}]
-           (for [result (hydrate/hydrate [{::venue_id 1} {::venue-id 2}] ::venue)]
-             (update result ::venue #(dissoc % :updated-at :created-at)))))))
+  (test/with-default-connection
+    (testing "it should correctly hydrate"
+      (is (= [{:venue-id 1
+               ::venue    {:category :bar, :name "Tempest", :id 1}}
+              {:venue-id 2
+               ::venue    {:category :bar, :name "Ho's Tavern", :id 2}}]
+             (for [result (hydrate/hydrate [{:venue-id 1} {:venue-id 2}] ::venue)]
+               (update result ::venue #(dissoc % :updated-at :created-at))))))))
 
 (defn- valid-form? [form]
   (try
@@ -276,8 +280,7 @@
 
 (deftest batched-hydration-test
   (testing "Check that batched hydration doesn't try to hydrate fields that already exist and are not delays"
-    (is (= {:user_id 1
-            :user    "OK <3"}
+    (is (= (bluejdbc.instance/instance :bluejdbc/default :user {:user-id 1, :user "OK <3"})
            (hydrate/hydrate (instance/instance :user {:user_id 1
                                                       :user    "OK <3"})
                             :user))))
@@ -287,4 +290,38 @@
                            (instance/instance :bird {:type :pigeon})]
                           ::is-bird?))))
 
-;; TODO add test for selecting hydration for where (not= pk :id)
+(m/defmethod tableable/primary-key* [:default :bluejdbc.hydrate-test.people/composite-pk]
+  [_ _]
+  [:id :name])
+
+(m/defmethod hydrate/table-for-automagic-hydration* [:default ::people]
+  [_ _]
+  :bluejdbc.hydrate-test.people/composite-pk)
+
+(m/defmethod hydrate/fk-keys-for-automagic-hydration* [:default :default ::people :default]
+  [_ _ _ _]
+  [:person-id :person-name])
+
+(deftest automagic-batched-hydration-composite-pks-test
+  (test/with-default-connection
+    (is (= [(bluejdbc.instance/instance nil {:person-id                    1
+                                             :person-name                  "Cam"
+                                             :bluejdbc.hydrate-test/people (bluejdbc.instance/instance
+                                                                            :bluejdbc.hydrate-test.people/composite-pk
+                                                                            {:id         1
+                                                                             :name       "Cam"
+                                                                             :created-at (t/offset-date-time "2020-04-21T23:56Z")})})
+            {:person-id                    2
+             :person-name                  "Sam"
+             :bluejdbc.hydrate-test/people (bluejdbc.instance/instance
+                                            :bluejdbc.hydrate-test.people/composite-pk
+                                            {:id         2
+                                             :name       "Sam"
+                                             :created-at (t/offset-date-time "2019-01-11T23:56Z")})}
+            {:person-id 3, :person-name "Bird"}
+            {:persion-id nil, :person-name "Pam"}]
+           ;; should use the connectable from the first row
+           (hydrate/hydrate [(instance/instance :test/postgres nil {:person-id 1, :person-name "Cam"})
+                             {:person-id 2, :person-name "Sam"}
+                             {:person-id 3, :person-name "Bird"}
+                             {:persion-id nil, :person-name "Pam"}] ::people)))))

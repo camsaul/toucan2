@@ -23,10 +23,9 @@
   [connectable tableable query {:keys [include-queries-in-exceptions?]
                                 :or   {include-queries-in-exceptions? true}
                                 :as   options}]
-  (log/tracef "Compile query with table %s and options %s\n^%s %s"
+  (log/tracef "Compile query with table %s and options %s\n%s"
               (pr-str tableable)
-              (u/pprint-to-str options)
-              (some-> query class .getCanonicalName)
+              (pr-str options)
               (u/pprint-to-str query))
   (try
     (let [sql-params (next-method connectable tableable query options)]
@@ -65,13 +64,13 @@
 
 (m/defmethod compile* [:default :default clojure.lang.IPersistentMap]
   [connectable _ honeysql-form {options :honeysql}]
-  (log/tracef "Compile HoneySQL form\n%s" (u/pprint-to-str honeysql-form))
+  (log/trace "Compile HoneySQL form")
   (when (seq options)
-    (log/tracef "\noptions: %s" (u/pprint-to-str options)))
+    (log/tracef "\noptions: %s" (pr-str options)))
   (binding [*compile-connectable* connectable
             *compile-options*     options]
     (let [sql-params (apply hsql/format honeysql-form (mapcat identity options))]
-      (log/tracef "->\n%s" (u/pprint-to-str sql-params))
+      (log/tracef "COMPILED SQL => %s" (u/pprint-to-str sql-params))
       sql-params)))
 
 (defn compile

@@ -170,7 +170,7 @@
   {:arglists '([f connectable-tableable pk? conditions? queryable? options?])}
   [f connectable-tableable & args]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        pks-fn                       (select-pks-fn connectable tableable)]
+        pks-fn                  (select-pks-fn connectable tableable)]
     (apply select-fn->fn f pks-fn [connectable tableable] args)))
 
 (defn select-pk->fn

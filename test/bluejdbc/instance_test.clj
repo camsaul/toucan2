@@ -179,8 +179,8 @@
 
 (deftest magic-equality-test
   (testing "Two maps created with different key cases should be equal"
-    (= (instance/instance nil {:db-id 1, :table-id 2})
-       (instance/instance nil {:db_id 1, :table_id 2})))
+    (is (= (instance/instance nil {:db-id 1, :table-id 2})
+           (instance/instance nil {:db_id 1, :table_id 2}))))
   (testing "should be equal to normal map with the same keys"
     (is (= {:db-id 1, :table-id 2}
            (instance/instance nil {:db_id 1, :table_id 2})))

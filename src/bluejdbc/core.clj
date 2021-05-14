@@ -50,8 +50,10 @@
  [hydrate
   automagic-hydration-key-table*
   batched-hydrate*
+  fk-keys-for-automagic-hydration*
   hydrate
-  simple-hydrate*]
+  simple-hydrate*
+  table-for-automagic-hydration*]
 
  [instance
   changes

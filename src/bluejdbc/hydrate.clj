@@ -1,9 +1,11 @@
 (ns bluejdbc.hydrate
   (:require [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
+            [bluejdbc.query :as query]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
+            [camel-snake-kebab.core :as csk]
             [methodical.core :as m]))
 
 (m/defmulti can-hydrate-with-strategy?*
@@ -18,49 +20,92 @@
 ;;;                                  Automagic Batched Hydration (via :table-keys)
 ;;; ==================================================================================================================
 
-(m/defmulti automagic-hydration-key-table*
+(m/defmulti table-for-automagic-hydration*
+  "The table that should be used to automagically hydrate from based on values of `k`.
+
+    (table-for-automagic-hydration* :bluejdbc/default :user) :-> :myapp.models/user"
   {:arglists '([connectable k])}
   u/dispatch-on-first-two-args)
 
-(m/defmethod automagic-hydration-key-table* :default
+(m/defmethod table-for-automagic-hydration* :default
   [_ _]
   nil)
 
-(defn- kw-append
-  "Append to a keyword.
-
-     (kw-append :user \"_id\") -> :user_id"
-  [k suffix]
-  (keyword
-   (str (when-let [nmspc (namespace k)]
-          (str nmspc "/"))
-        (name k)
-        suffix)))
-
 (m/defmethod can-hydrate-with-strategy?* [:default :default ::automagic-batched :default]
-  [connectable tableable strategy k]
-  (boolean (automagic-hydration-key-table* connectable k)))
+  [connectable tableable strategy dest-key]
+  (boolean (table-for-automagic-hydration* connectable dest-key)))
+
+(m/defmulti fk-keys-for-automagic-hydration*
+  {:arglists '([connectable original-tableable dest-key hydrated-tableable])}
+  u/dispatch-on-first-four-args)
+
+(m/defmethod fk-keys-for-automagic-hydration* :default
+  [_ _ dest-key _]
+  [(csk/->kebab-case (keyword (str (name dest-key) "-id")))])
+
+(defn- automagic-batched-hydration-add-fks [dest-key results fk-keys]
+  (let [get-fk-values (apply juxt fk-keys)]
+    (for [row results]
+      (if (get row dest-key)
+        (do
+          (log/tracef "Don't need to hydrate %s: already has %s" row dest-key)
+          row)
+        (let [fk-vals (get-fk-values row)]
+          (if (every? some? fk-vals)
+            (do
+              (log/tracef "Attempting to hydrate %s with values of %s %s" row fk-keys fk-vals)
+              (assoc row ::fk fk-vals))
+            (do
+              (log/tracef "Skipping %s: values of %s are %s" row fk-keys fk-vals)
+              row)))))))
+
+(defn- automagic-batched-hydration-fetch-pk->instance [connectable hydrating-table rows]
+  (let [pk-keys (tableable/primary-key-keys connectable hydrating-table)]
+    (assert (pos? (count pk-keys)))
+    (log/tracef "Hydrating with PKs %s" pk-keys)
+    (if-let [fk-values-set (not-empty (set (filter some? (map ::fk rows))))]
+      (select/select-pk->fn query/realize-row
+                            [connectable hydrating-table]
+                            {:where (let [clauses (map-indexed
+                                                   (fn [i pk-key]
+                                                     [:in pk-key (set (map #(nth % i) fk-values-set))])
+                                                   pk-keys)]
+                                      (if (> (count clauses) 1)
+                                        (cons :and clauses)
+                                        (first clauses)))})
+      (log/tracef "Not hydrating %s: no rows have non-nil FK values" hydrating-table))))
+
+(defn- do-automagic-batched-hydration [dest-key rows pk->fetched-instance]
+  (log/tracef "Attempting to hydrate %d/%d rows" (count (filter ::fk rows)) (count rows))
+  (for [row rows]
+    (if-not (::fk row)
+      row
+      (let [fk-vals          (::fk row)
+            ;; convert fk to from [id] to id if it only has one key. This is what `select-pk->fn` returns.
+            fk-vals          (if (= (count fk-vals) 1)
+                               (first fk-vals)
+                               fk-vals)
+            fetched-instance (get pk->fetched-instance fk-vals)]
+        (log/tracef "Hydrate %s %s -> %s" row dest-key (or fetched-instance "nil (no matching fetched row)"))
+        (cond-> (dissoc row ::fk)
+          fetched-instance (assoc dest-key fetched-instance))))))
 
 (m/defmethod hydrate-with-strategy* ::automagic-batched
-  [connectable tableable strategy dest-key results]
-  (let [table       (automagic-hydration-key-table* connectable dest-key)
-        source-keys #{(kw-append dest-key "_id") (kw-append dest-key "-id")}
-        ids         (set (for [result results
-                               :when  (not (get result dest-key))
-                               :let   [k (some result source-keys)]
-                               :when  k]
-                           k))
-        ;; TODO -- this doesn't work with composite PKs (yet)
-        primary-key (tableable/primary-key* nil table)
-        objs        (if (seq ids)
-                      (into {} (for [item (select/select table, primary-key [:in ids])]
-                                 {(primary-key item) item}))
-                      (constantly nil))]
-    (for [result results
-          :let   [source-id (some result source-keys)]]
-      (if (get result dest-key)
-        result
-        (assoc result dest-key (objs source-id))))))
+  [connectable original-table strategy dest-key rows]
+  (try
+    (let [hydrating-table      (table-for-automagic-hydration* connectable dest-key)
+          _                    (log/tracef "Hydrating %s key %s with rows from %s" (or original-table "map") dest-key hydrating-table)
+          fk-keys              (fk-keys-for-automagic-hydration* connectable (or original-table "map") dest-key hydrating-table)
+          _                    (log/tracef "Hydrating with FKs %s" fk-keys)
+          rows                 (automagic-batched-hydration-add-fks dest-key rows fk-keys)
+          pk->fetched-instance (automagic-batched-hydration-fetch-pk->instance connectable hydrating-table rows)]
+      (log/tracef "Fetched %d rows of %s" (count pk->fetched-instance) hydrating-table)
+      (do-automagic-batched-hydration dest-key rows pk->fetched-instance))
+    (catch Throwable e
+      (throw (ex-info (format "Error doing automagic batched hydration: %s" (ex-message e))
+                      {:tableable original-table
+                       :dest-key  dest-key}
+                      e)))))
 
 
 ;;;                         Method-Based Batched Hydration (using impls of `batched-hydrate`*)
@@ -124,7 +169,7 @@
   [connectable tableable rows k]
   (if-let [strategy (hydration-strategy connectable tableable k)]
     (do
-      (log/tracef "Hydrating %s with strategy %s" k strategy)
+      (log/tracef "Hydrating %s %s with strategy %s" (or tableable "map") k strategy)
       (hydrate-with-strategy* connectable tableable strategy k rows))
     (do
       (log/tracef "Don't know how to hydrate %s" k)
@@ -212,10 +257,10 @@
   "Hydrate a single object or sequence of objects.
 
 
-  #### Automagic Batched Hydration (via `automagic-hydration-key-table*`)
+  #### Automagic Batched Hydration (via `table-for-automagic-hydration*`)
 
   `hydrate` attempts to do a *batched hydration* where possible.
-  If the key being hydrated is defined as one of some table's `automagic-hydration-key-table*`,
+  If the key being hydrated is defined as one of some table's `table-for-automagic-hydration*`,
   `hydrate` will do a batched `db/select` if a corresponding key ending with `_id`
   is found in the objects being batch hydrated.
 
@@ -231,7 +276,7 @@
 
   #### Function-Based Batched Hydration (via functions marked ^:batched-hydrate*)
 
-  If the key can't be hydrated auto-magically with the appropriate `:automagic-hydration-key-table*`,
+  If the key can't be hydrated auto-magically with the appropriate `:table-for-automagic-hydration*`,
   `hydrate` will look for a function tagged with `:batched-hydrate`* in its metadata, and
   use that instead. If a matching function is found, it is called with a collection of objects,
   e.g.
