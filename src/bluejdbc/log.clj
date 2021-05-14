@@ -1,5 +1,6 @@
 (ns bluejdbc.log
-  (:require [clojure.tools.logging :as log]))
+  (:require [clojure.pprint :as pprint]
+            [clojure.tools.logging :as log]))
 
 (def ^:dynamic *enable-debug-logging*
   "Whether to print log messages to stdout. Useful for debugging things from the REPL."
@@ -13,23 +14,39 @@
   `(binding [*enable-debug-logging* true]
      ~@body))
 
+(defn- maybe-pr-str [x]
+  (cond
+    (string? x) x
+    (number? x) x
+    :else       (pr-str x)))
+
+(defn- log* [f x args]
+  (try
+    (if (instance? Throwable x)
+      (do
+        (pprint/pprint (Throwable->map x))
+        (f args))
+      (f (cons x args)))
+    (catch Throwable e
+      (throw (ex-info (str "Error printing log message: " (ex-message e)) {:args args} e)))))
+
 (defn debug-logp
   "Print log messages to stdout for debugging. (For `logp`-style logging macros.)"
   [x & args]
-  (if (instance? Throwable x)
-    (do
-      (println x)
-      (apply println args))
-    (apply println x args)))
+  (log*
+   (fn [args]
+     (apply println (map maybe-pr-str args)))
+   x
+   args))
 
 (defn debug-logf
   "Print log messages to stdout for debugging. (For `logf`-style logging macros.)"
   [x & args]
-  (if (instance? Throwable x)
-    (do
-      (println x)
-      (println (apply format args)))
-    (println (apply format x args))))
+  (log*
+   (fn [[format-string & args]]
+     (println (apply format format-string (map maybe-pr-str args))))
+   x
+   args))
 
 (defmacro logp
   "Like `clojure.tools.logging/logp`, but also prints log messages to stdout if debug logging is enabled."

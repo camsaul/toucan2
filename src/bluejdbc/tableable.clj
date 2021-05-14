@@ -1,6 +1,7 @@
 (ns bluejdbc.tableable
   (:require [bluejdbc.instance :as instance]
             [bluejdbc.util :as u]
+            [clojure.string :as str]
             [methodical.core :as m]))
 
 (m/defmulti table-name*
@@ -17,7 +18,7 @@
     (throw (ex-info (format "Don't know how to convert %s to a table name" (pr-str tableable))
                     {:tableable tableable})))
   (if-let [nmspace (namespace tableable)]
-    nmspace
+    (last (str/split nmspace #"\."))
     (name tableable)))
 
 (defn table-name
@@ -27,6 +28,8 @@
 
 ;; TODO -- shouldn't this take options as well?
 (m/defmulti primary-key*
+  "Return the primary key(s) for this table. Can be either a single keyword or a vector of multiple keywords for
+  composite PKs."
   {:arglists '([connectable tableable])}
   u/dispatch-on-first-two-args)
 
