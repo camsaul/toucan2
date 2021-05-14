@@ -18,7 +18,6 @@
   "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
   {:arglists '([connectable tableable ^ResultSet rs ^ResultSetMetaData rsmeta ^Integer i options])}
   (fn [connectable tableable _ ^ResultSetMetaData rsmeta ^Integer i _]
-    ;; TODO - log nice name for col type
     (let [col-type (.getColumnType rsmeta i)]
       (log/tracef "Column %d %s is of JDBC type %s, native type %s"
                   i (pr-str (.getColumnLabel rsmeta i)) (type-name col-type) (.getColumnTypeName rsmeta i))
@@ -30,18 +29,18 @@
     (.getObject rs i)))
 
 (m/defmethod read-column-thunk :around :default
-  [connectable tableable rs rsmeta i options]
+  [connectable tableable rs ^ResultSetMetaData rsmeta ^Integer i options]
   (log/tracef "Fetching values in column %d with (.getObject rs %d) and options %s" i i (pr-str options))
   (next-method connectable tableable rs rsmeta i options))
 
 (defn get-object-of-class-thunk [^ResultSet rs ^Integer i ^Class klass]
   (log/tracef "Fetching values in column %d with (.getObject rs %d %s)" i i (.getCanonicalName klass))
-  (fn []
+  (fn get-object-of-class-thunk []
     (.getObject rs i klass)))
 
 (m/defmethod read-column-thunk [:default :default Types/CLOB]
   [_ _ ^ResultSet rs _ ^Integer i _]
-  (fn []
+  (fn get-string-thunk []
     (.getString rs i)))
 
 (m/defmethod read-column-thunk [:default :default Types/TIMESTAMP]
@@ -78,7 +77,21 @@
            rsmeta        (.getMetaData rs)
            cols          (jdbc.rs/get-unqualified-column-names rsmeta options)
            i->col-thunk  (into {} (for [i (index-range rsmeta)]
-                                    [i (read-column-thunk connectable tableable rs rsmeta i options)]))]
+                                    [i (let [thunk (read-column-thunk connectable tableable rs rsmeta i options)]
+                                         (fn []
+                                           (try
+                                             (thunk)
+                                             (catch Throwable e
+                                               (throw (ex-info (format "Error reading %s column %d %s: %s"
+                                                                       (type-name (.getColumnType rsmeta i))
+                                                                       i
+                                                                       (pr-str (.getColumnLabel rsmeta i))
+                                                                       (ex-message e))
+                                                               {:name        (.getColumnLabel rsmeta i)
+                                                                :index       i
+                                                                :type        (type-name (.getColumnType rsmeta i))
+                                                                :native-type (.getColumnTypeName rsmeta i)}
+                                                               e))))))]))]
        (reify
          jdbc.rs/RowBuilder
          (->row [this]

@@ -1,5 +1,6 @@
 (ns bluejdbc.queryable
   (:require [bluejdbc.connectable :as conn]
+            [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.util :as u]
             [methodical.core :as m]))
 
@@ -28,10 +29,10 @@
 
 (defn queryable
   ([a-queryable]
-   (queryable conn/*connectable* nil a-queryable nil))
+   (queryable conn.current/*current-connectable* nil a-queryable nil))
 
   ([tableable a-queryable]
-   (queryable conn/*connectable* tableable a-queryable nil))
+   (queryable conn.current/*current-connectable* tableable a-queryable nil))
 
   ([connectable tableable a-queryable]
    (queryable connectable tableable a-queryable nil))

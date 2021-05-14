@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [count compile defmethod])
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as connectable]
+            [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
@@ -14,6 +15,7 @@
 
 (comment
   compile/keep-me
+  conn.current/keep-me
   connectable/keep-me
   hydrate/keep-me
   instance/keep-me
@@ -35,9 +37,11 @@
   from*
   table-identifier]
 
+ [conn.current
+  *current-connectable*
+  *current-connection*]
+
  [connectable
-  *connectable*
-  *connection*
   connection
   connection*
   default-options
@@ -52,6 +56,7 @@
  [instance
   changes
   instance
+  key-transform-fn*
   original
   table]
 

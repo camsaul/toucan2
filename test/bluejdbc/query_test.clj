@@ -20,7 +20,7 @@
              (into [] (map #(select-keys % [:count])) (query/reducible-query "SELECT count(*) FROM people;"))))))
 
   (testing "eductions"
-    (is (= [{:id 2, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}]
+    (is (= [{:id 2, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")}]
            (into
             []
             (map query/realize-row)
@@ -43,10 +43,10 @@
              (query/query "SELECT count(*) FROM people;")))))
 
   (testing "HoneySQL query"
-    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
-            {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56Z")}
-            {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56Z")}
-            {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")}
+            {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56Z")}
+            {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56Z")}
+            {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56Z")}]
            (query/query :test/postgres {:select [:*], :from [:people]}))))
 
   (testing "named query"

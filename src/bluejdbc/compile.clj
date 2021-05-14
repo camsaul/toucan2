@@ -1,6 +1,7 @@
 (ns bluejdbc.compile
   (:refer-clojure :exclude [compile])
   (:require [bluejdbc.connectable :as conn]
+            [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.log :as log]
             [bluejdbc.queryable :as queryable]
             [bluejdbc.tableable :as tableable]
@@ -64,7 +65,9 @@
 
 (m/defmethod compile* [:default :default clojure.lang.IPersistentMap]
   [connectable _ honeysql-form {options :honeysql}]
-  (log/tracef "Compile HoneySQL form\n%s\noptions: %s" (u/pprint-to-str honeysql-form) (u/pprint-to-str options))
+  (log/tracef "Compile HoneySQL form\n%s" (u/pprint-to-str honeysql-form))
+  (when (seq options)
+    (log/tracef "\noptions: %s" (u/pprint-to-str options)))
   (binding [*compile-connectable* connectable
             *compile-options*     options]
     (let [sql-params (apply hsql/format honeysql-form (mapcat identity options))]
@@ -73,10 +76,10 @@
 
 (defn compile
   ([queryable]
-   (compile conn/*connectable* nil queryable nil))
+   (compile conn.current/*current-connectable* nil queryable nil))
 
   ([tableable queryable]
-   (compile conn/*connectable* tableable queryable nil))
+   (compile conn.current/*current-connectable* tableable queryable nil))
 
   ([connectable tableable queryable]
    (compile connectable tableable queryable nil))
@@ -142,7 +145,7 @@
   ;; worth the added cognitive load of having the arguments appear in a different order in this place and nowhere
   ;; else.
   ([tableable queryable]
-   (from conn/*connectable* tableable queryable))
+   (from conn.current/*current-connectable* tableable queryable))
 
   ([connectable tableable queryable]
    (from connectable tableable queryable nil))

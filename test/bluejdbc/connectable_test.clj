@@ -1,5 +1,6 @@
 (ns bluejdbc.connectable-test
   (:require [bluejdbc.connectable :as conn]
+            [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.mutative :as mutative]
             [bluejdbc.select :as select]
             [bluejdbc.test :as test]
@@ -12,19 +13,19 @@
 (comment test/keep-me)
 
 (deftest parse-with-connection-arg-test
-  (is (= {:binding '_, :connectable `conn/*connectable*}
+  (is (= {:binding '_, :connectable `conn.current/*current-connectable*}
          (#'conn/parse-with-connection-arg '[_])))
-  (is (= {:connectable `conn/*connectable*, :binding '_}
+  (is (= {:connectable `conn.current/*current-connectable*, :binding '_}
          (#'conn/parse-with-connection-arg '[])))
-  (is (= {:binding '_, :connectable `conn/*connectable*}
+  (is (= {:binding '_, :connectable `conn.current/*current-connectable*}
          (#'conn/parse-with-connection-arg '[_ _])))
-  (is (= {:binding '_, :connectable `conn/*connectable*}
+  (is (= {:binding '_, :connectable `conn.current/*current-connectable*}
          (#'conn/parse-with-connection-arg '[_ nil])))
-  (is (= {:binding '_, :connectable `conn/*connectable*}
+  (is (= {:binding '_, :connectable `conn.current/*current-connectable*}
          (#'conn/parse-with-connection-arg '[nil])))
-  (is (= {:connectable `conn/*connectable*, :binding '_}
+  (is (= {:connectable `conn.current/*current-connectable*, :binding '_}
          (#'conn/parse-with-connection-arg nil)))
-  (is (= {:connectable `conn/*connectable*, :binding '_}
+  (is (= {:connectable `conn.current/*current-connectable*, :binding '_}
          (#'conn/parse-with-connection-arg '_)))
   (is (= '{:binding a, :connectable b, :options c}
          (#'conn/parse-with-connection-arg '[a b c]))))
@@ -71,11 +72,11 @@
   (conn/with-connection [conn-1 ::mock-connection]
     (testing "Should bind dynamic variables"
       (is (instance? java.sql.Connection conn-1))
-      (is (identical? conn-1 conn/*connection*))
+      (is (identical? conn-1 conn.current/*current-connection*))
       (is (= ::mock-connection
-             conn/*connectable*)))
+             conn.current/*current-connectable*)))
     (is (not @(:closed? conn-1)))
-    (conn/with-connection [conn-2 conn/*connectable*]
+    (conn/with-connection [conn-2 conn.current/*current-connectable*]
       (is (instance? java.sql.Connection conn-2))
       (testing "Should not create a new Connection"
         (is (identical? conn-1 conn-2))))

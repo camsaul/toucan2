@@ -63,8 +63,8 @@
      id SERIAL PRIMARY KEY,
      name VARCHAR(256) UNIQUE NOT NULL,
      category VARCHAR(256) NOT NULL,
-     \"created-at\" TIMESTAMP NOT NULL DEFAULT '2017-01-01T00:00:00Z'::timestamptz,
-     \"updated-at\" TIMESTAMP NOT NULL DEFAULT '2017-01-01T00:00:00Z'::timestamptz
+     created_at TIMESTAMP NOT NULL DEFAULT '2017-01-01T00:00:00Z'::timestamptz,
+     updated_at TIMESTAMP NOT NULL DEFAULT '2017-01-01T00:00:00Z'::timestamptz
     );"
    "INSERT INTO venues (name, category)
     VALUES

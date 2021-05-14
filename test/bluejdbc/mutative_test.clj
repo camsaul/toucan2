@@ -44,7 +44,18 @@
                                            :category   "bar"
                                            :created-at (t/local-date-time "2017-01-01T00:00")
                                            :updated-at (t/local-date-time "2017-01-01T00:00")})
-               (select/select-one :venues 1)))))))
+               (select/select-one :venues 1)))
+        (testing "Should work for 'magic' normalized keys."
+          (is (= {:next.jdbc/update-count 1}
+                 (-> (select/select-one :venues 1)
+                     (assoc :updated-at (t/local-date-time "2021-05-13T04:19:00"))
+                     mutative/save!)))
+          (is (= (instance/instance :venues {:id         1
+                                             :name       "Hi-Dive"
+                                             :category   "bar"
+                                             :created-at (t/local-date-time "2017-01-01T00:00")
+                                             :updated-at (t/local-date-time "2021-05-13T04:19:00")})
+                 (select/select-one :venues 1))))))))
 
 (deftest parse-insert!-args-test
   (testing "single map row"
