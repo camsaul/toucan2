@@ -10,8 +10,12 @@
 (deftest keyword-test
   (is (= "user"
          (tableable/table-name :user)))
-  (is (= "user"
-         (tableable/table-name :user/with-password))))
+  ;; (testing "Should let you use namespace-qualified `:bluejdbc.table/` and return the name"
+  ;;   (is (= "user"
+  ;;          (tableable/table-name :bluejdbc.table/user))))
+  (testing "Other namespaced keywords should return the namespace by default."
+    (is (= "user"
+           (tableable/table-name :user/with-password)))))
 
 (m/defmethod tableable/table-name* [:default ::test]
   [connectable _ options]

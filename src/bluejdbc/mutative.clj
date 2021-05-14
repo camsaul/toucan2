@@ -2,6 +2,7 @@
   "Table-aware methods that for changing data in the database, e.g. `update!`, `insert!`, and `save!`."
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as conn]
+            [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.honeysql-util :as honeysql-util]
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
@@ -74,7 +75,7 @@
 
 (defn save!
   [obj]
-  (let [connectable (or (instance/connectable obj) conn/*connectable*)
+  (let [connectable (or (instance/connectable obj) conn.current/*current-connectable*)
         tableable   (instance/table obj)
         options     (conn/default-options connectable)]
     (save!* connectable tableable obj options)))

@@ -3,6 +3,7 @@
   (:refer-clojure :exclude [count])
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as conn]
+            [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.honeysql-util :as honeysql-util]
             [bluejdbc.log :as log]
             [bluejdbc.query :as query]
@@ -18,7 +19,7 @@
 ;; TODO -- consider whether this should be moved to `query`
 (defn reducible-query-as
   ([tableable queryable]
-   (reducible-query-as conn/*connectable* tableable queryable nil))
+   (reducible-query-as conn.current/*current-connectable* tableable queryable nil))
 
   ([connectable tableable queryable]
    (reducible-query-as connectable tableable queryable nil))

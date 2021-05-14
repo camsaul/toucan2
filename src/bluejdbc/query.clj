@@ -1,6 +1,7 @@
 (ns bluejdbc.query
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as conn]
+            [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.log :as log]
             [bluejdbc.util :as u]
             [methodical.core :as m]
@@ -62,7 +63,7 @@
 
 (defn reducible-query
   ([queryable]
-   (reducible-query conn/*connectable* nil queryable nil))
+   (reducible-query conn.current/*current-connectable* nil queryable nil))
 
   ([connectable queryable]
    (reducible-query connectable nil queryable nil))
@@ -74,7 +75,7 @@
    (reducible-query* connectable tableable queryable (u/recursive-merge (conn/default-options connectable) options))))
 
 (defn realize-row [row]
-  (next.jdbc.rs/datafiable-row row conn/*connection* nil))
+  (next.jdbc.rs/datafiable-row row conn.current/*current-connection* nil))
 
 (defn all [reducible-query]
   (into

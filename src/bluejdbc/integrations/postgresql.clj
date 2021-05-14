@@ -29,7 +29,7 @@
 (m/defmethod rs/read-column-thunk [:bluejdbc.integrations/postgres :default Types/TIME]
   [_ _ ^ResultSet rs rsmeta ^Integer i options]
   (let [parent-thunk (next-method rs rsmeta i options)]
-    (fn []
+    (fn pg-get-time-thunk []
       (try
         (parent-thunk)
         (catch Throwable _
@@ -43,7 +43,7 @@
 (m/defmethod rs/read-column-thunk [:bluejdbc.integrations/postgres :default Types/DOUBLE]
   [_ _ ^ResultSet rs ^ResultSetMetaData rsmeta ^Integer i _]
   (if (= (.getColumnTypeName rsmeta i) "money")
-    (fn []
+    (fn pg-get-currency-thunk []
       (some-> (.getString rs i) u/parse-currency))
-    (fn []
+    (fn pg-get-object-thunk []
       (.getObject rs i))))

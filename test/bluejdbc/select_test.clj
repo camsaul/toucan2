@@ -1,5 +1,5 @@
 (ns bluejdbc.select-test
-  (:require [bluejdbc.connectable :as conn]
+  (:require [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.instance :as instance]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
@@ -21,10 +21,10 @@
   (let [results (query/all
                  (select/reducible-query-as :test/postgres :people {:select [:*], :from [:people]} nil))]
     (test-people-instances? results)
-    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
-            {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56Z")}
-            {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56Z")}
-            {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")}
+            {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56Z")}
+            {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56Z")}
+            {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56Z")}]
            results))))
 
 (m/defmethod queryable/queryable* [:default :default ::named-query]
@@ -75,44 +75,44 @@
 
 (deftest select-test
   (testing "no args"
-    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}
-            {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56:00Z")}
-            {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56:00Z")}
-            {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}
+            {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56:00Z")}
+            {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56:00Z")}
+            {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56:00Z")}]
            (select/select [:test/postgres :people])))
     (test-people-instances? (select/select [:test/postgres :people])))
 
   (testing "using current connection (dynamic binding)"
-    (binding [conn/*connectable* :test/postgres]
-      (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}
-              {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56:00Z")}
-              {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56:00Z")}
-              {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56:00Z")}]
+    (binding [conn.current/*current-connectable* :test/postgres]
+      (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}
+              {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56:00Z")}
+              {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56:00Z")}
+              {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56:00Z")}]
              (select/select :people)))))
 
   (testing "using default connection"
     (test/with-default-connection
-      (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}
-              {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56:00Z")}
-              {:id 3, :name "Pam", :created_at (t/offset-date-time "2020-01-01T21:56:00Z")}
-              {:id 4, :name "Tam", :created_at (t/offset-date-time "2020-05-25T19:56:00Z")}]
+      (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}
+              {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56:00Z")}
+              {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56:00Z")}
+              {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56:00Z")}]
              (select/select :people)))))
 
   (testing "one arg (id)"
-    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
            (select/select [:test/postgres :people] 1))))
 
   (testing "one arg (query)"
-    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
            (select/select [:test/postgres :people] {:where [:= :id 1]})))
     (is (= [{:id 1, :name "Tempest", :category "bar"}]
            (select/select [:test/postgres :venues] {:select [:id :name :category], :limit 1, :where [:= :id 1]}))))
 
   (testing "two args (k v)"
-    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
            (select/select [:test/postgres :people] :id 1)))
     (testing "sequential v"
-      (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+      (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
              (select/select [:test/postgres :people] :id [:= 1]))))))
 
 (m/defmethod tableable/primary-key* [:default :people/name-is-pk]
@@ -125,11 +125,11 @@
 
 (deftest select-non-integer-pks-test
   (testing "non-integer PK"
-    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
            (select/select [:test/postgres :people/name-is-pk] "Cam"))))
 
   (testing "composite PK"
-    (is (= [{:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
            (select/select [:test/postgres :people/composite-pk] [1 "Cam"])))
     (is (= []
            (select/select [:test/postgres :people/composite-pk] [2 "Cam"])
@@ -155,8 +155,8 @@
 (deftest pre-select-test
   (testing "Should be able to do cool stuff in pre-select (select* :before)"
     (test/with-default-connection
-      (is (= [(instance/instance :people/limit-2 {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")})
-              (instance/instance :people/limit-2 {:id 2, :name "Sam", :created_at (t/offset-date-time "2019-01-11T23:56Z")})]
+      (is (= [(instance/instance :people/limit-2 {:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")})
+              (instance/instance :people/limit-2 {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56Z")})]
              (select/select :people/limit-2))))))
 
 (m/defmethod select/select* :after [:default :people/no-timestamps :default]
@@ -186,7 +186,7 @@
          (select/select [:test/postgres :people/no-timestamps-limit-2]))))
 
 (deftest select-one-test
-  (is (= {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
+  (is (= {:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")}
          (select/select-one [:test/postgres :people])))
   (is (= nil
          (select/select-one [:test/postgres :people] :id 1000))))

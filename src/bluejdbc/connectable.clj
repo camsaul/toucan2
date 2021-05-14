@@ -1,5 +1,6 @@
 (ns bluejdbc.connectable
-  (:require [bluejdbc.result-set :as rs]
+  (:require [bluejdbc.connectable.current :as conn.current]
+            [bluejdbc.result-set :as rs]
             [bluejdbc.util :as u]
             [clojure.spec.alpha :as s]
             [methodical.core :as m]
@@ -72,23 +73,15 @@
   ([k options]
    (connection* k options)))
 
-;; TODO -- consider renaming to `*current-connectable*`
-(def ^:dynamic *connectable*
-  :bluejdbc/default)
-
-;; TODO -- consider renaming to `*current-connection*`
-(def ^:dynamic ^java.sql.Connection *connection*
-  nil)
-
 (defn do-with-connection [connectable options f]
   (let [connectable (or connectable :bluejdbc/default)]
-    (if (and *connection*
-             (= connectable *connectable*))
-      (f *connection*)
+    (if (and conn.current/*current-connection*
+             (= connectable conn.current/*current-connectable*))
+      (f conn.current/*current-connection*)
       (let [options                                        (u/recursive-merge (default-options connectable) options)
             {:keys [^java.sql.Connection connection new?]} (connection connectable options)]
-        (binding [*connectable* connectable
-                  *connection*  connection]
+        (binding [conn.current/*current-connectable* connectable
+                  conn.current/*current-connection*  connection]
           (if new?
             (with-open [connection connection]
               (f connection))
@@ -114,7 +107,7 @@
           (update :connectable (fn [connectable]
                                  (if (or (= connectable '_)
                                          (not connectable))
-                                   `*connectable*
+                                   `conn.current/*current-connectable*
                                    connectable)))
           (update :binding #(or % '_))))))
 
@@ -134,7 +127,7 @@
 (defn parse-connectable-tableable [connectable-tableable]
   (if (sequential? connectable-tableable)
     connectable-tableable
-    [*connectable* connectable-tableable]))
+    [conn.current/*current-connectable* connectable-tableable]))
 
 (defn do-with-transaction [connectable options f]
   (with-connection [conn connectable options]
@@ -143,8 +136,8 @@
       (next.jdbc/with-transaction [tx-connection conn]
         (let [save-point (.setSavepoint tx-connection)]
           (try
-            (binding [*connection* tx-connection]
-              (f *connection*))
+            (binding [conn.current/*current-connection* tx-connection]
+              (f conn.current/*current-connection*))
             (catch Throwable e
               (.rollback tx-connection save-point)
               (throw e))))))))

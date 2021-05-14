@@ -1,6 +1,14 @@
 (ns bluejdbc.instance-test
   (:require [bluejdbc.instance :as instance]
-            [clojure.test :refer :all]))
+            [bluejdbc.select :as select]
+            [bluejdbc.tableable :as tableable]
+            [bluejdbc.test :as test]
+            [clojure.string :as str]
+            [clojure.test :refer :all]
+            [java-time :as t]
+            [methodical.core :as m]))
+
+(use-fixtures :once test/do-with-test-data)
 
 (deftest instance-test
   (let [m (assoc (instance/instance :wow {:a 100}) :b 200)]
@@ -104,3 +112,95 @@
                (instance/connectable m))))
       (is (= :different-connectable
              (instance/connectable m2))))))
+
+;;;; Magic Map stuff.
+
+(deftest normalize-key-test
+  (doseq [k-str  ["my-key" "my_key"]
+          k-str  [k-str (str/upper-case k-str)]
+          ns-str [nil "my-ns" "my_ns"]
+          ns-str (if ns-str
+                   [ns-str (str/upper-case ns-str)]
+                   [ns-str])
+          k      [k-str
+                  (keyword ns-str k-str)]
+          :let   [expected (cond
+                             (string? k) :my-key
+                             ns-str      :my-ns/my-key
+                             :else       :my-key)]]
+    (testing (format "%s -> %s" (pr-str k) (pr-str expected))
+      (is (= expected
+             (instance/normalize-key k))))))
+
+(deftest normalize-map-test
+  (testing "Should normalize keys"
+    (is (= {:abc 100, :d-ef 200}
+           (instance/normalize-map instance/normalize-key {:ABC 100, "dEf" 200}))))
+  (testing "Should preserve metadata"
+    (is (= true
+           (:wow (meta (instance/normalize-map instance/normalize-key (with-meta {} {:wow true}))))))))
+
+(deftest magic-create-test
+  (let [m (instance/instance nil {:snake/snake_case 1, "SCREAMING_SNAKE_CASE" 2, :lisp-case 3, :ANGRY/LISP-CASE 4})]
+    (is (= (instance/instance nil {:snake/snake-case 1, "screaming-snake-case" 2, :lisp-case 3, :angry/lisp-case 4})
+           m)))
+  (testing "Should be able to create a map with varargs"
+    (is (= {:db-id 1}
+           (instance/instance nil nil :db_id 1)))
+    (is (= {:db-id 1, :table-id 2}
+
+           (instance/instance nil nil :db_id 1, :TABLE_ID 2))))
+  (testing "Should preserve metadata"
+    (is (= {:x 100}
+           (meta (instance/instance nil (with-meta {} {:x 100})))))))
+
+(deftest magic-keys-test
+  (testing "keys"
+    (let [m (instance/instance nil {:db_id 1, :table_id 2})]
+      (testing "get keys"
+        (testing "get"
+          (is (= 1
+                 (:db_id m)))
+          (is (= 1
+                 (:db-id m))))
+        (is (= [:db-id :table-id]
+               (keys m)))
+        (testing "assoc"
+          (is (= (instance/instance nil {:db-id 2, :table-id 2})
+                 (assoc m :db_id 2)))
+          (is (= (instance/instance nil {:db-id 3, :table-id 2})
+                 (assoc m :db-id 3))))
+        (testing "dissoc"
+          (is (= {}
+                 (dissoc (instance/instance nil nil "ScReAmInG_SnAkE_cAsE" 1) "sc-re-am-in-g-sn-ak-e-c-as-e"))))
+        (testing "update"
+          (is (= (instance/instance nil {:db-id 2, :table-id 2})
+                 (update m :db_id inc))))))))
+
+(deftest magic-equality-test
+  (testing "Two maps created with different key cases should be equal"
+    (= (instance/instance nil {:db-id 1, :table-id 2})
+       (instance/instance nil {:db_id 1, :table_id 2})))
+  (testing "should be equal to normal map with the same keys"
+    (is (= {:db-id 1, :table-id 2}
+           (instance/instance nil {:db_id 1, :table_id 2})))
+    (is (= {}
+           (instance/instance nil {})))))
+
+(m/defmethod tableable/table-name* [:default ::venues-no-key-transform]
+  [_ _ _]
+  "venues")
+
+(m/defmethod instance/key-transform-fn* [:default ::venues-no-key-transform]
+  [_ _]
+  identity)
+
+(deftest no-key-xform-test
+  (is (= "venues"
+         (tableable/table-name ::venues-no-key-transform)))
+  (test/with-default-connection
+    (is (= (bluejdbc.instance/instance :venues {:id 1, :created-at (t/local-date-time "2017-01-01T00:00")})
+           (select/select-one :venues {:select [:id :created-at]})))
+    (testing "Should be able to disable key transforms by overriding `key-transform-fn*`"
+      (is (= {:id 1, :created_at (t/local-date-time "2017-01-01T00:00")}
+             (select/select-one ::venues-no-key-transform {:select [:id :created-at]}))))))
