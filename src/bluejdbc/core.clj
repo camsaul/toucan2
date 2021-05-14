@@ -48,7 +48,6 @@
   with-connection]
 
  [hydrate
-  automagic-hydration-key-table*
   batched-hydrate*
   fk-keys-for-automagic-hydration*
   hydrate
