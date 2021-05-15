@@ -19,29 +19,42 @@
   {:category {:in  name
               :out keyword}})
 
+(derive ::transformed-venues-id-is-string ::transformed-venues)
+
+(m/defmethod transformed/transforms* [:default ::transformed-venues-id-is-string]
+  [connectable tableable options]
+  (merge
+   {:id {:in  #(Integer/parseInt ^String %)
+         :out str}}
+   (next-method connectable tableable options)))
+
 (deftest select-in-test
-  (testing "in (select)"
-    (is (= [{:id 1, :name "Tempest", :category :bar}
-            {:id 2, :name "Ho's Tavern", :category :bar}]
-           (select/select [:test/postgres ::transformed-venues] :category :bar {:select [:id :name :category]})))
-    (testing "if condition is not present"
-      (is (= [{:id 1, :name "Tempest", :category :bar}
-              {:id 2, :name "Ho's Tavern", :category :bar}
-              {:id 3, :name "BevMo", :category :store}]
-             (select/select [:test/postgres ::transformed-venues] {:select [:id :name :category]}))))))
+  (testing "select should transform values going in"
+    (testing "value is a pk condition"
+      (testing "k-v condition"
+        (is (= [{:id 1, :name "Tempest", :category :bar}
+                {:id 2, :name "Ho's Tavern", :category :bar}]
+               (select/select [:test/postgres ::transformed-venues] :category :bar {:select [:id :name :category]}))))
+      (testing "as the PK"
+        (testing "(single value)"
+          (is (= [{:id "1", :name "Tempest", :category :bar}]
+                 (select/select [:test/postgres ::transformed-venues-id-is-string] "1" {:select [:id :name :category]}))))
+        (testing "(vector of multiple values)"
+          (is (= [{:id "1", :name "Tempest", :category :bar}]
+                 (select/select [:test/postgres ::transformed-venues-id-is-string] ["1"] {:select [:id :name :category]}))))))))
 
 (deftest select-out-test
-  (testing "out (select)"
+  (testing "select should transform values coming out"
     (is (= [{:id 1, :name "Tempest", :category :bar}
             {:id 2, :name "Ho's Tavern", :category :bar}
             {:id 3, :name "BevMo", :category :store}]
            (select/select [:test/postgres ::transformed-venues] {:select [:id :name :category]})))
-    (testing "if value is not present"
+    (testing "should work if transformed key is not present in results"
       (is (= [{:id 1, :name "Tempest"}
               {:id 2, :name "Ho's Tavern"}
               {:id 3, :name "BevMo"}]
              (select/select [:test/postgres ::transformed-venues] {:select [:id :name]}))))
-    (testing "select-one-fn and other special methods"
+    (testing "should work with select-one and other special functions"
       (is (= :bar
              (select/select-one-fn :category [:test/postgres ::transformed-venues] :id 1)))
       (is (= #{:store :bar}
