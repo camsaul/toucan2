@@ -53,11 +53,6 @@
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
-(m/defmethod parse-select-args* :around :default
-  [connectable tableable args options]
-  (log/with-trace ["Parsing select args for %s %s" tableable args]
-    (next-method connectable tableable args options)))
-
 (m/defmethod parse-select-args* :default
   [connectable tableable args _]
   (let [spec   (specs/select-args-spec connectable tableable)
@@ -79,17 +74,18 @@
   "Parse args to the `select` family of functions. Returns a map with the parsed/combined `:query` and parsed
   `:options`."
   [connectable tableable args options-1]
-  (let [{:keys [pk conditions query options]} (parse-select-args* connectable tableable args
-                                                                  (conn/default-options connectable))
-        options                               (u/recursive-merge options-1 options)
-        conditions                            (cond-> conditions
-                                                pk (honeysql-util/merge-primary-key connectable tableable pk))
-        query                                 (if query
-                                                (queryable/queryable connectable tableable query options)
-                                                {})
-        query                                 (cond-> query
-                                                (seq conditions) (honeysql-util/merge-conditions conditions))]
-    {:query query, :options options}))
+  (log/with-trace ["Parsing select args for %s %s" tableable args]
+    (let [{:keys [pk conditions query options]} (parse-select-args* connectable tableable args
+                                                                    (conn/default-options connectable))
+          options                               (u/recursive-merge options-1 options)
+          conditions                            (cond-> conditions
+                                                  pk (honeysql-util/merge-primary-key connectable tableable pk))
+          query                                 (if query
+                                                  (queryable/queryable connectable tableable query options)
+                                                  {})
+          query                                 (cond-> query
+                                                  (seq conditions) (honeysql-util/merge-conditions conditions))]
+      {:query query, :options options})))
 
 (defn select-reducible
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
