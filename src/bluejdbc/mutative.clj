@@ -8,6 +8,7 @@
             [bluejdbc.log :as log]
             [bluejdbc.query :as query]
             [bluejdbc.result-set :as rs]
+            [bluejdbc.select :as select]
             [bluejdbc.specs :as specs]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
@@ -33,12 +34,17 @@
           (update :conditions merge (when (seq kv-conditions)
                                       (zipmap (map :k kv-conditions) (map :v kv-conditions))))))))
 
+(m/defmethod parse-update!-args* :around :default
+  [connectable tableable args options]
+  (log/with-trace ["Parsing update! args for %s %s" tableable args]
+    (next-method connectable tableable args options)))
+
 (m/defmulti update!*
   {:arglists '([connectable tableable honeysql-form options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
-(defn- insert-update-results [results options]
+(defn- execute-results [results options]
   (if (get-in options [:execute :return-keys])
     results
     (first results)))
@@ -46,7 +52,7 @@
 (m/defmethod update!* :default
   [connectable tableable honeysql-form options]
   (-> (query/execute! connectable tableable honeysql-form options)
-      (insert-update-results options)))
+      (execute-results options)))
 
 (defn update!
   {:arglists '([connectable-tableable id? conditions? changes options?])}
@@ -88,7 +94,7 @@
 (m/defmethod insert!* :default
   [connectable tableable honeysql-form options]
   (-> (query/execute! connectable tableable honeysql-form options)
-      (insert-update-results options)))
+      (execute-results options)))
 
 (m/defmulti parse-insert!-args*
   {:arglists '([connectable tableable args options])}
@@ -141,8 +147,45 @@
         results                 (insert! [connectable tableable] rows options)]
     (map get-pks results)))
 
-;; TODO
-#_(defn delete! [])
+(m/defmulti parse-delete-args*
+  {:arglists '([connectable tableable args options])}
+  u/dispatch-on-first-two-args
+  :combo (m.combo.threaded/threading-method-combination :third))
+
+(m/defmethod parse-delete-args* :default
+  [connectable tableable args options]
+  (select/parse-select-args connectable tableable args options))
+
+(m/defmethod parse-delete-args* :around :default
+  [connectable tableable args options]
+  (log/with-trace ["Parsing delete! args for %s %s" tableable args]
+    (next-method connectable tableable args options)))
+
+(defn parse-delete-args [[connectable-tableable & args]]
+  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+        {:keys [query options]} (parse-delete-args* connectable tableable args (conn/default-options connectable))]
+    {:connectable connectable
+     :tableable   tableable
+     :query       query
+     :options     options}))
+
+(m/defmulti delete!*
+  {:arglists '([connectable tableable query options])}
+  u/dispatch-on-first-three-args
+  :combo (m.combo.threaded/threading-method-combination :third))
+
+(m/defmethod delete!* :default
+  [connectable tableable query options]
+  (let [honeysql-form (merge {:delete-from (compile/table-identifier tableable options)}
+                             query)]
+    (log/with-trace ["DELETE rows: %s" honeysql-form]
+      (query/execute! connectable tableable honeysql-form options))))
+
+(defn delete!
+  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  [& args]
+  (let [{:keys [connectable tableable query options]} (parse-delete-args args)]
+    (execute-results (delete!* connectable tableable query options) options)))
 
 ;; TODO
 #_(defn upsert! [])

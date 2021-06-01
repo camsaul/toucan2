@@ -55,7 +55,7 @@
 
 (m/defmethod parse-select-args* :around :default
   [connectable tableable args options]
-  (log/with-trace ["Parsing select args for %s %s" tableable (pr-str args)]
+  (log/with-trace ["Parsing select args for %s %s" tableable args]
     (next-method connectable tableable args options)))
 
 (m/defmethod parse-select-args* :default
@@ -74,6 +74,7 @@
        :query   query
        :options options})))
 
+;; TODO -- I think this should just take `& options` and do the `parse-connectable-tableable` stuff inside this fn.
 (defn parse-select-args
   "Parse args to the `select` family of functions. Returns a map with the parsed/combined `:query` and parsed
   `:options`."

@@ -122,7 +122,7 @@
         (*call-count-thunk*)
         (next.jdbc/execute! conn sql-params (:execute options))
         (catch Throwable e
-          (throw (ex-info "Error executing statement"
+          (throw (ex-info (format "Error executing statement: %s" (ex-message e))
                           (merge
                            {:options options}
                            (when *include-queries-in-exceptions?*
