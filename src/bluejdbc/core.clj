@@ -65,7 +65,8 @@
   with-debug-logging]
 
  [mutative
-  #_delete!
+  delete!*
+  delete!
   insert!*
   insert!
   insert-returning-keys!

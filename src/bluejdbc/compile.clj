@@ -23,19 +23,19 @@
   [connectable tableable query {:keys [include-queries-in-exceptions?]
                                 :or   {include-queries-in-exceptions? true}
                                 :as   options}]
-  (log/with-trace ["Compile query with table %s and options %s\n%s"
-                   (pr-str tableable) (pr-str options) (u/pprint-to-str query)])
-  (try
-    (let [sql-params (next-method connectable tableable query options)]
-      (assert (and (sequential? sql-params) (string? (first sql-params)))
-              (str "compile* should return [sql & params], got " (pr-str sql-params)))
-      sql-params)
-    (catch Throwable e
-      (throw (ex-info (format "Error compiling query: %s" (ex-message e))
-                      (if include-queries-in-exceptions?
-                        {:query query}
-                        {})
-                      e)))))
+  (log/with-trace ["Compile query with table %s and options %s" tableable options]
+    (log/trace (u/pprint-to-str query))
+    (try
+      (let [sql-params (next-method connectable tableable query options)]
+        (assert (and (sequential? sql-params) (string? (first sql-params)))
+                (str "compile* should return [sql & params], got " (pr-str sql-params)))
+        sql-params)
+      (catch Throwable e
+        (throw (ex-info (format "Error compiling query: %s" (ex-message e))
+                        (if include-queries-in-exceptions?
+                          {:query query}
+                          {})
+                        e))))))
 
 (m/defmethod compile* :default
   [_ tableable query options]
@@ -61,14 +61,12 @@
 
 (m/defmethod compile* [:default :default clojure.lang.IPersistentMap]
   [connectable _ honeysql-form {options :honeysql}]
-  (log/trace "Compile HoneySQL form")
-  (when (seq options)
-    (log/tracef "\noptions: %s" (pr-str options)))
-  (binding [*compile-connectable* connectable
-            *compile-options*     options]
-    (let [sql-params (apply hsql/format honeysql-form (mapcat identity options))]
-      (log/tracef "COMPILED SQL => %s" (u/pprint-to-str sql-params))
-      sql-params)))
+  (log/with-trace "Compile HoneySQL form"
+    (when (seq options)
+      (log/tracef "\noptions: %s" (pr-str options)))
+    (binding [*compile-connectable* connectable
+              *compile-options*     options]
+      (apply hsql/format honeysql-form (mapcat identity options)))))
 
 (defn compile
   ([queryable]
