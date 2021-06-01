@@ -199,8 +199,22 @@
   (is (= "venues"
          (tableable/table-name ::venues-no-key-transform)))
   (test/with-default-connection
-    (is (= (bluejdbc.instance/instance :venues {:id 1, :created-at (t/local-date-time "2017-01-01T00:00")})
+    (is (= (instance/instance :venues {:id 1, :created-at (t/local-date-time "2017-01-01T00:00")})
            (select/select-one :venues {:select [:id :created-at]})))
     (testing "Should be able to disable key transforms by overriding `key-transform-fn*`"
       (is (= {:id 1, :created_at (t/local-date-time "2017-01-01T00:00")}
              (select/select-one ::venues-no-key-transform {:select [:id :created-at]}))))))
+
+(deftest pretty-print-test
+  (testing "Should pretty-print"
+    (binding [*ns* (the-ns 'bluejdbc.instance-test)]
+      (is (= "(instance/instance :bluejdbc/default :venues {:id 1})"
+             (pr-str (instance/instance :venues {:id 1})))))
+    (testing "Should use appropriate alias for current namespace"
+      (ns bluejdbc.instance-test.pretty-print-test
+        (:require [bluejdbc.core :as bluejdbc]))
+      (is (= "(bluejdbc/instance :bluejdbc/default :venues {:id 1})"
+             (pr-str (bluejdbc.instance/instance :venues {:id 1}))))
+      (binding [*ns* (the-ns 'bluejdbc.instance)]
+        (is (= "(instance :bluejdbc/default :venues {:id 1})"
+               (pr-str (bluejdbc.instance/instance :venues {:id 1}))))))))

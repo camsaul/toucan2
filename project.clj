@@ -30,7 +30,7 @@
    [methodical "0.10.1-alpha"]
    [org.clojure/tools.logging "1.1.0"]
    [potemkin "0.4.5"]
-   [pretty "1.0.4"]]
+   [pretty "1.0.5"]]
 
   :profiles
   {:h2
