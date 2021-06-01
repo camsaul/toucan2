@@ -94,7 +94,36 @@
                  (select/select-one-fn :name ::transformed-venues 1))))))))
 
 (deftest insert!-test
-  (testing "in (insert!)"))
+  (testing "in (insert!)"
+    (test/with-default-connection
+      (testing "single map row"
+        (test/with-venues-reset
+          (is (= {:next.jdbc/update-count 1}
+                 (mutative/insert! ::transformed-venues {:name "Hi-Dive", :category :bar})))
+          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+                 (select/select-fn-set :name ::transformed-venues :category :bar)))))
+      (testing "multiple map rows"
+        (test/with-venues-reset
+          (is (= {:next.jdbc/update-count 1}
+                 (mutative/insert! ::transformed-venues [{:name "Hi-Dive", :category :bar}])))
+          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+                 (select/select-fn-set :name ::transformed-venues :category :bar)))))
+      (testing "kv args"
+        (test/with-venues-reset
+          (is (= {:next.jdbc/update-count 1}
+                 (mutative/insert! ::transformed-venues :name "Hi-Dive", :category :bar)))
+          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+                 (select/select-fn-set :name ::transformed-venues :category :bar)))))
+      (testing "columns + vector rows"
+        (test/with-venues-reset
+          (is (= {:next.jdbc/update-count 1}
+                 (mutative/insert! ::transformed-venues [:name :category] [["Hi-Dive" :bar]])))
+          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+                 (select/select-fn-set :name ::transformed-venues :category :bar)))))
+      (testing "returning-keys"
+        (test/with-venues-reset
+          (is (= ["4"]
+                 (mutative/insert-returning-keys! ::transformed-venues-id-is-string [{:name "Hi-Dive", :category "bar"}]))))))))
 
 (deftest save!-test
   (testing "in (save!)"))

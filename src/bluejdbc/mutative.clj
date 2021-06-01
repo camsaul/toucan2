@@ -100,13 +100,13 @@
     (save!* connectable tableable obj options)))
 
 (m/defmulti insert!*
-  {:arglists '([connectable tableable honeysql-form options])}
+  {:arglists '([connectable tableable query options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
 (m/defmethod insert!* :default
-  [connectable tableable honeysql-form options]
-  (-> (query/execute! connectable tableable honeysql-form options)
+  [connectable tableable query options]
+  (-> (query/execute! connectable tableable query options)
       (execute-results options)))
 
 (m/defmulti parse-insert!-args*

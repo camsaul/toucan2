@@ -108,3 +108,28 @@
       (cond-> (apply-in-transforms connectable tableable args options)
         transforms (update :changes transform-conditions transforms)))
     args))
+
+(defn transform-insert-rows [rows transforms]
+  (let [row-xforms (for [[k xform] transforms]
+                     (fn [row]
+                       (if (contains? row k)
+                         (update row k xform)
+                         row)))
+        row-xform  (apply comp row-xforms)]
+    (map row-xform rows)))
+
+(m/defmethod mutative/parse-insert!-args* :after [:default :bluejdbc/transformed]
+  [connectable tableable {:keys [rows], :as args} options]
+  (if-let [transforms (in-transforms connectable tableable options)]
+    (log/with-trace ["Apply %s transforms to %s" transforms rows]
+      (update args :rows transform-insert-rows transforms))
+    args))
+
+(m/defmethod mutative/insert!* :after [:default :bluejdbc/transformed :default]
+  [connectable tableable results options]
+  (if-not (sequential? results)
+    results
+    (if-let [transforms (not-empty (transforms* connectable tableable options))]
+      (log/with-trace ["Apply %s transforms %s to results" (pr-str tableable) (pr-str transforms)]
+        (map (row-transform-fn transforms) results))
+      results)))
