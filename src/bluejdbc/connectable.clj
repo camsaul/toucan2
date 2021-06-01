@@ -16,6 +16,14 @@
   [connectable]
   {:next.jdbc {:builder-fn (rs/row-builder-fn connectable nil)}})
 
+(m/defmulti default-connectable-for-tableable*
+  {:arglists '([tableable options])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod default-connectable-for-tableable* :default
+  [_ _]
+  :bluejdbc/default)
+
 (m/defmulti connection*
   {:arglists '([connectable options])}
   u/dispatch-on-first-arg)
@@ -73,8 +81,8 @@
   ([k options]
    (connection* k options)))
 
-(defn do-with-connection [connectable options f]
-  (let [connectable (or connectable :bluejdbc/default)]
+(defn do-with-connection [connectable tableable options f]
+  (let [connectable (or connectable (default-connectable-for-tableable* tableable options))]
     (if (and conn.current/*current-connection*
              (= connectable conn.current/*current-connectable*))
       (f conn.current/*current-connection*)
@@ -92,7 +100,10 @@
   (s/or :connectable (complement vector?)
         :vector      (s/cat :binding     (s/? any?)
                             :connectable (s/? any?)
-                            :options     (s/? any?))))
+                            :tableable-options (s/?
+                                                (s/alt
+                                                 :options (s/cat :options any?)
+                                                 :tableable-options (s/cat :tableable any? :options any?))))))
 
 (defn- parse-with-connection-arg [arg]
   (let [parsed (s/conform ::with-connection-arg arg)]
@@ -100,26 +111,33 @@
       (throw (ex-info (format "Don't know how to interpret with-connection arg: %s"
                               (s/explain-str ::with-connection-arg arg))
                       {:arg arg})))
-    (let [[arg-type arg] parsed]
-      (-> (if (= arg-type :connectable)
-            {:connectable arg}
-            arg)
+    (let [[arg-type arg] parsed
+          args (-> (if (= arg-type :connectable)
+                     {:connectable arg}
+                     arg)
+                   (merge (-> arg :tableable-options last))
+                   (dissoc :tableable-options))]
+      (-> args
           (update :connectable (fn [connectable]
-                                 (if (or (= connectable '_)
-                                         (not connectable))
-                                   `conn.current/*current-connectable*
-                                   connectable)))
+                                 (if (and connectable
+                                          (not= connectable '_))
+                                   connectable
+                                   (if (and (:tableable args)
+                                            (= conn.current/*current-connectable* :bluejdbc/default))
+                                     (default-connectable-for-tableable* (:tableable args) (:options args))
+                                     `conn.current/*current-connectable*))))
           (update :binding #(or % '_))))))
 
 ;; TODO -- not sure about this syntax.
 (defmacro with-connection
   {:style/indent 1
-   :arglists     '([[conn-binding connectable options] & body]
+   :arglists     '([[conn-binding connectable? tableable? options?] & body]
                    [connectable & body])}
   [x & body]
-  (let [{:keys [binding connectable options]} (parse-with-connection-arg x)]
+  (let [{:keys [binding connectable tableable options]} (parse-with-connection-arg x)]
     `(do-with-connection
       ~connectable
+      ~tableable
       ~options
       (fn [~(vary-meta (or binding '_) assoc :tag 'java.sql.Connection)]
         ~@body))))

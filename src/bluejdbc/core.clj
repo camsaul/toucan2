@@ -45,6 +45,7 @@
  [connectable
   connection
   connection*
+  default-connectable-for-tableable*
   default-options
   with-connection]
 

@@ -28,7 +28,9 @@
   (is (= {:connectable `conn.current/*current-connectable*, :binding '_}
          (#'conn/parse-with-connection-arg '_)))
   (is (= '{:binding a, :connectable b, :options c}
-         (#'conn/parse-with-connection-arg '[a b c]))))
+         (#'conn/parse-with-connection-arg '[a b c])))
+  (is (= '{:binding a, :connectable b, :tableable c, :options d}
+         (#'conn/parse-with-connection-arg '[a b c d]))))
 
 (p/defrecord+ ^:private MockConnection [connectable options closed?]
   java.sql.Connection
@@ -195,3 +197,15 @@
             (is (venue-visible? 7)))
           (testing "object inserted by nested transaction (failed) should not exist"
             (is (not (venue-visible? 8)))))))))
+
+(m/defmethod conn/default-connectable-for-tableable* ::venues
+  [_ options]
+  (:connectable options))
+
+(deftest default-connectable-for-tableable-test
+  (conn/with-connection [conn nil ::venues {:connectable ::mock-connection}]
+    (is (instance? MockConnection conn))
+    (is (= {:connectable ::mock-connection
+            :options     {:default-options true
+                          :connectable     ::mock-connection}}
+           (dissoc conn :closed?)))))
