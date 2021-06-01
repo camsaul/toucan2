@@ -1,5 +1,6 @@
 (ns bluejdbc.log
   (:require [clojure.pprint :as pprint]
+            [clojure.string :as str]
             [clojure.tools.logging :as log]))
 
 (def ^:dynamic *enable-debug-logging*
@@ -30,12 +31,20 @@
     (catch Throwable e
       (throw (ex-info (str "Error printing log message: " (ex-message e)) {:args args} e)))))
 
+(def ^:dynamic *indent-level* 0)
+
+(defn- indent-println [s]
+  (doseq [line (str/split-lines (str/trim (with-out-str (println s))))]
+    (dotimes [_ *indent-level*]
+      (print "  "))
+    (println line)))
+
 (defn debug-logp
   "Print log messages to stdout for debugging. (For `logp`-style logging macros.)"
   [x & args]
   (log*
    (fn [args]
-     (apply println (map maybe-pr-str args)))
+     (apply indent-println (map maybe-pr-str args)))
    x
    args))
 
@@ -44,7 +53,7 @@
   [x & args]
   (log*
    (fn [[format-string & args]]
-     (println (apply format format-string (map maybe-pr-str args))))
+     (indent-println (apply format format-string (map maybe-pr-str args))))
    x
    args))
 
@@ -73,6 +82,16 @@
   "Like `clojure.tools.logging/tracef`, but also prints log messages to stdout if debug logging is enabled."
   [& args]
   `(logf :trace ~@args))
+
+(defmacro with-trace [message & body]
+  `(do
+     ~(if (vector? message)
+        `(tracef ~@message)
+        `(trace ~message))
+     (binding [*indent-level* (inc *indent-level*)]
+       (let [result# (do ~@body)]
+         (tracef "-> %s" result#)
+         result#))))
 
 (defmacro debug
   "Like `clojure.tools.logging/debug`, but also prints log messages to stdout if debug logging is enabled."

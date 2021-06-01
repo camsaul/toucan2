@@ -23,13 +23,10 @@
   [connectable tableable query {:keys [include-queries-in-exceptions?]
                                 :or   {include-queries-in-exceptions? true}
                                 :as   options}]
-  (log/tracef "Compile query with table %s and options %s\n%s"
-              (pr-str tableable)
-              (pr-str options)
-              (u/pprint-to-str query))
+  (log/with-trace ["Compile query with table %s and options %s\n%s"
+                   (pr-str tableable) (pr-str options) (u/pprint-to-str query)])
   (try
     (let [sql-params (next-method connectable tableable query options)]
-      (log/tracef "-> %s" (u/pprint-to-str sql-params))
       (assert (and (sequential? sql-params) (string? (first sql-params)))
               (str "compile* should return [sql & params], got " (pr-str sql-params)))
       sql-params)
@@ -98,11 +95,11 @@
   (to-sql [_]
     (let [options (u/recursive-merge *compile-options* options)]
       ;; TODO -- `:row-builder-fn` is present in `:honeysql` options in this log statement, but it shouldn't be. FIXME
-      (log/tracef "Convert table identifier %s to table name with options %s" (pr-str tableable) (pr-str (:honeysql options)))
-      (let [result (-> (tableable/table-name *compile-connectable* tableable options)
-                       (hsql/quote-identifier :style (get-in options [:honeysql :quoting])))]
-        (log/tracef "-> %s" (pr-str result))
-        result))))
+      (log/with-trace (format "Convert table identifier %s to table name with options %s"
+                              (pr-str tableable)
+                              (pr-str (:honeysql options)))
+        (-> (tableable/table-name *compile-connectable* tableable options)
+            (hsql/quote-identifier :style (get-in options [:honeysql :quoting])))))))
 
 (defn table-identifier
   ([tableable]         (->TableIdentifier tableable nil))
@@ -115,11 +112,9 @@
 
 (m/defmethod from* :around :default
   [connectable tableable query options]
-  (log/tracef "Adding :from %s to %s" tableable (pr-str query))
   (try
-    (let [result (next-method connectable tableable query options)]
-      (log/tracef "-> %s" (pr-str result))
-      result)
+    (log/with-trace ["Adding :from %s to %s" tableable (pr-str query)]
+      (next-method connectable tableable query options))
     (catch Throwable e
       (throw (ex-info (format "Error adding FROM %s to %s" (pr-str tableable) (pr-str query))
                       {:tableable tableable, :query query, :options options}

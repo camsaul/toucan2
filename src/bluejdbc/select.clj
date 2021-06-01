@@ -55,10 +55,8 @@
 
 (m/defmethod parse-select-args* :around :default
   [connectable tableable args options]
-  (log/tracef "Parsing select args for %s %s" tableable (pr-str args))
-  (let [parsed (next-method connectable tableable args options)]
-    (log/tracef "-> %s" (u/pprint-to-str parsed))
-    parsed))
+  (log/with-trace ["Parsing select args for %s %s" tableable (pr-str args)]
+    (next-method connectable tableable args options)))
 
 (m/defmethod parse-select-args* :default
   [connectable tableable args _]
