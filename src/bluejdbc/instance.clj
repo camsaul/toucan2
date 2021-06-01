@@ -1,4 +1,5 @@
 (ns bluejdbc.instance
+  (:refer-clojure :exclude [instance?])
   (:require [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.util :as u]
             [camel-snake-kebab.core :as csk]
@@ -27,6 +28,9 @@
   (original [instance]
     "Get the original version of `instance` as it appeared when it first came out of the DB.")
 
+  (with-original [instance new-original]
+    "Return a copy of `instance` with its `original` map set to `new-original`.")
+
   (changes [instance]
     "Get a map with any changes made to `instance` since it came out of the DB.")
 
@@ -42,6 +46,12 @@
 
   (with-connectable [instance new-connectable]
     "Return a copy of `instance` with its connectable set to `new-connectable.`"))
+
+(defn instance?
+  "True if `x` is a BlueJDBC instance, i.e. a `bluejdbc.instance.Instance` or some other class that satisfies
+  `bluejdbc.instance.IInstance`."
+  [x]
+  (clojure.core/instance? bluejdbc.instance.IInstance x))
 
 (declare ->TransientInstance)
 
@@ -60,7 +70,7 @@
     (Instance. conn tbl orig m key-xform new-meta))
 
   (equiv [_ x]
-    (if (instance? Instance x)
+    (if (instance? x)
       ;; TODO -- not sure if two instances with different connectables should be considered different. I guess not
       ;; because it makes them inconvenient to use in tests and stuff
       ;;
@@ -80,6 +90,8 @@
   IInstance
   (original [_]
     orig)
+  (with-original [_ new-original]
+    (Instance. conn tbl new-original m key-xform mta))
   (changes [_]
     (second (data/diff orig m)))
   (table [_]
@@ -170,3 +182,13 @@
     nil)
   (with-connectable [_ m]
     (instance connectable nil m)))
+
+(defn reset-original
+  "Return a copy of `instance` with its `original` value set to its current value, discarding the previous original
+  value. No-ops if `instance` is not a Blue JDBC instance."
+  [instance]
+  (if (instance? instance)
+    (with-original instance (.m ^Instance instance))
+    instance))
+
+;; TODO -- should we have a revert-changes helper function as well?
