@@ -183,3 +183,17 @@
                   (name bluejdbc-core-alias)
                   "bluejdbc.core")
                 (name symb))))))
+
+(defn quit-early-exception [x]
+  (throw (ex-info "Quit early" {::quit-early x})))
+
+(defn do-returning-quit-early [thunk]
+  (try
+    (thunk)
+    (catch Throwable e
+      (or (loop [e e]
+            (if-let [x (get (ex-data e) ::quit-early)]
+              x
+              (when-let [cause (ex-cause e)]
+                (recur cause))))
+          (throw e)))))

@@ -79,6 +79,7 @@
 
  [query
   all
+  compiled
   execute!
   execute!*
   query
@@ -86,6 +87,7 @@
   realize-row
   reducible-query
   reducible-query*
+  uncompiled
   with-call-count]
 
  [select
