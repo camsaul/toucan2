@@ -5,6 +5,7 @@
             [bluejdbc.test :as test]
             [bluejdbc.transformed :as transformed]
             [clojure.test :refer :all]
+            [java-time :as t]
             [methodical.core :as m]))
 
 (use-fixtures :once test/do-with-test-data)
@@ -127,8 +128,17 @@
                (mutative/insert-returning-keys! ::transformed-venues-id-is-string [{:name "Hi-Dive", :category "bar"}])))))))
 
 (deftest save!-test
-  ;; TODO
-)
+  (test/with-venues-reset
+    (test/with-default-connection
+      (let [venue (select/select-one ::transformed-venues 1)]
+        (is (= {:next.jdbc/update-count 1}
+               (mutative/save! (assoc venue :category :dive-bar))))
+        (is (= {:id         1
+                :name       "Tempest"
+                :category   :dive-bar
+                :created-at (t/local-date-time "2017-01-01T00:00")
+                :updated-at (t/local-date-time "2017-01-01T00:00")}
+               (select/select-one ::transformed-venues 1)))))))
 
 (deftest delete!-test
   (test/with-default-connection
