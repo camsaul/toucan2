@@ -137,6 +137,7 @@
       (str namespac "/" (name k))
       (name k))))
 
+;; TODO -- should this be part of the pretty lib?
 (defn pretty-printable-fn [pretty-representation f]
   (reify
     pretty/PrettyPrintable
@@ -163,3 +164,16 @@
 
   ([m1 m2 & more]
    (apply recursive-merge (recursive-merge m1 m2) more)))
+
+(defn qualify-symbol-for-*ns* [symb]
+  (let [qualified (pretty/qualify-symbol-for-*ns* symb)]
+    (if (not= qualified symb)
+      qualified
+      (let [aliases             (ns-aliases *ns*)
+            ns-symb->alias      (zipmap (map ns-name (vals aliases))
+                                        (keys aliases))
+            bluejdbc-core-alias (get ns-symb->alias 'bluejdbc.core)]
+        (symbol (if bluejdbc-core-alias
+                  (name bluejdbc-core-alias)
+                  "bluejdbc.core")
+                (name symb))))))

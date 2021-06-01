@@ -47,7 +47,7 @@
 (p/deftype+ ReducibleQuery [connectable tableable queryable options]
   pretty/PrettyPrintable
   (pretty [_]
-    (list `reducible-query connectable tableable queryable options))
+    (list (u/qualify-symbol-for-*ns* `reducible-query) connectable tableable queryable options))
 
   clojure.lang.IReduceInit
   (reduce [_ rf init]

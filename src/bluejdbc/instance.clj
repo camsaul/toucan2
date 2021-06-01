@@ -3,9 +3,9 @@
             [bluejdbc.util :as u]
             [camel-snake-kebab.core :as csk]
             [clojure.data :as data]
-            [clojure.pprint :as pprint]
             [methodical.core :as m]
-            [potemkin :as p]))
+            [potemkin :as p]
+            [pretty.core :as pretty]))
 
 (defn normalize-key [k]
   (when k
@@ -89,7 +89,11 @@
   (connectable [_]
     conn)
   (with-connectable [_ new-connectable]
-    (Instance. new-connectable tbl orig m key-xform mta)))
+    (Instance. new-connectable tbl orig m key-xform mta))
+
+  pretty/PrettyPrintable
+  (pretty [_]
+    (list (u/qualify-symbol-for-*ns* `instance) conn tbl m)))
 
 (deftype ^:private TransientInstance [conn tbl ^clojure.lang.ITransientMap m key-xform mta]
   clojure.lang.ITransientMap
@@ -105,20 +109,6 @@
   (without [this k]
     (.without m (key-xform k))
     this))
-
-;; TODO -- why don't we use `pretty/PrettyPrintable` here?
-(defmethod print-method Instance
-  [^Instance m ^java.io.Writer writer]
-  (binding [*out* writer]
-    (pr (list `instance (.connectable m) (.table m) (.m m)))))
-
-(defmethod print-dup Instance
-  [m writer]
-  (print-method m writer))
-
-(defmethod pprint/simple-dispatch Instance
-  [m]
-  (print-method m *out*))
 
 (defn normalize-map [key-xform m]
   (into (empty m)
