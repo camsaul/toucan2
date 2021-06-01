@@ -46,7 +46,7 @@
   [connectable tableable queryable options rf init]
   (let [options    (u/recursive-merge (conn/default-options connectable) options)
         sql-params (compile connectable tableable queryable options)]
-    (conn/with-connection [conn connectable options]
+    (conn/with-connection [conn connectable tableable options]
       (try
         (log/with-trace ["Executing query %s with options %s" sql-params (:next.jdbc options)]
           (let [results (next.jdbc/plan conn sql-params (:next.jdbc options))]
@@ -111,11 +111,11 @@
    reducible-query))
 
 (defn query
-  [& args]
   {:arglists '([queryable]
                [connectable queryable]
                [connectable tableable queryable]
                [connectable tableable queryable options])}
+  [& args]
   (all (apply reducible-query args)))
 
 (defn reduce-first
@@ -143,7 +143,7 @@
 
 (m/defmethod execute!* :default
   [connectable tableable query options]
-  (conn/with-connection [conn connectable options]
+  (conn/with-connection [conn connectable tableable options]
     (let [sql-params (compile connectable tableable query options)]
       (try
         (*call-count-thunk*)
@@ -159,7 +159,7 @@
 (defn execute!
   ([query]                               (execute!  :default    nil       query nil))
   ([connectable query]                   (execute!  connectable nil       query nil))
-  ([connectable query options]           (execute!  connectable nil       query nil))
+  ([connectable tableable query]         (execute!  connectable tableable query nil))
   ([connectable tableable query options] (execute!* connectable tableable query (merge (conn/default-options connectable)
                                                                                        options))))
 

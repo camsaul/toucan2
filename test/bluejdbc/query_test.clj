@@ -112,3 +112,14 @@
                (nested-call-count)))))
     (is (= 3
            (call-count)))))
+
+(m/defmethod conn/default-connectable-for-tableable* ::venues
+  [_ _]
+  :test/postgres)
+
+(deftest default-connectable-for-tableable-test
+  (is (= [{:one 1}]
+         (query/query nil ::venues "SELECT 1 AS one;")))
+  (test/with-venues-reset
+    (is (= [{:next.jdbc/update-count 1}]
+           (query/execute! nil ::venues "DELETE FROM venues WHERE id = 1;")))))
