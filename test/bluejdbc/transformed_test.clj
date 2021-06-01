@@ -1,5 +1,6 @@
 (ns bluejdbc.transformed-test
-  (:require [bluejdbc.mutative :as mutative]
+  (:require [bluejdbc.instance :as instance]
+            [bluejdbc.mutative :as mutative]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
@@ -68,7 +69,13 @@
       (is (= :bar
              (select/select-one-fn :category [:test/postgres ::transformed-venues] :id 1)))
       (is (= #{:store :bar}
-             (select/select-fn-set :category [:test/postgres ::transformed-venues]))))))
+             (select/select-fn-set :category [:test/postgres ::transformed-venues]))))
+    (testing "Transformed version of the map should be considered the instance 'original'"
+      (let [instance (select/select-one [:test/postgres ::transformed-venues] 1 {:select [:id :name :category]})]
+        (is (= {:id 1, :name "Tempest", :category :bar}
+               (instance/original instance)))
+        (is (= nil
+               (instance/changes instance)))))))
 
 (deftest update!-test
   (test/with-default-connection

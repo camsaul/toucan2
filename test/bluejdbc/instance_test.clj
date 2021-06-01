@@ -14,7 +14,6 @@
   (let [m (assoc (instance/instance :wow {:a 100}) :b 200)]
     (is (= {:a 100, :b 200}
            m))
-
     (testing "original/changes"
       (is (= {:a 100}
              (instance/original m)))
@@ -22,7 +21,22 @@
              (instance/changes m)))
       (is (= {:a 300, :b 200}
              (instance/changes (assoc m :a 300)))))
-
+    (testing "with-original"
+      (let [m2 (instance/with-original m {:a 200, :b 200})]
+        (is (= {:a 100, :b 200}
+               m2))
+        (is (= {:a 200, :b 200}
+               (instance/original m2)))
+        (is (= {:a 100}
+               (instance/changes m2)))))
+    (testing "reset-original"
+      (let [m2 (instance/reset-original m)]
+        (is (= {:a 100, :b 200}
+               m2))
+        (is (= {:a 100, :b 200}
+               (instance/original m2)))
+        (is (= nil
+               (instance/changes m2)))))
     (testing "table/with-table"
       (is (= :wow
              (instance/table m)))
