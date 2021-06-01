@@ -1,4 +1,5 @@
 (ns bluejdbc.query
+  (:refer-clojure :exclude [compile])
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as conn]
             [bluejdbc.connectable.current :as conn.current]
@@ -15,10 +16,36 @@
 
 (def ^:dynamic ^:private *call-count-thunk* (fn [])) ; no-op
 
+(def ^:dynamic ^:private *return-compiled* false)
+
+(def ^:dynamic ^:private *return-uncompiled* false)
+
+(defn do-compiled [thunk]
+  (binding [*return-compiled* true]
+    (u/do-returning-quit-early thunk)))
+
+(defmacro compiled {:style/indent 0} [& body]
+  `(do-compiled (fn [] ~@body)))
+
+(defn do-uncompiled [thunk]
+  (binding [*return-uncompiled* true]
+    (u/do-returning-quit-early thunk)))
+
+(defmacro uncompiled {:style/indent 0} [& body]
+  `(do-uncompiled (fn [] ~@body)))
+
+(defn- compile [connectable tableable queryable options]
+  (when *return-uncompiled*
+    (throw (u/quit-early-exception queryable)))
+  (let [sql-params (compile/compile connectable tableable queryable options)]
+    (when *return-compiled*
+      (throw (u/quit-early-exception sql-params)))
+    sql-params))
+
 (defn- reduce-query
   [connectable tableable queryable options rf init]
   (let [options    (u/recursive-merge (conn/default-options connectable) options)
-        sql-params (compile/compile connectable tableable queryable options)]
+        sql-params (compile connectable tableable queryable options)]
     (conn/with-connection [conn connectable options]
       (try
         (log/tracef "Executing query %s with options %s" (pr-str sql-params) (pr-str (:execute options)))
@@ -117,7 +144,7 @@
 (m/defmethod execute!* :default
   [connectable tableable query options]
   (conn/with-connection [conn connectable options]
-    (let [sql-params (compile/compile connectable tableable query options)]
+    (let [sql-params (compile connectable tableable query options)]
       (try
         (*call-count-thunk*)
         (next.jdbc/execute! conn sql-params (:execute options))
