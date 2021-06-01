@@ -67,20 +67,27 @@
 ;;
 ;; TODO -- update! should take a queryable HoneySQL arg, maybe we can figure this out by checking if `:where` is
 ;; present?
+(defn parse-update-args [connectable-tableable args]
+  (let [[connectable tableable]                 (conn/parse-connectable-tableable connectable-tableable)
+        {:keys [pk conditions changes options]} (parse-update!-args* connectable tableable args
+                                                                     (conn/default-options connectable))
+        conditions                              (cond-> conditions
+                                                  pk (honeysql-util/merge-primary-key connectable tableable pk options))
+        changes                                 (into {} (for [[k v] changes]
+                                                           [k (compile/value connectable tableable k v options)]))]
+    {:connectable   connectable
+     :tableable     tableable
+     :honeysql-form (cond-> {:update (compile/table-identifier tableable options)
+                             :set    changes}
+                      (seq conditions) (honeysql-util/merge-conditions connectable tableable conditions options))
+     :options       options}))
+
 (defn update!
   {:arglists '([connectable-tableable pk? & conditions? changes options?])}
   [connectable-tableable & args]
-  (let [[connectable tableable]                 (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [pk conditions changes options]} (parse-update!-args* connectable tableable args (conn/default-options connectable))
-        conditions                              (cond-> conditions
-                                                  pk (honeysql-util/merge-primary-key connectable tableable pk options))
-        honeysql-form                           (cond-> {:update (compile/table-identifier tableable options)
-                                                         :set    changes}
-                                                  (seq conditions) (honeysql-util/merge-conditions
-                                                                    connectable tableable conditions options))]
-    (log/tracef "UPDATE %s SET %s WHERE %s" (pr-str tableable) (pr-str changes) (pr-str conditions))
-    (update!* connectable tableable honeysql-form (merge (conn/default-options connectable)
-                                                         options))))
+  (let [{:keys [connectable tableable honeysql-form options]} (parse-update-args connectable-tableable args)]
+    (log/with-trace ["UPDATE %s SET %s WHERE %s" tableable (:set honeysql-form) (:where honeysql-form)]
+      (update!* connectable tableable honeysql-form options))))
 
 
 (m/defmulti save!*
@@ -131,17 +138,26 @@
                                                   (for [row rows]
                                                     (zipmap columns row))))))))
 
+(defn parse-insert-args [connectable-tableable args]
+  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+        {:keys [rows options]}  (parse-insert!-args* connectable tableable args (conn/default-options connectable))
+        honeysql-form           {:insert-into (compile/table-identifier tableable options)
+                                 :values      (for [row rows]
+                                                (into {} (for [[k v] row]
+                                                           [k (compile/value connectable tableable k v options)])))}]
+    {:connectable   connectable
+     :tableable     tableable
+     :honeysql-form honeysql-form
+     :options       options}))
+
 (defn insert!
   {:arglists '([connectable-tableable row-or-rows options?]
                [connectable-tableable k v & more options?]
                [connectable-tableable columns row-vectors options?])}
   [connectable-tableable & args]
-  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [rows options]}  (parse-insert!-args* connectable tableable args (conn/default-options connectable))
-        honeysql-form           {:insert-into (compile/table-identifier tableable options)
-                                 :values      rows}]
-    (log/tracef "INSERT %d %s rows:\n%s" (count rows) (pr-str tableable) (u/pprint-to-str rows))
-    (insert!* connectable tableable honeysql-form options)))
+  (let [{:keys [connectable tableable honeysql-form options]} (parse-insert-args connectable-tableable args)]
+    (log/with-trace ["INSERT %d %s rows:\n%s" (count (:values honeysql-form)) tableable (u/pprint-to-str (:values honeysql-form))]
+      (insert!* connectable tableable honeysql-form options))))
 
 (defn insert-returning-keys!
   {:arglists '([connectable-tableable row-or-rows options?]
