@@ -45,7 +45,7 @@
   :combo (m.combo.threaded/threading-method-combination :third))
 
 (defn- execute-results [results options]
-  (if (get-in options [:execute :return-keys])
+  (if (get-in options [:next.jdbc :return-keys])
     results
     (first results)))
 
@@ -172,8 +172,8 @@
                                   (apply juxt pks))
         options                 (u/recursive-merge
                                  options
-                                 {:execute {:return-keys true
-                                            :builder-fn  (rs/row-builder-fn connectable tableable)}})
+                                 {:next.jdbc {:return-keys true
+                                              :builder-fn  (rs/row-builder-fn connectable tableable)}})
         results                 (insert! [connectable tableable] rows options)]
     (map get-pks results)))
 
