@@ -61,12 +61,9 @@
 
 (m/defmethod compile* [:default :default clojure.lang.IPersistentMap]
   [connectable _ honeysql-form {options :honeysql}]
-  (log/with-trace "Compile HoneySQL form"
-    (when (seq options)
-      (log/tracef "\noptions: %s" (pr-str options)))
-    (binding [*compile-connectable* connectable
-              *compile-options*     options]
-      (apply hsql/format honeysql-form (mapcat identity options)))))
+  (binding [*compile-connectable* connectable
+            *compile-options*     options]
+    (apply hsql/format honeysql-form (mapcat identity options))))
 
 (defn compile
   ([queryable]
