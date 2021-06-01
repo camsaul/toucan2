@@ -1,5 +1,6 @@
 (ns bluejdbc.transformed
-  (:require [bluejdbc.log :as log]
+  (:require [bluejdbc.instance :as instance]
+            [bluejdbc.log :as log]
             [bluejdbc.mutative :as mutative]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
@@ -89,7 +90,7 @@
                           (if (contains? row k)
                             (update row k f)
                             row)))]
-    (apply comp transform-fns)))
+    (apply comp instance/reset-original transform-fns)))
 
 (m/defmethod select/select* :after [:default :bluejdbc/transformed :default]
   [connectable tableable reducible-query options]
