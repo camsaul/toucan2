@@ -75,16 +75,17 @@
   `:options`."
   [connectable tableable args options-1]
   (log/with-trace ["Parsing select args for %s %s" tableable args]
-    (let [{:keys [pk conditions query options]} (parse-select-args* connectable tableable args
-                                                                    (conn/default-options connectable))
+    (let [{:keys [pk conditions query options]} (parse-select-args*
+                                                 connectable tableable args (conn/default-options connectable))
           options                               (u/recursive-merge options-1 options)
           conditions                            (cond-> conditions
-                                                  pk (honeysql-util/merge-primary-key connectable tableable pk))
+                                                  pk (honeysql-util/merge-primary-key connectable tableable pk options))
           query                                 (if query
                                                   (queryable/queryable connectable tableable query options)
                                                   {})
           query                                 (cond-> query
-                                                  (seq conditions) (honeysql-util/merge-conditions conditions))]
+                                                  (seq conditions) (honeysql-util/merge-conditions
+                                                                    connectable tableable conditions options))]
       {:query query, :options options})))
 
 (defn select-reducible

@@ -14,6 +14,12 @@
     ([a b c d]        [c (fn [method c*] (method a b c* d))])
     ([a b c d & more] [c (fn [method c*] (apply method a b c* d more))])))
 
+(defmethod m.combo.threaded/threading-invoker :fourth
+  [_]
+  (fn
+    ([a b c d]        [d (fn [method d*] (method a b c d*))])
+    ([a b c d & more] [d (fn [method d*] (apply method a b c d* more))])))
+
 (defn keyword-or-class [x]
   (if (keyword? x)
     x

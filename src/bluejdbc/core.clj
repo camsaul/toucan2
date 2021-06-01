@@ -35,7 +35,8 @@
   compile*
   from
   from*
-  table-identifier]
+  table-identifier
+  to-sql*]
 
  [conn.current
   *current-connectable*

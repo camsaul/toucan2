@@ -73,10 +73,11 @@
   (let [[connectable tableable]                 (conn/parse-connectable-tableable connectable-tableable)
         {:keys [pk conditions changes options]} (parse-update!-args* connectable tableable args (conn/default-options connectable))
         conditions                              (cond-> conditions
-                                                  pk (honeysql-util/merge-primary-key connectable tableable pk))
+                                                  pk (honeysql-util/merge-primary-key connectable tableable pk options))
         honeysql-form                           (cond-> {:update (compile/table-identifier tableable options)
                                                          :set    changes}
-                                                  (seq conditions) (honeysql-util/merge-conditions conditions))]
+                                                  (seq conditions) (honeysql-util/merge-conditions
+                                                                    connectable tableable conditions options))]
     (log/tracef "UPDATE %s SET %s WHERE %s" (pr-str tableable) (pr-str changes) (pr-str conditions))
     (update!* connectable tableable honeysql-form (merge (conn/default-options connectable)
                                                          options))))
