@@ -27,7 +27,7 @@
   ([connectable tableable queryable options]
    (let [options (u/recursive-merge (conn/default-options connectable)
                                     options
-                                    {:execute {:builder-fn (rs/row-builder-fn connectable tableable)}})]
+                                    {:next.jdbc {:builder-fn (rs/row-builder-fn connectable tableable)}})]
      (query/reducible-query connectable tableable queryable options))))
 
 (m/defmulti select*

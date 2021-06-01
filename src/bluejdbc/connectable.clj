@@ -14,7 +14,7 @@
 
 (m/defmethod default-options :default
   [connectable]
-  {:execute {:builder-fn (rs/row-builder-fn connectable nil)}})
+  {:next.jdbc {:builder-fn (rs/row-builder-fn connectable nil)}})
 
 (m/defmulti connection*
   {:arglists '([connectable options])}

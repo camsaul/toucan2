@@ -48,17 +48,17 @@
         sql-params (compile connectable tableable queryable options)]
     (conn/with-connection [conn connectable options]
       (try
-        (log/tracef "Executing query %s with options %s" (pr-str sql-params) (pr-str (:execute options)))
-        (let [results (next.jdbc/plan conn sql-params (:execute options))]
-          (try
-            (log/tracef "Reducing results with rf %s and init %s" (pr-str rf) (pr-str init))
-            (*call-count-thunk*)
-            (reduce rf init results)
-            (catch Throwable e
-              (let [message (or (:message (ex-data e)) (ex-message e))]
-                (throw (ex-info (format "Error reducing results: %s" message)
-                                {:rf rf, :init init, :message message}
-                                e))))))
+        (log/with-trace ["Executing query %s with options %s" sql-params (:next.jdbc options)]
+          (let [results (next.jdbc/plan conn sql-params (:next.jdbc options))]
+            (try
+              (log/with-trace ["Reducing results with rf %s and init %s" rf init]
+                (*call-count-thunk*)
+                (reduce rf init results))
+              (catch Throwable e
+                (let [message (or (:message (ex-data e)) (ex-message e))]
+                  (throw (ex-info (format "Error reducing results: %s" message)
+                                  {:rf rf, :init init, :message message}
+                                  e)))))))
         (catch Throwable e
           (let [message (or (:message (ex-data e)) (ex-message e))]
             (throw (ex-info (format "Error executing query: %s" message)
@@ -147,7 +147,7 @@
     (let [sql-params (compile connectable tableable query options)]
       (try
         (*call-count-thunk*)
-        (next.jdbc/execute! conn sql-params (:execute options))
+        (next.jdbc/execute! conn sql-params (:next.jdbc options))
         (catch Throwable e
           (throw (ex-info (format "Error executing statement: %s" (ex-message e))
                           (merge
