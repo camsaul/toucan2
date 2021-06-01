@@ -35,24 +35,23 @@
 
 (deftest select-in-test
   (testing "select should transform values going in"
-    (testing "value is a pk condition"
-      (testing "key-value condition"
+    (testing "key-value condition"
+      (is (= [{:id 1, :name "Tempest", :category :bar}
+              {:id 2, :name "Ho's Tavern", :category :bar}]
+             (select/select [:test/postgres ::transformed-venues] :category :bar {:select   [:id :name :category]
+                                                                                  :order-by [[:id :asc]]})))
+      (testing "Toucan-style [f & args] condition"
         (is (= [{:id 1, :name "Tempest", :category :bar}
                 {:id 2, :name "Ho's Tavern", :category :bar}]
-               (select/select [:test/postgres ::transformed-venues] :category :bar {:select   [:id :name :category]
-                                                                                    :order-by [[:id :asc]]})))
-        (testing "Toucan-style [f & args] condition"
-          (is (= [{:id 1, :name "Tempest", :category :bar}
-                  {:id 2, :name "Ho's Tavern", :category :bar}]
-                 (select/select [:test/postgres ::transformed-venues] :category [:in [:bar]] {:select   [:id :name :category]
-                                                                                              :order-by [[:id :asc]]})))))
-      (testing "as the PK"
-        (testing "(single value)"
-          (is (= [{:id "1", :name "Tempest", :category :bar}]
-                 (select/select [:test/postgres ::transformed-venues-id-is-string] "1" {:select [:id :name :category]}))))
-        (testing "(vector of multiple values)"
-          (is (= [{:id "1", :name "Tempest", :category :bar}]
-                 (select/select [:test/postgres ::transformed-venues-id-is-string] ["1"] {:select [:id :name :category]}))))))))
+               (select/select [:test/postgres ::transformed-venues] :category [:in [:bar]] {:select   [:id :name :category]
+                                                                                            :order-by [[:id :asc]]})))))
+    (testing "as the PK"
+      (testing "(single value)"
+        (is (= [{:id "1", :name "Tempest", :category :bar}]
+               (select/select [:test/postgres ::transformed-venues-id-is-string] "1" {:select [:id :name :category]}))))
+      (testing "(vector of multiple values)"
+        (is (= [{:id "1", :name "Tempest", :category :bar}]
+               (select/select [:test/postgres ::transformed-venues-id-is-string] ["1"] {:select [:id :name :category]})))))))
 
 (deftest select-out-test
   (testing "select should transform values coming out"

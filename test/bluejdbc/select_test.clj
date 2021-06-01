@@ -1,5 +1,6 @@
 (ns bluejdbc.select-test
-  (:require [bluejdbc.connectable.current :as conn.current]
+  (:require [bluejdbc.compile :as compile]
+            [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.instance :as instance]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
@@ -271,3 +272,24 @@
          (select/exists? [:test/postgres :people] :name "Cam")))
   (is (= false
          (select/exists? [:test/postgres :people] :name "Cam Era"))))
+
+(m/defmethod compile/to-sql* [:default :people/custom-honeysql :id String]
+  [_ _ _ v _]
+  (assert (string? v) (format "V should be a string, got %s" (pr-str v)))
+  ["?::integer" v])
+
+(deftest custom-honeysql-test
+  (test/with-default-connection
+    (testing "key-value condition"
+      (is (= [{:id 1, :name "Cam"}]
+             (select/select :people/custom-honeysql :id "1" {:select [:id :name]})))
+      (testing "Toucan-style [f & args] condition"
+        (is (= [{:id 1, :name "Cam"}]
+               (select/select :people/custom-honeysql :id [:in ["1"]] {:select [:id :name]})))))
+    (testing "as the PK"
+      (testing "(single value)"
+        (is (= [{:id 1, :name "Cam"}]
+               (select/select :people/custom-honeysql "1" {:select [:id :name]}))))
+      (testing "(vector of multiple values)"
+        (is (= [{:id 1, :name "Cam"}]
+               (select/select :people/custom-honeysql ["1"] {:select [:id :name]})))))))

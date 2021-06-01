@@ -9,6 +9,7 @@
             [honeysql.core :as hsql]
             [honeysql.format :as hformat]
             [methodical.core :as m]
+            [methodical.impl.combo.threaded :as m.combo.threaded]
             [potemkin :as p]
             [pretty.core :as pretty]))
 
@@ -81,6 +82,7 @@
                    (queryable/queryable connectable tableable queryable options))]
      (compile* connectable tableable query options))))
 
+;; TODO -- should `connectable` be an arg here too?
 (p/defrecord+ TableIdentifier [tableable options]
   pretty/PrettyPrintable
   (pretty [_]
@@ -99,6 +101,46 @@
 (defn table-identifier
   ([tableable]         (->TableIdentifier tableable nil))
   ([tableable options] (->TableIdentifier tableable options)))
+
+(m/defmulti to-sql*
+  {:arglists '([connectable tableable column v options])}
+  u/dispatch-on-first-four-args
+  :combo (m.combo.threaded/threading-method-combination :fourth))
+
+(m/defmethod to-sql* :default
+  [_ _ _ v _]
+  (hformat/to-sql v))
+
+(m/defmethod to-sql* :around :default
+  [connectable tableable column v options]
+  (let [result (log/with-trace ["Convert %s to SQL" (pr-str v)]
+                 (next-method connectable tableable column v options))]
+    (if (sequential? result)
+      (let [[s & params] result]
+        (assert (string? s) (format "to-sql* should return either string or [string & parms], got %s" (pr-str result)))
+        (doseq [param params]
+          (hformat/add-anon-param param))
+        s)
+      result)))
+
+(p/defrecord+ Value [connectable tableable column v options]
+  pretty/PrettyPrintable
+  (pretty [_]
+    (list* (u/qualify-symbol-for-*ns* `value) connectable tableable column v (when options [options])))
+
+  hformat/ToSql
+  (to-sql [_]
+    (to-sql* connectable tableable column v options)))
+
+(defn value
+  ([connectable tableable column v]
+   (value connectable tableable column v nil))
+
+  ([connectable tableable column v options]
+   (assert (keyword? column) (format "column should be a keyword, got %s" (pr-str column)))
+   (when (seq options)
+     (assert (map? options) (format "options should be a map, got %s" (pr-str options))))
+   (->Value connectable tableable column v options)))
 
 (m/defmulti from*
   "Add a SQL `FROM` clause or equivalent to `query`."
