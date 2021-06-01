@@ -22,10 +22,13 @@
 
 (derive ::transformed-venues-id-is-string ::transformed-venues)
 
+(defn- parse-int [^String s]
+  (Integer/parseInt ^String s))
+
 (m/defmethod transformed/transforms* [:default ::transformed-venues-id-is-string]
   [connectable tableable options]
   (merge
-   {:id {:in  #(Integer/parseInt ^String %)
+   {:id {:in  parse-int
          :out str}}
    (next-method connectable tableable options)))
 
@@ -68,65 +71,84 @@
              (select/select-fn-set :category [:test/postgres ::transformed-venues]))))))
 
 (deftest update!-test
-  (testing "in (update!)"
-    (test/with-default-connection
-      (testing "key-value conditions"
+  (test/with-default-connection
+    (testing "key-value conditions"
+      (test/with-venues-reset
+        (is (= {:next.jdbc/update-count 2}
+               (mutative/update! ::transformed-venues :category :bar {:category :BAR})))
+        (is (= #{["Ho's Tavern" :BAR] ["Tempest" :BAR]}
+               (select/select-fn-set (juxt :name :category) ::transformed-venues :category :BAR))))
+      (testing "Toucan-style [f & args] condition"
         (test/with-venues-reset
           (is (= {:next.jdbc/update-count 2}
-                 (mutative/update! ::transformed-venues :category :bar {:category :BAR})))
-          (is (= #{["Ho's Tavern" :BAR] ["Tempest" :BAR]}
-                 (select/select-fn-set (juxt :name :category) ::transformed-venues :category :BAR))))
-        (testing "Toucan-style [f & args] condition"
-          (test/with-venues-reset
-            (is (= {:next.jdbc/update-count 2}
-                   (mutative/update! ::transformed-venues :category [:in [:bar]] {:category :BAR})))
-            (is (= #{:store :BAR}
-                   (select/select-fn-set :category ::transformed-venues))))))
-      (testing "conditions map"
-        (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 2}
-                 (mutative/update! ::transformed-venues {:category :bar} {:category :BAR})))))
-      (testing "PK"
-        (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 1}
-                 (mutative/update! ::transformed-venues-id-is-string "1" {:name "Wow"})))
-          (is (= "Wow"
-                 (select/select-one-fn :name ::transformed-venues 1))))))))
+                 (mutative/update! ::transformed-venues :category [:in [:bar]] {:category :BAR})))
+          (is (= #{:store :BAR}
+                 (select/select-fn-set :category ::transformed-venues))))))
+    (testing "conditions map"
+      (test/with-venues-reset
+        (is (= {:next.jdbc/update-count 2}
+               (mutative/update! ::transformed-venues {:category :bar} {:category :BAR})))))
+    (testing "PK"
+      (test/with-venues-reset
+        (is (= {:next.jdbc/update-count 1}
+               (mutative/update! ::transformed-venues-id-is-string "1" {:name "Wow"})))
+        (is (= "Wow"
+               (select/select-one-fn :name ::transformed-venues 1)))))))
 
 (deftest insert!-test
-  (testing "in (insert!)"
-    (test/with-default-connection
-      (testing "single map row"
-        (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 1}
-                 (mutative/insert! ::transformed-venues {:name "Hi-Dive", :category :bar})))
-          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-                 (select/select-fn-set :name ::transformed-venues :category :bar)))))
-      (testing "multiple map rows"
-        (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 1}
-                 (mutative/insert! ::transformed-venues [{:name "Hi-Dive", :category :bar}])))
-          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-                 (select/select-fn-set :name ::transformed-venues :category :bar)))))
-      (testing "kv args"
-        (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 1}
-                 (mutative/insert! ::transformed-venues :name "Hi-Dive", :category :bar)))
-          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-                 (select/select-fn-set :name ::transformed-venues :category :bar)))))
-      (testing "columns + vector rows"
-        (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 1}
-                 (mutative/insert! ::transformed-venues [:name :category] [["Hi-Dive" :bar]])))
-          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-                 (select/select-fn-set :name ::transformed-venues :category :bar)))))
-      (testing "returning-keys"
-        (test/with-venues-reset
-          (is (= ["4"]
-                 (mutative/insert-returning-keys! ::transformed-venues-id-is-string [{:name "Hi-Dive", :category "bar"}]))))))))
+  (test/with-default-connection
+    (testing "single map row"
+      (test/with-venues-reset
+        (is (= {:next.jdbc/update-count 1}
+               (mutative/insert! ::transformed-venues {:name "Hi-Dive", :category :bar})))
+        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+               (select/select-fn-set :name ::transformed-venues :category :bar)))))
+    (testing "multiple map rows"
+      (test/with-venues-reset
+        (is (= {:next.jdbc/update-count 1}
+               (mutative/insert! ::transformed-venues [{:name "Hi-Dive", :category :bar}])))
+        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+               (select/select-fn-set :name ::transformed-venues :category :bar)))))
+    (testing "kv args"
+      (test/with-venues-reset
+        (is (= {:next.jdbc/update-count 1}
+               (mutative/insert! ::transformed-venues :name "Hi-Dive", :category :bar)))
+        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+               (select/select-fn-set :name ::transformed-venues :category :bar)))))
+    (testing "columns + vector rows"
+      (test/with-venues-reset
+        (is (= {:next.jdbc/update-count 1}
+               (mutative/insert! ::transformed-venues [:name :category] [["Hi-Dive" :bar]])))
+        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+               (select/select-fn-set :name ::transformed-venues :category :bar)))))
+    (testing "returning-keys"
+      (test/with-venues-reset
+        (is (= ["4"]
+               (mutative/insert-returning-keys! ::transformed-venues-id-is-string [{:name "Hi-Dive", :category "bar"}])))))))
 
 (deftest save!-test
-  (testing "in (save!)"))
+  ;; TODO
+)
 
 (deftest delete!-test
-  (testing "in (delete!)"))
+  (test/with-default-connection
+    (testing "Delete row by PK"
+      (test/with-venues-reset
+        (is (= {:next.jdbc/update-count 1}
+               (mutative/delete! ::transformed-venues-id-is-string "1")))
+        (is (= []
+               (select/select :venues 1)))
+        (is (= #{2}
+               (select/select-fn-set :id :venues 2)))))
+    (testing "Delete row by key-value conditions"
+      (test/with-venues-reset
+        (is (= {:next.jdbc/update-count 2}
+               (mutative/delete! ::transformed-venues :category :bar)))
+        (is (= []
+               (select/select ::transformed-venues :category :bar))))
+      (testing "Toucan-style fn-args vector"
+        (test/with-venues-reset
+          (is (= {:next.jdbc/update-count 2}
+                 (mutative/delete! ::transformed-venues :category [:in [:bar]])))
+          (is (= []
+                 (select/select ::transformed-venues :category :bar))))))))
