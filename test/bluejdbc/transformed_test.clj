@@ -1,5 +1,6 @@
 (ns bluejdbc.transformed-test
-  (:require [bluejdbc.select :as select]
+  (:require [bluejdbc.mutative :as mutative]
+            [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
             [bluejdbc.transformed :as transformed]
@@ -31,10 +32,16 @@
 (deftest select-in-test
   (testing "select should transform values going in"
     (testing "value is a pk condition"
-      (testing "k-v condition"
+      (testing "key-value condition"
         (is (= [{:id 1, :name "Tempest", :category :bar}
                 {:id 2, :name "Ho's Tavern", :category :bar}]
-               (select/select [:test/postgres ::transformed-venues] :category :bar {:select [:id :name :category]}))))
+               (select/select [:test/postgres ::transformed-venues] :category :bar {:select   [:id :name :category]
+                                                                                    :order-by [[:id :asc]]})))
+        (testing "Toucan-style [f & args] condition"
+          (is (= [{:id 1, :name "Tempest", :category :bar}
+                  {:id 2, :name "Ho's Tavern", :category :bar}]
+                 (select/select [:test/postgres ::transformed-venues] :category [:in [:bar]] {:select   [:id :name :category]
+                                                                                              :order-by [[:id :asc]]})))))
       (testing "as the PK"
         (testing "(single value)"
           (is (= [{:id "1", :name "Tempest", :category :bar}]
@@ -60,11 +67,37 @@
       (is (= #{:store :bar}
              (select/select-fn-set :category [:test/postgres ::transformed-venues]))))))
 
-(deftest update-test
-  (testing "in (update!)"))
+(deftest update!-test
+  (testing "in (update!)"
+    (test/with-default-connection
+      (testing "key-value conditions"
+        (test/with-venues-reset
+          (is (= {:next.jdbc/update-count 2}
+                 (mutative/update! ::transformed-venues :category :bar {:category :BAR})))
+          (is (= #{["Ho's Tavern" :BAR] ["Tempest" :BAR]}
+                 (select/select-fn-set (juxt :name :category) ::transformed-venues :category :BAR))))
+        (testing "Toucan-style [f & args] condition"
+          (test/with-venues-reset
+            (is (= {:next.jdbc/update-count 2}
+                   (mutative/update! ::transformed-venues :category [:in [:bar]] {:category :BAR})))
+            (is (= #{:store :BAR}
+                   (select/select-fn-set :category ::transformed-venues))))))
+      (testing "conditions map"
+        (test/with-venues-reset
+          (is (= {:next.jdbc/update-count 2}
+                 (mutative/update! ::transformed-venues {:category :bar} {:category :BAR})))))
+      (testing "PK"
+        (test/with-venues-reset
+          (is (= {:next.jdbc/update-count 1}
+                 (mutative/update! ::transformed-venues-id-is-string "1" {:name "Wow"})))
+          (is (= "Wow"
+                 (select/select-one-fn :name ::transformed-venues 1))))))))
 
-(deftest insert-test
+(deftest insert!-test
   (testing "in (insert!)"))
 
 (deftest save!-test
   (testing "in (save!)"))
+
+(deftest delete!-test
+  (testing "in (delete!)"))

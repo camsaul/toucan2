@@ -14,8 +14,8 @@
       (merge kvs pk-map))))
 
 ;; TODO -- this should probably be a multimethod, to support theoretical non-HoneySQL queries
-(defn merge-kvs [query kvs]
-  (log/with-trace ["Adding key-values %s" (pr-str kvs)]
+(defn merge-conditions [query kvs]
+  (log/with-trace ["Adding key-value conditions %s" (pr-str kvs)]
     (apply hsql.helpers/merge-where query (for [[k v] kvs]
                                             (if (sequential? v)
                                               (into [(first v) k] (rest v))

@@ -67,10 +67,10 @@
                                         [{:options true}] {:options true}})
           :let                       [args (vec (concat id kvs query options))]]
     (testing (pr-str (list `parse-select-args* args))
-      (is (= {:id      expected-id
-              :kvs     expected-kvs
-              :query   expected-query
-              :options expected-options}
+      (is (= {:pk         expected-id
+              :conditions expected-kvs
+              :query      expected-query
+              :options    expected-options}
              (select/parse-select-args* :connectable :tableable args nil))))))
 
 (deftest select-test

@@ -54,16 +54,29 @@
   (-> (query/execute! connectable tableable honeysql-form options)
       (execute-results options)))
 
+;; Syntax is a bit different from Toucan -- Toucan is either
+;;
+;;    (update! table id changes-map)
+;;
+;; or
+;;
+;;    (update! table id & {:as changes})
+;;
+;; (i.e., the key-value varargs are collected into changes) whereas this syntax collects the key-value varargs into
+;; conditions and changes must always be a map.
+;;
+;; TODO -- update! should take a queryable HoneySQL arg, maybe we can figure this out by checking if `:where` is
+;; present?
 (defn update!
-  {:arglists '([connectable-tableable id? conditions? changes options?])}
+  {:arglists '([connectable-tableable pk? & conditions? changes options?])}
   [connectable-tableable & args]
   (let [[connectable tableable]                 (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [id conditions changes options]} (parse-update!-args* connectable tableable args (conn/default-options connectable))
+        {:keys [pk conditions changes options]} (parse-update!-args* connectable tableable args (conn/default-options connectable))
         conditions                              (cond-> conditions
-                                                  id (honeysql-util/merge-primary-key connectable tableable id))
+                                                  pk (honeysql-util/merge-primary-key connectable tableable pk))
         honeysql-form                           (cond-> {:update (compile/table-identifier tableable options)
                                                          :set    changes}
-                                                  (seq conditions) (honeysql-util/merge-kvs conditions))]
+                                                  (seq conditions) (honeysql-util/merge-conditions conditions))]
     (log/tracef "UPDATE %s SET %s WHERE %s" (pr-str tableable) (pr-str changes) (pr-str conditions))
     (update!* connectable tableable honeysql-form (merge (conn/default-options connectable)
                                                          options))))
@@ -182,7 +195,7 @@
       (query/execute! connectable tableable honeysql-form options))))
 
 (defn delete!
-  {:arglists '([connectable-tableable pk? conditions? queryable? options?])}
+  {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
   (let [{:keys [connectable tableable query options]} (parse-delete-args args)]
     (execute-results (delete!* connectable tableable query options) options)))

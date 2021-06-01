@@ -10,28 +10,44 @@
 
 (use-fixtures :once test/do-with-test-data)
 
+(m/defmethod tableable/primary-key* [:default :venues/composite-pk]
+  [_ _]
+  [:id :name])
+
 (deftest parse-update-args-test
-  (is (= {:id 1, :changes {:a 1}, :conditions nil}
+  (is (= {:pk 1, :changes {:a 1}, :conditions nil}
          (mutative/parse-update!-args* nil nil [1 {:a 1}] nil)))
   (is (= {:conditions {:id 1}, :changes {:a 1}}
          (mutative/parse-update!-args* nil nil [:id 1 {:a 1}] nil)))
-  (is (= {:id 1, :conditions {:name "Cam"}, :changes {:a 1}}
-         (mutative/parse-update!-args* nil nil [1 :name "Cam" {:a 1}] nil)))
+  (testing "composite PK"
+    (is (= {:pk [1 2], :changes {:a 1}, :conditions nil}
+           (mutative/parse-update!-args* nil nil [[1 2] {:a 1}] nil))))
+  (testing "key-value conditions"
+    (is (= {:pk 1, :conditions {:name "Cam"}, :changes {:a 1}}
+           (mutative/parse-update!-args* nil nil [1 :name "Cam" {:a 1}] nil))))
   (is (= {:changes {:name "Hi-Dive"}, :conditions {:id 1}}
          (mutative/parse-update!-args* nil nil [{:id 1} {:name "Hi-Dive"}] nil)))
   (is (= {:changes {:name "Hi-Dive"}, :conditions {:id 1}, :options {:options? true}}
          (mutative/parse-update!-args* nil nil [{:id 1} {:name "Hi-Dive"} {:options? true}] nil))))
 
 (deftest update!-test
-  (test/with-venues-reset
+  (testing "With PK and map conditions"
+    (test/with-venues-reset
+      (is (= {:next.jdbc/update-count 1}
+             (mutative/update! [:test/postgres :venues] 1 {:name "Hi-Dive"})))
+      (is (= (instance/instance :venues {:id         1
+                                         :name       "Hi-Dive"
+                                         :category   "bar"
+                                         :created-at (t/local-date-time "2017-01-01T00:00")
+                                         :updated-at (t/local-date-time "2017-01-01T00:00")})
+             (select/select-one [:test/postgres :venues] 1)))))
+  (testing "With key-value conditions"
+    (test/with-venues-reset
+      (is (= {:next.jdbc/update-count 1}
+             (mutative/update! [:test/postgres :venues] :name "Tempest" {:name "Hi-Dive"})))))
+  (testing "with composite PK"
     (is (= {:next.jdbc/update-count 1}
-           (mutative/update! [:test/postgres :venues] 1 {:name "Hi-Dive"})))
-    (is (= (instance/instance :venues {:id         1
-                                       :name       "Hi-Dive"
-                                       :category   "bar"
-                                       :created-at (t/local-date-time "2017-01-01T00:00")
-                                       :updated-at (t/local-date-time "2017-01-01T00:00")})
-           (select/select-one [:test/postgres :venues] 1)))))
+           (mutative/update! [:test/postgres :venues/composite-pk] [1 "Tempest"] {:name "Hi-Dive"})))))
 
 (deftest save!-test
   (test/with-venues-reset
@@ -144,10 +160,6 @@
             (is (= [(instance/instance "venues" {:id 8, :name "The Ramp"})
                     (instance/instance "venues" {:id 9, :name "Louie's"})]
                    (select/select "venues" :id [:> 7] {:select [:id :name], :order-by [[:id :asc]]})))))))))
-
-(m/defmethod tableable/primary-key* [:default :venues/composite-pk]
-  [_ _]
-  [:id :name])
 
 (deftest insert-returning-keys!-composite-pk-test
   (test/with-venues-reset
