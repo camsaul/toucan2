@@ -3,6 +3,7 @@
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as connectable]
             [bluejdbc.connectable.current :as conn.current]
+            [bluejdbc.helpers :as helpers]
             [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
@@ -20,6 +21,7 @@
   compile/keep-me
   conn.current/keep-me
   connectable/keep-me
+  helpers/keep-me
   hydrate/keep-me
   instance/keep-me
   log/keep-me
@@ -56,6 +58,10 @@
   connection*
   with-connection
   with-transaction]
+
+ [helpers
+  define-before-select
+  define-after-select]
 
  [hydrate
   batched-hydrate*
