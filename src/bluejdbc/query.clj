@@ -83,7 +83,12 @@
 
   clojure.lang.IReduceInit
   (reduce [_ rf init]
-    (reduce-query connectable tableable queryable options rf init)))
+    (reduce-query connectable tableable queryable options rf init))
+
+  ;; convenience: deref a ReducibleQuery to realize all results.
+  clojure.lang.IDeref
+  (deref [this]
+    (all this)))
 
 (m/defmulti reducible-query*
   {:arglists '([connectable tableable queryable options])}
@@ -111,7 +116,9 @@
 (defn realize-row [row]
   (next.jdbc.rs/datafiable-row row conn.current/*current-connection* nil))
 
-(defn all [reducible-query]
+(defn all
+  "Immediately realize all rows from `reducible-query` and return them."
+  [reducible-query]
   (into
    []
    (map realize-row)
@@ -147,13 +154,13 @@
   (reduce-first (map realize-row) (apply reducible-query args)))
 
 (m/defmulti execute!*
-  {:arglists '([connectable tableable query options])}
+  {:arglists '([connectable tableable queryable options])}
   u/dispatch-on-first-three-args)
 
 (m/defmethod execute!* :default
-  [connectable tableable query options]
+  [connectable tableable queryable options]
   (conn/with-connection [conn connectable tableable options]
-    (let [sql-params (compile connectable tableable query options)]
+    (let [sql-params (compile connectable tableable queryable options)]
       (try
         (*call-count-thunk*)
         (let [results (next.jdbc/execute! conn sql-params (:next.jdbc options))]
@@ -168,7 +175,7 @@
                           (merge
                            {:options options}
                            (when *include-queries-in-exceptions?*
-                             {:query query, :sql-params sql-params}))
+                             {:queryable queryable, :sql-params sql-params}))
                           e)))))))
 
 (defn execute!

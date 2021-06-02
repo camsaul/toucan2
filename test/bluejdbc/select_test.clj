@@ -19,14 +19,17 @@
     (is (every? (partial = :people) (map instance/table results)))))
 
 (deftest query-as-test
-  (let [results (query/all
-                 (select/reducible-query-as :test/postgres :people {:select [:*], :from [:people]} nil))]
-    (test-people-instances? results)
-    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")}
-            {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56Z")}
-            {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56Z")}
-            {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56Z")}]
-           results))))
+  (let [reducible-query (select/reducible-query-as :test/postgres :people {:select [:*], :from [:people]} nil)]
+    (doseq [[message f] {"(query/all reducible-query)" query/all
+                         "@reducible-query"            deref}
+            :let        [results (f reducible-query)]]
+      (testing message
+        (test-people-instances? results)
+        (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")}
+                {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56Z")}
+                {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56Z")}
+                {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56Z")}]
+               results))))))
 
 (m/defmethod queryable/queryable* [:default :default ::named-query]
   [_ _ _ _]
