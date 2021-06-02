@@ -218,3 +218,7 @@
     instance))
 
 ;; TODO -- should we have a revert-changes helper function as well?
+
+(defn assoc-original
+  [instance & kvs]
+  (reset-original (apply assoc instance kvs)))

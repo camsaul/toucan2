@@ -77,11 +77,14 @@
   table-for-automagic-hydration*]
 
  [instance
+  assoc-original
+  bluejdbc-instance?
   changes
   instance
   instance*
   key-transform-fn*
   original
+  reset-original
   tableable]
 
  [log
