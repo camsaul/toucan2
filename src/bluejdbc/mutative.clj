@@ -39,13 +39,13 @@
     (next-method connectable tableable args options)))
 
 (m/defmulti update!*
-  {:arglists '([connectable tableable honeysql-form options])}
+  {:arglists '([connectable tableable query options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
 (m/defmethod update!* :default
-  [connectable tableable honeysql-form options]
-  (query/execute! connectable tableable honeysql-form options))
+  [connectable tableable query options]
+  (query/execute! connectable tableable query options))
 
 ;; Syntax is a bit different from Toucan -- Toucan is either
 ;;
@@ -68,19 +68,20 @@
                                                   pk (honeysql-util/merge-primary-key connectable tableable pk options))
         changes                                 (into {} (for [[k v] changes]
                                                            [k (compile/value connectable tableable k v options)]))]
-    {:connectable   connectable
-     :tableable     tableable
-     :honeysql-form (cond-> {:update (compile/table-identifier tableable options)
-                             :set    changes}
-                      (seq conditions) (honeysql-util/merge-conditions connectable tableable conditions options))
-     :options       options}))
+    {:connectable connectable
+     :tableable   tableable
+     :query       (cond-> {:update (compile/table-identifier tableable options)
+                           :set    changes}
+                    (seq conditions) (honeysql-util/merge-conditions connectable tableable conditions options))
+     :options     options}))
 
 (defn update!
+  "Returns number of rows updated."
   {:arglists '([connectable-tableable pk? & conditions? changes options?])}
   [connectable-tableable & args]
-  (let [{:keys [connectable tableable honeysql-form options]} (parse-update-args connectable-tableable args)]
-    (log/with-trace ["UPDATE %s SET %s WHERE %s" tableable (:set honeysql-form) (:where honeysql-form)]
-      (update!* connectable tableable honeysql-form options))))
+  (let [{:keys [connectable tableable query options]} (parse-update-args connectable-tableable args)]
+    (log/with-trace ["UPDATE %s SET %s WHERE %s" tableable (:set query) (:where query)]
+      (update!* connectable tableable query options))))
 
 (m/defmulti save!*
   {:arglists '([connectable tableable obj options])}
@@ -145,37 +146,37 @@
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
         [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
         {:keys [rows options]}  (parse-insert!-args* connectable tableable args options)
-        honeysql-form           {:insert-into (compile/table-identifier tableable options)
+        query                   {:insert-into (compile/table-identifier tableable options)
                                  :values      (for [row rows]
                                                 (into {} (for [[k v] row]
                                                            [k (compile/value connectable tableable k v options)])))}]
-    {:connectable   connectable
-     :tableable     tableable
-     :honeysql-form honeysql-form
-     :options       options}))
+    {:connectable connectable
+     :tableable   tableable
+     :query       query
+     :options     options}))
+
+(defn do-insert! [connectable tableable query options]
+  (log/with-trace ["INSERT %d %s rows:\n%s" (count (:values query)) tableable (u/pprint-to-str (:values query))]
+    (insert!* connectable tableable query options)))
 
 (defn insert!
   {:arglists '([connectable-tableable row-or-rows options?]
                [connectable-tableable k v & more options?]
                [connectable-tableable columns row-vectors options?])}
   [connectable-tableable & args]
-  (let [{:keys [connectable tableable honeysql-form options]} (parse-insert-args connectable-tableable args)]
-    (log/with-trace ["INSERT %d %s rows:\n%s" (count (:values honeysql-form)) tableable (u/pprint-to-str (:values honeysql-form))]
-      (insert!* connectable tableable honeysql-form options))))
+  (let [{:keys [connectable tableable query options]} (parse-insert-args connectable-tableable args)]
+    (do-insert! connectable tableable query options)))
 
 (defn insert-returning-keys!
   {:arglists '([connectable-tableable row-or-rows options?]
                [connectable-tableable k v & more options?]
                [connectable-tableable columns row-vectors options?])}
   [connectable-tableable & args]
-  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
-        {:keys [rows options]}  (parse-insert!-args* connectable tableable args options)
-        options                 (u/recursive-merge
-                                 options
-                                 {:next.jdbc  {:return-keys true}
-                                  :reducible? true})
-        reducible-query         (insert! [connectable tableable] rows options)]
+  (let [{:keys [connectable tableable query options]} (parse-insert-args connectable-tableable args)
+        options                                       (-> options
+                                                          (assoc-in [:next.jdbc :return-keys] true)
+                                                          (assoc :reducible? true))
+        reducible-query (do-insert! connectable tableable query options)]
     (into
      []
      (map (select/select-pks-fn connectable tableable))
@@ -211,10 +212,10 @@
 
 (m/defmethod delete!* :default
   [connectable tableable query options]
-  (let [honeysql-form (merge {:delete-from (compile/table-identifier tableable options)}
+  (let [query (merge {:delete-from (compile/table-identifier tableable options)}
                              query)]
-    (log/with-trace ["DELETE rows: %s" honeysql-form]
-      (query/execute! connectable tableable honeysql-form options))))
+    (log/with-trace ["DELETE rows: %s" query]
+      (query/execute! connectable tableable query options))))
 
 (defn delete!
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}

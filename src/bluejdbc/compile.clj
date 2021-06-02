@@ -61,6 +61,8 @@
 
 (m/defmethod compile* [:default :default clojure.lang.IPersistentMap]
   [connectable _ honeysql-form {options :honeysql}]
+  (assert (not (contains? honeysql-form :next.jdbc))
+          (format "Options should not be present in honeysql-form! Got: %s" (pr-str honeysql-form)))
   (binding [*compile-connectable* connectable
             *compile-options*     options]
     (apply hsql/format honeysql-form (mapcat identity options))))

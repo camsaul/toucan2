@@ -31,18 +31,17 @@
 
 (m/defmethod read-column-thunk* :default
   [_ _ ^ResultSet rs _ ^Integer i options]
+  (log/tracef "Fetching values in column %d with (.getObject rs %d) and options %s" i i (pr-str options))
   (fn default-read-column-thunk* []
     (.getObject rs i)))
 
-(m/defmethod read-column-thunk* :around :default
-  [connectable tableable rs ^ResultSetMetaData rsmeta ^Integer i options]
-  (log/with-trace ["Fetching values in column %d with (.getObject rs %d) and options %s" i i (pr-str options)]
-    (next-method connectable tableable rs rsmeta i options)))
-
 (defn get-object-of-class-thunk [^ResultSet rs ^Integer i ^Class klass]
   (log/tracef "Fetching values in column %d with (.getObject rs %d %s)" i i (.getCanonicalName klass))
-  (fn get-object-of-class-thunk []
-    (.getObject rs i klass)))
+  (u/pretty-printable-fn
+   (fn []
+     (list '.getObject 'rs i klass))
+   (fn get-object-of-class-thunk []
+     (.getObject rs i klass))))
 
 (m/defmethod read-column-thunk* [:default :default Types/CLOB]
   [_ _ ^ResultSet rs _ ^Integer i _]
