@@ -1,10 +1,4 @@
 (disable-warning
- {:linter :unused-ret-vals-in-try
-  :if-inside-macroexpansion-of #{'clojure.test/is}
-  :within-depth 10
-  :reason "A thrown? form can generate false positives for this linter."})
-
-(disable-warning
  {:linter :wrong-arity
   :function-symbol 'bluejdbc.compile/compile*
   :arglists-for-linting '([connectable-tableable & args])})
@@ -12,6 +6,11 @@
 (disable-warning
  {:linter :wrong-arity
   :function-symbol 'bluejdbc.select/select
+  :arglists-for-linting '([connectable-tableable & args])})
+
+(disable-warning
+ {:linter :wrong-arity
+  :function-symbol 'bluejdbc.core/select
   :arglists-for-linting '([connectable-tableable & args])})
 
 (disable-warning
@@ -87,4 +86,9 @@
 (disable-warning
  {:linter :wrong-arity
   :function-symbol 'bluejdbc.mutative/insert-returning-keys!
+  :arglists-for-linting '([connectable-tableable & args])})
+
+(disable-warning
+ {:linter :wrong-arity
+  :function-symbol 'bluejdbc.mutative/delete!
   :arglists-for-linting '([connectable-tableable & args])})

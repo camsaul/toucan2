@@ -94,9 +94,9 @@
   `:options`."
   [connectable tableable args options]
   (log/with-trace ["Parsing select args for %s %s" tableable args]
-    (let [[connectable options-1] (conn.current/ensure-connectable connectable tableable options)
-          parsed-select-args      (parse-select-args* connectable tableable args options)
-          compiled                (compile-select* connectable tableable parsed-select-args options)]
+    (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
+          parsed-select-args    (parse-select-args* connectable tableable args options)
+          compiled              (compile-select* connectable tableable parsed-select-args options)]
       (assert (and (map? compiled) (contains? compiled :query) (contains? compiled :options))
               "compile-select* should return a map with :query and :options")
       compiled)))

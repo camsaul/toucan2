@@ -103,7 +103,7 @@
     reducible-query))
 
 (m/defmethod mutative/parse-update!-args* :after [:default :bluejdbc/transformed]
-  [connectable tableable {:keys [changes], :as args} options]
+  [connectable tableable args options]
   (if-let [transforms (in-transforms connectable tableable options)]
     (log/with-trace ["Apply %s transforms to %s" transforms args]
       (cond-> (apply-in-transforms connectable tableable args options)

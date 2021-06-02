@@ -314,4 +314,4 @@
     (is (= {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
            m))
     (is (map? m))
-    (is (not (instance/instance? m)))))
+    (is (not (instance/bluejdbc-instance? m)))))
