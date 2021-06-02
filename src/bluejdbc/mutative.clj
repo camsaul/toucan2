@@ -83,7 +83,6 @@
     (log/with-trace ["UPDATE %s SET %s WHERE %s" tableable (:set honeysql-form) (:where honeysql-form)]
       (update!* connectable tableable honeysql-form options))))
 
-
 (m/defmulti save!*
   {:arglists '([connectable tableable obj options])}
   u/dispatch-on-first-three-args
@@ -91,8 +90,20 @@
 
 (m/defmethod save!* :default
   [connectable tableable obj _]
-  (when-let [changes (not-empty (instance/changes obj))]
-    (update! [connectable tableable] (tableable/primary-key-values connectable tableable obj) changes)))
+  (log/with-trace ["Saving %s (changes: %s)" obj (instance/changes obj)]
+    (if-let [changes (not-empty (instance/changes obj))]
+      (let [pk-values     (tableable/primary-key-values connectable tableable obj)
+            rows-affected (update! [connectable tableable] pk-values changes)]
+        (when-not (pos? rows-affected)
+          (throw (ex-info (format "Unable to save object: %s with primary key %s does not exist." tableable pk-values)
+                          {:object obj
+                           :pk     pk-values})))
+        (when (> rows-affected 1)
+          (log/warnf "Warning: more than 1 row affected when saving %s with primary key %s" tableable pk-values))
+        (instance/reset-original obj))
+      (do
+        (log/tracef "No changes; nothing to save.")
+        obj))))
 
 (defn save!
   [obj]
@@ -211,7 +222,7 @@
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
   (let [{:keys [connectable tableable query options]} (parse-delete-args args)]
-    (delete!* connectable tableable query options) options))
+    (delete!* connectable tableable query options)))
 
 ;; TODO
 #_(defn upsert! [])
