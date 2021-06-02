@@ -84,7 +84,7 @@
 (deftest execute!-test
   (try
     ;; TODO -- should `update!` just return `0` instead of the `:update-count` key?
-    (is (= [{:next.jdbc/update-count 0}]
+    (is (= [0]
            (query/execute! :test/postgres "CREATE TABLE \"execute_test_table\" (\"id\" INTEGER NOT NULL);")))
     (is (= []
            (query/query :test/postgres "SELECT * FROM \"execute_test_table\";")))
@@ -123,7 +123,7 @@
   (is (= [{:one 1}]
          (query/query nil ::venues "SELECT 1 AS one;")))
   (test/with-venues-reset
-    (is (= [{:next.jdbc/update-count 1}]
+    (is (= 1
            (query/execute! nil ::venues "DELETE FROM venues WHERE id = 1;")))))
 
 (deftest readable-column-test

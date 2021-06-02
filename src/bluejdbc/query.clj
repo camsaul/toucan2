@@ -137,6 +137,8 @@
     reducible)))
 
 (defn query-one
+  "Like `query`, but returns only the first row. Does not fetch additional rows regardless of whether the query would
+  yielded them."
   {:arglists '([queryable]
                [connectable queryable]
                [connectable tableable queryable]
@@ -154,7 +156,10 @@
     (let [sql-params (compile connectable tableable query options)]
       (try
         (*call-count-thunk*)
-        (next.jdbc/execute! conn sql-params (:next.jdbc options))
+        (let [results (next.jdbc/execute! conn sql-params (:next.jdbc options))]
+          (if (get-in options [:next.jdbc :return-keys])
+            results
+            (-> results first :next.jdbc/update-count)))
         (catch Throwable e
           (throw (ex-info (format "Error executing statement: %s" (ex-message e))
                           (merge
@@ -164,15 +169,21 @@
                           e)))))))
 
 (defn execute!
-  ([query]                       (execute!  nil         nil       query nil))
-  ([connectable query]           (execute!  connectable nil       query nil))
-  ([connectable tableable query] (execute!  connectable tableable query nil))
+  "Compile and execute a `queryable` such as a String SQL statement, `[sql & params]` vector, or HoneySQL map. Intended
+  for use with statements such as `UPDATE`, `INSERT`, or `DELETE`, or DDL statements like `CREATE TABLE`; for queries
+  like `SELECT`, use `query` instead. Returns the number of rows affected, unless `{:next.jdbc {:return-keys true}}`
+  is set, in which case it returns generated keys (see next.jdbc documentation for more details)."
+  ([queryable]                       (execute!  nil         nil       queryable nil))
+  ([connectable queryable]           (execute!  connectable nil       queryable nil))
+  ([connectable tableable queryable] (execute!  connectable tableable queryable nil))
 
-  ([connectable tableable query options]
+  ([connectable tableable queryable options]
    (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)]
-     (execute!* connectable tableable query options))))
+     (execute!* connectable tableable queryable options))))
 
-(defn do-with-call-counts [f]
+(defn do-with-call-counts
+  "Impl for `with-call-count` macro; don't call this directly."
+  [f]
   (let [call-count (atom 0)
         old-thunk  *call-count-thunk*]
     (binding [*call-count-thunk* #(do
@@ -180,5 +191,16 @@
                                     (swap! call-count inc))]
       (f (fn [] @call-count)))))
 
-(defmacro with-call-count [[call-count-fn-binding] & body]
+(defmacro with-call-count
+  "Execute `body`, trackingthe number of database queries and statements executed. This number can be fetched at any
+  time withing `body` by calling function bound to `call-count-fn-binding`:
+
+    (with-call-count [call-count]
+      (select ...)
+      (println \"CALLS:\" (call-count))
+      (insert! ...)
+      (println \"CALLS:\" (call-count)))
+    ;; -> CALLS: 1
+    ;; -> CALLS: 2"
+  [[call-count-fn-binding] & body]
   `(do-with-call-counts (fn [~call-count-fn-binding] ~@body)))

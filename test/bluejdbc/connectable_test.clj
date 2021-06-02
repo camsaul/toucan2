@@ -104,7 +104,7 @@
     (test/with-default-connection
       (testing "should commit if no exception is thrown"
         (testing "_ = use current connection"
-          (is (= {:next.jdbc/update-count 1}
+          (is (= 1
                  (conn/with-transaction _
                    (mutative/insert! :venues {:name "Venue 4", :category "place"})))))
         (is (select/exists? :venues :name "Venue 4"))))

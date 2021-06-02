@@ -81,23 +81,23 @@
   (test/with-default-connection
     (testing "key-value conditions"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 2}
+        (is (= 2
                (mutative/update! ::transformed-venues :category :bar {:category :BAR})))
         (is (= #{["Ho's Tavern" :BAR] ["Tempest" :BAR]}
                (select/select-fn-set (juxt :name :category) ::transformed-venues :category :BAR))))
       (testing "Toucan-style [f & args] condition"
         (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 2}
+          (is (= 2
                  (mutative/update! ::transformed-venues :category [:in [:bar]] {:category :BAR})))
           (is (= #{:store :BAR}
                  (select/select-fn-set :category ::transformed-venues))))))
     (testing "conditions map"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 2}
+        (is (= 2
                (mutative/update! ::transformed-venues {:category :bar} {:category :BAR})))))
     (testing "PK"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/update! ::transformed-venues-id-is-string "1" {:name "Wow"})))
         (is (= "Wow"
                (select/select-one-fn :name ::transformed-venues 1)))))))
@@ -106,7 +106,7 @@
   (test/with-venues-reset
     (test/with-default-connection
       (let [venue (select/select-one ::transformed-venues 1)]
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/save! (assoc venue :category :dive-bar))))
         (is (= {:id         1
                 :name       "Tempest"
@@ -119,25 +119,25 @@
   (test/with-default-connection
     (testing "single map row"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/insert! ::transformed-venues {:name "Hi-Dive", :category :bar})))
         (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
                (select/select-fn-set :name ::transformed-venues :category :bar)))))
     (testing "multiple map rows"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/insert! ::transformed-venues [{:name "Hi-Dive", :category :bar}])))
         (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
                (select/select-fn-set :name ::transformed-venues :category :bar)))))
     (testing "kv args"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/insert! ::transformed-venues :name "Hi-Dive", :category :bar)))
         (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
                (select/select-fn-set :name ::transformed-venues :category :bar)))))
     (testing "columns + vector rows"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/insert! ::transformed-venues [:name :category] [["Hi-Dive" :bar]])))
         (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
                (select/select-fn-set :name ::transformed-venues :category :bar)))))
@@ -150,7 +150,7 @@
   (test/with-default-connection
     (testing "Delete row by PK"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/delete! ::transformed-venues-id-is-string "1")))
         (is (= []
                (select/select :venues 1)))
@@ -158,13 +158,13 @@
                (select/select-fn-set :id :venues 2)))))
     (testing "Delete row by key-value conditions"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 2}
+        (is (= 2
                (mutative/delete! ::transformed-venues :category :bar)))
         (is (= []
                (select/select ::transformed-venues :category :bar))))
       (testing "Toucan-style fn-args vector"
         (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 2}
+          (is (= 2
                  (mutative/delete! ::transformed-venues :category [:in [:bar]])))
           (is (= []
                  (select/select ::transformed-venues :category :bar))))))))
