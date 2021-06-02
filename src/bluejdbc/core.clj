@@ -42,7 +42,8 @@
   *current-connectable*
   *current-connection*
   default-connectable-for-tableable*
-  default-options*]
+  default-options-for-connectable*
+  default-options-for-tableable*]
 
  [connectable
   connection

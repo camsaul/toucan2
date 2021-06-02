@@ -41,11 +41,24 @@
    (or *current-connectable*
        (default-connectable-for-tableable* tableable options))))
 
-(m/defmulti default-options*
+(m/defmulti default-options-for-connectable*
   {:arglists '([connectable])}
   u/dispatch-on-first-arg)
 
+(m/defmulti default-options-for-tableable*
+  {:arglists '([connectable tableable])}
+  u/dispatch-on-first-two-args)
+
+(m/defmethod default-options-for-tableable* :default
+  [_ _]
+  nil)
+
 (defn ensure-connectable [connectable tableable options]
-  (let [connectable (or connectable (current-connectable tableable options))
-        options     (u/recursive-merge (default-options* connectable) options)]
+  (let [options     (u/recursive-merge
+                     (default-options-for-tableable* connectable tableable)
+                     options)
+        connectable (or connectable (current-connectable tableable options))
+        options     (u/recursive-merge
+                     (default-options-for-connectable* connectable)
+                     options)]
     [connectable options]))

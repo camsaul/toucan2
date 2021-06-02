@@ -43,13 +43,13 @@
   {:connection (->MockConnection connectable options (atom false))
    :new?       true})
 
-(m/defmethod conn.current/default-options* ::mock-connection
+(m/defmethod conn.current/default-options-for-connectable* ::mock-connection
   [_]
   {:default-options true})
 
 (derive ::mock-connection-additional-options ::mock-connection)
 
-(m/defmethod conn.current/default-options* ::mock-connection-additional-options
+(m/defmethod conn.current/default-options-for-connectable* ::mock-connection-additional-options
   [connectable]
   (merge (next-method connectable)
          {:additional-options true}))
