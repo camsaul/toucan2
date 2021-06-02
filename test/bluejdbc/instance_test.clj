@@ -49,6 +49,13 @@
              (assoc :name "Hi-Dive")
              instance/changes))))
 
+(deftest contains-key-test
+  (is (= true
+         (.containsKey (instance/instance :wow {:some-key true}) :some-key)))
+  (testing "unnormalized keys"
+    (is (= true
+           (.containsKey (instance/instance :wow {:some-key true}) :SOME_KEY)))))
+
 (deftest equality-test
   (testing "equality"
     (testing "two instances with the same Table should be equal"
@@ -67,10 +74,12 @@
       (is (= (instance/instance :connectable :table {:a 100})
              (instance/instance :different-connectable :table {:a 100}))))
     (testing "An Instance should be considered equal to a plain map for convenience purposes"
-      (is (= {:a 100}
-             (instance/instance :wow {:a 100})))
-      (is (= (instance/instance :wow {:a 100})
-             {:a 100})))))
+      (testing "map == instance"
+        (is (= {:a 100}
+               (instance/instance :wow {:a 100}))))
+      (testing "instance == map"
+        (is (= (instance/instance :wow {:a 100})
+               {:a 100}))))))
 
 (deftest instance-test-2
   (is (= {}
@@ -196,8 +205,12 @@
     (is (= (instance/instance nil {:db-id 1, :table-id 2})
            (instance/instance nil {:db_id 1, :table_id 2}))))
   (testing "should be equal to normal map with the same keys"
-    (is (= {:db-id 1, :table-id 2}
-           (instance/instance nil {:db_id 1, :table_id 2})))
+    (testing "map == instance"
+      (is (= {:db-id 1, :table-id 2}
+             (instance/instance nil {:db_id 1, :table_id 2}))))
+    (testing "instance == map"
+      (is (= (instance/instance nil {:db_id 1, :table_id 2})
+             {:db-id 1, :table-id 2})))
     (is (= {}
            (instance/instance nil {})))))
 
