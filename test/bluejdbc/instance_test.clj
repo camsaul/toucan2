@@ -232,3 +232,14 @@
       (binding [*ns* (the-ns 'bluejdbc.instance)]
         (is (= "(instance :bluejdbc/default :venues {:id 1})"
                (pr-str (bluejdbc.instance/instance :venues {:id 1}))))))))
+
+(m/defmethod instance/instance* [:default :people/custom-instance-type]
+  [_ _ _ m _ metta]
+  (with-meta m metta))
+
+(deftest custom-instance-type-test
+  (let [m (instance/instance :people/custom-instance-type)]
+    (is (= {}
+           m))
+    (is (not (instance/instance? m)))
+    (is (map? m))))

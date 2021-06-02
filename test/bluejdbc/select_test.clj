@@ -297,3 +297,18 @@
       (testing "(vector of multiple values)"
         (is (= [{:id 1, :name "Cam"}]
                (select/select :people/custom-honeysql ["1"] {:select [:id :name]})))))))
+
+(m/defmethod instance/instance* [:default :people/custom-instance-type]
+  [_ _ _ m _ metta]
+  (with-meta m metta))
+
+(m/defmethod conn.current/default-connectable-for-tableable* :people/custom-instance-type
+  [_ _]
+  :test/postgres)
+
+(deftest custom-instance-type-test
+  (let [m (select/select-one :people/custom-instance-type 1)]
+    (is (= {:id 1, :name "Cam", :created_at (t/offset-date-time "2020-04-21T23:56Z")}
+           m))
+    (is (map? m))
+    (is (not (instance/instance? m)))))

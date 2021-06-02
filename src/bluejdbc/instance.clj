@@ -5,6 +5,7 @@
             [camel-snake-kebab.core :as csk]
             [clojure.data :as data]
             [methodical.core :as m]
+            [methodical.impl.combo.threaded :as m.combo.threaded]
             [potemkin :as p]
             [pretty.core :as pretty]))
 
@@ -128,8 +129,14 @@
                [(key-xform k) v]))
         m))
 
-;; (m/defmulti instance*
-;;   {:arglists '([connectable tableable])})
+(m/defmulti instance*
+  {:arglists '([connectable tableable original-map current-map key-xform meta])}
+  u/dispatch-on-first-two-args
+  :combo (m.combo.threaded/threading-method-combination :fourth))
+
+(m/defmethod instance* :default
+  [connectable tableable original current key-xform metta]
+  (->Instance connectable tableable original current key-xform metta))
 
 (defn instance
   (^bluejdbc.instance.Instance [tableable]
@@ -139,9 +146,10 @@
    (instance (conn.current/current-connectable tableable) tableable m))
 
   (^bluejdbc.instance.Instance [connectable tableable m]
-   (let [key-xform (key-transform-fn* connectable tableable)
-         m         (normalize-map key-xform m)]
-     (Instance. connectable tableable m m key-xform (meta m))))
+   (let [key-xform     (key-transform-fn* connectable tableable)
+         m             (normalize-map key-xform m)
+         [connectable] (conn.current/ensure-connectable connectable tableable nil)]
+     (instance* connectable tableable m m key-xform (meta m))))
 
   (^bluejdbc.instance.Instance [connectable tableable k v & more]
    (let [m (into {} (partition-all 2) (list* k v more))]

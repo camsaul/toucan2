@@ -27,40 +27,44 @@
 
 (defn dispatch-on-first-arg-with [f]
   (fn dispatch-on-first-arg-with*
-    ([x]         (f x))
-    ([x _]       (f x))
-    ([x _ _]     (f x))
-    ([x _ _ _]   (f x))
-    ([x _ _ _ _] (f x))))
+    ([x]           (f x))
+    ([x _]         (f x))
+    ([x _ _]       (f x))
+    ([x _ _ _]     (f x))
+    ([x _ _ _ _]   (f x))
+    ([x _ _ _ _ _] (f x))))
 
-(def ^{:arglists '([a] [a b] [a b c] [a b c d] [a b c d e])} dispatch-on-first-arg
+(def ^{:arglists '([a] [a b] [a b c] [a b c d] [a b c d e] [a b c d e f])} dispatch-on-first-arg
   (dispatch-on-first-arg-with keyword-or-class))
 
 (defn dispatch-on-first-two-args-with [f]
   (fn dispatch-on-first-two-args-with*
-    ([x y]       [(f x) (f y)])
-    ([x y _]     [(f x) (f y)])
-    ([x y _ _]   [(f x) (f y)])
-    ([x y _ _ _] [(f x) (f y)])))
+    ([x y]         [(f x) (f y)])
+    ([x y _]       [(f x) (f y)])
+    ([x y _ _]     [(f x) (f y)])
+    ([x y _ _ _]   [(f x) (f y)])
+    ([x y _ _ _ _] [(f x) (f y)])))
 
-(def ^{:arglists '([a b] [a b c] [a b c d] [a b c d e])} dispatch-on-first-two-args
+(def ^{:arglists '([a b] [a b c] [a b c d] [a b c d e] [a b c d e f])} dispatch-on-first-two-args
   (dispatch-on-first-two-args-with keyword-or-class))
 
 (defn dispatch-on-first-three-args-with [f]
   (fn dispatch-on-first-three-args-with*
-    ([x y z]     [(f x) (f y) (f z)])
-    ([x y z _]   [(f x) (f y) (f z)])
-    ([x y z _ _] [(f x) (f y) (f z)])))
+    ([x y z]       [(f x) (f y) (f z)])
+    ([x y z _]     [(f x) (f y) (f z)])
+    ([x y z _ _]   [(f x) (f y) (f z)])
+    ([x y z _ _ _] [(f x) (f y) (f z)])))
 
-(def ^{:arglists '([a b c] [a b c d] [a b c d e])} dispatch-on-first-three-args
+(def ^{:arglists '([a b c] [a b c d] [a b c d e] [a b c d e f])} dispatch-on-first-three-args
   (dispatch-on-first-three-args-with keyword-or-class))
 
 (defn dispatch-on-first-four-args-with [f]
   (fn dispatch-on-first-four-args-with*
-    ([a b c d]   [(f a) (f b) (f c) (f d)])
-    ([a b c d _] [(f a) (f b) (f c) (f d)])))
+    ([a b c d]     [(f a) (f b) (f c) (f d)])
+    ([a b c d _]   [(f a) (f b) (f c) (f d)])
+    ([a b c d _ _] [(f a) (f b) (f c) (f d)])))
 
-(def ^{:arglists '([a b c d] [a b c d e])} dispatch-on-first-four-args
+(def ^{:arglists '([a b c d] [a b c d e] [a b c d e f])} dispatch-on-first-four-args
   (dispatch-on-first-four-args-with keyword-or-class))
 
 (p/defprotocol+ CoerceToProperties
