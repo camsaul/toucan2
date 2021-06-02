@@ -14,21 +14,24 @@
   (into {} (for [^java.lang.reflect.Field field (.getDeclaredFields Types)]
              [(.getLong field Types) (.getName field)])))
 
-(m/defmulti read-column-thunk
+(m/defmulti read-column-thunk*
   "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
   {:arglists '([connectable tableable ^ResultSet rs ^ResultSetMetaData rsmeta ^Integer i options])}
   (fn [connectable tableable _ ^ResultSetMetaData rsmeta ^Integer i _]
     (let [col-type (.getColumnType rsmeta i)]
       (log/tracef "Column %d %s is of JDBC type %s, native type %s"
                   i (pr-str (.getColumnLabel rsmeta i)) (type-name col-type) (.getColumnTypeName rsmeta i))
-      [connectable tableable col-type])))
+      ;; TODO -- enable this only if some `*log-connectable*` flag is set. (TBD)
+      #_(log/tracef "Using read-column-thunk* impl for dispatch value %s"
+                    [(u/dispatch-value connectable) (u/dispatch-value tableable) col-type])
+      [(u/dispatch-value connectable) (u/dispatch-value tableable) col-type])))
 
-(m/defmethod read-column-thunk :default
+(m/defmethod read-column-thunk* :default
   [_ _ ^ResultSet rs _ ^Integer i options]
-  (fn default-read-column-thunk []
+  (fn default-read-column-thunk* []
     (.getObject rs i)))
 
-(m/defmethod read-column-thunk :around :default
+(m/defmethod read-column-thunk* :around :default
   [connectable tableable rs ^ResultSetMetaData rsmeta ^Integer i options]
   (log/with-trace ["Fetching values in column %d with (.getObject rs %d) and options %s" i i (pr-str options)]
     (next-method connectable tableable rs rsmeta i options)))
@@ -38,28 +41,28 @@
   (fn get-object-of-class-thunk []
     (.getObject rs i klass)))
 
-(m/defmethod read-column-thunk [:default :default Types/CLOB]
+(m/defmethod read-column-thunk* [:default :default Types/CLOB]
   [_ _ ^ResultSet rs _ ^Integer i _]
   (fn get-string-thunk []
     (.getString rs i)))
 
-(m/defmethod read-column-thunk [:default :default Types/TIMESTAMP]
+(m/defmethod read-column-thunk* [:default :default Types/TIMESTAMP]
   [_ _ rs _ i _]
   (get-object-of-class-thunk rs i java.time.LocalDateTime))
 
-(m/defmethod read-column-thunk [:default :default Types/TIMESTAMP_WITH_TIMEZONE]
+(m/defmethod read-column-thunk* [:default :default Types/TIMESTAMP_WITH_TIMEZONE]
   [_ _ rs _ i _]
   (get-object-of-class-thunk rs i java.time.OffsetDateTime))
 
-(m/defmethod read-column-thunk [:default :default Types/DATE]
+(m/defmethod read-column-thunk* [:default :default Types/DATE]
   [_ _ rs _ i _]
   (get-object-of-class-thunk rs i java.time.LocalDate))
 
-(m/defmethod read-column-thunk [:default :default Types/TIME]
+(m/defmethod read-column-thunk* [:default :default Types/TIME]
   [_ _ rs _ i _]
   (get-object-of-class-thunk rs i java.time.LocalTime))
 
-(m/defmethod read-column-thunk [:default :default Types/TIME_WITH_TIMEZONE]
+(m/defmethod read-column-thunk* [:default :default Types/TIME_WITH_TIMEZONE]
   [_ _ rs _ i _]
   (get-object-of-class-thunk rs i java.time.OffsetTime))
 
@@ -78,7 +81,7 @@
            rsmeta        (.getMetaData rs)
            cols          (jdbc.rs/get-unqualified-column-names rsmeta options)
            i->col-thunk  (into {} (for [i (index-range rsmeta)]
-                                    [i (let [thunk (read-column-thunk connectable tableable rs rsmeta i options)]
+                                    [i (let [thunk (read-column-thunk* connectable tableable rs rsmeta i options)]
                                          (fn []
                                            (try
                                              (thunk)

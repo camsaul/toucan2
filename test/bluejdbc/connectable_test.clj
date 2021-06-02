@@ -2,9 +2,12 @@
   (:require [bluejdbc.connectable :as conn]
             [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.mutative :as mutative]
+            [bluejdbc.query :as query]
             [bluejdbc.select :as select]
             [bluejdbc.test :as test]
+            [bluejdbc.util :as u]
             [clojure.test :refer :all]
+            [java-time :as t]
             [methodical.core :as m]
             [potemkin :as p]))
 
@@ -209,3 +212,7 @@
             :options     {:default-options true
                           :connectable     ::mock-connection}}
            (dissoc conn :closed?)))))
+
+(deftest dispatch-on-test
+  (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")}]
+         (query/query (u/dispatch-on test/test-postgres-url :bluejdbc.integrations/postgres) "SELECT * FROM PEOPLE WHERE id = 1;"))))

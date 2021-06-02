@@ -45,6 +45,8 @@
   {:arglists '([connectable])}
   u/dispatch-on-first-arg)
 
+;; default impl for `default-options-for-connectable*` is in `bluejdbc.connectable` to avoid circular refs.
+
 (m/defmulti default-options-for-tableable*
   {:arglists '([connectable tableable])}
   u/dispatch-on-first-two-args)

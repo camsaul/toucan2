@@ -26,6 +26,7 @@
   normalize-key)
 
 (p/defprotocol+ IInstance
+  :extend-via-metadata true
   (original [instance]
     "Get the original version of `instance` as it appeared when it first came out of the DB.")
 

@@ -4,6 +4,7 @@
             [bluejdbc.connectable :as conn]
             [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.log :as log]
+            [bluejdbc.statement :as stmt]
             [bluejdbc.util :as u]
             [methodical.core :as m]
             [next.jdbc :as next.jdbc]
@@ -49,7 +50,11 @@
     (conn/with-connection [conn connectable tableable options]
       (try
         (log/with-trace ["Executing query %s with options %s" sql-params (:next.jdbc options)]
-          (let [results (next.jdbc/plan conn sql-params (:next.jdbc options))]
+          (let [[sql & params] sql-params
+                params         (for [param params]
+                                 (stmt/parameter connectable tableable param options))
+                sql-params     (cons sql params)
+                results        (next.jdbc/plan conn sql-params (:next.jdbc options))]
             (try
               (log/with-trace ["Reducing results with rf %s and init %s" rf init]
                 (*call-count-thunk*)
@@ -159,7 +164,7 @@
                           e)))))))
 
 (defn execute!
-  ([query]                       (execute!  :default    nil       query nil))
+  ([query]                       (execute!  nil         nil       query nil))
   ([connectable query]           (execute!  connectable nil       query nil))
   ([connectable tableable query] (execute!  connectable tableable query nil))
 

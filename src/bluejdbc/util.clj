@@ -1,10 +1,22 @@
 (ns bluejdbc.util
   (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
-            [clojure.walk :as walk]
             [methodical.impl.combo.threaded :as m.combo.threaded]
             [potemkin :as p]
             [pretty.core :as pretty]))
+
+(defn qualify-symbol-for-*ns* [symb]
+  (let [qualified (pretty/qualify-symbol-for-*ns* symb)]
+    (if (not= qualified symb)
+      qualified
+      (let [aliases             (ns-aliases *ns*)
+            ns-symb->alias      (zipmap (map ns-name (vals aliases))
+                                        (keys aliases))
+            bluejdbc-core-alias (get ns-symb->alias 'bluejdbc.core)]
+        (symbol (if bluejdbc-core-alias
+                  (name bluejdbc-core-alias)
+                  "bluejdbc.core")
+                (name symb))))))
 
 ;; threads the third arg.
 (defmethod m.combo.threaded/threading-invoker :third
@@ -20,10 +32,41 @@
     ([a b c d]        [d (fn [method d*] (method a b c d*))])
     ([a b c d & more] [d (fn [method d*] (apply method a b c d* more))])))
 
-(defn keyword-or-class [x]
-  (if (keyword? x)
-    x
-    (class x)))
+(p/defprotocol+ DispatchValue
+  :extend-via-metadata true
+  (dispatch-value [this]))
+
+(extend-protocol DispatchValue
+  clojure.lang.Keyword
+  (dispatch-value [k]
+    k)
+
+  Object
+  (dispatch-value [this]
+    (class this))
+
+  nil
+  (dispatch-value [_]
+    nil))
+
+(p/defrecord+ DispatchOn [x dv]
+  DispatchValue
+  (dispatch-value [_] dv)
+
+  pretty/PrettyPrintable
+  (pretty [_]
+    (list (qualify-symbol-for-*ns* `dispatch-on) x dv)))
+
+(defn dispatch-on [x dispatch-value]
+  (->DispatchOn x dispatch-value))
+
+(defn dispatch-on? [x]
+  (instance? DispatchOn x))
+
+(defn unwrap-dispatch-on [x]
+  (if (dispatch-on? x)
+    (:x x)
+    x))
 
 (defn dispatch-on-first-arg-with [f]
   (fn dispatch-on-first-arg-with*
@@ -35,7 +78,7 @@
     ([x _ _ _ _ _] (f x))))
 
 (def ^{:arglists '([a] [a b] [a b c] [a b c d] [a b c d e] [a b c d e f])} dispatch-on-first-arg
-  (dispatch-on-first-arg-with keyword-or-class))
+  (dispatch-on-first-arg-with dispatch-value))
 
 (defn dispatch-on-first-two-args-with [f]
   (fn dispatch-on-first-two-args-with*
@@ -46,7 +89,7 @@
     ([x y _ _ _ _] [(f x) (f y)])))
 
 (def ^{:arglists '([a b] [a b c] [a b c d] [a b c d e] [a b c d e f])} dispatch-on-first-two-args
-  (dispatch-on-first-two-args-with keyword-or-class))
+  (dispatch-on-first-two-args-with dispatch-value))
 
 (defn dispatch-on-first-three-args-with [f]
   (fn dispatch-on-first-three-args-with*
@@ -56,7 +99,7 @@
     ([x y z _ _ _] [(f x) (f y) (f z)])))
 
 (def ^{:arglists '([a b c] [a b c d] [a b c d e] [a b c d e f])} dispatch-on-first-three-args
-  (dispatch-on-first-three-args-with keyword-or-class))
+  (dispatch-on-first-three-args-with dispatch-value))
 
 (defn dispatch-on-first-four-args-with [f]
   (fn dispatch-on-first-four-args-with*
@@ -65,42 +108,7 @@
     ([a b c d _ _] [(f a) (f b) (f c) (f d)])))
 
 (def ^{:arglists '([a b c d] [a b c d e] [a b c d e f])} dispatch-on-first-four-args
-  (dispatch-on-first-four-args-with keyword-or-class))
-
-(p/defprotocol+ CoerceToProperties
-  "Protocol for anything that can be coerced to an instance of `java.util.Properties`."
-  (->Properties ^java.util.Properties [this]
-    "Coerce `this` to a `java.util.Properties`."))
-
-(extend-protocol CoerceToProperties
-  nil
-  (->Properties [_]
-    nil)
-
-  java.util.Properties
-  (->Properties [this]
-    this)
-
-  clojure.lang.IPersistentMap
-  (->Properties [m]
-    (let [properties (java.util.Properties.)]
-      (doseq [[k v] m]
-        (.setProperty properties (name k) (if (keyword? v)
-                                            (name v)
-                                            (str v))))
-      properties)))
-
-(defn assert-no-recurs
-  "Throw an Exception if there are any `recur` forms in `form`."
-  [message form]
-  (walk/postwalk
-   (fn [form]
-     (when (and (seqable? form)
-                (symbol? (first form))
-                (= (first form) 'recur))
-       (throw (ex-info (str "recur is not allowed inside " message) {:form form})))
-     form)
-   form))
+  (dispatch-on-first-four-args-with dispatch-value))
 
 (defn parse-currency
   "Parse a currency String to a BigDecimal. Handles a variety of different formats, such as:
@@ -174,19 +182,6 @@
 
   ([m1 m2 & more]
    (apply recursive-merge (recursive-merge m1 m2) more)))
-
-(defn qualify-symbol-for-*ns* [symb]
-  (let [qualified (pretty/qualify-symbol-for-*ns* symb)]
-    (if (not= qualified symb)
-      qualified
-      (let [aliases             (ns-aliases *ns*)
-            ns-symb->alias      (zipmap (map ns-name (vals aliases))
-                                        (keys aliases))
-            bluejdbc-core-alias (get ns-symb->alias 'bluejdbc.core)]
-        (symbol (if bluejdbc-core-alias
-                  (name bluejdbc-core-alias)
-                  "bluejdbc.core")
-                (name symb))))))
 
 (defn quit-early-exception [x]
   (throw (ex-info "Quit early" {::quit-early x})))
