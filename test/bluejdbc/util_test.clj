@@ -54,3 +54,16 @@
     (is (= {:a 10, :b {:c 2, :d 3}, :d 3}
            (u/recursive-merge {:a [1], :b {:c 2}, :d 3}
                               {:a 10, :b {:d 3}})))))
+
+(deftest dispatch-value-test
+  (is (= clojure.lang.PersistentArrayMap
+         (u/dispatch-value (array-map))))
+  (is (= :wow
+         (u/dispatch-value :wow)))
+  (is (= :ok
+         (u/dispatch-value (u/dispatch-on :wow :ok))))
+  (is (= :birds
+         (u/dispatch-value (u/dispatch-on {} :birds))))
+  (testing "Should be able to extend protocol via metadata"
+    (is (= ::meta
+           (u/dispatch-value (with-meta (fn []) {`u/dispatch-value (constantly ::meta)}))))))

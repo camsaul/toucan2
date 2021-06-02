@@ -13,10 +13,13 @@
 
 (derive :test/postgres :bluejdbc.integrations/postgres)
 
+(def test-postgres-url
+  (env/env :jdbc-url-postgres "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam"))
+
 (m/defmethod conn/connection* :test/postgres
   [_ options]
   (next-method
-   (env/env :jdbc-url-postgres "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam")
+   test-postgres-url
    options))
 
 (derive :test/postgres-with-quoting :test/postgres)

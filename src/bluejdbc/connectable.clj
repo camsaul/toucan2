@@ -35,7 +35,7 @@
                         {:returned m})))
       m)
     (catch Throwable e
-      (throw (ex-info (ex-message e)
+      (throw (ex-info (format "Error creating connection: %s" (ex-message e))
                       (if include-connection-info-in-exceptions?
                         {:connectable connectable
                          :options     options}
@@ -45,13 +45,14 @@
 (m/defmethod connection* :default
   [connectable options]
   (assert (some? connectable) "connectable cannot be nil")
+  (assert (not= connectable :default) "connectable should not be :default. Use :bluejdbc/default for the default connection.")
   (when (= connectable :bluejdbc/default)
     (throw (ex-info (format "No default connectable is defined. Define an implementation of connection* for :bluejdbc/default")
                     {})))
   (when (keyword? connectable)
     (throw (ex-info (format "Unknown connectable %s. Did you define a connection* method for it?" connectable)
                     {:k connectable})))
-  {:connection  (next.jdbc/get-connection connectable)
+  {:connection  (next.jdbc/get-connection (u/unwrap-dispatch-on connectable))
    :new?        true
    :options     options})
 

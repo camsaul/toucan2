@@ -10,6 +10,7 @@
             [bluejdbc.query :as query]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
+            [bluejdbc.util :as u]
             [methodical.core :as m]
             [potemkin :as p]))
 
@@ -24,7 +25,8 @@
   mutative/keep-me
   query/keep-me
   select/keep-me
-  tableable/keep-me)
+  tableable/keep-me
+  u/keep-me)
 
 (p/import-vars
  [m
@@ -117,4 +119,7 @@
  [tableable
   primary-key*
   table-name
-  table-name*])
+  table-name*]
+
+ [u
+  dispatch-on])
