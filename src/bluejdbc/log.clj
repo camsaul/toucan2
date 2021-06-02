@@ -83,14 +83,31 @@
   [& args]
   `(logf :trace ~@args))
 
+(defn do-indent-when-debugging
+  [thunk]
+  (if *enable-debug-logging*
+    (binding [*indent-level* (inc *indent-level*)]
+      (thunk))
+    (thunk)))
+
+(defmacro indent-when-debugging {:style/indent 0} [& body]
+  `(do-indent-when-debugging (fn [] ~@body)))
+
+(defn pprint-result-to-str [result]
+  (with-out-str
+    (let [[first-line & more] (-> result pprint/pprint with-out-str str/trim str/split-lines)]
+      (println (str "-> " first-line))
+      (doseq [line more]
+        (println (str "   " line))))))
+
 (defmacro with-trace [message & body]
   `(do
      ~(if (vector? message)
         `(tracef ~@message)
         `(trace ~message))
-     (binding [*indent-level* (inc *indent-level*)]
+     (indent-when-debugging
        (let [result# (do ~@body)]
-         (tracef "-> %s" result#)
+         (trace (pprint-result-to-str result#))
          result#))))
 
 (defmacro debug

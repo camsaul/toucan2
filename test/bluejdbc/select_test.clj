@@ -91,13 +91,15 @@
                   {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56:00Z")}
                   {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56:00Z")}]]
     (testing "no args"
-        (is (= all-rows
-               (select/select [:test/postgres :people] {:order-by [[:id :asc]]})))
-        (test-people-instances? (select/select [:test/postgres :people] {:order-by [[:id :asc]]})))
+      (is (= all-rows
+             (sort-by :id (select/select ::people))))
+      (is (= all-rows
+             (sort-by :id (select/select [:test/postgres :people]))))
+      (test-people-instances? (select/select [:test/postgres :people] {:order-by [[:id :asc]]})))
     (testing "using current connection (dynamic binding)"
-        (binding [conn.current/*current-connectable* :test/postgres]
-          (is (= all-rows
-                 (select/select :people {:order-by [[:id :asc]]})))))
+      (binding [conn.current/*current-connectable* :test/postgres]
+        (is (= all-rows
+               (select/select :people {:order-by [[:id :asc]]})))))
     (testing "using default connection"
       (test/with-default-connection
         (is (= all-rows
@@ -107,21 +109,21 @@
              (select/select ::people {:order-by [[:id :asc]]})))))
 
   (testing "one arg (id)"
-      (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-             (select/select ::people 1))))
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+           (select/select ::people 1))))
 
   (testing "one arg (query)"
-      (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-             (select/select [:test/postgres :people] {:where [:= :id 1]})))
-      (is (= [{:id 1, :name "Tempest", :category "bar"}]
-             (select/select [:test/postgres :venues] {:select [:id :name :category], :limit 1, :where [:= :id 1]}))))
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+           (select/select [:test/postgres :people] {:where [:= :id 1]})))
+    (is (= [{:id 1, :name "Tempest", :category "bar"}]
+           (select/select [:test/postgres :venues] {:select [:id :name :category], :limit 1, :where [:= :id 1]}))))
 
   (testing "two args (k v)"
+    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+           (select/select [:test/postgres :people] :id 1)))
+    (testing "sequential v"
       (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-             (select/select [:test/postgres :people] :id 1)))
-      (testing "sequential v"
-        (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-               (select/select [:test/postgres :people] :id [:= 1]))))))
+             (select/select [:test/postgres :people] :id [:= 1]))))))
 
 (m/defmethod tableable/primary-key* [:default :people/name-is-pk]
   [_ _]
@@ -173,7 +175,12 @@
     (is (not (instance? clojure.core.Eduction reducible-query))))
   (assert (not (instance? clojure.core.Eduction reducible-query)))
   (eduction
-   (map #(dissoc % :timestamp))
+   (map (fn [person]
+          (testing "select* :after should see Blue JDBC instances"
+            (is (instance/bluejdbc-instance? person)))
+          (testing "instance table should be a :people/no-timestamps"
+            (is (isa? (instance/table person) :people/no-timestamps)))
+          (dissoc person :timestamp)))
    reducible-query))
 
 (deftest post-select-test
@@ -208,7 +215,14 @@
            (select/select-fn-vec :id [:test/postgres :people]))))
   (testing "Arbitrary function instead of a key"
     (is (= [2 3 4 5]
-           (select/select-fn-vec (comp inc :id) [:test/postgres :people])))))
+           (select/select-fn-vec (comp inc :id) [:test/postgres :people]))))
+  (testing "Should work with magical keys"
+    (is (= [(t/offset-date-time "2020-04-21T23:56Z")
+            (t/offset-date-time "2019-01-11T23:56Z")
+            (t/offset-date-time "2020-01-01T21:56Z")
+            (t/offset-date-time "2020-05-25T19:56Z")]
+           (select/select-fn-vec :created-at [:test/postgres :people] {:order-by [[:id :asc]]})
+           (select/select-fn-vec :created_at [:test/postgres :people] {:order-by [[:id :asc]]})))))
 
 (deftest select-one-fn-test
   (is (= 1
@@ -300,6 +314,10 @@
       (testing "(vector of multiple values)"
         (is (= [{:id 1, :name "Cam"}]
                (select/select :people/custom-honeysql ["1"] {:select [:id :name]})))))))
+
+(m/defmethod instance/key-transform-fn* [:default :people/custom-instance-type]
+  [_ _]
+  identity)
 
 (m/defmethod instance/instance* [:default :people/custom-instance-type]
   [_ _ _ m _ metta]

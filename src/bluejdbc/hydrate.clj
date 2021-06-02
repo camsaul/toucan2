@@ -6,7 +6,8 @@
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
             [camel-snake-kebab.core :as csk]
-            [methodical.core :as m]))
+            [methodical.core :as m]
+            [bluejdbc.row :as row]))
 
 (m/defmulti can-hydrate-with-strategy?*
   {:arglists '([connectable tableable strategy k])}
@@ -64,7 +65,7 @@
     (assert (pos? (count pk-keys)))
     (log/tracef "Hydrating with PKs %s" pk-keys)
     (if-let [fk-values-set (not-empty (set (filter some? (map ::fk rows))))]
-      (select/select-pk->fn query/realize-row
+      (select/select-pk->fn row/realize-row
                             [connectable hydrating-table]
                             {:where (let [clauses (map-indexed
                                                    (fn [i pk-key]

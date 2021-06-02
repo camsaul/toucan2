@@ -156,11 +156,11 @@
       (name k))))
 
 ;; TODO -- should this be part of the pretty lib?
-(defn pretty-printable-fn [pretty-representation f]
+(defn pretty-printable-fn [pretty-representation-fn f]
   (reify
     pretty/PrettyPrintable
     (pretty [_]
-      (pretty-representation))
+      (pretty-representation-fn))
     clojure.lang.IFn
     (invoke [_]           (f))
     (invoke [_ a]         (f a))

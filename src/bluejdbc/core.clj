@@ -9,6 +9,7 @@
             [bluejdbc.mutative :as mutative]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
+            [bluejdbc.row :as row]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
@@ -26,6 +27,7 @@
   mutative/keep-me
   query/keep-me
   queryable/keep-me
+  row/keep-me
   select/keep-me
   tableable/keep-me
   u/keep-me)
@@ -52,7 +54,8 @@
  [connectable
   connection
   connection*
-  with-connection]
+  with-connection
+  with-transaction]
 
  [hydrate
   batched-hydrate*
@@ -91,7 +94,6 @@
   execute!*
   query
   query-one
-  realize-row
   reducible-query
   reducible-query*
   uncompiled
@@ -100,6 +102,9 @@
  [queryable
   queryable
   queryable*]
+
+ [row
+  realize-row]
 
  [select
   count

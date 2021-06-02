@@ -202,7 +202,7 @@
                      [5 6]
                      2)
                    (insert! :venues [{:name "Black Horse London Pub", :category "bar"}
-                                              {:name "Nick's Crispy Tacos", :category "bar"}])))
+                                     {:name "Nick's Crispy Tacos", :category "bar"}])))
             (is (= [(instance/instance :venues {:id         5
                                                 :name       "Black Horse London Pub"
                                                 :category   "bar"
@@ -232,7 +232,7 @@
                      [8 9]
                      2)
                    (insert! "venues" [:name :category] [["The Ramp" "bar"]
-                                                                 ["Louie's" "bar"]])))
+                                                        ["Louie's" "bar"]])))
             (is (= [(instance/instance "venues" {:id 8, :name "The Ramp"})
                     (instance/instance "venues" {:id 9, :name "Louie's"})]
                    (select/select "venues" :id [:> 7] {:select [:id :name], :order-by [[:id :asc]]})))))))))

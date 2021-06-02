@@ -4,11 +4,11 @@
             [bluejdbc.connectable :as conn]
             [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.log :as log]
+            [bluejdbc.row :as row]
             [bluejdbc.statement :as stmt]
             [bluejdbc.util :as u]
+            [clojure.pprint :as pprint]
             [methodical.core :as m]
-            [next.jdbc :as next.jdbc]
-            [next.jdbc.result-set :as next.jdbc.rs]
             [potemkin :as p]
             [pretty.core :as pretty]))
 
@@ -16,6 +16,84 @@
 (def ^:dynamic *include-queries-in-exceptions?* true)
 
 (def ^:dynamic ^:private *call-count-thunk* (fn [])) ; no-op
+
+(p/defprotocol+ All
+  (all [reducible-query]
+    "Immediately realize all rows from `reducible-query` and return them."))
+
+(defn realize-all-rows [this]
+  (into [] (map row/realize-row) this))
+
+(extend-protocol All
+  Object
+  (all [this]
+    this)
+
+  ;; NOCOMMIT
+  clojure.lang.IReduceInit
+  (all [this]
+    (realize-all-rows this)))
+
+(p/deftype+ ReducibleSQLQuery [connectable tableable sql-params options]
+  clojure.lang.IReduceInit
+  (reduce [_ rf init]
+    (conn/with-connection [conn connectable tableable options]
+      (try
+        (log/with-trace ["Executing query %s with options %s" sql-params (:next.jdbc options)]
+          (with-open [stmt (stmt/prepare connectable tableable conn sql-params options)]
+            (let [results (stmt/reducible-statement connectable tableable stmt options)]
+              (try
+                (log/with-trace ["Reducing results with rf %s and init %s" rf init]
+                  (*call-count-thunk*)
+                  (reduce rf init results))
+                (catch Throwable e
+                  (let [message (or (:message (ex-data e)) (ex-message e))]
+                    (throw (ex-info (format "Error reducing results: %s" message)
+                                    {:rf rf, :init init, :message message}
+                                    e))))))))
+        (catch Throwable e
+          (let [message (or (:message (ex-data e)) (ex-message e))]
+            (throw (ex-info (format "Error executing query: %s" message)
+                            (merge
+                             {:options options
+                              :message message}
+                             (when *include-queries-in-exceptions?*
+                               {:sql-params sql-params, :options options}))
+                            e)))))))
+
+  clojure.lang.IDeref
+  (deref [this]
+    (all this))
+
+  All
+  (all [this]
+    (realize-all-rows this))
+
+  pretty/PrettyPrintable
+  (pretty [_]
+    (list (pretty/qualify-symbol-for-*ns* `->ReducibleSQLQuery) connectable tableable sql-params options)))
+
+(doseq [method [print-method pprint/simple-dispatch]]
+  (prefer-method method pretty.core.PrettyPrintable clojure.lang.IDeref))
+
+(p/deftype+ ReducibleQuery [connectable tableable queryable options]
+  pretty/PrettyPrintable
+  (pretty [_]
+    (list (u/qualify-symbol-for-*ns* `reducible-query) connectable tableable queryable options))
+
+  clojure.lang.IReduceInit
+  (reduce [this rf init]
+    (let [reducible-sql-query (compile/compile* connectable tableable this options)]
+      (reduce rf init reducible-sql-query)))
+
+  ;; convenience: deref a ReducibleQuery to realize all results.
+  clojure.lang.IDeref
+  (deref [this]
+    (all this))
+
+  All
+  (all [this]
+    (realize-all-rows this)))
 
 (def ^:dynamic ^:private *return-compiled* false)
 
@@ -43,76 +121,11 @@
       (throw (u/quit-early-exception sql-params)))
     sql-params))
 
-(defn- reduce-query
-  [connectable tableable queryable options rf init]
+(m/defmethod compile/compile* [:default :default ReducibleQuery]
+  [connectable tableable ^ReducibleQuery query options]
   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
-        sql-params            (compile connectable tableable queryable options)]
-    (conn/with-connection [conn connectable tableable options]
-      (try
-        (log/with-trace ["Executing query %s with options %s" sql-params (:next.jdbc options)]
-          (let [[sql & params] sql-params
-                params         (for [param params]
-                                 (stmt/parameter connectable tableable param options))
-                sql-params     (cons sql params)
-                results        (next.jdbc/plan conn sql-params (:next.jdbc options))]
-            (try
-              (log/with-trace ["Reducing results with rf %s and init %s" rf init]
-                (*call-count-thunk*)
-                (reduce rf init results))
-              (catch Throwable e
-                (let [message (or (:message (ex-data e)) (ex-message e))]
-                  (throw (ex-info (format "Error reducing results: %s" message)
-                                  {:rf rf, :init init, :message message}
-                                  e)))))))
-        (catch Throwable e
-          (let [message (or (:message (ex-data e)) (ex-message e))]
-            (throw (ex-info (format "Error executing query: %s" message)
-                            (merge
-                             {:options options
-                              :message message}
-                             (when *include-queries-in-exceptions?*
-                               {:query queryable, :sql-params sql-params, :options options}))
-                            e))))))))
-
-(p/defprotocol+ RealizeRow
-  (realize-row [row]))
-
-(p/defprotocol+ All
-  (all [reducible-query]
-    "Immediately realize all rows from `reducible-query` and return them."))
-
-(defn default-all [this]
-  (into [] (map realize-row) this))
-
-(extend-protocol All
-  Object
-  (all [this]
-    this)
-
-  ;; NOCOMMIT
-  clojure.lang.IReduceInit
-  (all [this]
-    (default-all this)))
-
-(p/deftype+ ReducibleQuery [connectable tableable queryable options]
-  pretty/PrettyPrintable
-  (pretty [_]
-    (list (u/qualify-symbol-for-*ns* `reducible-query) connectable tableable queryable options))
-
-  clojure.lang.IReduceInit
-  (reduce [_ rf init]
-    (reduce-query connectable tableable queryable options rf init))
-
-  ;; convenience: deref a ReducibleQuery to realize all results.
-  clojure.lang.IDeref
-  (deref [this]
-    (all this))
-
-  All
-  (all [this]
-    (default-all this)))
-
-(prefer-method print-method pretty.core.PrettyPrintable clojure.lang.IDeref)
+        sql-params            (compile connectable tableable (.queryable query) options)]
+    (->ReducibleSQLQuery connectable tableable sql-params options)))
 
 (m/defmulti reducible-query*
   {:arglists '([connectable tableable queryable options])}
@@ -137,15 +150,6 @@
    (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)]
      (reducible-query* connectable tableable queryable options))))
 
-(extend-protocol RealizeRow
-  Object
-  (realize-row [row]
-    row)
-
-  next.jdbc.result_set.DatafiableRow
-  (realize-row [row]
-    (next.jdbc.rs/datafiable-row row conn.current/*current-connection* nil)))
-
 (defn query
   {:arglists '([queryable]
                [connectable queryable]
@@ -161,7 +165,7 @@
   ([xform reducible]
    (transduce
     (comp xform (take 1))
-    (completing conj first)
+    (completing conj (comp first #_unreduced))
     []
     reducible)))
 
@@ -173,7 +177,7 @@
                [connectable tableable queryable]
                [connectable tableable queryable options])}
   [& args]
-  (reduce-first (map realize-row) (apply reducible-query args)))
+  (reduce-first (map row/realize-row) (apply reducible-query args)))
 
 (m/defmulti execute!*
   {:arglists '([connectable tableable queryable options])}
@@ -182,23 +186,12 @@
 (m/defmethod execute!* :default
   [connectable tableable queryable options]
   (conn/with-connection [conn connectable tableable options]
-    (let [sql-params (compile connectable tableable queryable options)]
-      (try
-        (*call-count-thunk*)
-        (let [results (next.jdbc/execute! conn sql-params (:next.jdbc options))]
-          (if (get-in options [:next.jdbc :return-keys])
-            results
-            (let [n (-> results first :next.jdbc/update-count)]
-              (log/tracef "%d rows affected." n)
-              (assert (integer? n) (format "Expected updated count, got %s" (pr-str results)))
-              n)))
-        (catch Throwable e
-          (throw (ex-info (format "Error executing statement: %s" (ex-message e))
-                          (merge
-                           {:options options}
-                           (when *include-queries-in-exceptions?*
-                             {:queryable queryable, :sql-params sql-params}))
-                          e)))))))
+    (let [reducible (reducible-query connectable tableable queryable options)]
+      (if (get-in options [:next.jdbc :return-keys])
+        (all reducible)
+        (let [update-count (reduce-first reducible)]
+          (log/tracef "%d rows-affected." update-count)
+          update-count)))))
 
 (defn execute!
   "Compile and execute a `queryable` such as a String SQL statement, `[sql & params]` vector, or HoneySQL map. Intended
