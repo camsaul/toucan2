@@ -106,7 +106,7 @@
 
 (defn save!
   [obj]
-  (let [tableable             (instance/table obj)
+  (let [tableable             (instance/tableable obj)
         connectable           (instance/connectable obj)
         [connectable options] (conn.current/ensure-connectable connectable tableable nil)]
     (save!* connectable tableable obj options)))

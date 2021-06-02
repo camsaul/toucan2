@@ -39,9 +39,9 @@
                (instance/changes m2)))))
     (testing "table/with-table"
       (is (= :wow
-             (instance/table m)))
+             (instance/tableable m)))
       (is (= :ok
-             (instance/table (instance/with-table m :ok)))))))
+             (instance/tableable (instance/with-tableable m :ok)))))))
 
 (deftest changes-test
   (is (= {:name "Hi-Dive"}
@@ -80,9 +80,9 @@
   (is (= {:a 1}
          (instance/instance ::MyModel {:a 1})))
   (is (= ::MyModel
-         (instance/table (instance/instance ::MyModel))))
+         (instance/tableable (instance/instance ::MyModel))))
   (is (= ::MyModel
-         (instance/table (instance/instance ::MyModel {}))))
+         (instance/tableable (instance/instance ::MyModel {}))))
   (let [m (instance/instance ::MyModel {:original? true})]
     (is (= {:original? false}
            (assoc m :original? false)))

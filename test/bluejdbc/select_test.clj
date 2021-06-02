@@ -16,7 +16,7 @@
 
 (defn- test-people-instances? [results]
   (testing "All results should be :people instances"
-    (is (every? (partial = :people) (map instance/table results)))))
+    (is (every? (partial = :people) (map instance/tableable results)))))
 
 (deftest query-as-test
   (let [reducible-query (select/reducible-query-as :test/postgres :people {:select [:*], :from [:people]} nil)]
@@ -179,7 +179,7 @@
           (testing "select* :after should see Blue JDBC instances"
             (is (instance/bluejdbc-instance? person)))
           (testing "instance table should be a :people/no-timestamps"
-            (is (isa? (instance/table person) :people/no-timestamps)))
+            (is (isa? (instance/tableable person) :people/no-timestamps)))
           (dissoc person :timestamp)))
    reducible-query))
 
