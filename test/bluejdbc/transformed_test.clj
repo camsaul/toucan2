@@ -106,7 +106,11 @@
   (test/with-venues-reset
     (test/with-default-connection
       (let [venue (select/select-one ::transformed-venues 1)]
-        (is (= 1
+        (is (= {:id         1
+                :name       "Tempest"
+                :category   :dive-bar
+                :created-at (t/local-date-time "2017-01-01T00:00")
+                :updated-at (t/local-date-time  "2017-01-01T00:00")}
                (mutative/save! (assoc venue :category :dive-bar))))
         (is (= {:id         1
                 :name       "Tempest"

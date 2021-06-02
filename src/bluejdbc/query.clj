@@ -159,7 +159,10 @@
         (let [results (next.jdbc/execute! conn sql-params (:next.jdbc options))]
           (if (get-in options [:next.jdbc :return-keys])
             results
-            (-> results first :next.jdbc/update-count)))
+            (let [n (-> results first :next.jdbc/update-count)]
+              (log/tracef "%d rows affected." n)
+              (assert (integer? n) (format "Expected updated count, got %s" (pr-str results)))
+              n)))
         (catch Throwable e
           (throw (ex-info (format "Error executing statement: %s" (ex-message e))
                           (merge

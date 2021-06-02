@@ -84,7 +84,7 @@
 (deftest execute!-test
   (try
     ;; TODO -- should `update!` just return `0` instead of the `:update-count` key?
-    (is (= [0]
+    (is (= 0
            (query/execute! :test/postgres "CREATE TABLE \"execute_test_table\" (\"id\" INTEGER NOT NULL);")))
     (is (= []
            (query/query :test/postgres "SELECT * FROM \"execute_test_table\";")))
@@ -98,7 +98,7 @@
     (query/query :test/postgres "SELECT 1;")
     (is (= 1
            (call-count)))
-    (query/execute! :test/postgres "SELECT 1;")
+    (query/execute! :test/postgres "DELETE FROM people WHERE id = 1000;")
     (is (= 2
            (call-count)))
     (testing "Should be able to do nested calls to with-call-count"
