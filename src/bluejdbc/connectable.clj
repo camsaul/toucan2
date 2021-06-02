@@ -7,7 +7,7 @@
             [next.jdbc :as next.jdbc]
             [next.jdbc.transaction :as next.jdbc.transaction]))
 
-(m/defmethod conn.current/default-options* :default
+(m/defmethod conn.current/default-options-for-connectable* :default
   [connectable]
   (assert (some? connectable) "connectable should be non-nil, make sure you use ensure-connection")
   {:next.jdbc {:builder-fn (rs/row-builder-fn connectable nil)}})
@@ -74,8 +74,7 @@
              (= connectable conn.current/*current-connectable*))
       (f conn.current/*current-connection*)
       (let [options                                        (u/recursive-merge
-                                                            (conn.current/default-options* connectable)
-                                                            options)
+                                                            (conn.current/default-options-for-connectable* connectable) options)
             {:keys [^java.sql.Connection connection new?]} (connection connectable options)]
         (binding [conn.current/*current-connectable* connectable
                   conn.current/*current-connection*  connection]

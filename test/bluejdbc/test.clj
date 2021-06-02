@@ -21,7 +21,7 @@
 
 (derive :test/postgres-with-quoting :test/postgres)
 
-(m/defmethod conn.current/default-options* :test/postgres-with-quoting
+(m/defmethod conn.current/default-options-for-connectable* :test/postgres-with-quoting
   [_]
   {:honeysql {:quoting :ansi}})
 
