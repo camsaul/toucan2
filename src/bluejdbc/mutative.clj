@@ -44,15 +44,9 @@
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
-(defn- execute-results [results options]
-  (if (get-in options [:next.jdbc :return-keys])
-    results
-    (first results)))
-
 (m/defmethod update!* :default
   [connectable tableable honeysql-form options]
-  (-> (query/execute! connectable tableable honeysql-form options)
-      (execute-results options)))
+  (query/execute! connectable tableable honeysql-form options))
 
 ;; Syntax is a bit different from Toucan -- Toucan is either
 ;;
@@ -114,8 +108,7 @@
 
 (m/defmethod insert!* :default
   [connectable tableable query options]
-  (-> (query/execute! connectable tableable query options)
-      (execute-results options)))
+  (query/execute! connectable tableable query options))
 
 (m/defmulti parse-insert!-args*
   {:arglists '([connectable tableable args options])}
@@ -218,7 +211,7 @@
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
   (let [{:keys [connectable tableable query options]} (parse-delete-args args)]
-    (execute-results (delete!* connectable tableable query options) options)))
+    (delete!* connectable tableable query options) options))
 
 ;; TODO
 #_(defn upsert! [])

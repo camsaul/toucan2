@@ -43,7 +43,7 @@
 (deftest update!-test
   (testing "With PK and map conditions"
     (test/with-venues-reset
-      (is (= {:next.jdbc/update-count 1}
+      (is (= 1
              (mutative/update! [:test/postgres :venues] 1 {:name "Hi-Dive"})))
       (is (= (instance/instance :venues {:id         1
                                          :name       "Hi-Dive"
@@ -53,30 +53,30 @@
              (select/select-one [:test/postgres :venues] 1)))))
   (testing "With key-value conditions"
     (test/with-venues-reset
-      (is (= {:next.jdbc/update-count 1}
+      (is (= 1
              (mutative/update! [:test/postgres :venues] :name "Tempest" {:name "Hi-Dive"})))))
   (testing "with composite PK"
-    (is (= {:next.jdbc/update-count 1}
+    (is (= 1
            (mutative/update! [:test/postgres :venues/composite-pk] [1 "Tempest"] {:name "Hi-Dive"})))))
 
 (deftest update!-custom-honeysql-test
   (testing "custom HoneySQL for PK"
     (test/with-venues-reset
-      (is (= {:next.jdbc/update-count 1}
+      (is (= 1
              (mutative/update! [:test/postgres :venues/custom-honeysql] "1" {:name "Hi-Dive"})))
       (is (= (instance/instance :venues/custom-honeysql {:id 1, :name "Hi-Dive"})
              (select/select-one [:test/postgres :venues/custom-honeysql] "1" {:select [:id :name]}))))
     (testing "composite PK"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/update! [:test/postgres :venues/custom-honeysql-composite-pk] ["1" "Tempest"] {:name "Hi-Dive"}))))))
   (testing "custom HoneySQL for key-value conditions"
     (test/with-venues-reset
-      (is (= {:next.jdbc/update-count 1}
+      (is (= 1
              (mutative/update! [:test/postgres :venues/custom-honeysql] :id "1" {:name "Hi-Dive"})))))
   (testing "custom HoneySQL for changes"
     (test/with-venues-reset
-      (is (= {:next.jdbc/update-count 1}
+      (is (= 1
              (mutative/update! [:test/postgres :venues/custom-honeysql] :id "1" {:id "100"})))
       (is (= (instance/instance :venues/custom-honeysql {:id 100, :name "Tempest"})
              (select/select-one [:test/postgres :venues/custom-honeysql] "100" {:select [:id :name]}))))))
@@ -85,7 +85,7 @@
   (test/with-venues-reset
     (test/with-default-connection
       (let [venue (select/select-one :venues 1)]
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/save! (assoc venue :name "Hi-Dive"))))
         (is (= (instance/instance :venues {:id         1
                                            :name       "Hi-Dive"
@@ -94,7 +94,7 @@
                                            :updated-at (t/local-date-time "2017-01-01T00:00")})
                (select/select-one :venues 1)))
         (testing "Should work for 'magic' normalized keys."
-          (is (= {:next.jdbc/update-count 1}
+          (is (= 1
                  (-> (select/select-one :venues 1)
                      (assoc :updated-at (t/local-date-time "2021-05-13T04:19:00"))
                      mutative/save!)))
@@ -109,7 +109,7 @@
   (test/with-venues-reset
     (test/with-default-connection
       (let [venue (select/select-one :venues/custom-honeysql :id "1")]
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/save! (assoc venue :id "1"))))
         (is (= ["UPDATE venues SET id = ?::integer WHERE id = ?::integer" "1" "1"]
                (query/compiled (mutative/save! (assoc venue :id "1")))))))))
@@ -153,7 +153,7 @@
           (testing "Insert a single row"
             (is (= (if returning-keys?
                      [4]
-                     {:next.jdbc/update-count 1})
+                     1)
                    (insert! :venues {:name "Grant & Green", :category "bar"})))
             (is (= (instance/instance :venues {:id         4
                                                :name       "Grant & Green"
@@ -165,7 +165,7 @@
           (testing "Insert multiple rows"
             (is (= (if returning-keys?
                      [5 6]
-                     {:next.jdbc/update-count 2})
+                     2)
                    (insert! :venues [{:name "Black Horse London Pub", :category "bar"}
                                               {:name "Nick's Crispy Tacos", :category "bar"}])))
             (is (= [(instance/instance :venues {:id         5
@@ -183,7 +183,7 @@
           (testing "Insert with key/values"
             (is (= (if returning-keys?
                      [7]
-                     {:next.jdbc/update-count 1})
+                     1)
                    (insert! :venues :name "HiDive SF", :category "bar")))
             (is (= (instance/instance :venues {:id         7
                                                :name       "HiDive SF"
@@ -195,7 +195,7 @@
           (testing "Insert with column names"
             (is (= (if returning-keys?
                      [8 9]
-                     {:next.jdbc/update-count 2})
+                     2)
                    (insert! "venues" [:name :category] [["The Ramp" "bar"]
                                                                  ["Louie's" "bar"]])))
             (is (= [(instance/instance "venues" {:id 8, :name "The Ramp"})
@@ -212,25 +212,25 @@
   (test/with-default-connection
     (testing "single map row"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/insert! :venues/custom-honeysql {:id "4", :name "Hi-Dive", :category "bar"})))
         (is (= {:id 4, :name "Hi-Dive"}
                (select/select-one :venues :id 4 {:select [:id :name]})))))
     (testing "multiple map rows"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/insert! :venues/custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))
         (is (= {:id 4, :name "Hi-Dive"}
                (select/select-one :venues :id 4 {:select [:id :name]})))))
     (testing "kv args"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/insert! :venues/custom-honeysql :id "4", :name "Hi-Dive", :category "bar")))
         (is (= {:id 4, :name "Hi-Dive"}
                (select/select-one :venues :id 4 {:select [:id :name]})))))
     (testing "columns + vector rows"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/insert! :venues/custom-honeysql [:id :name :category] [["4" "Hi-Dive" "bar"]])))
         (is (= {:id 4, :name "Hi-Dive"}
                (select/select-one :venues :id 4 {:select [:id :name]})))))
@@ -243,7 +243,7 @@
   (test/with-default-connection
     (testing "Delete row by PK"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/delete! :venues 1)))
         (is (= []
                (select/select :venues 1)))
@@ -251,37 +251,37 @@
                (select/select-fn-set :id :venues 2))))
       (testing "Composite PK"
         (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 1}
+          (is (= 1
                  (mutative/delete! :venues/composite-pk [1 "Tempest"])))
           (is (= []
                  (select/select :venues :id 1))))))
     (testing "Delete row by key-value conditions"
       (testing "single row"
         (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 1}
+          (is (= 1
                  (mutative/delete! :venues :name "Tempest")))
           (is (= []
                  (select/select :venues :id 1)))))
       (testing "multiple rows"
         (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 2}
+          (is (= 2
                  (mutative/delete! :venues :category "bar")))
           (is (= #{"store"}
                  (select/select-fn-set :category :venues)))))
       (testing "Toucan-style fn-args vector"
         (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 2}
+          (is (= 2
                  (mutative/delete! :venues :id [:> 1]))))))
     (testing "Delete row by HoneySQL query"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 2}
+        (is (= 2
                (mutative/delete! :venues {:where [:> :id 1]})))))))
 
 (deftest delete!-custom-honeysql-test
   (test/with-default-connection
     (testing "Delete row by PK"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/delete! :venues/custom-honeysql "1")))
         (is (= []
                (select/select :venues 1)))
@@ -289,13 +289,13 @@
                (select/select-fn-set :id :venues 2)))))
     (testing "Delete row by key-value conditions"
       (test/with-venues-reset
-        (is (= {:next.jdbc/update-count 1}
+        (is (= 1
                (mutative/delete! :venues/custom-honeysql :id "1")))
         (is (= []
                (select/select :venues :id 1))))
       (testing "Toucan-style fn-args vector"
         (test/with-venues-reset
-          (is (= {:next.jdbc/update-count 1}
+          (is (= 1
                  (mutative/delete! :venues/custom-honeysql :id [:in ["1"]])))
           (is (= []
                  (select/select :venues :id 1))))))))
