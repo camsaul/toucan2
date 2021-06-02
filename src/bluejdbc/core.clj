@@ -59,6 +59,7 @@
  [instance
   changes
   instance
+  instance*
   key-transform-fn*
   original
   table]
