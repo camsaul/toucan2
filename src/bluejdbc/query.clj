@@ -187,17 +187,21 @@
   [connectable tableable queryable options]
   (conn/with-connection [conn connectable tableable options]
     (let [reducible (reducible-query connectable tableable queryable options)]
-      (if (get-in options [:next.jdbc :return-keys])
-        (all reducible)
-        (let [update-count (reduce-first reducible)]
-          (log/tracef "%d rows-affected." update-count)
-          update-count)))))
+      (if (:reducible? options)
+        reducible
+        (if (get-in options [:next.jdbc :return-keys])
+          (all reducible)
+          (let [update-count (reduce-first reducible)]
+            (log/tracef "%d rows-affected." update-count)
+            update-count))))))
 
 (defn execute!
   "Compile and execute a `queryable` such as a String SQL statement, `[sql & params]` vector, or HoneySQL map. Intended
   for use with statements such as `UPDATE`, `INSERT`, or `DELETE`, or DDL statements like `CREATE TABLE`; for queries
   like `SELECT`, use `query` instead. Returns the number of rows affected, unless `{:next.jdbc {:return-keys true}}`
-  is set, in which case it returns generated keys (see next.jdbc documentation for more details)."
+  is set, in which case it returns generated keys (see next.jdbc documentation for more details).
+
+  You can return a reducible query instead by passing `:reducible?` in the options."
   ([queryable]                       (execute!  nil         nil       queryable nil))
   ([connectable queryable]           (execute!  connectable nil       queryable nil))
   ([connectable tableable queryable] (execute!  connectable tableable queryable nil))

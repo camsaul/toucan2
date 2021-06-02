@@ -1,6 +1,7 @@
 (ns bluejdbc.query-test
   (:require [bluejdbc.connectable :as conn]
             [bluejdbc.connectable.current :as conn.current]
+            [bluejdbc.instance :as instance]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
             [bluejdbc.row :as row]
@@ -144,3 +145,10 @@
           java.math.BigDecimal
           (read-column-by-index [n _ _]
             n))))))
+
+(deftest execute-reducible-test
+  (testing "execute! should return a reducible query if you pass `:reducible?` in the options"
+    (let [query (query/execute! :test/postgres nil "SELECT 1 AS one;" {:reducible? true})]
+      (is (instance? bluejdbc.query.ReducibleQuery query))
+      (is (= [(instance/instance :test/postgres nil {:one 1})]
+             (query/all query))))))
