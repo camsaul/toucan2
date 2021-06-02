@@ -128,12 +128,15 @@
                [(key-xform k) v]))
         m))
 
+;; (m/defmulti instance*
+;;   {:arglists '([connectable tableable])})
+
 (defn instance
   (^bluejdbc.instance.Instance [tableable]
-   (instance conn.current/*current-connectable* tableable {}))
+   (instance (conn.current/current-connectable tableable) tableable {}))
 
   (^bluejdbc.instance.Instance [tableable m]
-   (instance conn.current/*current-connectable* tableable m))
+   (instance (conn.current/current-connectable tableable) tableable m))
 
   (^bluejdbc.instance.Instance [connectable tableable m]
    (let [key-xform (key-transform-fn* connectable tableable)

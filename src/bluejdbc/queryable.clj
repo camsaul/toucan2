@@ -1,6 +1,5 @@
 (ns bluejdbc.queryable
-  (:require [bluejdbc.connectable :as conn]
-            [bluejdbc.connectable.current :as conn.current]
+  (:require [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.util :as u]
             [methodical.core :as m]))
 
@@ -28,17 +27,12 @@
   coll)
 
 (defn queryable
-  ([a-queryable]
-   (queryable conn.current/*current-connectable* nil a-queryable nil))
-
-  ([tableable a-queryable]
-   (queryable conn.current/*current-connectable* tableable a-queryable nil))
-
-  ([connectable tableable a-queryable]
-   (queryable connectable tableable a-queryable nil))
+  ([a-queryable]                       (queryable nil         nil       a-queryable nil))
+  ([tableable a-queryable]             (queryable nil         tableable a-queryable nil))
+  ([connectable tableable a-queryable] (queryable connectable tableable a-queryable nil))
 
   ([connectable tableable a-queryable options]
-   (let [options (u/recursive-merge (conn/default-options connectable) options)]
+   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)]
      (queryable* connectable tableable a-queryable options))))
 
 (defn queryable? [connectable tableable a-queryable]

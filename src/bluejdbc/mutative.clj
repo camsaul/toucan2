@@ -69,8 +69,8 @@
 ;; present?
 (defn parse-update-args [connectable-tableable args]
   (let [[connectable tableable]                 (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [pk conditions changes options]} (parse-update!-args* connectable tableable args
-                                                                     (conn/default-options connectable))
+        [connectable options]                   (conn.current/ensure-connectable connectable tableable nil)
+        {:keys [pk conditions changes options]} (parse-update!-args* connectable tableable args options)
         conditions                              (cond-> conditions
                                                   pk (honeysql-util/merge-primary-key connectable tableable pk options))
         changes                                 (into {} (for [[k v] changes]
@@ -102,9 +102,9 @@
 
 (defn save!
   [obj]
-  (let [connectable (or (instance/connectable obj) conn.current/*current-connectable*)
-        tableable   (instance/table obj)
-        options     (conn/default-options connectable)]
+  (let [tableable             (instance/table obj)
+        connectable           (instance/connectable obj)
+        [connectable options] (conn.current/ensure-connectable connectable tableable nil)]
     (save!* connectable tableable obj options)))
 
 (m/defmulti insert!*
@@ -140,7 +140,8 @@
 
 (defn parse-insert-args [connectable-tableable args]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [rows options]}  (parse-insert!-args* connectable tableable args (conn/default-options connectable))
+        [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
+        {:keys [rows options]}  (parse-insert!-args* connectable tableable args options)
         honeysql-form           {:insert-into (compile/table-identifier tableable options)
                                  :values      (for [row rows]
                                                 (into {} (for [[k v] row]
@@ -165,7 +166,8 @@
                [connectable-tableable columns row-vectors options?])}
   [connectable-tableable & args]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [rows options]}  (parse-insert!-args* connectable tableable args (conn/default-options connectable))
+        [connectable options] (conn.current/ensure-connectable connectable tableable nil)
+        {:keys [rows options]}  (parse-insert!-args* connectable tableable args options)
         pks                     (tableable/primary-key-keys connectable tableable)
         get-pks                 (if (= (count pks) 1)
                                   (first pks)
@@ -193,7 +195,8 @@
 
 (defn parse-delete-args [[connectable-tableable & args]]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [query options]} (parse-delete-args* connectable tableable args (conn/default-options connectable))]
+        [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
+        {:keys [query options]} (parse-delete-args* connectable tableable args options)]
     {:connectable connectable
      :tableable   tableable
      :query       query

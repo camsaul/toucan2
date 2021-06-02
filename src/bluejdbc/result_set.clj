@@ -30,8 +30,8 @@
 
 (m/defmethod read-column-thunk :around :default
   [connectable tableable rs ^ResultSetMetaData rsmeta ^Integer i options]
-  (log/tracef "Fetching values in column %d with (.getObject rs %d) and options %s" i i (pr-str options))
-  (next-method connectable tableable rs rsmeta i options))
+  (log/with-trace ["Fetching values in column %d with (.getObject rs %d) and options %s" i i (pr-str options)]
+    (next-method connectable tableable rs rsmeta i options)))
 
 (defn get-object-of-class-thunk [^ResultSet rs ^Integer i ^Class klass]
   (log/tracef "Fetching values in column %d with (.getObject rs %d %s)" i i (.getCanonicalName klass))
@@ -70,6 +70,7 @@
   (range 1 (inc (.getColumnCount rsmeta))))
 
 (defn row-builder-fn [connectable tableable]
+  (assert (some? connectable) "Connectable should be non-nil")
   (u/pretty-printable-fn
    #(list `row-builder-fn (if (keyword? connectable) connectable 'connectable) tableable)
    (fn [rs options]

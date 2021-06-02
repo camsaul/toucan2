@@ -1,5 +1,6 @@
 (ns bluejdbc.query-test
   (:require [bluejdbc.connectable :as conn]
+            [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
             [bluejdbc.test :as test]
@@ -113,7 +114,7 @@
     (is (= 3
            (call-count)))))
 
-(m/defmethod conn/default-connectable-for-tableable* ::venues
+(m/defmethod conn.current/default-connectable-for-tableable* ::venues
   [_ _]
   :test/postgres)
 

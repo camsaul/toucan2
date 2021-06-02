@@ -19,15 +19,15 @@
 ;; TODO -- consider whether this should be moved to `query`
 (defn reducible-query-as
   ([tableable queryable]
-   (reducible-query-as conn.current/*current-connectable* tableable queryable nil))
+   (reducible-query-as (conn.current/current-connectable tableable) tableable queryable nil))
 
   ([connectable tableable queryable]
    (reducible-query-as connectable tableable queryable nil))
 
   ([connectable tableable queryable options]
-   (let [options (u/recursive-merge (conn/default-options connectable)
-                                    options
-                                    {:next.jdbc {:builder-fn (rs/row-builder-fn connectable tableable)}})]
+   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
+         options               (u/recursive-merge options
+                                                  {:next.jdbc {:builder-fn (rs/row-builder-fn connectable tableable)}})]
      (query/reducible-query connectable tableable queryable options))))
 
 (m/defmulti select*
@@ -75,8 +75,8 @@
   `:options`."
   [connectable tableable args options-1]
   (log/with-trace ["Parsing select args for %s %s" tableable args]
-    (let [{:keys [pk conditions query options]} (parse-select-args*
-                                                 connectable tableable args (conn/default-options connectable))
+    (let [[connectable options-1]               (conn.current/ensure-connectable connectable tableable options-1)
+          {:keys [pk conditions query options]} (parse-select-args* connectable tableable args options-1)
           options                               (u/recursive-merge options-1 options)
           conditions                            (cond-> conditions
                                                   pk (honeysql-util/merge-primary-key connectable tableable pk options))
@@ -92,7 +92,8 @@
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [connectable-tableable & args]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [query options]} (parse-select-args connectable tableable args (conn/default-options connectable))]
+        [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
+        {:keys [query options]} (parse-select-args connectable tableable args options)]
     (select* connectable tableable query options)))
 
 (defn select
@@ -192,7 +193,8 @@
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [connectable-tableable & args]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [query options]} (parse-select-args connectable tableable args (conn/default-options connectable))]
+        [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
+        {:keys [query options]} (parse-select-args connectable tableable args options)]
     (count* connectable tableable query options)))
 
 (m/defmulti exists?*
@@ -215,5 +217,6 @@
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [connectable-tableable & args]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        {:keys [query options]} (parse-select-args connectable tableable args (conn/default-options connectable))]
+        [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
+        {:keys [query options]} (parse-select-args connectable tableable args options)]
     (exists?* connectable tableable query options)))

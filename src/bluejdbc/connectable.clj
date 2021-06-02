@@ -7,22 +7,10 @@
             [next.jdbc :as next.jdbc]
             [next.jdbc.transaction :as next.jdbc.transaction]))
 
-;; TODO -- consider whether this should end with a `*` so it's consistent with the other multimethods.
-(m/defmulti default-options
-  {:arglists '([connectable])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod default-options :default
+(m/defmethod conn.current/default-options* :default
   [connectable]
+  (assert (some? connectable) "connectable should be non-nil, make sure you use ensure-connection")
   {:next.jdbc {:builder-fn (rs/row-builder-fn connectable nil)}})
-
-(m/defmulti default-connectable-for-tableable*
-  {:arglists '([tableable options])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod default-connectable-for-tableable* :default
-  [_ _]
-  :bluejdbc/default)
 
 (m/defmulti connection*
   {:arglists '([connectable options])}
@@ -56,8 +44,7 @@
 
 (m/defmethod connection* :default
   [connectable options]
-  (when (nil? connectable)
-    (throw (ex-info "Connectable cannot be nil" {})))
+  (assert (some? connectable) "connectable cannot be nil")
   (when (= connectable :bluejdbc/default)
     (throw (ex-info (format "No default connectable is defined. Define an implementation of connection* for :bluejdbc/default")
                     {})))
@@ -82,11 +69,13 @@
    (connection* k options)))
 
 (defn do-with-connection [connectable tableable options f]
-  (let [connectable (or connectable (default-connectable-for-tableable* tableable options))]
+  (let [connectable (or connectable (conn.current/current-connectable tableable options))]
     (if (and conn.current/*current-connection*
              (= connectable conn.current/*current-connectable*))
       (f conn.current/*current-connection*)
-      (let [options                                        (u/recursive-merge (default-options connectable) options)
+      (let [options                                        (u/recursive-merge
+                                                            (conn.current/default-options* connectable)
+                                                            options)
             {:keys [^java.sql.Connection connection new?]} (connection connectable options)]
         (binding [conn.current/*current-connectable* connectable
                   conn.current/*current-connection*  connection]
@@ -119,13 +108,9 @@
                    (dissoc :tableable-options))]
       (-> args
           (update :connectable (fn [connectable]
-                                 (if (and connectable
-                                          (not= connectable '_))
-                                   connectable
-                                   (if (and (:tableable args)
-                                            (= conn.current/*current-connectable* :bluejdbc/default))
-                                     (default-connectable-for-tableable* (:tableable args) (:options args))
-                                     `conn.current/*current-connectable*))))
+                                 (when (and connectable
+                                            (not= connectable '_))
+                                   connectable)))
           (update :binding #(or % '_))))))
 
 ;; TODO -- not sure about this syntax.
@@ -142,10 +127,26 @@
       (fn [~(vary-meta (or binding '_) assoc :tag 'java.sql.Connection)]
         ~@body))))
 
-(defn parse-connectable-tableable [connectable-tableable]
-  (if (sequential? connectable-tableable)
-    connectable-tableable
-    [conn.current/*current-connectable* connectable-tableable]))
+(s/def ::connectable-tableable
+  (s/or :connectable-tableable (s/cat :connectable any?
+                                      :tableable   any?)
+        :tableable (complement sequential?)))
+
+(defn parse-connectable-tableable
+  "Parse the `connectable-tableable` argument for various functions. Returns a tuple of `[connectable tableable]`."
+  [connectable-tableable]
+  (let [parsed (s/conform ::connectable-tableable connectable-tableable)]
+    (when (= parsed :clojure.spec.alpha/invalid)
+      (throw (ex-info (format "Don't know how to interpret connectable-tableable arg: %s"
+                              (s/explain-str ::connectable-tableable connectable-tableable))
+                      {:connectable-tableable connectable-tableable})))
+    (let [[arg-type arg]                  parsed
+          {:keys [connectable tableable]} (case arg-type
+                                            :connectable-tableable arg
+                                            :tableable             {:tableable arg})]
+      [(or connectable
+           (conn.current/current-connectable tableable))
+       tableable])))
 
 (defn do-with-transaction [connectable options f]
   (with-connection [conn connectable options]
