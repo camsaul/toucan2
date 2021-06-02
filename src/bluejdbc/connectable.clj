@@ -1,6 +1,5 @@
 (ns bluejdbc.connectable
   (:require [bluejdbc.connectable.current :as conn.current]
-            [bluejdbc.result-set :as rs]
             [bluejdbc.util :as u]
             [clojure.spec.alpha :as s]
             [methodical.core :as m]
@@ -10,7 +9,7 @@
 (m/defmethod conn.current/default-options-for-connectable* :default
   [connectable]
   (assert (some? connectable) "connectable should be non-nil, make sure you use ensure-connection")
-  {:next.jdbc {:builder-fn (rs/row-builder-fn connectable nil)}})
+  nil)
 
 (m/defmulti connection*
   {:arglists '([connectable options])}
@@ -47,7 +46,7 @@
   (assert (some? connectable) "connectable cannot be nil")
   (assert (not= connectable :default) "connectable should not be :default. Use :bluejdbc/default for the default connection.")
   (when (= connectable :bluejdbc/default)
-    (throw (ex-info (format "No default connectable is defined. Define an implementation of connection* for :bluejdbc/default")
+    (throw (ex-info (format "No default connectable is defined. Pass an explicit connectable or define an implementation of connection* for :bluejdbc/default")
                     {})))
   (when (keyword? connectable)
     (throw (ex-info (format "Unknown connectable %s. Did you define a connection* method for it?" connectable)

@@ -1,5 +1,6 @@
 (ns bluejdbc.instance
   (:require [bluejdbc.connectable.current :as conn.current]
+            [bluejdbc.row :as row]
             [bluejdbc.util :as u]
             [camel-snake-kebab.core :as csk]
             [clojure.data :as data]
@@ -104,6 +105,13 @@
   (with-connectable [_ new-connectable]
     (Instance. new-connectable tbl orig m key-xform mta))
 
+  row/RealizeRow
+  (realize-row [_]
+    (if (identical? orig m)
+      (let [m (row/realize-row m)]
+        (Instance. conn tbl m m key-xform mta))
+      (Instance. conn tbl (row/realize-row orig) (row/realize-row m) key-xform mta)))
+
   pretty/PrettyPrintable
   (pretty [_]
     (list (u/qualify-symbol-for-*ns* `instance) conn tbl m)))
@@ -124,6 +132,7 @@
     this))
 
 (defn normalize-map [key-xform m]
+  {:pre [(fn? key-xform) (map? m)]}
   (into (empty m)
         (map (fn [[k v]]
                [(key-xform k) v]))

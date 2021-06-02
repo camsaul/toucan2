@@ -8,7 +8,7 @@
             [bluejdbc.log :as log]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
-            [bluejdbc.result-set :as rs]
+            [bluejdbc.row :as row]
             [bluejdbc.specs :as specs]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
@@ -25,9 +25,7 @@
    (reducible-query-as connectable tableable queryable nil))
 
   ([connectable tableable queryable options]
-   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
-         options               (u/recursive-merge options
-                                                  {:next.jdbc {:builder-fn (rs/row-builder-fn connectable tableable)}})]
+   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)]
      (query/reducible-query connectable tableable queryable options))))
 
 (m/defmulti select*
@@ -119,7 +117,7 @@
 (defn select-one
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
-  (query/reduce-first (map query/realize-row) (apply select-reducible args)))
+  (query/reduce-first (map row/realize-row) (apply select-reducible args)))
 
 (defn select-fn-reducible
   {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}

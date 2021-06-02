@@ -3,6 +3,7 @@
             [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
+            [bluejdbc.row :as row]
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [java-time :as t]
@@ -14,7 +15,7 @@
 (deftest reducible-query-test
   (is (= [{:count 4}]
          (let [query (query/reducible-query :test/postgres "SELECT count(*) FROM people;")]
-           (into [] (map query/realize-row) query))))
+           (into [] (map row/realize-row) query))))
 
   (testing "with current connection"
     (conn/with-connection :test/postgres
@@ -25,7 +26,7 @@
     (is (= [{:id 2, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")}]
            (into
             []
-            (map query/realize-row)
+            (map row/realize-row)
             (eduction
              (comp (map #(update % :id inc))
                    (take 1))

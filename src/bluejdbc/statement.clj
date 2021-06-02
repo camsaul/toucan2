@@ -1,8 +1,10 @@
 (ns bluejdbc.statement
   (:require [bluejdbc.log :as log]
+            [bluejdbc.result-set :as rs]
             [bluejdbc.util :as u]
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
+            [next.jdbc :as next.jdbc]
             [next.jdbc.prepare :as next.jdbc.prepare]
             [potemkin :as p]
             [pretty.core :as pretty]))
@@ -28,3 +30,32 @@
 
 (defn parameter [connectable tableable x options]
   (->Parameter connectable tableable x options))
+
+(p/deftype+ ReducibleStatement [connectable tableable ^java.sql.PreparedStatement stmt options]
+  clojure.lang.IReduceInit
+  (reduce [_ rf init]
+    (if (get-in options [:next.jdbc :return-keys])
+      (do
+        (.executeUpdate stmt)
+        (with-open [rs (.getGeneratedKeys stmt)]
+          (reduce rf init (rs/reducible-result-set connectable tableable rs options))))
+      (let [has-result-set? (.execute stmt)]
+        (if has-result-set?
+          (with-open [rs (.getResultSet stmt)]
+            (reduce rf init (rs/reducible-result-set connectable tableable rs options)))
+          ;; TODO -- should this be reduced with rf and init??
+          #_(reduce rf init (reduced [(.getUpdateCount stmt)]))
+          [(.getUpdateCount stmt)]))))
+
+  pretty/PrettyPrintable
+  (pretty [_]
+    (list (pretty/qualify-symbol-for-*ns* `reducible-statement) connectable tableable stmt options)))
+
+(defn reducible-statement [connectable tableable stmt options]
+  (->ReducibleStatement connectable tableable stmt options))
+
+(defn prepare ^java.sql.PreparedStatement [connectable tableable conn [sql & params] options]
+  (let [params     (for [param params]
+                     (parameter connectable tableable param options))
+        sql-params (cons sql params)]
+    (next.jdbc/prepare conn sql-params (:next.jdbc options))))

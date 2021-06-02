@@ -7,7 +7,6 @@
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
             [bluejdbc.query :as query]
-            [bluejdbc.result-set :as rs]
             [bluejdbc.select :as select]
             [bluejdbc.specs :as specs]
             [bluejdbc.tableable :as tableable]
@@ -170,7 +169,7 @@
                [connectable-tableable columns row-vectors options?])}
   [connectable-tableable & args]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        [connectable options] (conn.current/ensure-connectable connectable tableable nil)
+        [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
         {:keys [rows options]}  (parse-insert!-args* connectable tableable args options)
         pks                     (tableable/primary-key-keys connectable tableable)
         get-pks                 (if (= (count pks) 1)
@@ -178,10 +177,9 @@
                                   (apply juxt pks))
         options                 (u/recursive-merge
                                  options
-                                 {:next.jdbc {:return-keys true
-                                              :builder-fn  (rs/row-builder-fn connectable tableable)}})
+                                 {:next.jdbc {:return-keys true}})
         results                 (insert! [connectable tableable] rows options)]
-    (map get-pks results)))
+    (mapv get-pks results)))
 
 (m/defmulti parse-delete-args*
   {:arglists '([connectable tableable args options])}

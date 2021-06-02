@@ -90,7 +90,6 @@
   hformat/ToSql
   (to-sql [_]
     (let [options (u/recursive-merge *compile-options* options)]
-      ;; TODO -- `:row-builder-fn` is present in `:honeysql` options in this log statement, but it shouldn't be. FIXME
       (log/with-trace (format "Convert table identifier %s to table name with options %s"
                               (pr-str tableable)
                               (pr-str (:honeysql options)))
@@ -125,7 +124,7 @@
 (p/defrecord+ Value [connectable tableable column v options]
   pretty/PrettyPrintable
   (pretty [_]
-    (list* (u/qualify-symbol-for-*ns* `value) connectable tableable column v (when options [options])))
+    (list* (pretty/qualify-symbol-for-*ns* `value) connectable tableable column v (when options [options])))
 
   hformat/ToSql
   (to-sql [_]
