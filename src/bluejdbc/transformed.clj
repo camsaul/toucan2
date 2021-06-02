@@ -92,8 +92,7 @@
                             row)))]
     (apply comp instance/reset-original transform-fns)))
 
-(m/defmethod select/select* :after [:default :bluejdbc/transformed :default]
-  [connectable tableable reducible-query options]
+(defn transform-results [connectable tableable reducible-query options]
   (if-let [transforms (not-empty (transforms* connectable tableable options))]
     (do
       (log/tracef "Apply %s transforms %s to results" (pr-str tableable) (pr-str transforms))
@@ -101,6 +100,10 @@
        (map (row-transform-fn transforms))
        reducible-query))
     reducible-query))
+
+(m/defmethod select/select* :after [:default :bluejdbc/transformed :default]
+  [connectable tableable reducible-query options]
+  (transform-results connectable tableable reducible-query options))
 
 (m/defmethod mutative/parse-update!-args* :after [:default :bluejdbc/transformed]
   [connectable tableable args options]
@@ -128,9 +131,6 @@
 
 (m/defmethod mutative/insert!* :after [:default :bluejdbc/transformed :default]
   [connectable tableable results options]
-  (if-not (sequential? results)
+  (if (integer? results)
     results
-    (if-let [transforms (not-empty (transforms* connectable tableable options))]
-      (log/with-trace ["Apply %s transforms %s to results" (pr-str tableable) (pr-str transforms)]
-        (map (row-transform-fn transforms) results))
-      results)))
+    (transform-results connectable tableable results options)))

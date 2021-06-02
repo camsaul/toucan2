@@ -141,7 +141,7 @@
   [& args]
   (query/reduce-first (apply select-fn-reducible args)))
 
-(defn- select-pks-fn [connectable tableable]
+(defn select-pks-fn [connectable tableable]
   (let [pk-keys (tableable/primary-key-keys connectable tableable)]
     (if (= (clojure.core/count pk-keys) 1)
       (first pk-keys)

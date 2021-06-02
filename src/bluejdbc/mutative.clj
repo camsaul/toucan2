@@ -171,15 +171,15 @@
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
         [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
         {:keys [rows options]}  (parse-insert!-args* connectable tableable args options)
-        pks                     (tableable/primary-key-keys connectable tableable)
-        get-pks                 (if (= (count pks) 1)
-                                  (first pks)
-                                  (apply juxt pks))
         options                 (u/recursive-merge
                                  options
-                                 {:next.jdbc {:return-keys true}})
-        results                 (insert! [connectable tableable] rows options)]
-    (mapv get-pks results)))
+                                 {:next.jdbc  {:return-keys true}
+                                  :reducible? true})
+        reducible-query         (insert! [connectable tableable] rows options)]
+    (into
+     []
+     (map (select/select-pks-fn connectable tableable))
+     reducible-query)))
 
 (m/defmulti parse-delete-args*
   {:arglists '([connectable tableable args options])}
