@@ -4,6 +4,7 @@
             [bluejdbc.connectable :as connectable]
             [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.helpers :as helpers]
+            [bluejdbc.honeysql-util :as honeysql-util]
             [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
@@ -22,6 +23,7 @@
   conn.current/keep-me
   connectable/keep-me
   helpers/keep-me
+  honeysql-util/keep-me
   hydrate/keep-me
   instance/keep-me
   log/keep-me
@@ -62,6 +64,10 @@
  [helpers
   define-before-select
   define-after-select]
+
+ [honeysql-util
+  handle-condition*
+  handle-sequential-condition*]
 
  [hydrate
   batched-hydrate*
