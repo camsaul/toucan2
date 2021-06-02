@@ -6,7 +6,8 @@
             [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [java-time :as t]
-            [methodical.core :as m]))
+            [methodical.core :as m]
+            [next.jdbc.result-set :as next.jdbc.rs]))
 
 (use-fixtures :once test/do-with-test-data)
 
@@ -124,3 +125,21 @@
   (test/with-venues-reset
     (is (= [{:next.jdbc/update-count 1}]
            (query/execute! nil ::venues "DELETE FROM venues WHERE id = 1;")))))
+
+(deftest readable-column-test
+  (testing "Blue JDBC should call next.jdbc.result-set/read-column-by-index"
+    (is (= [{:n 100.0M}]
+           (query/query :test/postgres "SELECT '100.0'::decimal AS n;")))
+    (try
+      (extend-protocol next.jdbc.rs/ReadableColumn
+        java.math.BigDecimal
+        (read-column-by-index [n _ _]
+          (str n)))
+      (is (= [{:n "100.0"}]
+             (query/query :test/postgres "SELECT '100.0'::decimal AS n;")))
+      (finally
+        ;; reverse the changes.
+        (extend-protocol next.jdbc.rs/ReadableColumn
+          java.math.BigDecimal
+          (read-column-by-index [n _ _]
+            n))))))

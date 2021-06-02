@@ -3,7 +3,7 @@
             [bluejdbc.log :as log]
             [bluejdbc.util :as u]
             [methodical.core :as m]
-            [next.jdbc.result-set :as jdbc.rs])
+            [next.jdbc.result-set :as next.jdbc.rs])
   (:import [java.sql ResultSet ResultSetMetaData Types]))
 
 (def type-name
@@ -79,12 +79,12 @@
    (fn [rs options]
      (let [^ResultSet rs rs
            rsmeta        (.getMetaData rs)
-           cols          (jdbc.rs/get-unqualified-column-names rsmeta options)
+           cols          (next.jdbc.rs/get-unqualified-column-names rsmeta options)
            i->col-thunk  (into {} (for [i (index-range rsmeta)]
                                     [i (let [thunk (read-column-thunk* connectable tableable rs rsmeta i options)]
                                          (fn []
                                            (try
-                                             (thunk)
+                                             (next.jdbc.rs/read-column-by-index (thunk) rsmeta i)
                                              (catch Throwable e
                                                (throw (ex-info (format "Error reading %s column %d %s: %s"
                                                                        (type-name (.getColumnType rsmeta i))
@@ -97,20 +97,20 @@
                                                                 :native-type (.getColumnTypeName rsmeta i)}
                                                                e))))))]))]
        (reify
-         jdbc.rs/RowBuilder
+         next.jdbc.rs/RowBuilder
          (->row [this]
            (transient (instance/instance connectable tableable {})))
          (column-count [this]
            (count cols))
          (with-column [this row i]
            (let [col-thunk (get i->col-thunk i)]
-             (jdbc.rs/with-column-value this row (nth cols (dec i)) (col-thunk))))
+             (next.jdbc.rs/with-column-value this row (nth cols (dec i)) (col-thunk))))
          (with-column-value [this row col v]
            (assoc! row col v))
          (row! [this row]
            (persistent! row))
 
-         jdbc.rs/ResultSetBuilder
+         next.jdbc.rs/ResultSetBuilder
          (->rs [this]
            (transient []))
          (with-row [this mrs row]
