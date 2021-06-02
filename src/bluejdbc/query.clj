@@ -74,7 +74,25 @@
                                {:query queryable, :sql-params sql-params, :options options}))
                             e))))))))
 
-(declare all)
+(p/defprotocol+ RealizeRow
+  (realize-row [row]))
+
+(p/defprotocol+ All
+  (all [reducible-query]
+    "Immediately realize all rows from `reducible-query` and return them."))
+
+(defn default-all [this]
+  (into [] (map realize-row) this))
+
+(extend-protocol All
+  Object
+  (all [this]
+    this)
+
+  ;; NOCOMMIT
+  clojure.lang.IReduceInit
+  (all [this]
+    (default-all this)))
 
 (p/deftype+ ReducibleQuery [connectable tableable queryable options]
   pretty/PrettyPrintable
@@ -88,7 +106,13 @@
   ;; convenience: deref a ReducibleQuery to realize all results.
   clojure.lang.IDeref
   (deref [this]
-    (all this)))
+    (all this))
+
+  All
+  (all [this]
+    (default-all this)))
+
+(prefer-method print-method pretty.core.PrettyPrintable clojure.lang.IDeref)
 
 (m/defmulti reducible-query*
   {:arglists '([connectable tableable queryable options])}
@@ -113,16 +137,14 @@
    (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)]
      (reducible-query* connectable tableable queryable options))))
 
-(defn realize-row [row]
-  (next.jdbc.rs/datafiable-row row conn.current/*current-connection* nil))
+(extend-protocol RealizeRow
+  Object
+  (realize-row [row]
+    row)
 
-(defn all
-  "Immediately realize all rows from `reducible-query` and return them."
-  [reducible-query]
-  (into
-   []
-   (map realize-row)
-   reducible-query))
+  next.jdbc.result_set.DatafiableRow
+  (realize-row [row]
+    (next.jdbc.rs/datafiable-row row conn.current/*current-connection* nil)))
 
 (defn query
   {:arglists '([queryable]

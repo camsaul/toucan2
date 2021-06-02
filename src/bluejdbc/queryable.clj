@@ -1,15 +1,19 @@
 (ns bluejdbc.queryable
   (:require [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.util :as u]
-            [methodical.core :as m]))
+            [methodical.core :as m]
+            [methodical.impl.combo.threaded :as m.combo.threaded]))
 
 (m/defmulti queryable*
   {:arglists '([connectable tableable queryable options])}
-  u/dispatch-on-first-three-args)
+  u/dispatch-on-first-three-args
+  :combo (m.combo.threaded/threading-method-combination :third))
 
 (m/defmethod queryable* :default
-  [_ tableable queryable options]
-  (throw (ex-info (format "Don't know how to convert %s to a query. Add an impl for queryable*" (pr-str queryable))
+  [connectable tableable queryable options]
+  (throw (ex-info (format "Don't know how to convert %s to a query. %s"
+                          queryable
+                          (u/suggest-dispatch-values connectable tableable queryable))
                   {:tableable tableable
                    :queryable queryable
                    :options   options})))

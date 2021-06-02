@@ -27,7 +27,7 @@
     (log/trace (u/pprint-to-str query))
     (try
       (let [sql-params (next-method connectable tableable query options)]
-        (assert (and (sequential? sql-params) (string? (first sql-params)))
+        #_(assert (and (sequential? sql-params) (string? (first sql-params)))
                 (str "compile* should return [sql & params], got " (pr-str sql-params)))
         sql-params)
       (catch Throwable e
@@ -38,8 +38,8 @@
                         e))))))
 
 (m/defmethod compile* :default
-  [_ tableable query options]
-  (throw (ex-info (format "Don't know how to compile %s" (pr-str query))
+  [queryable tableable query options]
+  (throw (ex-info (format "Don't know how to compile %s. %s" query (u/suggest-dispatch-values queryable tableable query))
                   {:tableable tableable
                    :query     query
                    :options   options})))
@@ -172,11 +172,8 @@
   ;; to facilitate threading, but I thought this would used in a threading context relatively rarely and it's not
   ;; worth the added cognitive load of having the arguments appear in a different order in this place and nowhere
   ;; else.
-  ([tableable queryable]
-   (from (conn.current/current-connectable tableable) tableable queryable))
-
-  ([connectable tableable queryable]
-   (from connectable tableable queryable nil))
+  ([tableable queryable]             (from nil         tableable queryable nil))
+  ([connectable tableable queryable] (from connectable tableable queryable nil))
 
   ([connectable tableable queryable options]
    (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)

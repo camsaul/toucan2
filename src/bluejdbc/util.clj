@@ -196,3 +196,21 @@
               (when-let [cause (ex-cause e)]
                 (recur cause))))
           (throw e)))))
+
+(defn implementable-dispatch-values
+  "Return a sequence of dispatch values to suggest someone implement when there's no matching method."
+  ([x]
+   (let [x (some-> x dispatch-value)]
+     (for [x (if x [x :default] [:default])]
+       [x])))
+
+  ([x & more]
+   (for [x-dv    (implementable-dispatch-values x)
+         more-dv (apply implementable-dispatch-values more)]
+     (vec (concat x-dv more-dv)))))
+
+(defn suggest-dispatch-values
+  "Generate a string suggesting dispatch values to implement methods for. For throwing exceptions in `:default`
+  implementations when there's no matching method."
+  [& dispatch-values]
+  (str "Add an impl for " (str/join " or " (apply implementable-dispatch-values dispatch-values))))

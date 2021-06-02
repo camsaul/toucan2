@@ -8,6 +8,7 @@
             [bluejdbc.log :as log]
             [bluejdbc.mutative :as mutative]
             [bluejdbc.query :as query]
+            [bluejdbc.queryable :as queryable]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
@@ -24,6 +25,7 @@
   m/keep-me
   mutative/keep-me
   query/keep-me
+  queryable/keep-me
   select/keep-me
   tableable/keep-me
   u/keep-me)
@@ -94,6 +96,10 @@
   reducible-query*
   uncompiled
   with-call-count]
+
+ [queryable
+  queryable
+  queryable*]
 
  [select
   count

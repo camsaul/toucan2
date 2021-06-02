@@ -69,24 +69,37 @@
        :query      query
        :options    options})))
 
+(m/defmulti compile-select*
+  {:arglists '([connectable tableable parsed-select-args options])}
+  u/dispatch-on-first-two-args
+  :combo (m.combo.threaded/threading-method-combination :third))
+
+(m/defmethod compile-select* :default
+  [connectable tableable parsed-select-args options-1]
+  (let [{:keys [pk conditions query options]} parsed-select-args
+        options                               (u/recursive-merge options-1 options)
+        conditions                            (cond-> conditions
+                                                pk (honeysql-util/merge-primary-key connectable tableable pk options))
+        query                                 (if query
+                                                (queryable/queryable connectable tableable query options)
+                                                {})
+        query                                 (cond-> query
+                                                (seq conditions) (honeysql-util/merge-conditions
+                                                                  connectable tableable conditions options))]
+    {:query query, :options options}))
+
 ;; TODO -- I think this should just take `& options` and do the `parse-connectable-tableable` stuff inside this fn.
 (defn parse-select-args
   "Parse args to the `select` family of functions. Returns a map with the parsed/combined `:query` and parsed
   `:options`."
-  [connectable tableable args options-1]
+  [connectable tableable args options]
   (log/with-trace ["Parsing select args for %s %s" tableable args]
-    (let [[connectable options-1]               (conn.current/ensure-connectable connectable tableable options-1)
-          {:keys [pk conditions query options]} (parse-select-args* connectable tableable args options-1)
-          options                               (u/recursive-merge options-1 options)
-          conditions                            (cond-> conditions
-                                                  pk (honeysql-util/merge-primary-key connectable tableable pk options))
-          query                                 (if query
-                                                  (queryable/queryable connectable tableable query options)
-                                                  {})
-          query                                 (cond-> query
-                                                  (seq conditions) (honeysql-util/merge-conditions
-                                                                    connectable tableable conditions options))]
-      {:query query, :options options})))
+    (let [[connectable options-1] (conn.current/ensure-connectable connectable tableable options)
+          parsed-select-args      (parse-select-args* connectable tableable args options)
+          compiled                (compile-select* connectable tableable parsed-select-args options)]
+      (assert (and (map? compiled) (contains? compiled :query) (contains? compiled :options))
+              "compile-select* should return a map with :query and :options")
+      compiled)))
 
 (defn select-reducible
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
@@ -99,7 +112,9 @@
 (defn select
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
-  (query/all (apply select-reducible args)))
+  (let [result (query/all (apply select-reducible args))]
+    (assert (not (instance? clojure.core.Eduction result)))
+    result))
 
 (defn select-one
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
