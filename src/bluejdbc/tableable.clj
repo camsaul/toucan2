@@ -13,9 +13,10 @@
   s)
 
 (m/defmethod table-name* :default
-  [_ tableable _]
+  [connectable tableable _]
   (when-not (instance? clojure.lang.Named tableable)
-    (throw (ex-info (format "Don't know how to convert %s to a table name" (pr-str tableable))
+    (throw (ex-info (format "Don't know how to convert %s to a table name. %s"
+                            tableable (u/suggest-dispatch-values connectable tableable))
                     {:tableable tableable})))
   (if-let [nmspace (namespace tableable)]
     (last (str/split nmspace #"\."))
