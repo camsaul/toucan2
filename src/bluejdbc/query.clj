@@ -44,8 +44,8 @@
 
 (defn- reduce-query
   [connectable tableable queryable options rf init]
-  (let [options    (u/recursive-merge (conn/default-options connectable) options)
-        sql-params (compile connectable tableable queryable options)]
+  (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
+        sql-params            (compile connectable tableable queryable options)]
     (conn/with-connection [conn connectable tableable options]
       (try
         (log/with-trace ["Executing query %s with options %s" sql-params (:next.jdbc options)]
@@ -86,11 +86,12 @@
 
 (m/defmethod reducible-query* :default
   [connectable tableable queryable options]
+  (assert (some? connectable) "connectable should not be nil; use current-connectable to get the connectable to use")
   (->ReducibleQuery connectable tableable queryable options))
 
 (defn reducible-query
   ([queryable]
-   (reducible-query conn.current/*current-connectable* nil queryable nil))
+   (reducible-query nil nil queryable nil))
 
   ([connectable queryable]
    (reducible-query connectable nil queryable nil))
@@ -99,7 +100,8 @@
    (reducible-query connectable tableable queryable nil))
 
   ([connectable tableable queryable options]
-   (reducible-query* connectable tableable queryable (u/recursive-merge (conn/default-options connectable) options))))
+   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)]
+     (reducible-query* connectable tableable queryable options))))
 
 (defn realize-row [row]
   (next.jdbc.rs/datafiable-row row conn.current/*current-connection* nil))
@@ -157,11 +159,13 @@
                           e)))))))
 
 (defn execute!
-  ([query]                               (execute!  :default    nil       query nil))
-  ([connectable query]                   (execute!  connectable nil       query nil))
-  ([connectable tableable query]         (execute!  connectable tableable query nil))
-  ([connectable tableable query options] (execute!* connectable tableable query (merge (conn/default-options connectable)
-                                                                                       options))))
+  ([query]                       (execute!  :default    nil       query nil))
+  ([connectable query]           (execute!  connectable nil       query nil))
+  ([connectable tableable query] (execute!  connectable tableable query nil))
+
+  ([connectable tableable query options]
+   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)]
+     (execute!* connectable tableable query options))))
 
 (defn do-with-call-counts [f]
   (let [call-count (atom 0)

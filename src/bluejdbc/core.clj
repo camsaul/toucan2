@@ -40,13 +40,13 @@
 
  [conn.current
   *current-connectable*
-  *current-connection*]
+  *current-connection*
+  default-connectable-for-tableable*
+  default-options*]
 
  [connectable
   connection
   connection*
-  default-connectable-for-tableable*
-  default-options
   with-connection]
 
  [hydrate

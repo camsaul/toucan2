@@ -1,5 +1,6 @@
 (ns bluejdbc.test
   (:require [bluejdbc.connectable :as conn]
+            [bluejdbc.connectable.current :as conn.current]
             bluejdbc.integrations.postgresql
             [bluejdbc.log :as log]
             [bluejdbc.query :as query]
@@ -20,7 +21,7 @@
 
 (derive :test/postgres-with-quoting :test/postgres)
 
-(m/defmethod conn/default-options :test/postgres-with-quoting
+(m/defmethod conn.current/default-options* :test/postgres-with-quoting
   [_]
   {:honeysql {:quoting :ansi}})
 

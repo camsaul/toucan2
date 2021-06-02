@@ -1,7 +1,6 @@
 (ns bluejdbc.compile
   (:refer-clojure :exclude [compile])
-  (:require [bluejdbc.connectable :as conn]
-            [bluejdbc.connectable.current :as conn.current]
+  (:require [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.log :as log]
             [bluejdbc.queryable :as queryable]
             [bluejdbc.tableable :as tableable]
@@ -68,18 +67,18 @@
 
 (defn compile
   ([queryable]
-   (compile conn.current/*current-connectable* nil queryable nil))
+   (compile (conn.current/current-connectable) nil queryable nil))
 
   ([tableable queryable]
-   (compile conn.current/*current-connectable* tableable queryable nil))
+   (compile (conn.current/current-connectable tableable) tableable queryable nil))
 
   ([connectable tableable queryable]
    (compile connectable tableable queryable nil))
 
   ([connectable tableable queryable options]
-   (let [options (u/recursive-merge (conn/default-options connectable) options)
-         query   (when queryable
-                   (queryable/queryable connectable tableable queryable options))]
+   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
+         query                 (when queryable
+                                 (queryable/queryable connectable tableable queryable options))]
      (compile* connectable tableable query options))))
 
 ;; TODO -- should `connectable` be an arg here too?
@@ -174,13 +173,13 @@
   ;; worth the added cognitive load of having the arguments appear in a different order in this place and nowhere
   ;; else.
   ([tableable queryable]
-   (from conn.current/*current-connectable* tableable queryable))
+   (from (conn.current/current-connectable tableable) tableable queryable))
 
   ([connectable tableable queryable]
    (from connectable tableable queryable nil))
 
   ([connectable tableable queryable options]
-   (let [options (u/recursive-merge (conn/default-options connectable) options)
-         query   (when queryable
-                   (queryable/queryable connectable tableable queryable options))]
+   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
+         query                 (when queryable
+                                 (queryable/queryable connectable tableable queryable options))]
      (from* connectable tableable query options))))

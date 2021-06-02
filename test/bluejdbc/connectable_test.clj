@@ -13,19 +13,19 @@
 (comment test/keep-me)
 
 (deftest parse-with-connection-arg-test
-  (is (= {:binding '_, :connectable `conn.current/*current-connectable*}
+  (is (= {:binding '_, :connectable nil}
          (#'conn/parse-with-connection-arg '[_])))
-  (is (= {:connectable `conn.current/*current-connectable*, :binding '_}
+  (is (= {:connectable nil, :binding '_}
          (#'conn/parse-with-connection-arg '[])))
-  (is (= {:binding '_, :connectable `conn.current/*current-connectable*}
+  (is (= {:binding '_, :connectable nil}
          (#'conn/parse-with-connection-arg '[_ _])))
-  (is (= {:binding '_, :connectable `conn.current/*current-connectable*}
+  (is (= {:binding '_, :connectable nil}
          (#'conn/parse-with-connection-arg '[_ nil])))
-  (is (= {:binding '_, :connectable `conn.current/*current-connectable*}
+  (is (= {:binding '_, :connectable nil}
          (#'conn/parse-with-connection-arg '[nil])))
-  (is (= {:connectable `conn.current/*current-connectable*, :binding '_}
+  (is (= {:connectable nil, :binding '_}
          (#'conn/parse-with-connection-arg nil)))
-  (is (= {:connectable `conn.current/*current-connectable*, :binding '_}
+  (is (= {:connectable nil, :binding '_}
          (#'conn/parse-with-connection-arg '_)))
   (is (= '{:binding a, :connectable b, :options c}
          (#'conn/parse-with-connection-arg '[a b c])))
@@ -43,13 +43,13 @@
   {:connection (->MockConnection connectable options (atom false))
    :new?       true})
 
-(m/defmethod conn/default-options ::mock-connection
+(m/defmethod conn.current/default-options* ::mock-connection
   [_]
   {:default-options true})
 
 (derive ::mock-connection-additional-options ::mock-connection)
 
-(m/defmethod conn/default-options ::mock-connection-additional-options
+(m/defmethod conn.current/default-options* ::mock-connection-additional-options
   [connectable]
   (merge (next-method connectable)
          {:additional-options true}))
@@ -198,7 +198,7 @@
           (testing "object inserted by nested transaction (failed) should not exist"
             (is (not (venue-visible? 8)))))))))
 
-(m/defmethod conn/default-connectable-for-tableable* ::venues
+(m/defmethod conn.current/default-connectable-for-tableable* ::venues
   [_ options]
   (:connectable options))
 

@@ -74,47 +74,51 @@
               :options    expected-options}
              (select/parse-select-args* :connectable :tableable args nil))))))
 
+(m/defmethod tableable/table-name* [:default ::people]
+  [_ _ _]
+  "people")
+
+(m/defmethod conn.current/default-connectable-for-tableable* ::people
+  [_ _]
+  :test/postgres)
+
 (deftest select-test
-  (testing "no args"
-    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}
-            {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56:00Z")}
-            {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56:00Z")}
-            {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56:00Z")}]
-           (select/select [:test/postgres :people])))
-    (test-people-instances? (select/select [:test/postgres :people])))
-
-  (testing "using current connection (dynamic binding)"
-    (binding [conn.current/*current-connectable* :test/postgres]
-      (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}
-              {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56:00Z")}
-              {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56:00Z")}
-              {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56:00Z")}]
-             (select/select :people)))))
-
-  (testing "using default connection"
-    (test/with-default-connection
-      (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}
-              {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56:00Z")}
-              {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56:00Z")}
-              {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56:00Z")}]
-             (select/select :people)))))
+  (let [all-rows [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}
+                  {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56:00Z")}
+                  {:id 3, :name "Pam", :created-at (t/offset-date-time "2020-01-01T21:56:00Z")}
+                  {:id 4, :name "Tam", :created-at (t/offset-date-time "2020-05-25T19:56:00Z")}]]
+    (testing "no args"
+        (is (= all-rows
+               (select/select [:test/postgres :people] {:order-by [[:id :asc]]})))
+        (test-people-instances? (select/select [:test/postgres :people] {:order-by [[:id :asc]]})))
+    (testing "using current connection (dynamic binding)"
+        (binding [conn.current/*current-connectable* :test/postgres]
+          (is (= all-rows
+                 (select/select :people {:order-by [[:id :asc]]})))))
+    (testing "using default connection"
+      (test/with-default-connection
+        (is (= all-rows
+               (select/select :people {:order-by [[:id :asc]]})))))
+    (testing "with default connectable for tableable"
+      (is (= all-rows
+             (select/select ::people {:order-by [[:id :asc]]})))))
 
   (testing "one arg (id)"
-    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (select/select [:test/postgres :people] 1))))
+      (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+             (select/select ::people 1))))
 
   (testing "one arg (query)"
-    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (select/select [:test/postgres :people] {:where [:= :id 1]})))
-    (is (= [{:id 1, :name "Tempest", :category "bar"}]
-           (select/select [:test/postgres :venues] {:select [:id :name :category], :limit 1, :where [:= :id 1]}))))
+      (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+             (select/select [:test/postgres :people] {:where [:= :id 1]})))
+      (is (= [{:id 1, :name "Tempest", :category "bar"}]
+             (select/select [:test/postgres :venues] {:select [:id :name :category], :limit 1, :where [:= :id 1]}))))
 
   (testing "two args (k v)"
-    (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (select/select [:test/postgres :people] :id 1)))
-    (testing "sequential v"
       (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-             (select/select [:test/postgres :people] :id [:= 1]))))))
+             (select/select [:test/postgres :people] :id 1)))
+      (testing "sequential v"
+        (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
+               (select/select [:test/postgres :people] :id [:= 1]))))))
 
 (m/defmethod tableable/primary-key* [:default :people/name-is-pk]
   [_ _]
