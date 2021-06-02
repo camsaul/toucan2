@@ -15,6 +15,13 @@
       (keyword (csk/->kebab-case (namespace k)) (csk/->kebab-case (name k)))
       (keyword (csk/->kebab-case k)))))
 
+(defn normalize-map [key-xform m]
+  {:pre [(fn? key-xform) (map? m)]}
+  (into (empty m)
+        (map (fn [[k v]]
+               [(key-xform k) v]))
+        m))
+
 (m/defmulti key-transform-fn*
   {:arglists '([connectable tableable])}
   u/dispatch-on-first-two-args)
@@ -57,7 +64,7 @@
 
 (declare ->TransientInstance)
 
-(p/def-map-type Instance [conn tbl orig m key-xform mta]
+(p/def-map-type Instance [conn tbl ^java.util.Map orig ^java.util.Map m key-xform mta]
   (get [_ k default-value]
     (get m (key-xform k) default-value))
   (assoc [_ k v]
@@ -71,6 +78,7 @@
   (with-meta [_ new-meta]
     (Instance. conn tbl orig m key-xform new-meta))
 
+  clojure.lang.IPersistentCollection
   (equiv [_ x]
     (if (bluejdbc-instance? x)
       ;; TODO -- not sure if two instances with different connectables should be considered different. I guess not
@@ -83,7 +91,12 @@
       (and #_(= conn (connectable x))
            (= tbl (tableable x))
            (= m   x))
-      (= m x)))
+      (and (map? x)
+           (= m (normalize-map key-xform x)))))
+
+  java.util.Map
+  (containsKey [_ k]
+    (.containsKey m (key-xform k)))
 
   clojure.lang.IEditableCollection
   (asTransient [_]
@@ -130,13 +143,6 @@
   (without [this k]
     (.without m (key-xform k))
     this))
-
-(defn normalize-map [key-xform m]
-  {:pre [(fn? key-xform) (map? m)]}
-  (into (empty m)
-        (map (fn [[k v]]
-               [(key-xform k) v]))
-        m))
 
 (m/defmulti instance*
   {:arglists '([connectable tableable original-map current-map key-xform metta])}
