@@ -1,5 +1,4 @@
 (ns bluejdbc.instance
-  (:refer-clojure :exclude [instance?])
   (:require [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.util :as u]
             [camel-snake-kebab.core :as csk]
@@ -49,7 +48,7 @@
   (with-connectable [instance new-connectable]
     "Return a copy of `instance` with its connectable set to `new-connectable.`"))
 
-(defn instance?
+(defn bluejdbc-instance?
   "True if `x` is a BlueJDBC instance, i.e. a `bluejdbc.instance.Instance` or some other class that satisfies
   `bluejdbc.instance.IInstance`."
   [x]
@@ -72,7 +71,7 @@
     (Instance. conn tbl orig m key-xform new-meta))
 
   (equiv [_ x]
-    (if (instance? x)
+    (if (bluejdbc-instance? x)
       ;; TODO -- not sure if two instances with different connectables should be considered different. I guess not
       ;; because it makes them inconvenient to use in tests and stuff
       ;;
@@ -131,7 +130,7 @@
         m))
 
 (m/defmulti instance*
-  {:arglists '([connectable tableable original-map current-map key-xform meta])}
+  {:arglists '([connectable tableable original-map current-map key-xform metta])}
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :fourth))
 
@@ -199,7 +198,7 @@
   "Return a copy of `instance` with its `original` value set to its current value, discarding the previous original
   value. No-ops if `instance` is not a Blue JDBC instance."
   [instance]
-  (if (instance? instance)
+  (if (bluejdbc-instance? instance)
     (with-original instance (.m ^Instance instance))
     instance))
 

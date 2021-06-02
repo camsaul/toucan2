@@ -225,13 +225,15 @@
       (is (= "(instance/instance :bluejdbc/default :venues {:id 1})"
              (pr-str (instance/instance :venues {:id 1})))))
     (testing "Should use appropriate alias for current namespace"
-      (ns bluejdbc.instance-test.pretty-print-test
-        (:require [bluejdbc.core :as bluejdbc]))
-      (is (= "(bluejdbc/instance :bluejdbc/default :venues {:id 1})"
-             (pr-str (bluejdbc.instance/instance :venues {:id 1}))))
+      (try
+        (require '[bluejdbc.core :as bluejdbc])
+        (is (= "(bluejdbc/instance :bluejdbc/default :venues {:id 1})"
+               (pr-str (instance/instance :venues {:id 1}))))
+        (finally
+          (ns-unalias *ns* 'bluejdbc)))
       (binding [*ns* (the-ns 'bluejdbc.instance)]
         (is (= "(instance :bluejdbc/default :venues {:id 1})"
-               (pr-str (bluejdbc.instance/instance :venues {:id 1}))))))))
+               (pr-str (instance/instance :venues {:id 1}))))))))
 
 (m/defmethod instance/instance* [:default :people/custom-instance-type]
   [_ _ _ m _ metta]
@@ -241,5 +243,5 @@
   (let [m (instance/instance :people/custom-instance-type)]
     (is (= {}
            m))
-    (is (not (instance/instance? m)))
+    (is (not (instance/bluejdbc-instance? m)))
     (is (map? m))))

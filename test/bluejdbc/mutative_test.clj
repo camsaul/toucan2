@@ -138,7 +138,7 @@
     (test/with-default-connection
       (let [venue (assoc (select/select-one :venues/custom-honeysql :id "1")
                          :name "Hi-Dive")]
-        (is (instance/instance? venue))
+        (is (instance/bluejdbc-instance? venue))
         (is (= {:name "Hi-Dive"}
                (instance/changes venue)))
         (is (= ["UPDATE venues SET name = ?, id = ?::integer WHERE id = ?::integer" "Hi-Dive" "1" "1"]
