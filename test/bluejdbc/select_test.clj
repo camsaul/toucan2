@@ -159,7 +159,7 @@
              (select/select :people/no-timestamps 1))))))
 
 (m/defmethod select/select* :before [:default :people/limit-2 clojure.lang.IPersistentMap]
-  [connectable tableable query options]
+  [_ _ query _]
   (assoc query :limit 2))
 
 (deftest pre-select-test
