@@ -54,7 +54,7 @@
     (primary-key-values a-user) ;-> {:id 1}"
 
   ([obj]
-   (primary-key-values (instance/connectable obj) (instance/table obj) obj))
+   (primary-key-values (instance/connectable obj) (instance/tableable obj) obj))
 
   ([connectable tableable m]
    (let [pk-keys (primary-key-keys connectable tableable)]

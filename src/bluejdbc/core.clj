@@ -70,7 +70,7 @@
   instance*
   key-transform-fn*
   original
-  table]
+  tableable]
 
  [log
   with-debug-logging]

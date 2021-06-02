@@ -37,10 +37,10 @@
     "Get a map with any changes made to `instance` since it came out of the DB.")
 
   ;; TODO -- these should probably be renamed to `tableable` and `with-tableable` respectively.
-  (table [instance]
+  (tableable [instance]
     ("Get the tableable associated with `instance`."))
 
-  (with-table [instance new-tableable]
+  (with-tableable [instance new-tableable]
     "Return a copy of `instance` with its tableable set to `new-tableable.`")
 
   (connectable [instance]
@@ -81,7 +81,7 @@
       ;;
       ;; I was leaning towards yes but I'm not sure how to make it work in both directions.
       (and #_(= conn (connectable x))
-           (= tbl (table x))
+           (= tbl (tableable x))
            (= m   x))
       (= m x)))
 
@@ -96,10 +96,10 @@
     (Instance. conn tbl new-original m key-xform mta))
   (changes [_]
     (second (data/diff orig m)))
-  (table [_]
+  (tableable [_]
     tbl)
-  (with-table [_ new-table]
-    (Instance. conn new-table orig m key-xform mta))
+  (with-tableable [_ new-tableable]
+    (Instance. conn new-tableable orig m key-xform mta))
   (connectable [_]
     conn)
   (with-connectable [_ new-connectable]
@@ -166,13 +166,13 @@
 
 (extend-protocol IInstance
   nil
-  (table [_]
+  (tableable [_]
     nil)
   (original [_]
     nil)
   (changes [_]
     nil)
-  (with-table [_ new-table]
+  (with-tableable [_ new-table]
     (instance new-table))
   (connectable [_]
     nil)
@@ -180,7 +180,7 @@
     (instance connectable nil nil))
 
   Object
-  (table [_]
+  (tableable [_]
     nil)
   (original [_]
     nil)
@@ -190,10 +190,10 @@
     nil)
 
   clojure.lang.IPersistentMap
-  (table [_]
+  (tableable [_]
     nil)
-  (with-table [m new-table]
-    (instance table m))
+  (with-tableable [m new-tableable]
+    (instance tableable m))
   (original [_]
     nil)
   (changes [_]

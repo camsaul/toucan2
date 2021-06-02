@@ -1,13 +1,12 @@
 (ns bluejdbc.hydrate
   (:require [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
-            [bluejdbc.query :as query]
+            [bluejdbc.row :as row]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
             [camel-snake-kebab.core :as csk]
-            [methodical.core :as m]
-            [bluejdbc.row :as row]))
+            [methodical.core :as m]))
 
 (m/defmulti can-hydrate-with-strategy?*
   {:arglists '([connectable tableable strategy k])}
@@ -342,5 +341,5 @@
       (if (empty? results)
         results
         (let [first-row (first results)]
-          (apply hydrate-forms (instance/connectable first-row) (instance/table first-row) results k ks)))
-      (first (apply hydrate-forms (instance/connectable results) (instance/table results) [results] k ks)))))
+          (apply hydrate-forms (instance/connectable first-row) (instance/tableable first-row) results k ks)))
+      (first (apply hydrate-forms (instance/connectable results) (instance/tableable results) [results] k ks)))))
