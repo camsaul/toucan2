@@ -23,7 +23,7 @@
     (name tableable)))
 
 (defn table-name
-  ([tableable]                     (table-name* :current    tableable nil))
+  ([tableable]                     (table-name* nil         tableable nil))
   ([connectable tableable]         (table-name* connectable tableable nil))
   ([connectable tableable options] (table-name* connectable tableable options)))
 
