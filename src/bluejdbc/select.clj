@@ -127,14 +127,17 @@
    (apply select-reducible args)))
 
 (defn select-fn-set
+  "Like `select`, but returns a set of values of `(f instance)` for the results. Returns `nil` if the set is empty."
   {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
-  (reduce conj #{} (apply select-fn-reducible args)))
+  (not-empty (reduce conj #{} (apply select-fn-reducible args))))
 
 (defn select-fn-vec
+  "Like `select`, but returns a vector of values of `(f instance)` for the results. Returns `nil` if the vector is
+  empty."
   {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
-  (reduce conj [] (apply select-fn-reducible args)))
+  (not-empty (reduce conj [] (apply select-fn-reducible args))))
 
 (defn select-one-fn
   {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
@@ -157,12 +160,12 @@
 (defn select-pks-set
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
-  (reduce conj #{} (apply select-pks-reducible args)))
+  (not-empty (reduce conj #{} (apply select-pks-reducible args))))
 
 (defn select-pks-vec
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
-  (reduce conj [] (apply select-pks-reducible args)))
+  (not-empty (reduce conj [] (apply select-pks-reducible args))))
 
 (defn select-one-pk
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
@@ -172,10 +175,11 @@
 (defn select-fn->fn
   {:arglists '([f1 f2 connectable-tableable pk? & conditions? queryable? options?])}
   [f1 f2 & args]
-  (into
-   {}
-   (map (juxt f1 f2))
-   (apply select-reducible args)))
+  (not-empty
+   (into
+    {}
+    (map (juxt f1 f2))
+    (apply select-reducible args))))
 
 (defn select-fn->pk
   {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
