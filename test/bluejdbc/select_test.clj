@@ -333,3 +333,11 @@
            m))
     (is (map? m))
     (is (not (instance/bluejdbc-instance? m)))))
+
+(deftest dont-add-from-if-it-already-exists-test
+  (testing "Select shouldn't add a :from clause if one is passed in explicitly already"
+    (is (= (instance/instance :bluejdbc.select-test/people {:id 1})
+           (select/select-one ::people {:select [:p.id], :from [[::people :p]], :where [:= :p.id 1]})))
+    (is (= ["SELECT p.id FROM people p WHERE p.id = ?" 1]
+           (query/compiled
+             (select/select-one ::people {:select [:p.id], :from [[::people :p]], :where [:= :p.id 1]}))))))

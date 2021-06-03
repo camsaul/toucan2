@@ -166,7 +166,11 @@
 ;; method for HoneySQL maps
 (m/defmethod from* [:default :default clojure.lang.IPersistentMap]
   [_ tableable query options]
-  (assoc query :from [(table-identifier tableable (not-empty (select-keys options [:honeysql])))]))
+  (if (:from query)
+    (do
+      (log/tracef "Query already has :from; not adding one for %s" tableable)
+      query)
+    (assoc query :from [(table-identifier tableable (not-empty (select-keys options [:honeysql])))])))
 
 (defn from
   ;; I considering arglists of [query tableable], [query tableable options], and [query connectable tableable options]

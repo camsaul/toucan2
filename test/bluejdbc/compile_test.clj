@@ -52,6 +52,10 @@
   (is (= (compile/table-identifier :people nil)
          (compile/table-identifier :people))))
 
+(m/defmethod queryable/queryable* [:default :default ::named-query-no-from]
+  [_ _ _ _]
+  {:select [:%count.*]})
+
 (deftest from-test
   (is (= {:select [:*]
           :from   [(compile/table-identifier :people)]}
@@ -88,5 +92,10 @@
            (compile/compile (compile/from ::my-amazing-table {:select [:*]})))))
 
   (testing "named query"
-      (is (= ["SELECT count(*) FROM wow"]
-             (compile/compile (compile/from ::my-amazing-table ::named-query))))))
+    (is (= "wow"
+           (tableable/table-name ::my-amazing-table)))
+    (is (= ["SELECT count(*) FROM wow"]
+           (compile/compile (compile/from ::my-amazing-table ::named-query-no-from))))
+    (testing "If named query already has :from, don't stomp on it"
+      (is (= ["SELECT count(*) FROM people"]
+             (compile/compile (compile/from ::my-amazing-table ::named-query)))))))
