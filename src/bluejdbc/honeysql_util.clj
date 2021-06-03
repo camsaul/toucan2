@@ -16,7 +16,7 @@
                     [pk-vals])
           pk-map  (into {} (map
                             (fn [k v]
-                              [k (compile/value connectable tableable k v options)])
+                              [k (compile/maybe-wrap-value connectable tableable k v options)])
                             pk-cols
                             pk-vals))]
       (merge kvs pk-map))))
@@ -32,7 +32,7 @@
                             (fn ->value [arg]
                               (if (sequential? arg)
                                 (mapv ->value arg)
-                                (compile/value connectable tableable k arg options)))
+                                (compile/maybe-wrap-value connectable tableable k arg options)))
                             args)))
 
 (m/defmulti handle-condition*
@@ -54,7 +54,7 @@
                     {:k              k
                      :v              v
                      :dispatch-value (m/dispatch-value handle-condition* connectable tableable k v)})))
-  [:= k (compile/value connectable tableable k v options)])
+  [:= k (compile/maybe-wrap-value connectable tableable k v options)])
 
 (m/defmethod handle-condition* :around :default
   [connectable tableable k v options]

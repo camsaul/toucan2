@@ -67,13 +67,13 @@
         conditions                              (cond-> conditions
                                                   pk (honeysql-util/merge-primary-key connectable tableable pk options))
         changes                                 (into {} (for [[k v] changes]
-                                                           [k (compile/value connectable tableable k v options)]))]
+                                                           [k (compile/maybe-wrap-value connectable tableable k v options)]))]
     {:connectable connectable
      :tableable   tableable
      :query       (cond-> {:update (compile/table-identifier tableable options)
                            :set    changes}
                     (seq conditions) (honeysql-util/merge-conditions connectable tableable conditions options))
-     :options     options}))
+     :options     (assoc options ::update {:pk pk, :conditions conditions})}))
 
 (defn update!
   "Returns number of rows updated."
@@ -148,16 +148,24 @@
         {:keys [rows options]}  (parse-insert!-args* connectable tableable args options)
         query                   {:insert-into (compile/table-identifier tableable options)
                                  :values      (for [row rows]
-                                                (into {} (for [[k v] row]
-                                                           [k (compile/value connectable tableable k v options)])))}]
+                                                (do
+                                                  (assert (seq row) "Row cannot be empty")
+                                                  (into {} (for [[k v] row]
+                                                             [k (compile/maybe-wrap-value connectable tableable k v options)]))))}]
     {:connectable connectable
      :tableable   tableable
      :query       query
      :options     options}))
 
-(defn do-insert! [connectable tableable query options]
-  (log/with-trace ["INSERT %d %s rows:\n%s" (count (:values query)) tableable (u/pprint-to-str (:values query))]
-    (insert!* connectable tableable query options)))
+(defn do-insert! [connectable tableable {:keys [values], :as query} options]
+  (log/with-trace ["INSERT %d %s rows:\n%s" (count values) tableable (u/pprint-to-str values)]
+    (try
+      (assert (seq values) "Values cannot be empty")
+      (insert!* connectable tableable query options)
+      (catch Throwable e
+        (throw (ex-info (format "Error in insert!: %s" (ex-message e))
+                        {:tableable tableable, :query query, :options options}
+                        e))))))
 
 (defn insert!
   {:arglists '([connectable-tableable row-or-rows options?]
