@@ -87,7 +87,7 @@
 (p/defrecord+ TableIdentifier [tableable options]
   pretty/PrettyPrintable
   (pretty [_]
-    (list* (u/qualify-symbol-for-*ns* `table-identifier) tableable (when options [options])))
+    (list* (pretty/qualify-symbol-for-*ns* `table-identifier) tableable (when options [options])))
 
   hformat/ToSql
   (to-sql [_]
