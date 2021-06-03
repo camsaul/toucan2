@@ -61,8 +61,17 @@
   with-transaction]
 
  [helpers
+  #_define-after-delete
+  define-after-insert
+  define-after-select
+  define-after-update
+  define-before-delete
+  define-before-insert
   define-before-select
-  define-after-select]
+  define-before-update
+  define-hydration-keys
+  define-table-name
+  deftransforms]
 
  [honeysql-util
   handle-condition*
