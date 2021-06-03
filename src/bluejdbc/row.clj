@@ -48,4 +48,8 @@
     (list (pretty/qualify-symbol-for-*ns* `row) col-name->thunk)))
 
 (defn row [col-name->thunk]
-  (Row. col-name->thunk nil))
+  ;; wrap the thunks in delays so we don't end up invoking them multiple times, since they are potentially expensive.
+  (Row. (into {} (for [[k thunk] col-name->thunk
+                       :let      [dlay (delay (thunk))]]
+                   [k (fn [] @dlay)]))
+        nil))

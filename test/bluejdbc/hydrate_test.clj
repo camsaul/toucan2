@@ -1,9 +1,9 @@
 (ns bluejdbc.hydrate-test
-  (:require [bluejdbc.hydrate :as hydrate]
+  (:require [bluejdbc.helpers :as helpers]
+            [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
-            [bluejdbc.transformed :as transformed]
             [clojure.test :refer :all]
             [java-time :as t]
             [methodical.core :as m]))
@@ -11,23 +11,21 @@
 (use-fixtures :once test/do-with-test-data)
 (use-fixtures :each test/do-with-default-connection)
 
-(m/defmethod tableable/table-name* [:default ::venues-with-category-keyword]
-  [_ _ _]
+(helpers/define-table-name ::venues-with-category-keyword
   "venues")
 
 (derive ::venues-with-category-keyword :bluejdbc/transformed)
 
-(m/defmethod transformed/transforms* [:default ::venues-with-category-keyword]
-  [_ _ _]
+(helpers/deftransforms ::venues-with-category-keyword
   {:category {:in  name
               :out keyword}})
 
-(m/defmethod hydrate/table-for-automagic-hydration* [:default ::user]
-  [_ _]
+(m/defmethod hydrate/table-for-automagic-hydration* [:default :default ::user]
+  [_ _ _]
   :user)
 
-(m/defmethod hydrate/table-for-automagic-hydration* [:default ::venue]
-  [_ _]
+(m/defmethod hydrate/table-for-automagic-hydration* [:default :default ::venue]
+  [_ _ _]
   ::venues-with-category-keyword)
 
 (deftest fk-keys-for-automagic-hydration*-test
@@ -43,15 +41,44 @@
     (is (= false
            (hydrate/can-hydrate-with-strategy?* nil nil ::hydrate/automagic-batched :a)))))
 
-(deftest hydrate-test
-  (test/with-default-connection
-    (testing "it should correctly hydrate"
-      (is (= [{:venue-id 1
-               ::venue    {:category :bar, :name "Tempest", :id 1}}
-              {:venue-id 2
-               ::venue    {:category :bar, :name "Ho's Tavern", :id 2}}]
-             (for [result (hydrate/hydrate [{:venue-id 1} {:venue-id 2}] ::venue)]
-               (update result ::venue #(dissoc % :updated-at :created-at))))))))
+;; custom automagic hydration
+
+(m/defmethod hydrate/table-for-automagic-hydration* [:default ::hydrate-venue-with-people ::venue]
+  [_ _ _]
+  :people)
+
+(m/defmethod hydrate/fk-keys-for-automagic-hydration* [:default ::hydrate-venue-with-people :default :default]
+  [_ _ _ _]
+  [:venue_id])
+
+(deftest automagic-hydration-test
+  (letfn [(remove-venues-timestamps [rows]
+            (for [result rows]
+              (update result ::venue #(dissoc % :updated-at :created-at))))]
+    (is (= [{:venue-id 1
+             ::venue   {:category :bar, :name "Tempest", :id 1}}
+            {:venue-id 2
+             ::venue   {:category :bar, :name "Ho's Tavern", :id 2}}]
+           (remove-venues-timestamps
+            (hydrate/hydrate [{:venue-id 1} {:venue-id 2}] ::venue))))
+
+    (testing "dispatch off of tableable -- hydrate different Tables for different instances"
+      (is (= [(instance/instance :a-place {:venue-id 1
+                                           ::venue   {:category :bar, :name "Tempest", :id 1}})
+              (instance/instance :a-place {:venue-id 2
+                                           ::venue   {:category :bar, :name "Ho's Tavern", :id 2}})]
+             (remove-venues-timestamps
+              (hydrate/hydrate [(instance/instance :a-place {:venue_id 1})
+                                (instance/instance :a-place {:venue-id 2})]
+                               ::venue))))
+      (is (= [(instance/instance :bluejdbc.hydrate-test/hydrate-venue-with-people
+                                 {:venue-id 1, :bluejdbc.hydrate-test/venue (instance/instance :people {:id 1, :name "Cam"})})
+              (instance/instance :bluejdbc.hydrate-test/hydrate-venue-with-people
+                                 {:venue-id 1000, :bluejdbc.hydrate-test/venue nil})]
+             (remove-venues-timestamps
+              (hydrate/hydrate [(instance/instance ::hydrate-venue-with-people {:venue_id 1})
+                                (instance/instance ::hydrate-venue-with-people {:venue-id 1000})]
+                               ::venue)))))))
 
 (defn- valid-form? [form]
   (try
@@ -294,8 +321,8 @@
   [_ _]
   [:id :name])
 
-(m/defmethod hydrate/table-for-automagic-hydration* [:default ::people]
-  [_ _]
+(m/defmethod hydrate/table-for-automagic-hydration* [:default :default ::people]
+  [_ _ _]
   :bluejdbc.hydrate-test.people/composite-pk)
 
 (m/defmethod hydrate/fk-keys-for-automagic-hydration* [:default :default ::people :default]

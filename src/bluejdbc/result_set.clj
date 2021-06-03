@@ -78,22 +78,22 @@
   (let [row (row/row col-name->thunk)]
     (instance/instance* connectable tableable row row key-xform nil)))
 
-(defn row-thunk [connectable tableable ^java.sql.ResultSet rs options]
+(defn row-thunk
+  "Return a thunk that when called fetched the current row from the cursor and returns it as a `row-instance`."
+  [connectable tableable ^java.sql.ResultSet rs options]
   (let [rsmeta          (.getMetaData rs)
         key-xform       (instance/key-transform-fn* connectable tableable)
+        ;; create a set of thunks to read each column. These thunks will call `read-column-thunk*` to determine the
+        ;; appropriate column-reading thunk the first time they are used.
         col-name->thunk (into {} (for [^Long i (index-range rsmeta)
-                                       :let    [col-name (key-xform (keyword (.getColumnName rsmeta i)))
-                                                thunk    (delay
-                                                           (let [thunk (read-column-thunk* connectable tableable rs rsmeta i options)]
-                                                             (fn []
-                                                               (next.jdbc.rs/read-column-by-index (thunk) rsmeta i))))
-                                                thunk    (u/pretty-printable-fn
-                                                          (fn []
-                                                            (symbol (format "#function[bluejdbc.result-set/row-thunk/col-thunk-%d-%s]" i (name col-name))))
-                                                          (fn []
-                                                            (log/tracef "Realize column %d %s" i col-name)
-                                                            (@thunk)))]]
-                                   [col-name thunk]))]
+                                       :let    [col-name     (key-xform (keyword (.getColumnName rsmeta i)))
+                                                ;; TODO -- add test to ensure we only resolve the read-column-thunk*
+                                                ;; once even with multiple rows.
+                                                read-thunk   (delay (read-column-thunk* connectable tableable rs rsmeta i options))
+                                                result-thunk (fn []
+                                                               (log/with-trace-no-result ["Realize column %d %s" i col-name]
+                                                                 (next.jdbc.rs/read-column-by-index (@read-thunk) rsmeta i)))]]
+                                   [col-name result-thunk]))]
     (fn row-instance-thunk []
       (row-instance connectable tableable key-xform col-name->thunk))))
 

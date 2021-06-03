@@ -235,19 +235,19 @@
 (deftest pretty-print-test
   (testing "Should pretty-print"
     (binding [*ns* (the-ns 'bluejdbc.instance-test)]
-      (is (= "(instance/instance :bluejdbc/default :venues {:id 1})"
+      (is (= "(instance/instance :venues {:id 1})"
              (pr-str (instance/instance :venues {:id 1})))))
     (testing "Should use appropriate alias for current namespace"
       (try
         (ns-unalias *ns* 'instance)
         (require '[bluejdbc.core :as bluejdbc])
-        (is (= "(bluejdbc/instance :bluejdbc/default :venues {:id 1})"
+        (is (= "(bluejdbc/instance :venues {:id 1})"
                (pr-str (instance/instance :venues {:id 1}))))
         (finally
           (require '[bluejdbc.instance :as instance])
           (ns-unalias *ns* 'bluejdbc)))
       (binding [*ns* (the-ns 'bluejdbc.instance)]
-        (is (= "(instance :bluejdbc/default :venues {:id 1})"
+        (is (= "(instance :venues {:id 1})"
                (pr-str (instance/instance :venues {:id 1}))))))))
 
 (m/defmethod instance/instance* [:default :people/custom-instance-type]
