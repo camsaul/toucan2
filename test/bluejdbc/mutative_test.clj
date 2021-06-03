@@ -316,6 +316,9 @@
   (test/with-default-connection
     (testing "Delete row by PK"
       (test/with-venues-reset
+        (is (= ["DELETE FROM venues WHERE id = ?::integer" "1"]
+               (query/compiled
+                 (mutative/delete! :venues/custom-honeysql "1"))))
         (is (= 1
                (mutative/delete! :venues/custom-honeysql "1")))
         (is (= []

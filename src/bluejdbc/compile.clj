@@ -107,14 +107,9 @@
   u/dispatch-on-first-four-args
   :combo (m.combo.threaded/threading-method-combination :fourth))
 
-(m/defmethod to-sql* :default
-  [_ _ _ v _]
-  (hformat/to-sql v))
-
 (m/defmethod to-sql* :around :default
   [connectable tableable column v options]
-  (let [result (log/with-trace ["Convert %s to SQL" (pr-str v)]
-                 (next-method connectable tableable column v options))]
+  (let [result (next-method connectable tableable column v options)]
     (if (sequential? result)
       (let [[s & params] result]
         (assert (string? s) (format "to-sql* should return either string or [string & parms], got %s" (pr-str result)))
@@ -129,8 +124,9 @@
     (list* (pretty/qualify-symbol-for-*ns* `value) connectable tableable column v (when options [options])))
 
   hformat/ToSql
-  (to-sql [_]
-    (to-sql* connectable tableable column v options)))
+  (to-sql [this]
+    (log/with-trace ["Convert %s to SQL" this]
+      (to-sql* connectable tableable column v options))))
 
 (defn value
   ([connectable tableable column v]
@@ -142,6 +138,19 @@
      (assert (map? options) (format "options should be a map, got %s" (pr-str options))))
    (->Value connectable tableable column v options)))
 
+(defn maybe-wrap-value
+  "If there's an applicable impl of `to-sql*` for connectable + tableable + column + (class v), wrap in `v` in a
+  `Value`; if there's not one, return `v` as-is."
+  ([connectable tableable column v]
+   (maybe-wrap-value connectable tableable column v nil))
+
+  ([connectable tableable column v options]
+   (let [dv (m/dispatch-value to-sql* connectable tableable column v)]
+     (if (m/effective-primary-method to-sql* dv)
+       (log/with-trace ["Found to-sql* method impl for dispatch value %s; wrapping in Value" dv]
+         (value connectable tableable column v options))
+       v))))
+
 (m/defmulti from*
   "Add a SQL `FROM` clause or equivalent to `query`."
   {:arglists '([connectable tableable query options])}
@@ -150,7 +159,8 @@
 (m/defmethod from* :around :default
   [connectable tableable query options]
   (try
-    (log/with-trace ["Adding :from %s to %s" tableable (pr-str query)]
+    (log/with-trace ["Adding :from %s to" tableable]
+      (log/trace (u/pprint-to-str query))
       (next-method connectable tableable query options))
     (catch Throwable e
       (throw (ex-info (format "Error adding FROM %s to %s" (pr-str tableable) (pr-str query))
@@ -173,6 +183,9 @@
     (assoc query :from [(table-identifier tableable (not-empty (select-keys options [:honeysql])))])))
 
 (defn from
+  "Add a `:from` clause for `tableable` to `queryable` e.g.
+
+    (from :my-table {:select [:*]}) ; -> {:select [:*], :from [:my-table]}"
   ;; I considering arglists of [query tableable], [query tableable options], and [query connectable tableable options]
   ;; to facilitate threading, but I thought this would used in a threading context relatively rarely and it's not
   ;; worth the added cognitive load of having the arguments appear in a different order in this place and nowhere

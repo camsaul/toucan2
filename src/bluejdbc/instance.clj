@@ -151,7 +151,9 @@
 
 (m/defmethod instance* :default
   [connectable tableable original current key-xform metta]
-  (->Instance connectable tableable original current key-xform metta))
+  ;; TODO -- not sure if unwrapping this stuff makes sense or not... it makes sense for (instance (->LegacyModel ...))
+  ;; tho
+  (->Instance (u/dispatch-value connectable) (u/dispatch-value tableable) original current key-xform metta))
 
 (defn instance
   (^bluejdbc.instance.Instance [tableable]

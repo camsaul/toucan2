@@ -313,6 +313,9 @@
 
 (deftest custom-honeysql-test
   (test/with-default-connection
+    (is (= ["SELECT id, name FROM people WHERE id = ?::integer" "1"]
+           (query/compiled
+             (select/select :people/custom-honeysql :id "1" {:select [:id :name]}))))
     (testing "key-value condition"
       (is (= [{:id 1, :name "Cam"}]
              (select/select :people/custom-honeysql :id "1" {:select [:id :name]})))

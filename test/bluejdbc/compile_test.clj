@@ -99,3 +99,14 @@
     (testing "If named query already has :from, don't stomp on it"
       (is (= ["SELECT count(*) FROM people"]
              (compile/compile (compile/from ::my-amazing-table ::named-query)))))))
+
+(m/defmethod compile/to-sql* [:default ::my-table :k2 :default]
+  [_ _ _ v _]
+  v)
+
+(deftest maybe-wrap-value-test
+  (testing "value should only wrap keys in `Value`s if an impl for `to-sql*` exists."
+    (is (= 100
+           (compile/maybe-wrap-value :test/postgres ::my-table :k1 100)))
+    (is (= (compile/value :test/postgres ::my-table :k2 100)
+           (compile/maybe-wrap-value :test/postgres ::my-table :k2 100)))))
