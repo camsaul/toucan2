@@ -123,6 +123,7 @@
 
     :eastwood
     {:config-files [".eastwood-config.clj"]
+     :exclude-namespaces [bluejdbc.util.schema bluejdbc.legacy-compatibility]
 
      :add-linters
      [:unused-private-vars
