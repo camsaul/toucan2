@@ -34,25 +34,33 @@
          :out str}}
    (next-method connectable tableable options)))
 
+(defmacro ^:private test-both-normal-and-magic-keys {:style/indent 1} [[category-key-binding] & body]
+  `(doseq [[message# ~category-key-binding] {"normal keys" :category
+                                             "magic keys" :CATEGORY}]
+     (testing message#
+       ~@body)))
+
 (deftest select-in-test
-  (testing "select should transform values going in"
-    (testing "key-value condition"
-      (is (= [{:id 1, :name "Tempest", :category :bar}
-              {:id 2, :name "Ho's Tavern", :category :bar}]
-             (select/select [:test/postgres ::transformed-venues] :category :bar {:select   [:id :name :category]
-                                                                                  :order-by [[:id :asc]]})))
-      (testing "Toucan-style [f & args] condition"
+  (test-both-normal-and-magic-keys [category-key]
+    (testing "select should transform values going in"
+      (testing "key-value condition"
         (is (= [{:id 1, :name "Tempest", :category :bar}
                 {:id 2, :name "Ho's Tavern", :category :bar}]
-               (select/select [:test/postgres ::transformed-venues] :category [:in [:bar]] {:select   [:id :name :category]
-                                                                                            :order-by [[:id :asc]]})))))
-    (testing "as the PK"
-      (testing "(single value)"
-        (is (= [{:id "1", :name "Tempest", :category :bar}]
-               (select/select [:test/postgres ::transformed-venues-id-is-string] "1" {:select [:id :name :category]}))))
-      (testing "(vector of multiple values)"
-        (is (= [{:id "1", :name "Tempest", :category :bar}]
-               (select/select [:test/postgres ::transformed-venues-id-is-string] ["1"] {:select [:id :name :category]})))))))
+               (select/select [:test/postgres ::transformed-venues] category-key :bar {:select   [:id :name category-key]
+                                                                                       :order-by [[:id :asc]]})))
+        (testing "Toucan-style [f & args] condition"
+          (is (= [{:id 1, :name "Tempest", :category :bar}
+                  {:id 2, :name "Ho's Tavern", :category :bar}]
+                 (select/select [:test/postgres ::transformed-venues] category-key [:in [:bar]]
+                                {:select   [:id :name category-key]
+                                 :order-by [[:id :asc]]})))))
+      (testing "as the PK"
+        (testing "(single value)"
+          (is (= [{:id "1", :name "Tempest", :category :bar}]
+                 (select/select [:test/postgres ::transformed-venues-id-is-string] "1" {:select [:id :name category-key]}))))
+        (testing "(vector of multiple values)"
+          (is (= [{:id "1", :name "Tempest", :category :bar}]
+                 (select/select [:test/postgres ::transformed-venues-id-is-string] ["1"] {:select [:id :name category-key]}))))))))
 
 (deftest select-out-test
   (testing "select should transform values coming out"
@@ -79,76 +87,79 @@
 
 (deftest update!-test
   (test/with-default-connection
-    (testing "key-value conditions"
-      (test/with-venues-reset
-        (is (= 2
-               (mutative/update! ::transformed-venues :category :bar {:category :BAR})))
-        (is (= #{["Ho's Tavern" :BAR] ["Tempest" :BAR]}
-               (select/select-fn-set (juxt :name :category) ::transformed-venues :category :BAR))))
-      (testing "Toucan-style [f & args] condition"
+    (test-both-normal-and-magic-keys [category-key]
+      (testing "key-value conditions"
         (test/with-venues-reset
           (is (= 2
-                 (mutative/update! ::transformed-venues :category [:in [:bar]] {:category :BAR})))
-          (is (= #{:store :BAR}
-                 (select/select-fn-set :category ::transformed-venues))))))
-    (testing "conditions map"
-      (test/with-venues-reset
-        (is (= 2
-               (mutative/update! ::transformed-venues {:category :bar} {:category :BAR})))))
-    (testing "PK"
-      (test/with-venues-reset
-        (is (= 1
-               (mutative/update! ::transformed-venues-id-is-string "1" {:name "Wow"})))
-        (is (= "Wow"
-               (select/select-one-fn :name ::transformed-venues 1)))))))
+                 (mutative/update! ::transformed-venues category-key :bar {category-key :BAR})))
+          (is (= #{["Ho's Tavern" :BAR] ["Tempest" :BAR]}
+                 (select/select-fn-set (juxt :name category-key) ::transformed-venues category-key :BAR))))
+        (testing "Toucan-style [f & args] condition"
+          (test/with-venues-reset
+            (is (= 2
+                   (mutative/update! ::transformed-venues category-key [:in [:bar]] {category-key :BAR})))
+            (is (= #{:store :BAR}
+                   (select/select-fn-set category-key ::transformed-venues))))))
+      (testing "conditions map"
+        (test/with-venues-reset
+          (is (= 2
+                 (mutative/update! ::transformed-venues {category-key :bar} {category-key :BAR})))))
+      (testing "PK"
+        (test/with-venues-reset
+          (is (= 1
+                 (mutative/update! ::transformed-venues-id-is-string "1" {:name "Wow"})))
+          (is (= "Wow"
+                 (select/select-one-fn :name ::transformed-venues 1))))))))
 
 (deftest save!-test
-  (test/with-venues-reset
-    (test/with-default-connection
-      (let [venue (select/select-one ::transformed-venues 1)]
-        (is (= {:id         1
-                :name       "Tempest"
-                :category   :dive-bar
-                :created-at (t/local-date-time "2017-01-01T00:00")
-                :updated-at (t/local-date-time  "2017-01-01T00:00")}
-               (mutative/save! (assoc venue :category :dive-bar))))
-        (is (= {:id         1
-                :name       "Tempest"
-                :category   :dive-bar
-                :created-at (t/local-date-time "2017-01-01T00:00")
-                :updated-at (t/local-date-time "2017-01-01T00:00")}
-               (select/select-one ::transformed-venues 1)))))))
+  (test/with-default-connection
+    (test-both-normal-and-magic-keys [category-key]
+      (test/with-venues-reset
+        (let [venue (select/select-one ::transformed-venues 1)]
+          (is (= {:id         1
+                  :name       "Tempest"
+                  :category   :dive-bar
+                  :created-at (t/local-date-time "2017-01-01T00:00")
+                  :updated-at (t/local-date-time  "2017-01-01T00:00")}
+                 (mutative/save! (assoc venue category-key :dive-bar))))
+          (is (= {:id         1
+                  :name       "Tempest"
+                  :category   :dive-bar
+                  :created-at (t/local-date-time "2017-01-01T00:00")
+                  :updated-at (t/local-date-time "2017-01-01T00:00")}
+                 (select/select-one ::transformed-venues 1))))))))
 
 (deftest insert!-test
   (test/with-default-connection
-    (testing "single map row"
-      (test/with-venues-reset
-        (is (= 1
-               (mutative/insert! ::transformed-venues {:name "Hi-Dive", :category :bar})))
-        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-               (select/select-fn-set :name ::transformed-venues :category :bar)))))
-    (testing "multiple map rows"
-      (test/with-venues-reset
-        (is (= 1
-               (mutative/insert! ::transformed-venues [{:name "Hi-Dive", :category :bar}])))
-        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-               (select/select-fn-set :name ::transformed-venues :category :bar)))))
-    (testing "kv args"
-      (test/with-venues-reset
-        (is (= 1
-               (mutative/insert! ::transformed-venues :name "Hi-Dive", :category :bar)))
-        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-               (select/select-fn-set :name ::transformed-venues :category :bar)))))
-    (testing "columns + vector rows"
-      (test/with-venues-reset
-        (is (= 1
-               (mutative/insert! ::transformed-venues [:name :category] [["Hi-Dive" :bar]])))
-        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-               (select/select-fn-set :name ::transformed-venues :category :bar)))))
-    (testing "returning-keys"
-      (test/with-venues-reset
-        (is (= ["4"]
-               (mutative/insert-returning-keys! ::transformed-venues-id-is-string [{:name "Hi-Dive", :category "bar"}])))))))
+    (test-both-normal-and-magic-keys [category-key]
+      (testing "single map row"
+        (test/with-venues-reset
+          (is (= 1
+                 (mutative/insert! ::transformed-venues {:name "Hi-Dive", category-key :bar})))
+          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+                 (select/select-fn-set :name ::transformed-venues category-key :bar)))))
+      (testing "multiple map rows"
+        (test/with-venues-reset
+          (is (= 1
+                 (mutative/insert! ::transformed-venues [{:name "Hi-Dive", category-key :bar}])))
+          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+                 (select/select-fn-set :name ::transformed-venues category-key :bar)))))
+      (testing "kv args"
+        (test/with-venues-reset
+          (is (= 1
+                 (mutative/insert! ::transformed-venues :name "Hi-Dive", category-key :bar)))
+          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+                 (select/select-fn-set :name ::transformed-venues category-key :bar)))))
+      (testing "columns + vector rows"
+        (test/with-venues-reset
+          (is (= 1
+                 (mutative/insert! ::transformed-venues [:name category-key] [["Hi-Dive" :bar]])))
+          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+                 (select/select-fn-set :name ::transformed-venues category-key :bar)))))
+      (testing "returning-keys"
+        (test/with-venues-reset
+          (is (= ["4"]
+                 (mutative/insert-returning-keys! ::transformed-venues-id-is-string [{:name "Hi-Dive", category-key "bar"}]))))))))
 
 (deftest delete!-test
   (test/with-default-connection
@@ -160,15 +171,16 @@
                (select/select :venues 1)))
         (is (= #{2}
                (select/select-fn-set :id :venues 2)))))
-    (testing "Delete row by key-value conditions"
-      (test/with-venues-reset
-        (is (= 2
-               (mutative/delete! ::transformed-venues :category :bar)))
-        (is (= []
-               (select/select ::transformed-venues :category :bar))))
-      (testing "Toucan-style fn-args vector"
+    (test-both-normal-and-magic-keys [category-key]
+      (testing "Delete row by key-value conditions"
         (test/with-venues-reset
           (is (= 2
-                 (mutative/delete! ::transformed-venues :category [:in [:bar]])))
+                 (mutative/delete! ::transformed-venues category-key :bar)))
           (is (= []
-                 (select/select ::transformed-venues :category :bar))))))))
+                 (select/select ::transformed-venues category-key :bar))))
+        (testing "Toucan-style fn-args vector"
+          (test/with-venues-reset
+            (is (= 2
+                   (mutative/delete! ::transformed-venues category-key [:in [:bar]])))
+            (is (= []
+                   (select/select ::transformed-venues category-key :bar)))))))))

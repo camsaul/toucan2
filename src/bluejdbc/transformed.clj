@@ -67,13 +67,18 @@
 
 (defn in-transforms [connectable tableable options]
   (when-let [transforms (not-empty (transforms* connectable tableable options))]
-    (zipmap (keys transforms) (map :in (vals transforms)))))
+    ;; make the transforms map an instance so we can get appropriate magic map behavior when looking for the
+    ;; appropriate transform for a given key.
+    (instance/instance
+     connectable tableable
+     (zipmap (keys transforms) (map :in (vals transforms))))))
 
 (defn apply-in-transforms
   [connectable tableable {:keys [conditions pk], :as args} options]
-  (if-let [transforms (when (or (seq conditions) pk)
-                        (in-transforms connectable tableable options))]
-    (log/with-trace ["Apply %s transforms to pk %s and conditions %s" transforms pk conditions]
+  (if-let [transforms (not-empty (when (or (seq conditions) pk)
+                                   (in-transforms connectable tableable options)))]
+    (log/with-trace ["Apply transforms to pk %s and conditions %s" pk conditions]
+      (log/trace transforms)
       (cond-> args
         (seq conditions) (update :conditions transform-conditions transforms)
         pk               (update :pk transform-pk connectable tableable transforms)))
@@ -94,8 +99,8 @@
 
 (defn transform-results [connectable tableable reducible-query options]
   (if-let [transforms (not-empty (transforms* connectable tableable options))]
-    (do
-      (log/tracef "Apply %s transforms %s to results" (pr-str tableable) (pr-str transforms))
+    (log/with-trace ["Apply transforms %s to results" tableable]
+      (log/trace transforms)
       (eduction
        (map (row-transform-fn transforms))
        reducible-query))
@@ -113,13 +118,14 @@
         transforms (update :changes transform-conditions transforms)))
     args))
 
-(defn transform-insert-rows [rows transforms]
-  (let [row-xforms (for [[k xform] transforms]
+(defn transform-insert-rows [[first-row :as rows] transforms]
+  ;; all rows should have the same keys, so we just need to look at the keys in the first row
+  (let [row-xforms (for [k (keys first-row)
+                         :let [xform (get transforms k)]
+                         :when xform]
                      (fn [row]
-                       (if (contains? row k)
-                         (update row k xform)
-                         row)))
-        row-xform  (apply comp row-xforms)]
+                       (update row k xform)))
+        row-xform (apply comp row-xforms)]
     (map row-xform rows)))
 
 (m/defmethod mutative/parse-insert!-args* :after [:default :bluejdbc/transformed]
