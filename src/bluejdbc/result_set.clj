@@ -101,14 +101,14 @@
   clojure.lang.IReduceInit
   (reduce [_ rf init]
     (try
-      (let [row-thunk (row-thunk connectable tableable rs options)]
+      (let [thunk (row-thunk connectable tableable rs options)]
         (loop [acc init]
           (cond
             (reduced? acc)
             (unreduced acc)
 
             (.next rs)
-            (recur (rf acc (row-thunk)))
+            (recur (rf acc (thunk)))
 
             :else
             acc)))
