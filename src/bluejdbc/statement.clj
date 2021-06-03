@@ -16,7 +16,7 @@
 
 (m/defmethod set-parameter!* :default
   [_ _ x ^java.sql.PreparedStatement stmt ^Long i _]
-  (log/tracef "Set parameter %d -> %s %s" i (some-> x class (.getCanonicalName)) x)
+  (log/tracef "Set parameter %d -> %s %s" i (some-> x class (.getCanonicalName)) (pr-str x))
   (next.jdbc.prepare/set-parameter x stmt i))
 
 (p/deftype+ Parameter [connectable tableable x options]
@@ -34,18 +34,25 @@
 (p/deftype+ ReducibleStatement [connectable tableable ^java.sql.PreparedStatement stmt options]
   clojure.lang.IReduceInit
   (reduce [_ rf init]
-    (if (get-in options [:next.jdbc :return-keys])
-      (do
-        (.executeUpdate stmt)
-        (with-open [rs (.getGeneratedKeys stmt)]
-          (reduce rf init (rs/reducible-result-set connectable tableable rs options))))
-      (let [has-result-set? (.execute stmt)]
-        (if has-result-set?
-          (with-open [rs (.getResultSet stmt)]
-            (reduce rf init (rs/reducible-result-set connectable tableable rs options)))
-          ;; TODO -- should this be reduced with rf and init??
-          #_(reduce rf init (reduced [(.getUpdateCount stmt)]))
-          [(.getUpdateCount stmt)]))))
+    (letfn [(try-execute [thunk]
+              (try
+                (thunk)
+                (catch Throwable e
+                  (throw (ex-info (format "Error executing query: %s" (ex-message e))
+                                  {:statement stmt, :options options}
+                                  e)))))]
+      (if (get-in options [:next.jdbc :return-keys])
+        (do
+          (try-execute #(.executeUpdate stmt))
+          (with-open [rs (.getGeneratedKeys stmt)]
+            (reduce rf init (rs/reducible-result-set connectable tableable rs options))))
+        (let [has-result-set? (try-execute #(.execute stmt))]
+          (if has-result-set?
+            (with-open [rs (.getResultSet stmt)]
+              (reduce rf init (rs/reducible-result-set connectable tableable rs options)))
+            ;; TODO -- should this be reduced with rf and init??
+            #_(reduce rf init (reduced [(.getUpdateCount stmt)]))
+            [(.getUpdateCount stmt)])))))
 
   pretty/PrettyPrintable
   (pretty [_]

@@ -100,17 +100,22 @@
 (p/deftype+ ReducibleResultSet [connectable tableable ^java.sql.ResultSet rs options]
   clojure.lang.IReduceInit
   (reduce [_ rf init]
-    (let [row-thunk (row-thunk connectable tableable rs options)]
-      (loop [acc init]
-        (cond
-          (reduced? acc)
-          (unreduced acc)
+    (try
+      (let [row-thunk (row-thunk connectable tableable rs options)]
+        (loop [acc init]
+          (cond
+            (reduced? acc)
+            (unreduced acc)
 
-          (.next rs)
-          (recur (rf acc (row-thunk)))
+            (.next rs)
+            (recur (rf acc (row-thunk)))
 
-          :else
-          acc))))
+            :else
+            acc)))
+      (catch Throwable e
+        (throw (ex-info (format "Error reducing results: %s" (ex-message e))
+                        {:rf rf, :init init, :result-set rs, :options options}
+                        e)))))
 
   pretty/PrettyPrintable
   (pretty [_]
