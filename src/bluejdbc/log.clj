@@ -13,7 +13,9 @@
   "Execute `body` and print all Blue JDBC log messages to stdout. Useful for debugging things from the REPL."
   [& body]
   `(binding [*enable-debug-logging* true]
-     ~@body))
+     (let [result# (do ~@body)]
+       (cond-> result#
+         (seqable? result#) doall))))
 
 (defn- maybe-pr-str [x]
   (cond
@@ -108,13 +110,25 @@
                         {:result result}
                         e))))))
 
+(defn maybe-doall [result]
+  (cond-> result
+    (and *enable-debug-logging* (seqable? result)) doall))
+
+(defmacro with-trace-no-result [message & body]
+  `(do
+     ~(if (vector? message)
+        `(tracef ~@message)
+        `(trace ~message))
+     (indent-when-debugging
+       (maybe-doall (do ~@body)))))
+
 (defmacro with-trace [message & body]
   `(do
      ~(if (vector? message)
         `(tracef ~@message)
         `(trace ~message))
      (indent-when-debugging
-       (let [result# (do ~@body)]
+       (let [result# (maybe-doall (do ~@body))]
          (trace (pprint-result-to-str result#))
          result#))))
 

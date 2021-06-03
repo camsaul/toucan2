@@ -61,7 +61,7 @@
   with-transaction]
 
  [helpers
-  #_define-after-delete
+  #_define-after-delete #_TODO
   define-after-insert
   define-after-select
   define-after-update
@@ -69,7 +69,7 @@
   define-before-insert
   define-before-select
   define-before-update
-  define-hydration-keys
+  define-hydration-keys-for-automagic-hydration
   define-table-name
   deftransforms]
 

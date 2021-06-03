@@ -21,18 +21,18 @@
      (or tableable :default)]))
 
 (defn dispatch-value-3 [dispatch-value]
-  (let [{:keys [connectable tableable query-class]}
+  (let [{:keys [connectable tableable x]}
         (if-not (sequential? dispatch-value)
           {:tableable dispatch-value}
           (zipmap
            (condp = (count dispatch-value)
              1 [:tableable]
              2 [:connectable :tableable]
-             [:connectable :tableable :query-class])
+             [:connectable :tableable :x])
            dispatch-value))]
     [(or connectable :default)
      (or tableable :default)
-     (or query-class :default)]))
+     (or x :default)]))
 
 (defn do-helper [msg tableable thunk]
   (log/with-trace ["Doing %s for %s" msg tableable]
@@ -151,21 +151,20 @@
                        (fn [~instance-binding]
                          ~@body))))
 
+;; TODO
 #_(defmacro define-after-delete {:style/indent :defn} [dispatch-value [a-binding] & body]
-  (m/defmethod mutative/delete!* :after ~(dispatch-value-3 dispatch-value)
-    [~'&connectable ~'&tableable _ ~'&options]
-    ~@body))
+    (m/defmethod mutative/delete!* :after ~(dispatch-value-3 dispatch-value)
+      [~'&connectable ~'&tableable _ ~'&options]
+      ~@body))
 
-(defmacro define-hydration-keys
+(defmacro define-hydration-keys-for-automagic-hydration
   {:style/indent 1}
-  [connectable-tableable & ks]
-  (let [[connectable tableable] (if (sequential? connectable-tableable)
-                                  connectable-tableable
-                                  [:default connectable-tableable])]
+  [dispatch-value & ks]
+  (let [[connectable tableable k] (dispatch-value-3 dispatch-value)]
     `(do
        ~@(for [k ks]
-           `(m/defmethod hydrate/table-for-automagic-hydration* [~connectable ~k]
-              [~'_ ~'_]
+           `(m/defmethod hydrate/table-for-automagic-hydration* [~connectable ~tableable ~k]
+              [~'_ ~'_ ~'_]
               ~tableable)))))
 
 (defmacro deftransforms

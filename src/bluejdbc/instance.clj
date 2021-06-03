@@ -127,7 +127,8 @@
 
   pretty/PrettyPrintable
   (pretty [_]
-    (list (u/qualify-symbol-for-*ns* `instance) conn tbl m)))
+    ;; TODO -- only print connectable if enabled?
+    (list (u/qualify-symbol-for-*ns* `instance) #_conn tbl m)))
 
 (deftype ^:private TransientInstance [conn tbl ^clojure.lang.ITransientMap m key-xform mta]
   clojure.lang.ITransientMap
