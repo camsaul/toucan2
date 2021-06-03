@@ -94,11 +94,19 @@
   `(do-indent-when-debugging (fn [] ~@body)))
 
 (defn pprint-result-to-str [result]
-  (with-out-str
-    (let [[first-line & more] (-> result pprint/pprint with-out-str str/trim str/split-lines)]
-      (println (str "-> " first-line))
-      (doseq [line more]
-        (println (str "   " line))))))
+  ;; don't try to pretty-print Eductions: it never ends well
+  (if (instance? clojure.core.Eduction result)
+    (str "-> " result)
+    (try
+      (with-out-str
+        (let [[first-line & more] (-> result pprint/pprint with-out-str str/trim str/split-lines)]
+          (println (str "-> " first-line))
+          (doseq [line more]
+            (println (str "   " line)))))
+      (catch Throwable e
+        (throw (ex-info (format "Error pretty-printing %s result: %s" (some-> result class (.getCanonicalName)) (ex-message e))
+                        {:result result}
+                        e))))))
 
 (defmacro with-trace [message & body]
   `(do
