@@ -222,7 +222,10 @@
             (t/offset-date-time "2020-01-01T21:56Z")
             (t/offset-date-time "2020-05-25T19:56Z")]
            (select/select-fn-vec :created-at [:test/postgres :people] {:order-by [[:id :asc]]})
-           (select/select-fn-vec :created_at [:test/postgres :people] {:order-by [[:id :asc]]})))))
+           (select/select-fn-vec :created_at [:test/postgres :people] {:order-by [[:id :asc]]}))))
+  (testing "Should return nil if the result is empty"
+    (is (nil? (select/select-fn-set :id [:test/postgres :people] :id 100)))
+    (is (nil? (select/select-fn-vec :id [:test/postgres :people] :id 100)))))
 
 (deftest select-one-fn-test
   (is (= 1
@@ -242,7 +245,10 @@
     (is (= #{[1 "Cam"] [2 "Sam"] [3 "Pam"] [4 "Tam"]}
            (select/select-pks-set [:test/postgres :people/composite-pk])))
     (is (= [[1 "Cam"] [2 "Sam"] [3 "Pam"] [4 "Tam"]]
-           (select/select-pks-vec [:test/postgres :people/composite-pk])))))
+           (select/select-pks-vec [:test/postgres :people/composite-pk]))))
+  (testing "Should return nil if the result is empty"
+    (is (nil? (select/select-pks-set [:test/postgres :people] :id 100)))
+    (is (nil? (select/select-pks-vec [:test/postgres :people] :id 100)))))
 
 (deftest select-one-pk-test
   (is (= 1
@@ -258,7 +264,9 @@
   (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
          (select/select-fn->fn :id :name [:test/postgres :people])))
   (is (= {2 "cam", 3 "sam", 4 "pam", 5 "tam"}
-         (select/select-fn->fn (comp inc :id) (comp str/lower-case :name) [:test/postgres :people]))))
+         (select/select-fn->fn (comp inc :id) (comp str/lower-case :name) [:test/postgres :people])))
+  (testing "Should return nil if the result is empty"
+    (is (nil? (select/select-fn->fn :id :name [:test/postgres :people] :id 100)))))
 
 (deftest select-pk->fn-test
   (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
@@ -267,7 +275,9 @@
          (select/select-pk->fn (comp str/lower-case :name) [:test/postgres :people])))
   (testing "Composite PKs"
     (is (= {[1 "Cam"] "Cam", [2 "Sam"] "Sam", [3 "Pam"] "Pam", [4 "Tam"] "Tam"}
-           (select/select-pk->fn :name [:test/postgres :people/composite-pk])))))
+           (select/select-pk->fn :name [:test/postgres :people/composite-pk]))))
+  (testing "Should return nil if the result is empty"
+    (is (nil? (select/select-pk->fn :name [:test/postgres :people] :id 100)))))
 
 (deftest select-fn->pk-test
   (is (= {"Cam" 1, "Sam" 2, "Pam" 3, "Tam" 4}
@@ -276,7 +286,9 @@
          (select/select-fn->pk (comp str/lower-case :name) [:test/postgres :people])))
   (testing "Composite PKs"
     (is (= {"Cam" [1 "Cam"], "Sam" [2 "Sam"], "Pam" [3 "Pam"], "Tam" [4 "Tam"]}
-           (select/select-fn->pk :name [:test/postgres :people/composite-pk])))))
+  (testing "Should return nil if the result is empty"
+           (select/select-fn->pk :name [:test/postgres :people/composite-pk]))))
+    (is (nil? (select/select-fn->pk :name [:test/postgres :people/composite-pk] :id 100)))))
 
 (deftest count-test
   (is (= 4
