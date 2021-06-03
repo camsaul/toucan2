@@ -37,29 +37,16 @@
 (p/deftype+ ReducibleSQLQuery [connectable tableable sql-params options]
   clojure.lang.IReduceInit
   (reduce [_ rf init]
-    (conn/with-connection [conn connectable tableable options]
-      (try
+    (try
+      (conn/with-connection [conn connectable tableable options]
         (log/with-trace ["Executing query %s with options %s" sql-params (:next.jdbc options)]
           (with-open [stmt (stmt/prepare connectable tableable conn sql-params options)]
             (let [results (stmt/reducible-statement connectable tableable stmt options)]
-              (try
-                (log/with-trace ["Reducing results with rf %s and init %s" rf init]
-                  (*call-count-thunk*)
-                  (reduce rf init results))
-                (catch Throwable e
-                  (let [message (or (:message (ex-data e)) (ex-message e))]
-                    (throw (ex-info (format "Error reducing results: %s" message)
-                                    {:rf rf, :init init, :message message}
-                                    e))))))))
-        (catch Throwable e
-          (let [message (or (:message (ex-data e)) (ex-message e))]
-            (throw (ex-info (format "Error executing query: %s" message)
-                            (merge
-                             {:options options
-                              :message message}
-                             (when *include-queries-in-exceptions?*
-                               {:sql-params sql-params, :options options}))
-                            e)))))))
+              (log/with-trace ["Reducing results with rf %s and init %s" rf init]
+                (*call-count-thunk*)
+                (reduce rf init results))))))
+      (catch Throwable e
+        (throw (ex-info (ex-message e) {:sql-params sql-params} e)))))
 
   clojure.lang.IDeref
   (deref [this]
@@ -83,8 +70,11 @@
 
   clojure.lang.IReduceInit
   (reduce [this rf init]
-    (let [reducible-sql-query (compile/compile* connectable tableable this options)]
-      (reduce rf init reducible-sql-query)))
+    (try
+      (let [reducible-sql-query (compile/compile* connectable tableable this options)]
+        (reduce rf init reducible-sql-query))
+      (catch Throwable e
+        (throw (ex-info (ex-message e) {:query queryable} e)))))
 
   ;; convenience: deref a ReducibleQuery to realize all results.
   clojure.lang.IDeref
