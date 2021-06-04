@@ -160,7 +160,7 @@
 (defmacro define-hydration-keys-for-automagic-hydration
   {:style/indent 1}
   [dispatch-value & ks]
-  (let [[connectable tableable k] (dispatch-value-3 dispatch-value)]
+  (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
     `(do
        ~@(for [k ks]
            `(m/defmethod hydrate/table-for-automagic-hydration* [~connectable ~tableable ~k]
