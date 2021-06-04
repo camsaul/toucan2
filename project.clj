@@ -27,7 +27,7 @@
    [com.github.seancorfield/next.jdbc "1.2.659"]
    [honeysql "1.0.461" :exclusions [org.clojure/clojurescript]]
    [metabase/second-date "1.0.0"]
-   [methodical "0.11.0"]
+   [methodical "0.11.1"]
    [org.clojure/tools.logging "1.1.0"]
    [potemkin "0.4.5"]
    [pretty "1.0.5"]]
@@ -147,7 +147,9 @@
    :check-namespace-decls
    {:plugins               [[lein-check-namespace-decls "1.0.2"]]
     :source-paths          ^:replace ["src" "test"]
-    :check-namespace-decls {:prefix-rewriting false}}
+    :check-namespace-decls {:prefix-rewriting false
+                            :ignore-paths [#"bluejdbc/legacy_compatibility\.clj$"
+                                           #"bluejdbc/util/schema\.clj$"]}}
 
    ;; run `lein check-reflection-warnings` to check for reflection warnings
    :reflection-warnings
