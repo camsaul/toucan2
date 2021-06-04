@@ -1,5 +1,6 @@
 (ns bluejdbc.instance
   (:require [bluejdbc.connectable.current :as conn.current]
+            [bluejdbc.instance :as instance]
             [bluejdbc.row :as row]
             [bluejdbc.util :as u]
             [camel-snake-kebab.core :as csk]
@@ -40,6 +41,12 @@
   (with-original [instance new-original]
     "Return a copy of `instance` with its `original` map set to `new-original`.")
 
+  (current [instance]
+    "Return the underlying map representing the current state of an `instance`.")
+
+  (with-current [instance new-current]
+    "Return a copy of `instance` with its underlying `current` map set to `new-current`.")
+
   (changes [instance]
     "Get a map with any changes made to `instance` since it came out of the DB.")
 
@@ -64,19 +71,32 @@
 
 (declare ->TransientInstance)
 
-(p/def-map-type Instance [conn tbl ^java.util.Map orig ^java.util.Map m key-xform mta]
+(p/def-map-type Instance [conn tbl ^clojure.lang.IPersistentMap orig ^clojure.lang.IPersistentMap m key-xform mta]
   (get [_ k default-value]
     (get m (key-xform k) default-value))
-  (assoc [_ k v]
-    (Instance. conn tbl orig (assoc m (key-xform k) v) key-xform mta))
-  (dissoc [_ k]
-    (Instance. conn tbl orig (dissoc m (key-xform k)) key-xform mta))
+
+  (assoc [this k v]
+    (let [new-m (assoc m (key-xform k) v)]
+      (if (identical? m new-m)
+        this
+        (Instance. conn tbl orig new-m key-xform mta))))
+
+  (dissoc [this k]
+    (let [new-m (dissoc m (key-xform k))]
+      (if (identical? m new-m)
+        this
+        (Instance. conn tbl orig new-m key-xform mta))))
+
   (keys [_]
     (keys m))
+
   (meta [_]
     mta)
-  (with-meta [_ new-meta]
-    (Instance. conn tbl orig m key-xform new-meta))
+
+  (with-meta [this new-meta]
+    (if (identical? mta new-meta)
+      this
+      (Instance. conn tbl orig m key-xform new-meta)))
 
   clojure.lang.IPersistentCollection
   (equiv [_ x]
@@ -105,18 +125,38 @@
   IInstance
   (original [_]
     orig)
-  (with-original [_ new-original]
-    (Instance. conn tbl new-original m key-xform mta))
+
+  (with-original [this new-original]
+    (if (identical? orig new-original)
+      this
+      (Instance. conn tbl new-original m key-xform mta)))
+
+  (current [_]
+    m)
+
+  (with-current [this new-current]
+    (if (identical? m new-current)
+      this
+      (Instance. conn tbl orig new-current key-xform mta)))
+
   (changes [_]
     (second (data/diff orig m)))
+
   (tableable [_]
     tbl)
-  (with-tableable [_ new-tableable]
-    (Instance. conn new-tableable orig m key-xform mta))
+
+  (with-tableable [this new-tableable]
+    (if (identical? tbl new-tableable)
+      this
+      (Instance. conn new-tableable orig m key-xform mta)))
+
   (connectable [_]
     conn)
-  (with-connectable [_ new-connectable]
-    (Instance. new-connectable tbl orig m key-xform mta))
+
+  (with-connectable [this new-connectable]
+    (if (identical? conn new-connectable)
+      this
+      (Instance. new-connectable tbl orig m key-xform mta)))
 
   row/RealizeRow
   (realize-row [_]
@@ -179,6 +219,8 @@
     nil)
   (original [_]
     nil)
+  (current [_]
+    nil)
   (changes [_]
     nil)
   (with-tableable [_ new-table]
@@ -188,16 +230,29 @@
   (with-connectable [this _]
     (instance connectable nil nil))
 
+  ;; TODO -- not sure what the correct behavior for objects should be... if I call (original 1) I think that should
+  ;; throw an Exception rather than returning nil, because that makes no sense.
+  ;;
   Object
   (tableable [_]
     nil)
-  (original [_]
-    nil)
-  (changes [_]
-    nil)
+  ;; (original [_]
+  ;;   nil)
+  ;; (current [_]
+  ;;   nil)
+  ;; (changes [_]
+  ;;   nil)
   (connectable [_]
     nil)
 
+  ;; generally just treat a plain map like an instance with nil tableable/connectable and original = nil,
+  ;; and no-op for anything that would require "upgrading" the map to an actual instance in such a way that if
+  ;;
+  ;;    (= plain-map instance)
+  ;;
+  ;; then
+  ;;
+  ;;    (= (f plain-map) (f instance))
   clojure.lang.IPersistentMap
   (tableable [_]
     nil)
@@ -205,6 +260,12 @@
     (instance tableable m))
   (original [_]
     nil)
+  (current [m]
+    m)
+  (with-current [_ new-current]
+    new-current)
+  (with-original [m _]
+    m)
   (changes [_]
     nil)
   (connectable [_]
@@ -217,11 +278,34 @@
   value. No-ops if `instance` is not a Blue JDBC instance."
   [instance]
   (if (bluejdbc-instance? instance)
-    (with-original instance (.m ^Instance instance))
+    (with-original instance (current instance))
     instance))
 
 ;; TODO -- should we have a revert-changes helper function as well?
 
-(defn assoc-original
-  [instance & kvs]
-  (reset-original (apply assoc instance kvs)))
+(defn update-original
+  "Applies `f` directly to the underlying `original` map of an `instance`. No-ops if `instance` is not an `Instance`."
+  [instance f & args]
+  (if (bluejdbc-instance? instance)
+    (with-original instance (apply f (original instance) args))
+    instance))
+
+(defn update-current
+  "Applies `f` directly to the underlying `current` map of an `instance`; useful if you need to operate on it directly.
+  Acts like regular `(apply f instance args)` if `instance` is not an `Instance`."
+  [instance f & args]
+  (with-current instance (apply f (current instance) args)))
+
+(defn update-original-and-current
+  "Like `(apply f instance args)`, but affects both the `original` map and `current` map of `instance` rather than just
+  the current map. Acts like regular `(apply f instance args)` if `instance` is not an `Instance`.
+
+  `f` is applied directly to the underlying `original` and `current` maps of `instance` itself. `f` is only applied
+  once if `original` and `current` are currently the same object (i.e., the new `original` and `current` will also be
+  the same object). If `current` and `original` are not the same object, `f` is applied twice."
+  [instance f & args]
+  (if (identical? (original instance) (current instance))
+    (reset-original (apply update-current instance f args))
+    (as-> instance instance
+      (apply update-original instance f args)
+      (apply update-current  instance f args))))

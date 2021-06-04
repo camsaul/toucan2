@@ -15,6 +15,20 @@
   (realize-row [_]
     nil))
 
+(p/defprotocol+ IRow
+  (thunks [row]
+    "Get the underlying map of `col-name->thunk` for a `Row`.")
+  (with-thunks [row new-thunks]))
+
+(extend-protocol IRow
+  nil
+  (thunks [_] nil)
+  (with-thunks [_] nil)
+
+  Object
+  (thunks [_] nil))
+
+;; TODO -- maybe give this a better name like `ResultSetRow` that conveys the fact that it's tied to a result set.
 (p/def-map-type Row [col-name->thunk mta]
   (get [_ k default-value]
     (if-let [thunk (get col-name->thunk k)]
@@ -36,6 +50,12 @@
   (with-meta [_ new-meta]
     (Row. col-name->thunk new-meta))
 
+  IRow
+  (thunks [_]
+    col-name->thunk)
+  (with-thunks [_ new-thunks]
+    (Row. new-thunks mta))
+
   RealizeRow
   (realize-row [_]
     (log/with-trace "Realize entire row"
@@ -51,5 +71,8 @@
   ;; wrap the thunks in delays so we don't end up invoking them multiple times, since they are potentially expensive.
   (Row. (into {} (for [[k thunk] col-name->thunk
                        :let      [dlay (delay (thunk))]]
-                   [k (fn [] @dlay)]))
+                   [k (fn cached-thunk [] @dlay)]))
         nil))
+
+(defn row? [x]
+  (instance? IRow x))

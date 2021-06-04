@@ -1,9 +1,12 @@
 (ns bluejdbc.transformed-test
   (:require [bluejdbc.instance :as instance]
             [bluejdbc.mutative :as mutative]
+            [bluejdbc.result-set :as rs]
+            [bluejdbc.row :as row]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
+            [bluejdbc.test.custom-types :as test.custom-types]
             [bluejdbc.transformed :as transformed]
             [clojure.test :refer :all]
             [java-time :as t]
@@ -84,6 +87,77 @@
                (instance/original instance)))
         (is (= nil
                (instance/changes instance)))))))
+
+(deftest apply-row-transform-test
+  (doseq [[message m] {"plain map"        {:id 1}
+                       "Instance"         (instance/instance :x {:id 1})
+                       "custom IInstance" (test.custom-types/->CustomIInstance {:id 1} {:id 1})}
+          [message m] (list*
+                       [message m]
+                       (when (instance/bluejdbc-instance? m)
+                         (for [[row-message row] {"wrapping Row"         (row/row {:id (constantly 1)})
+                                                  "wrapping custom IRow" (test.custom-types/->CustomIRow
+                                                                          {:id (constantly 1)})}]
+                           [(str message " " row-message)
+                            (-> m
+                                (instance/with-original row)
+                                (instance/with-current row))])))]
+    (testing message
+      (let [m2 (transformed/apply-row-transform m :id str)]
+        (testing "current value"
+          (is (= {:id "1"}
+                 m2)))
+        (when (instance/bluejdbc-instance? m)
+          (testing "original value"
+            (is (= {:id "1"}
+                   (instance/original m2))))
+          (is (identical? (instance/current m2)
+                          (instance/original m2))))))))
+
+(derive ::transformed-venues-id-is-string-track-reads ::transformed-venues-id-is-string)
+
+(def ^:dynamic ^:private *thunk-resolve-counts* nil)
+(def ^:dynamic ^:private *col-read-counts* nil)
+
+(m/defmethod rs/read-column-thunk* [:default ::transformed-venues-id-is-string-track-reads :default]
+  [connectable tableable rs ^java.sql.ResultSetMetaData rsmeta ^Long i options]
+  (when *thunk-resolve-counts*
+    (swap! *thunk-resolve-counts* update (.getColumnLabel rsmeta i) (fnil inc 0)))
+  (let [thunk (next-method connectable tableable rs rsmeta i options)]
+    (fn []
+      (when *col-read-counts*
+        (swap! *col-read-counts* update (.getColumnLabel rsmeta i) (fnil inc 0)))
+      (thunk))))
+
+(deftest select-out-only-transform-realized-columns-test
+  (testing "only columns that get realized should get transformed; don't realize others as a side-effect"
+    (testing "Realize both category and id"
+      (binding [*col-read-counts*      (atom nil)
+                *thunk-resolve-counts* (atom nil)]
+        (is (= [(instance/instance
+                 :bluejdbc.transformed-test/transformed-venues-id-is-string-track-reads
+                 {:id "1", :category :bar})
+                (instance/instance
+                 :bluejdbc.transformed-test/transformed-venues-id-is-string-track-reads
+                 {:id "2", :category :bar})]
+               (select/select [:test/postgres ::transformed-venues-id-is-string-track-reads]
+                              :id [:in ["1" "2"]]
+                              {:select [:id :category]})))
+        (is (= {"category" 1, "id" 1}
+               @*thunk-resolve-counts*))
+        (is (= {"category" 2, "id" 2}
+               @*col-read-counts*))))
+    (testing "Realize only id"
+      (binding [*col-read-counts*      (atom nil)
+                *thunk-resolve-counts* (atom nil)]
+        (is (= #{"1" "2"}
+               (select/select-pks-set [:test/postgres ::transformed-venues-id-is-string-track-reads]
+                                      :id [:in ["1" "2"]]
+                                      {:select [:id :category]})))
+        (is (= {"id" 1}
+               @*thunk-resolve-counts*))
+        (is (= {"id" 2}
+               @*col-read-counts*))))))
 
 (deftest update!-test
   (test/with-default-connection
