@@ -2,6 +2,7 @@
   (:require [bluejdbc.instance :as instance]
             [bluejdbc.log :as log]
             [bluejdbc.mutative :as mutative]
+            [bluejdbc.row :as row]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
@@ -88,14 +89,32 @@
   [connectable tableable args options]
   (apply-in-transforms connectable tableable args options))
 
+(defn apply-row-transform [instance k xform]
+  ;; The "Special Optimizations" below *should* be the default case, but if some other aux methods are in place or
+  ;; custom impls it might not be; things should still work normally either way.
+  ;;
+  ;; Special Optimization 1: if `instance` is an `IInstance`, and original and current are the same object, this only
+  ;; applies `xform` once.
+  (instance/update-original-and-current
+   instance
+   (fn [row]
+     ;; Special Optimization 2: if the underlying original/current maps of `instance` are instances of `IRow` (which
+     ;; themselves have underlying key->value thunks) we can compose the thunk itself rather than immediately
+     ;; realizing and transforming the value. This means transforms don't get applied to values that are never
+     ;; realized.
+     (if-let [thunks (row/thunks row)]
+       (row/with-thunks row (update thunks k (fn [thunk]
+                                               (comp xform thunk))))
+       (update row k xform)))))
+
 (defn row-transform-fn [transforms]
   {:pre [(seq transforms)]}
-  (let [transform-fns (for [[k {f :out}] transforms]
-                        (fn [row]
-                          (if (contains? row k)
-                            (update row k f)
-                            row)))]
-    (apply comp instance/reset-original transform-fns)))
+  (let [transform-fns (for [[k {xform :out}] transforms]
+                        (fn [instance]
+                          (if (contains? instance k)
+                            (apply-row-transform instance k xform)
+                            instance)))]
+    (apply comp transform-fns)))
 
 (defn transform-results [connectable tableable reducible-query options]
   (if-let [transforms (not-empty (transforms* connectable tableable options))]

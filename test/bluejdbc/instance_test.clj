@@ -29,19 +29,45 @@
                (instance/original m2)))
         (is (= {:a 100}
                (instance/changes m2)))))
-    (testing "reset-original"
-      (let [m2 (instance/reset-original m)]
-        (is (= {:a 100, :b 200}
-               m2))
-        (is (= {:a 100, :b 200}
-               (instance/original m2)))
-        (is (= nil
-               (instance/changes m2)))))
     (testing "table/with-table"
       (is (= :wow
              (instance/tableable m)))
       (is (= :ok
-             (instance/tableable (instance/with-tableable m :ok)))))))
+             (instance/tableable (instance/with-tableable m :ok)))))
+    (testing "current"
+      (is (= {:a 100, :b 200}
+             (instance/current m)))
+      (is (not (instance/bluejdbc-instance? (instance/current m)))))))
+
+(deftest no-changes-return-this-test
+  (testing "Operations that result in no changes to the underlying map should return instance as-is, rather than a new copy."
+    ;; this is mostly important because we do optimizations in cases where `original` and `current` are identical objects.
+    (let [m (instance/instance :bird {:a 100})]
+      (testing "assoc"
+        (let [m2 (assoc m :a 100)]
+          (is (identical? m m2))
+          (is (identical? (instance/current m2)
+                          (instance/original m2)))))
+      (testing "dissoc"
+        (let [m2 (dissoc m :b)]
+          (is (identical? m m2))
+          (is (identical? (instance/current m2)
+                          (instance/original m2)))))
+      (testing "with-meta"
+        (let [m2 (with-meta m (meta m))]
+          (is (identical? m m2))))
+      (testing "with-original"
+        (let [m2 (instance/with-original m (instance/original m))]
+          (is (identical? m m2))))
+      (testing "with-current"
+        (let [m2 (instance/with-current m (instance/current m))]
+          (is (identical? m m2))))
+      (testing "with-tableable"
+        (let [m2 (instance/with-tableable m (instance/tableable m))]
+          (is (identical? m m2))))
+      (testing "with-connectable"
+        (let [m2 (instance/with-connectable m (instance/connectable m))]
+          (is (identical? m m2)))))))
 
 (deftest changes-test
   (is (= {:name "Hi-Dive"}
@@ -260,3 +286,67 @@
            m))
     (is (not (instance/bluejdbc-instance? m)))
     (is (map? m))))
+
+(deftest reset-original-test
+  (let [m  (assoc (instance/instance :wow {:a 100}) :b 200)
+        m2 (instance/reset-original m)]
+    (is (= {:a 100, :b 200}
+           m2))
+    (is (= {:a 100, :b 200}
+           (instance/original m2)))
+    (is (= nil
+           (instance/changes m2))))
+  (testing "No-op for non-instances"
+    (let [result (instance/reset-original {:a 1})]
+      (is (= {:a 1}
+             result))
+      (is (= nil
+             (instance/original result)))
+      (is (not (instance/bluejdbc-instance? result))))))
+
+(deftest update-original-test
+  (let [m (-> (instance/instance nil :x :a 1)
+              (assoc :b 2)
+              (instance/update-original assoc :c 3))]
+    (is (= {:a 1, :c 3}
+           (instance/original m)))
+    (is (= (instance/instance :x {:a 1, :b 2})
+           m))
+    ;; A key being present in original but not in 'current' does not constitute a change
+    (is (= {:b 2}
+           (instance/changes m)))
+    (testing "No-op for non-instances"
+      (let [result (instance/update-original {:a 1} assoc :c 3)]
+        (is (= {:a 1}
+               result))
+        (is (= nil
+               (instance/original result)))
+        (is (not (instance/bluejdbc-instance? result)))))))
+
+(deftest update-original-and-current-test
+  (let [m (-> (instance/instance nil :x :a 1)
+              (assoc :b 2)
+              (instance/update-original-and-current assoc :c 3))]
+    (is (= {:a 1, :c 3}
+           (instance/original m)))
+    (is (= (instance/instance :x {:a 1, :b 2, :c 3})
+           m))
+    ;; A key being present in original but not in 'current' does not constitute a change
+    (is (= {:b 2}
+           (instance/changes m)))
+    (testing "Just act like regular 'apply' for non-instances"
+      (let [result (instance/update-original-and-current {:a 1} assoc :c 3)]
+        (is (= {:a 1, :c 3}
+               result))
+        (is (= nil
+               (instance/original result)))
+        (is (not (instance/bluejdbc-instance? result)))))
+    (testing "If original and current were previously identical, they should be after update as well."
+      (let [m (instance/instance :x {:a 1})]
+        (is (identical? (instance/original m)
+                        (instance/current m)))
+        (let [m2 (instance/update-original-and-current m assoc :b 2)]
+          (is (= (instance/original m2)
+                 (instance/current m2)))
+          (is (identical? (instance/original m2)
+                          (instance/current m2))))))))

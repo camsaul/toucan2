@@ -7,15 +7,25 @@
   "Whether to print log messages to stdout. Useful for debugging things from the REPL."
   false)
 
+(defn maybe-doall
+  "Fully realize `result` if it sequential (i.e. a lazy seq) and debug logging is enabled. This is done so various
+  operations like `for` and `map` get logged correctly when debugging stuff."
+  [result]
+
+  (cond-> result
+    (and *enable-debug-logging*
+         (seqable? result)
+         ;; Eduction is seqable, but we don't want to fully realize it!
+         (not (instance? clojure.core.Eduction result)))
+    doall))
+
 ;; TODO -- with-debug-logging should enable `*include-queries-in-exceptions*` and
 ;; `*include-connection-info-in-exceptions*` as well
 (defmacro with-debug-logging
   "Execute `body` and print all Blue JDBC log messages to stdout. Useful for debugging things from the REPL."
   [& body]
   `(binding [*enable-debug-logging* true]
-     (let [result# (do ~@body)]
-       (cond-> result#
-         (seqable? result#) doall))))
+     (maybe-doall (do ~@body))))
 
 (defn- maybe-pr-str [x]
   (cond
@@ -109,10 +119,6 @@
         (throw (ex-info (format "Error pretty-printing %s result: %s" (some-> result class (.getCanonicalName)) (ex-message e))
                         {:result result}
                         e))))))
-
-(defn maybe-doall [result]
-  (cond-> result
-    (and *enable-debug-logging* (seqable? result)) doall))
 
 (defmacro with-trace-no-result [message & body]
   `(do

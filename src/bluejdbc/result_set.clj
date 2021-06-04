@@ -19,8 +19,8 @@
 
 (m/defmulti read-column-thunk*
   "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
-  {:arglists '([connectable tableable ^ResultSet rs ^ResultSetMetaData rsmeta ^Integer i options])}
-  (fn [connectable tableable _ ^ResultSetMetaData rsmeta ^Integer i _]
+  {:arglists '([connectable tableable ^ResultSet rs ^ResultSetMetaData rsmeta ^Long i options])}
+  (fn [connectable tableable _ ^ResultSetMetaData rsmeta ^Long i _]
     (let [col-type (.getColumnType rsmeta i)]
       (log/tracef "Column %d %s is of JDBC type %s, native type %s"
                   i (pr-str (.getColumnLabel rsmeta i)) (type-name col-type) (.getColumnTypeName rsmeta i))
@@ -30,12 +30,12 @@
       [(u/dispatch-value connectable) (u/dispatch-value tableable) col-type])))
 
 (m/defmethod read-column-thunk* :default
-  [_ _ ^ResultSet rs _ ^Integer i options]
+  [_ _ ^ResultSet rs _ ^Long i options]
   (log/tracef "Fetching values in column %d with (.getObject rs %d) and options %s" i i (pr-str options))
   (fn default-read-column-thunk* []
     (.getObject rs i)))
 
-(defn get-object-of-class-thunk [^ResultSet rs ^Integer i ^Class klass]
+(defn get-object-of-class-thunk [^ResultSet rs ^Long i ^Class klass]
   (log/tracef "Fetching values in column %d with (.getObject rs %d %s)" i i (.getCanonicalName klass))
   (u/pretty-printable-fn
    (fn []
@@ -44,7 +44,7 @@
      (.getObject rs i klass))))
 
 (m/defmethod read-column-thunk* [:default :default Types/CLOB]
-  [_ _ ^ResultSet rs _ ^Integer i _]
+  [_ _ ^ResultSet rs _ ^Long i _]
   (fn get-string-thunk []
     (.getString rs i)))
 

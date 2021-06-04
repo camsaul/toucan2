@@ -85,7 +85,7 @@
   table-for-automagic-hydration*]
 
  [instance
-  assoc-original
+  #_assoc-original
   bluejdbc-instance?
   changes
   instance
@@ -93,7 +93,9 @@
   key-transform-fn*
   original
   reset-original
-  tableable]
+  tableable
+  update-original
+  update-original-and-current]
 
  [log
   with-debug-logging]
