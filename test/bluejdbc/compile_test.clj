@@ -2,8 +2,11 @@
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.queryable :as queryable]
             [bluejdbc.tableable :as tableable]
+            [bluejdbc.test :as test]
             [clojure.test :refer :all]
             [methodical.core :as m]))
+
+(use-fixtures :once test/do-with-test-data)
 
 (deftest compile-string-test
   (testing "Compiling a plain string should no-op"

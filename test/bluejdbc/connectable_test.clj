@@ -13,8 +13,6 @@
 
 (use-fixtures :once test/do-with-test-data)
 
-(comment test/keep-me)
-
 (deftest parse-with-connection-arg-test
   (is (= {:binding '_, :connectable nil}
          (#'conn/parse-with-connection-arg '[_])))
