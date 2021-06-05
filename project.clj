@@ -112,8 +112,10 @@
     :cloverage
     {:fail-threshold   70
      :exclude-call     [bluejdbc.log/logf
-                    bluejdbc.log/logp]
-     :ns-exclude-regex [#"bluejdbc\.log"]}}
+                        bluejdbc.log/logp]
+     :ns-exclude-regex [#"bluejdbc\.log"
+                        #"bluejdbc\.legacy-compatibility"
+                        #"bluejdbc\.util\.schema"]}}
 
    :eastwood
    {:plugins
