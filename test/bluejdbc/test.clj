@@ -99,7 +99,7 @@
   (try
     (thunk)
     (finally
-      (query/execute! :test/postgres "DROP TABLE venues;")
+      (query/execute! :test/postgres "DROP TABLE IF EXISTS venues;")
       (load-test-data-if-needed! :test/postgres :venues))))
 
 (defmacro with-venues-reset [& body]

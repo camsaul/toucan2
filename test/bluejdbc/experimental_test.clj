@@ -8,6 +8,8 @@
             [java-time :as t]
             [methodical.core :as m]))
 
+(use-fixtures :once test/do-with-test-data)
+
 (comment experimental/keep-me)
 
 (derive :venues/return-instances :bluejdbc.experimental/insert-return-instances)
