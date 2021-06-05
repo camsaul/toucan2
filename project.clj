@@ -110,7 +110,7 @@
     :source-paths ^:replace ["src"]
 
     :cloverage
-    {:fail-threshold   70
+    {:fail-threshold   65
      :exclude-call     [bluejdbc.log/logf
                         bluejdbc.log/logp]
      :ns-exclude-regex [#"bluejdbc\.log"
