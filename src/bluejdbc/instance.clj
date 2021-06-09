@@ -157,6 +157,10 @@
       this
       (Instance. new-connectable tbl orig m key-xform mta)))
 
+  u/DispatchValue
+  (dispatch-value [_]
+    (u/dispatch-value tbl))
+
   row/RealizeRow
   (realize-row [_]
     (if (identical? orig m)

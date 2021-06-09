@@ -3,6 +3,7 @@
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
+            [bluejdbc.util :as u]
             [clojure.string :as str]
             [clojure.test :refer :all]
             [java-time :as t]
@@ -350,3 +351,8 @@
                  (instance/current m2)))
           (is (identical? (instance/original m2)
                           (instance/current m2))))))))
+
+(deftest dispatch-value-test
+  (testing "Instance should implement dispatch-value"
+    (is (= :wow
+           (u/dispatch-value (instance/instance (u/dispatch-on :whatever :wow) {}))))))
