@@ -1,4 +1,4 @@
-(defproject bluejdbc "0.9.2-alpha"
+(defproject bluejdbc "0.9.3-alpha-SNAPSHOT"
   :url "https://github.com/camsaul/bluejdbc"
   :min-lein-version "2.5.0"
 
@@ -27,7 +27,7 @@
    [com.github.seancorfield/next.jdbc "1.2.659"]
    [honeysql "1.0.461" :exclusions [org.clojure/clojurescript]]
    [metabase/second-date "1.0.0"]
-   [methodical "0.11.2"]
+   [methodical "0.11.3"]
    [org.clojure/tools.logging "1.1.0"]
    [potemkin "0.4.5"]
    [pretty "1.0.5"]]
@@ -114,7 +114,6 @@
      :exclude-call     [bluejdbc.log/logf
                         bluejdbc.log/logp]
      :ns-exclude-regex [#"bluejdbc\.log"
-                        #"bluejdbc\.legacy-compatibility"
                         #"bluejdbc\.util\.schema"]}}
 
    :eastwood
@@ -125,7 +124,7 @@
 
     :eastwood
     {:config-files [".eastwood-config.clj"]
-     :exclude-namespaces [bluejdbc.util.schema bluejdbc.legacy-compatibility]
+     :exclude-namespaces [bluejdbc.util.schema]
 
      :add-linters
      [:unused-private-vars
@@ -150,8 +149,7 @@
    {:plugins               [[lein-check-namespace-decls "1.0.2"]]
     :source-paths          ^:replace ["src" "test"]
     :check-namespace-decls {:prefix-rewriting false
-                            :ignore-paths [#"bluejdbc/legacy_compatibility\.clj$"
-                                           #"bluejdbc/util/schema\.clj$"]}}
+                            :ignore-paths [#"bluejdbc/util/schema\.clj$"]}}
 
    ;; run `lein check-reflection-warnings` to check for reflection warnings
    :reflection-warnings
