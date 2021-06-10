@@ -39,7 +39,7 @@
     (next-method connectable tableable args options)))
 
 (m/defmulti update!*
-  {:arglists '([connectable tableable query options])}
+  {:arglists '([connectable* tableable* query* options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -73,7 +73,7 @@
      :query       (cond-> {:update (compile/table-identifier tableable options)
                            :set    changes}
                     (seq conditions) (honeysql-util/merge-conditions connectable tableable conditions options))
-     :options     (assoc options ::update {:pk pk, :conditions conditions})}))
+     :options     options}))
 
 (defn update!
   "Returns number of rows updated."

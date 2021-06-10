@@ -18,7 +18,14 @@
                   "bluejdbc.core")
                 (name symb))))))
 
-;; threads the third arg.
+(defmethod m.combo.threaded/threading-invoker :second
+  [_]
+  (fn
+    ([a b]            [b (fn [method b*] (method a b*))])
+    ([a b c]          [b (fn [method b*] (method a b* c))])
+    ([a b c d]        [b (fn [method b*] (method a b* c d))])
+    ([a b c d & more] [b (fn [method b*] (apply method a b* c d more))])))
+
 (defmethod m.combo.threaded/threading-invoker :third
   [_]
   (fn

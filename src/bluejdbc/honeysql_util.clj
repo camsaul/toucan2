@@ -68,19 +68,21 @@
 
 (m/defmethod handle-condition* [:default :default :bluejdbc/with-pks :default]
   [connectable tableable _ pks options]
-  (let [pk-keys (tableable/primary-key-keys connectable tableable)
-        pks     (for [pk-vals pks]
-                  (if (sequential? pk-vals)
-                    pk-vals
-                    [pk-vals]))]
-    (log/with-trace ["Adding :bluejdbc/with-pks %s condition" pks]
-      (into [:and] (map-indexed
-                    (fn [i k]
-                      (let [vs (mapv #(nth % i) pks)]
-                        [:in k vs]))
-                    pk-keys)))))
+  (when (seq pks)
+    (let [pk-keys (tableable/primary-key-keys connectable tableable)
+          pks     (for [pk-vals pks]
+                    (if (sequential? pk-vals)
+                      pk-vals
+                      [pk-vals]))]
+      (log/with-trace ["Adding :bluejdbc/with-pks %s condition" pks]
+        (into [:and] (map-indexed
+                      (fn [i k]
+                        (let [vs (mapv #(nth % i) pks)]
+                          [:in k vs]))
+                      pk-keys))))))
 
 ;; TODO -- this should probably be a multimethod, to support theoretical non-HoneySQL queries
+;; TODO -- query should be the third arg here for consistency.
 (defn merge-conditions [query connectable tableable conditions options]
   (log/with-trace ["Adding key-value conditions %s" conditions]
     (apply hsql.helpers/merge-where query (for [[k v] conditions]

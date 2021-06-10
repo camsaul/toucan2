@@ -15,7 +15,7 @@
 (def ^:dynamic ^java.sql.Connection *current-connection* nil)
 
 (m/defmulti default-connectable-for-tableable*
-  {:arglists '([tableable options])}
+  {:arglists '([tableable* options])}
   u/dispatch-on-first-arg)
 
 (m/defmethod default-connectable-for-tableable* :default
