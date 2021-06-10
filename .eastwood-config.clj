@@ -15,6 +15,11 @@
 
 (disable-warning
  {:linter :wrong-arity
+  :function-symbol 'bluejdbc.select/select-reducible
+  :arglists-for-linting '([connectable-tableable & args])})
+
+(disable-warning
+ {:linter :wrong-arity
   :function-symbol 'bluejdbc.select/select-one
   :arglists-for-linting '([connectable-tableable & args])})
 

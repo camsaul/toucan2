@@ -171,7 +171,7 @@
                     (if (seq (instance/changes instance))
                       instance
                       (log/tracef "Skipping row with PK %s, it has no changes after applying f"
-                                  (tableable/primary-key-keys instance)))))
+                                  (tableable/primary-key-keys connectable instance)))))
           ;; TODO -- consider whether we should batch the stuff below. e.g. if we end up matching 1 million objects,
           ;; it might not be ideal to keep a million PK value vectors in memory at once. Also, a query with `UPDATE
           ;; table WHERE id IN (...)` with a million ids probably isn't going to work so well.
