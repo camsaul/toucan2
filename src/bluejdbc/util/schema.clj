@@ -5,7 +5,7 @@
 (defn instance-of [model]
   (s/named
    (s/constrained
-    bluejdbc.instance.Instance
+    bluejdbc.instance.IInstance
     (fn [instance]
       (isa? (instance/tableable instance) model)))
    (format "Blue JDBC instance of %s" (pr-str model))))

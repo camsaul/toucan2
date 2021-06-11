@@ -62,11 +62,30 @@
   (with-connectable [instance new-connectable]
     "Return a copy of `instance` with its connectable set to `new-connectable.`"))
 
+;; TODO -- consider renaming to `instance?`
 (defn bluejdbc-instance?
   "True if `x` is a BlueJDBC instance, i.e. a `bluejdbc.instance.Instance` or some other class that satisfies
   `bluejdbc.instance.IInstance`."
   [x]
   (clojure.core/instance? bluejdbc.instance.IInstance x))
+
+;; I know the args are in the opposite order of `instance?`, but it seems like a Yoda Condition to write the code as
+;;
+;;    (instance-of? ::toucan my-instance)
+;;
+;; I read that as "::toucan instance-of? my-instance".
+;;
+;;    (instance-of? my-instance ::toucan)
+;;
+;; Makes more sense. It also follows the same order as `isa?`.
+(defn instance-of?
+  "True if `x` is a BlueJDBC instance, and its [[tableable]] `isa?` `a-tableable`.
+
+    (instance-of? (instance ::toucan {}) ::bird) ; -> true
+    (instance-of? (instance ::bird {}) ::toucan) ; -> false"
+  [x a-tableable]
+  (and (bluejdbc-instance? x)
+       (isa? (tableable x) a-tableable)))
 
 (declare ->TransientInstance)
 

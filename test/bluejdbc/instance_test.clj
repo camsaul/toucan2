@@ -356,3 +356,12 @@
   (testing "Instance should implement dispatch-value"
     (is (= :wow
            (u/dispatch-value (instance/instance (u/dispatch-on :whatever :wow) {}))))))
+
+(derive ::toucan ::bird)
+
+(deftest instance-of?-test
+  (is (instance/instance-of? (instance/instance ::toucan {}) ::bird))
+  (is (not (instance/instance-of? (instance/instance ::bird {}) ::toucan)))
+  (is (not (instance/instance-of? nil ::toucan)))
+  (is (not (instance/instance-of? {} ::toucan)))
+  (is (not (instance/instance-of? (instance/instance ::shoe {}) ::toucan))))
