@@ -5,6 +5,7 @@
             [bluejdbc.jdbc.statement :as stmt]
             [bluejdbc.log :as log]
             [bluejdbc.query :as query]
+            [bluejdbc.realize :as realize]
             [bluejdbc.util :as u]
             [clojure.pprint :as pprint]
             [methodical.core :as m]
@@ -27,11 +28,7 @@
 
   clojure.lang.IDeref
   (deref [this]
-    (query/all this))
-
-  query/All
-  (all [this]
-    (query/realize-all-rows this))
+    (realize/realize this))
 
   pretty/PrettyPrintable
   (pretty [_]
@@ -56,11 +53,7 @@
   ;; convenience: deref a ReducibleQuery to realize all results.
   clojure.lang.IDeref
   (deref [this]
-    (query/all this))
-
-  query/All
-  (all [this]
-    (query/realize-all-rows this)))
+    (realize/realize this)))
 
 (m/defmethod query/reducible-query* [:bluejdbc/jdbc :default :default]
   [connectable tableable queryable options]

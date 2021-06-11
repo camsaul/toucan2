@@ -2,11 +2,11 @@
   "(Incomplete) custom impls of `IInstance` and `IRow` to make sure things are flexible enough to work with types other
   than the ones provided."
   (:require [bluejdbc.instance :as instance]
-            [bluejdbc.jdbc.row :as row]
+            [bluejdbc.result-row :as result-row]
             [potemkin :as p]
             [pretty.core :as pretty]))
 
-(comment instance/keep-me row/keep-me)
+(comment instance/keep-me result-row/keep-me)
 
 (p/def-map-type CustomIInstance [orig m]
   (get [_ k default-value]
@@ -50,7 +50,7 @@
   (keys [_]
     (keys m))
 
-  bluejdbc.jdbc.row.IRow
+  bluejdbc.result_row.ResultRow
   (thunks [_]
     m)
   (with-thunks [_ new-thunks]

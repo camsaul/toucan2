@@ -3,61 +3,16 @@
   (:require [bluejdbc.compile :as compile]
             [bluejdbc.connectable :as conn]
             [bluejdbc.connectable.current :as conn.current]
-            [bluejdbc.jdbc.row :as row]
             [bluejdbc.log :as log]
+            [bluejdbc.realize :as realize]
             [bluejdbc.util :as u]
-            [clojure.pprint :as pprint]
             [methodical.core :as m]
-            [methodical.impl.combo.threaded :as m.combo.threaded]
-            [potemkin :as p]
-            [pretty.core :as pretty]))
+            [methodical.impl.combo.threaded :as m.combo.threaded]))
 
 ;; TODO -- should this be off by default?
 (def ^:dynamic *include-queries-in-exceptions?* true)
 
 (def ^:dynamic *call-count-thunk* (fn [])) ; no-op
-
-(p/defprotocol+ All
-  (all [reducible-query]
-    "Immediately realize all rows from `reducible-query` and return them."))
-
-(defn realize-all-rows [this]
-  (into [] (map row/realize-row) this))
-
-(extend-protocol All
-  Object
-  (all [this]
-    this)
-
-  ;; NOCOMMIT
-  clojure.lang.IReduceInit
-  (all [this]
-    (realize-all-rows this)))
-
-(doseq [method [print-method pprint/simple-dispatch]]
-  (prefer-method method pretty.core.PrettyPrintable clojure.lang.IDeref))
-
-(p/deftype+ ReducibleQuery [connectable tableable queryable options]
-  pretty/PrettyPrintable
-  (pretty [_]
-    (list (u/qualify-symbol-for-*ns* `reducible-query) connectable tableable queryable options))
-
-  clojure.lang.IReduceInit
-  (reduce [this rf init]
-    (try
-      (let [reducible-sql-query (compile/compile* connectable tableable this options)]
-        (reduce rf init reducible-sql-query))
-      (catch Throwable e
-        (throw (ex-info (ex-message e) {:query queryable} e)))))
-
-  ;; convenience: deref a ReducibleQuery to realize all results.
-  clojure.lang.IDeref
-  (deref [this]
-    (all this))
-
-  All
-  (all [this]
-    (realize-all-rows this)))
 
 (def ^:dynamic ^:private *return-compiled* false)
 
@@ -116,7 +71,7 @@
                [connectable tableable queryable]
                [connectable tableable queryable options])}
   [& args]
-  (all (apply reducible-query args)))
+  (realize/realize (apply reducible-query args)))
 
 (defn reduce-first
   ([reducible]
@@ -137,7 +92,7 @@
                [connectable tableable queryable]
                [connectable tableable queryable options])}
   [& args]
-  (reduce-first (map row/realize-row) (apply reducible-query args)))
+  (reduce-first (map realize/realize) (apply reducible-query args)))
 
 (m/defmulti execute!*
   {:arglists '([connectableᵈ tableableᵈ queryableᵈᵗ options])}
@@ -151,7 +106,7 @@
       (if (:reducible? options)
         reducible
         (if (get-in options [:next.jdbc :return-keys])
-          (all reducible)
+          (realize/realize reducible)
           (let [update-count (reduce-first reducible)]
             (log/tracef "%d rows-affected." update-count)
             update-count))))))

@@ -1,5 +1,6 @@
 (ns bluejdbc.jdbc.row-test
   (:require [bluejdbc.jdbc.row :as row]
+            [bluejdbc.result-row :as result-row]
             [clojure.test :refer :all]))
 
 (deftest row-test
@@ -20,7 +21,7 @@
              @c-realized?))
       (testing "thunks"
         (is (= (.col-name->thunk ^bluejdbc.jdbc.row.Row row)
-               (row/thunks row)))))))
+               (result-row/thunks row)))))))
 
 (deftest cache-results-test
   (testing "row should only call a column thunk the first time the column value is fetched"
