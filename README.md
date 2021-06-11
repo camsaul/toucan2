@@ -38,7 +38,7 @@ complete documentation.
 
 ```clj
 (require 'bluejdbc.integrations.postgresql)
-(derive ::pg-connection :bluejdbc.integrations/postgres)
+(derive ::pg-connection :bluejdbc.jdbc/postgresql)
 ```
 
 ##### Run a query.

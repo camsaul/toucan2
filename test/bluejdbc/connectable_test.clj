@@ -213,4 +213,4 @@
 
 (deftest dispatch-on-test
   (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")}]
-         (query/query (u/dispatch-on test/test-postgres-url :bluejdbc.integrations/postgres) "SELECT * FROM PEOPLE WHERE id = 1;"))))
+         (query/query (u/dispatch-on test/test-postgres-url :bluejdbc.jdbc/postgresql) "SELECT * FROM PEOPLE WHERE id = 1;"))))

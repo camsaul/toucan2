@@ -11,7 +11,7 @@
 
 (comment bluejdbc.integrations.postgresql/keep-me)
 
-(derive :test/postgres :bluejdbc.integrations/postgres)
+(derive :test/postgres :bluejdbc.jdbc/postgresql)
 
 (def test-postgres-url
   (env/env :jdbc-url-postgres "jdbc:postgresql://localhost:5432/bluejdbc?user=cam&password=cam"))
@@ -85,11 +85,11 @@
   (try
     (m/add-primary-method! conn/connection* :bluejdbc/default (fn [_ _ options]
                                                                 (conn/connection* :test/postgres options)))
-    (derive :bluejdbc/default :bluejdbc.integrations/postgres)
+    (derive :bluejdbc/default :bluejdbc.jdbc/postgresql)
     (testing "using default connection"
       (thunk))
     (finally
-      (underive :bluejdbc/default :bluejdbc.integrations/postgres)
+      (underive :bluejdbc/default :bluejdbc.jdbc/postgresql)
       (m/remove-primary-method! conn/connection* :bluejdbc/default))))
 
 (defmacro with-default-connection [& body]
