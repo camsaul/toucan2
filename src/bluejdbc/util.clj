@@ -221,3 +221,8 @@
   implementations when there's no matching method."
   [& dispatch-values]
   (str "Add an impl for " (str/join " or " (apply implementable-dispatch-values dispatch-values))))
+
+(defn maybe-derive
+  [child parent]
+  (when-not (isa? child parent)
+    (derive child parent)))

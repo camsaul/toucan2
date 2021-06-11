@@ -207,8 +207,7 @@
 (defmacro define-before-update {:style/indent :defn} [dispatch-value [instance-binding] & body]
   (let [[connectable-dv tableable-dv] (dispatch-value-2 dispatch-value)]
     `(do
-       (when-not (isa? ~tableable-dv ::before-update-transform-matching-rows)
-         (derive ~tableable-dv ::before-update-transform-matching-rows))
+       (u/maybe-derive ~tableable-dv ::before-update-transform-matching-rows)
        (m/defmethod before-update-transform-changes* [~connectable-dv ~tableable-dv]
          [~'&connectable ~instance-binding ~'&options]
          (let [result# ~(disallow-next-method-calls `(do ~@body))]
@@ -293,8 +292,7 @@
   [dispatch-value transforms]
   (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
     `(do
-       (when-not (isa? ~tableable :bluejdbc/transformed)
-         (derive ~tableable :bluejdbc/transformed))
+       (u/maybe-derive ~tableable :bluejdbc/transformed)
        (m/defmethod transformed/transforms* [~connectable ~tableable]
          [~'&connectable ~'&tableable ~'&options]
          ~transforms))))
