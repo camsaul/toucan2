@@ -19,6 +19,7 @@
   (letfn [(query? [x]
             (or (map? x)
                 (queryable/queryable? connectable tableable x)))]
+    ;; TODO -- rename these keys, since query is not necessarily a map.
     (s/cat :query   (s/alt :map     (s/cat :pk         (s/? ::pk)
                                            :conditions ::kv-conditions
                                            :query      (s/? query?))

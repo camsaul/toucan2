@@ -34,16 +34,23 @@
 ;; don't know about). I think leaving HoneySQL as an outlet to bypass type transforms makes sense for now. This also
 ;; avoids locking us in to HoneySQL too much
 
-(defn- transform-value [xform v]
+(defn- transform-condition-value [xform v]
   (try
-    (if (sequential? v)
+    (cond
+      (sequential? v)
       (into [(first v)]
             (map (fn xform* [v]
                    (if (sequential? v)
                      (mapv xform* v)
                      (xform v))))
             (rest v))
-      (xform v))
+
+      ;; only apply xform if the value is non-nil.
+      (some? v)
+      (xform v)
+
+      :else
+      nil)
     (catch Throwable e
       (throw (ex-info (format "Error transforming %s: %s" (pr-str v) (ex-message e))
                       {:v v, :transform xform}
@@ -53,7 +60,7 @@
   {:pre [(seq transforms)]}
   (into {} (for [[k v] conditions]
              [k (if-let [xform (get transforms k)]
-                  (transform-value xform v)
+                  (transform-condition-value xform v)
                   v)])))
 
 (defn transform-pk [pk-vals connectable tableable transforms]
@@ -145,7 +152,10 @@
                          :let [xform (get transforms k)]
                          :when xform]
                      (fn [row]
-                       (update row k xform)))
+                       (update row k (fn [v]
+                                       (if (some? v)
+                                         (xform v)
+                                         v)))))
         row-xform (apply comp row-xforms)]
     (map row-xform rows)))
 

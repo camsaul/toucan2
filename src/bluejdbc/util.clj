@@ -56,13 +56,13 @@
   (dispatch-value [_]
     nil))
 
-(p/defrecord+ DispatchOn [x dv]
+(p/defrecord+ DispatchOn [wrapped dv]
   DispatchValue
   (dispatch-value [_] dv)
 
   pretty/PrettyPrintable
   (pretty [_]
-    (list (qualify-symbol-for-*ns* `dispatch-on) x dv)))
+    (list (qualify-symbol-for-*ns* `dispatch-on) wrapped dv)))
 
 (defn dispatch-on [x dispatch-value]
   (->DispatchOn x dispatch-value))
@@ -72,7 +72,7 @@
 
 (defn unwrap-dispatch-on [x]
   (if (dispatch-on? x)
-    (:x x)
+    (:wrapped x)
     x))
 
 (defn dispatch-on-first-arg-with [f]
