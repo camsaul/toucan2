@@ -5,11 +5,19 @@
             [potemkin :as p]
             [pretty.core :as pretty]))
 
-;; TODO -- maybe give this a better name like `ResultSetRow` that conveys the fact that it's tied to a result set.
+(defn- realize-column-with-thunk [k thunk]
+  (try
+    (thunk)
+    (catch Throwable e
+      (throw (ex-info (format "Error realizing column %s: %s" (pr-str k) (ex-message e))
+                      {:k k, :thunk thunk}
+                      e)))))
+
+;; TODO -- instead of thunks, should these just be DELAYS????
 (p/def-map-type Row [col-name->thunk mta]
   (get [_ k default-value]
     (if-let [thunk (get col-name->thunk k)]
-      (thunk)
+      (realize-column-with-thunk k thunk)
       default-value))
 
   (assoc [_ k v]
@@ -34,10 +42,10 @@
     (Row. new-thunks mta))
 
   realize/Realize
-  (realize [_]
+  (realize [this]
     (log/with-trace "Realize entire row"
       (-> (into {} (for [[col-name thunk] col-name->thunk]
-                     [col-name (thunk)]))
+                     [col-name (realize-column-with-thunk col-name thunk)]))
           (with-meta mta))))
 
   pretty/PrettyPrintable

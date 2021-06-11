@@ -1,5 +1,6 @@
 (ns bluejdbc.transformed-test
-  (:require [bluejdbc.instance :as instance]
+  (:require [bluejdbc.helpers :as helpers]
+            [bluejdbc.instance :as instance]
             [bluejdbc.jdbc.result-set :as rs]
             [bluejdbc.jdbc.row :as row]
             [bluejdbc.mutative :as mutative]
@@ -15,10 +16,11 @@
 
 (use-fixtures :once test/do-with-test-data)
 
-(m/defmethod tableable/table-name* [:default ::transformed-venues]
+(m/defmethod tableable/table-name* [:default ::venues]
   [_ _ _]
   "venues")
 
+(derive ::transformed-venues ::venues)
 (derive ::transformed-venues :bluejdbc/transformed)
 
 (m/defmethod transformed/transforms* [:default ::transformed-venues]
@@ -285,3 +287,32 @@
                                                               [{:id 1, :name "No Category", :category nil}]))]
         (is (= {:id 1, :name "No Category", :category nil}
                instance))))))
+
+(derive ::venues-transform-in-only ::venues)
+(derive ::venues-transform-out-only ::venues)
+
+(helpers/deftransforms ::venues-transform-in-only
+  {:category {:in name}})
+
+(helpers/deftransforms ::venues-transform-out-only
+  {:category {:out keyword}})
+
+(deftest one-way-transforms-test
+  (testing "Transforms should still work if you only specify `:in` or only specify `:out`"
+    (testing "in"
+      (testing "insert rows"
+        (test/with-venues-reset
+          (is (= 1
+                 (mutative/insert! [:test/postgres ::venues-transform-out-only] {:name "Walgreens", :category "store"})))))
+      (testing "conditions"
+        (is (= nil
+               (select/select-one [:test/postgres ::venues-transform-out-only] :category "pet-store")))))
+    (testing "out"
+      (is (= (instance/instance
+              ::venues-transform-in-only
+              {:id         3
+               :name       "BevMo"
+               :category   "store"
+               :created-at (t/local-date-time "2017-01-01T00:00")
+               :updated-at (t/local-date-time "2017-01-01T00:00")})
+             (select/select-one [:test/postgres ::venues-transform-in-only] :category :store))))))

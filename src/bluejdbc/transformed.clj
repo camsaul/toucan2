@@ -75,13 +75,29 @@
        pk-keys
        pk-vals))))
 
-(defn in-transforms [connectable tableable options]
+(defn wrapped-transforms [connectable tableable direction options]
   (when-let [transforms (not-empty (transforms* connectable tableable options))]
     ;; make the transforms map an instance so we can get appropriate magic map behavior when looking for the
     ;; appropriate transform for a given key.
     (instance/instance
      connectable tableable
-     (zipmap (keys transforms) (map :in (vals transforms))))))
+     (into {} (for [[k direction->xform] transforms
+                    :let                 [xform (get direction->xform direction)]
+                    :when                xform]
+                [k (fn [v]
+                     (try
+                       (xform v)
+                       (catch Throwable e
+                         (throw (ex-info (format "Error transforming %s %s value %s: %s"
+                                                 (pr-str tableable)
+                                                 (pr-str k)
+                                                 (pr-str v)
+                                                 (ex-message e))
+                                         {:tableable tableable, :k k, :v v, :xform xform}
+                                         e)))))])))))
+
+(defn in-transforms [connectable tableable options]
+  (wrapped-transforms connectable tableable :in options))
 
 (defn apply-in-transforms
   [connectable tableable {:keys [conditions pk], :as args} options]
@@ -116,9 +132,12 @@
                                                       (comp xform thunk))))
        (update row k xform)))))
 
+(defn out-transforms [connectable tableable options]
+  (wrapped-transforms connectable tableable :out options))
+
 (defn row-transform-fn [transforms]
   {:pre [(seq transforms)]}
-  (let [transform-fns (for [[k {xform :out}] transforms]
+  (let [transform-fns (for [[k xform] transforms]
                         (fn [instance]
                           (if (contains? instance k)
                             (apply-row-transform instance k xform)
@@ -126,7 +145,7 @@
     (apply comp transform-fns)))
 
 (defn transform-results [connectable tableable reducible-query options]
-  (if-let [transforms (not-empty (transforms* connectable tableable options))]
+  (if-let [transforms (not-empty (out-transforms connectable tableable options))]
     (log/with-trace ["Apply transforms %s to results" tableable]
       (log/trace transforms)
       (eduction
