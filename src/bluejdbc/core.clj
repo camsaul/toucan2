@@ -69,7 +69,7 @@
   define-before-insert
   define-before-select
   define-before-update
-  define-hydration-keys-for-automagic-hydration
+  define-keys-for-automagic-hydration
   define-table-name
   deftransforms]
 
