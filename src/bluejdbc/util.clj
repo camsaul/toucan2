@@ -50,7 +50,7 @@
 
   Object
   (dispatch-value [this]
-    (class this))
+    (type this))
 
   nil
   (dispatch-value [_]

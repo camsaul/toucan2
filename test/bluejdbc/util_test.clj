@@ -66,4 +66,7 @@
          (u/dispatch-value (u/dispatch-on {} :birds))))
   (testing "Should be able to extend protocol via metadata"
     (is (= ::meta
-           (u/dispatch-value (with-meta (fn []) {`u/dispatch-value (constantly ::meta)}))))))
+           (u/dispatch-value (with-meta (fn []) {`u/dispatch-value (constantly ::meta)})))))
+  (testing "Should dispatch on `:type` if object has it"
+    (is (= :wow
+           (u/dispatch-value (with-meta 'x {:type :wow}))))))
