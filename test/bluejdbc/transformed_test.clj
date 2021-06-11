@@ -3,6 +3,7 @@
             [bluejdbc.jdbc.result-set :as rs]
             [bluejdbc.jdbc.row :as row]
             [bluejdbc.mutative :as mutative]
+            [bluejdbc.query :as query]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
@@ -87,6 +88,13 @@
                (instance/original instance)))
         (is (= nil
                (instance/changes instance)))))))
+
+(m/defmethod transformed/transforms* [:default ::unnormalized]
+  [_ _ _]
+  {:un_normalized {:in name, :out keyword}})
+
+(deftest normalize-transform-keys-test
+  (testing "Should work if transform keys are defined in snake_case or whatever (for legacy compatibility purposes)"))
 
 (deftest apply-row-transform-test
   (doseq [[message m] {"plain map"        {:id 1}
@@ -258,3 +266,22 @@
                    (mutative/delete! ::transformed-venues category-key [:in [:bar]])))
             (is (= []
                    (select/select ::transformed-venues category-key :bar)))))))))
+
+(deftest no-npes-test
+  (testing "Don't apply transforms to values that are nil (avoid NPEs)"
+    (testing "in"
+      (testing "insert rows"
+        (test/with-venues-reset
+          ;; this should still throw an error, but it shouldn't be an NPE from the transform.
+          (is (thrown-with-msg?
+               clojure.lang.ExceptionInfo
+               #"ERROR: null value in column .* violates not-null constraint"
+               (mutative/insert! [:test/postgres ::transformed-venues] {:name "No Category", :category nil})))))
+      (testing "conditions"
+        (is (= nil
+               (select/select-one [:test/postgres ::transformed-venues] :category nil)))))
+    (testing "out"
+      (let [instance (select/select-one ::transformed-venues (query/identity-query
+                                                              [{:id 1, :name "No Category", :category nil}]))]
+        (is (= {:id 1, :name "No Category", :category nil}
+               instance))))))

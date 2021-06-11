@@ -18,17 +18,16 @@
                    :queryable queryable
                    :options   options})))
 
-(m/defmethod queryable* [:default :default String]
-  [_ _ s _]
-  s)
+;; derive from `:bluejdbc/queryable` to have something be considered queryable out of the box without having to
+;; implement any additional methods.
 
-(m/defmethod queryable* [:default :default clojure.lang.IPersistentMap]
-  [_ _ m _]
-  m)
+(derive String :bluejdbc/queryable)
+(derive clojure.lang.IPersistentMap :bluejdbc/queryable)
+(derive clojure.lang.Sequential :bluejdbc/queryable)
 
-(m/defmethod queryable* [:default :default clojure.lang.Sequential]
-  [_ _ coll _]
-  coll)
+(m/defmethod queryable* [:default :default :bluejdbc/queryable]
+  [_ _ x _]
+  x)
 
 (defn queryable
   ([a-queryable]                       (queryable nil         nil       a-queryable nil))

@@ -117,6 +117,7 @@
   compiled
   execute!
   execute!*
+  identity-query
   query
   query-one
   reducible-query

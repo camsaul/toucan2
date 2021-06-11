@@ -149,3 +149,25 @@
     ;; -> CALLS: 2"
   [[call-count-fn-binding] & body]
   `(do-with-call-counts (fn [~call-count-fn-binding] ~@body)))
+
+;; TODO -- consider whether this belongs in a "mock" namespace
+
+(derive :bluejdbc/identity-query :bluejdbc/queryable)
+
+(m/defmethod compile/compile* [:default :default :bluejdbc/identity-query]
+  [_ _ rows _]
+  rows)
+
+(m/defmethod compile/from* [:default :default :bluejdbc/identity-query]
+  [_ _ rows _]
+  rows)
+
+(m/defmethod reducible-query* [:default :default :bluejdbc/identity-query]
+  [_ _ rows _]
+  (u/unwrap-dispatch-on rows))
+
+(defn identity-query
+  "A queryable that returns `rows` as-is without compiling anything or running anything against a database.
+  Good for mocking stuff."
+  [rows]
+  (u/dispatch-on rows :bluejdbc/identity-query))
