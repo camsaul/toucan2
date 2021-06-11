@@ -1,8 +1,8 @@
 (ns bluejdbc.transformed
   (:require [bluejdbc.instance :as instance]
+            [bluejdbc.jdbc.row :as row]
             [bluejdbc.log :as log]
             [bluejdbc.mutative :as mutative]
-            [bluejdbc.row :as row]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]

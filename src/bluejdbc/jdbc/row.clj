@@ -1,4 +1,4 @@
-(ns bluejdbc.row
+(ns bluejdbc.jdbc.row
   (:require [bluejdbc.log :as log]
             [potemkin :as p]
             [pretty.core :as pretty]))

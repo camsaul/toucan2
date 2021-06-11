@@ -1,5 +1,5 @@
-(ns bluejdbc.row-test
-  (:require [bluejdbc.row :as row]
+(ns bluejdbc.jdbc.row-test
+  (:require [bluejdbc.jdbc.row :as row]
             [clojure.test :refer :all]))
 
 (deftest row-test
@@ -19,7 +19,7 @@
       (is (= false
              @c-realized?))
       (testing "thunks"
-        (is (= (.col-name->thunk ^bluejdbc.row.Row row)
+        (is (= (.col-name->thunk ^bluejdbc.jdbc.row.Row row)
                (row/thunks row)))))))
 
 (deftest cache-results-test
