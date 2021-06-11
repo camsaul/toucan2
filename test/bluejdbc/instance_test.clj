@@ -365,3 +365,11 @@
   (is (not (instance/instance-of? nil ::toucan)))
   (is (not (instance/instance-of? {} ::toucan)))
   (is (not (instance/instance-of? (instance/instance ::shoe {}) ::toucan))))
+
+(deftest preserve-tableable-test
+  (testing "Preserve tableable and connectable as-is rather than their dispatch value"
+    (let [instance (instance/instance "jdbc:whatever" "a_table" {})]
+      (is (= "jdbc:whatever"
+             (instance/connectable instance)))
+      (is (= "a_table"
+             (instance/tableable instance))))))
