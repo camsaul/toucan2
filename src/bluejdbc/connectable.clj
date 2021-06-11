@@ -12,8 +12,9 @@
   nil)
 
 (m/defmulti connection*
-  {:arglists '([connectable options])}
-  u/dispatch-on-first-arg)
+  {:arglists '([connectableᵈᵗ options])}
+  u/dispatch-on-first-arg
+  :combo (m/thread-first-method-combination))
 
 ;; TODO -- not sure if `include-connection-info-in-exceptions?` should be something in the options map or be its own
 ;; dynamic variable for debug purposes.

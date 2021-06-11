@@ -5,7 +5,7 @@
             [methodical.impl.combo.threaded :as m.combo.threaded]))
 
 (m/defmulti queryable*
-  {:arglists '([connectable tableable queryable options])}
+  {:arglists '([connectableᵈ tableableᵈ queryableᵈᵗ options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 

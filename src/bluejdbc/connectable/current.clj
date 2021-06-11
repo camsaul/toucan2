@@ -15,8 +15,9 @@
 (def ^:dynamic ^java.sql.Connection *current-connection* nil)
 
 (m/defmulti default-connectable-for-tableable*
-  {:arglists '([tableable* options])}
-  u/dispatch-on-first-arg)
+  {:arglists '([tableableᵈᵗ options])}
+  u/dispatch-on-first-arg
+  :combo (m/thread-first-method-combination))
 
 (m/defmethod default-connectable-for-tableable* :default
   [_ _]
@@ -42,13 +43,13 @@
        (default-connectable-for-tableable* tableable options))))
 
 (m/defmulti default-options-for-connectable*
-  {:arglists '([connectable])}
+  {:arglists '([connectableᵈᵗ])}
   u/dispatch-on-first-arg)
 
 ;; default impl for `default-options-for-connectable*` is in `bluejdbc.connectable` to avoid circular refs.
 
 (m/defmulti default-options-for-tableable*
-  {:arglists '([connectable tableable])}
+  {:arglists '([connectableᵈ tableableᵈᵗ])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod default-options-for-tableable* :default

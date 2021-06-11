@@ -9,6 +9,7 @@
             [bluejdbc.util :as u]
             [clojure.pprint :as pprint]
             [methodical.core :as m]
+            [methodical.impl.combo.threaded :as m.combo.threaded]
             [potemkin :as p]
             [pretty.core :as pretty]))
 
@@ -118,8 +119,9 @@
     (->ReducibleSQLQuery connectable tableable sql-params options)))
 
 (m/defmulti reducible-query*
-  {:arglists '([connectable tableable queryable options])}
-  u/dispatch-on-first-three-args)
+  {:arglists '([connectableᵈ tableableᵈ queryableᵈᵗ options])}
+  u/dispatch-on-first-three-args
+  :combo (m.combo.threaded/threading-method-combination :third))
 
 (m/defmethod reducible-query* :default
   [connectable tableable queryable options]
@@ -170,8 +172,9 @@
   (reduce-first (map row/realize-row) (apply reducible-query args)))
 
 (m/defmulti execute!*
-  {:arglists '([connectable tableable queryable options])}
-  u/dispatch-on-first-three-args)
+  {:arglists '([connectableᵈ tableableᵈ queryableᵈᵗ options])}
+  u/dispatch-on-first-three-args
+  :combo (m.combo.threaded/threading-method-combination :third))
 
 (m/defmethod execute!* :default
   [connectable tableable queryable options]

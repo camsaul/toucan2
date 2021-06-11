@@ -29,7 +29,7 @@
      (query/reducible-query connectable tableable queryable options))))
 
 (m/defmulti select*
-  {:arglists '([connectable tableable query options])}
+  {:arglists '([connectableᵈ tableableᵈ queryᵈᵗ options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -47,7 +47,7 @@
     (next-method connectable tableable query options)))
 
 (m/defmulti parse-select-args*
-  {:arglists '([connectable tableable args options])}
+  {:arglists '([connectableᵈ tableableᵈ argsᵈᵗ options])}
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -68,7 +68,7 @@
        :options    options})))
 
 (m/defmulti compile-select*
-  {:arglists '([connectable tableable parsed-select-args options])}
+  {:arglists '([connectableᵈ tableableᵈ parsed-select-argsᵗ options])}
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -196,7 +196,7 @@
     (apply select-fn->fn pks-fn f [connectable tableable] args)))
 
 (m/defmulti count*
-  {:arglists '([connectable tableable queryable options])}
+  {:arglists '([connectableᵈ tableableᵈ queryableᵈᵗ options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -215,7 +215,7 @@
     (count* connectable tableable query options)))
 
 (m/defmulti exists?*
-  {:arglists '([connectable tableable queryable options])}
+  {:arglists '([connectableᵈ tableableᵈ queryableᵈᵗ options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 

@@ -19,7 +19,7 @@
 
 (m/defmulti read-column-thunk*
   "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
-  {:arglists '([connectable tableable ^ResultSet rs ^ResultSetMetaData rsmeta ^Long i options])}
+  {:arglists '([connectableᵈ tableableᵈ ^ResultSet rs ^ResultSetMetaData rsmeta ^Long i optionsᵗ])}
   (fn [connectable tableable _ ^ResultSetMetaData rsmeta ^Long i _]
     (let [col-type (.getColumnType rsmeta i)]
       (log/tracef "Column %d %s is of JDBC type %s, native type %s"

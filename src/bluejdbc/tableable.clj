@@ -2,11 +2,13 @@
   (:require [bluejdbc.instance :as instance]
             [bluejdbc.util :as u]
             [clojure.string :as str]
-            [methodical.core :as m]))
+            [methodical.core :as m]
+            [methodical.impl.combo.threaded :as m.combo.threaded]))
 
 (m/defmulti table-name*
-  {:arglists '([connectable tableable options])}
-  u/dispatch-on-first-two-args)
+  {:arglists '([connectableᵈ tableableᵈᵗ options])}
+  u/dispatch-on-first-two-args
+  :combo (m.combo.threaded/threading-method-combination :second))
 
 (m/defmethod table-name* [:default String]
   [_ s _]
@@ -31,7 +33,7 @@
 (m/defmulti primary-key*
   "Return the primary key(s) for this table. Can be either a single keyword or a vector of multiple keywords for
   composite PKs."
-  {:arglists '([connectable tableable])}
+  {:arglists '([connectableᵈ tableableᵈᵗ])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod primary-key* :default

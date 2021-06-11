@@ -39,7 +39,7 @@
   (contains? (table-names connectable) (name table-name)))
 
 (m/defmulti ^:private load-test-data-if-needed!
-  {:arglists '([connectable table-name])}
+  {:arglists '([connectableᵈ table-nameᵈᵗ])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod load-test-data-if-needed! :around :default
