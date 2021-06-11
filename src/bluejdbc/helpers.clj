@@ -291,6 +291,10 @@
 (defmacro deftransforms
   {:style/indent 1}
   [dispatch-value transforms]
-  `(m/defmethod transformed/transforms* ~(dispatch-value-2 dispatch-value)
-     [~'&connectable ~'&tableable ~'&options]
-     ~transforms))
+  (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
+    `(do
+       (when-not (isa? ~tableable :bluejdbc/transformed)
+         (derive ~tableable :bluejdbc/transformed))
+       (m/defmethod transformed/transforms* [~connectable ~tableable]
+         [~'&connectable ~'&tableable ~'&options]
+         ~transforms))))

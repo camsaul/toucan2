@@ -255,3 +255,19 @@
   (testing "before-update should run in a transaction; an error during some part should cause all updates to be discarded"
     ;; TODO
     ))
+
+(helpers/deftransforms ::transformed-venues
+  {:id {:in  #(some-> % Integer/parseInt)
+        :out str}})
+
+(helpers/define-table-name ::transformed-venues "venues")
+
+(deftest deftransforms-test
+  (is (= (instance/instance
+          ::transformed-venues
+          {:id         "1"
+           :name       "Tempest"
+           :category   "bar"
+           :created-at (t/local-date-time "2017-01-01T00:00")
+           :updated-at (t/local-date-time "2017-01-01T00:00")})
+         (select/select-one [:test/postgres ::transformed-venues] "1"))))
