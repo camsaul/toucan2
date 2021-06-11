@@ -216,6 +216,12 @@
   [connectable tableable original current key-xform metta]
   (->Instance connectable tableable original current key-xform metta))
 
+;; this is implemented as an around method rather than as part of the primary method so other primary implementations
+;; still get this behavior.
+(m/defmethod instance* :around :default
+  [connectable tableable original current-map key-xform metta]
+  (next-method connectable tableable original current-map key-xform (merge {:type (u/dispatch-value tableable)} metta)))
+
 (defn instance
   (^bluejdbc.instance.Instance [tableable]
    (instance (conn.current/current-connectable tableable) tableable {}))
