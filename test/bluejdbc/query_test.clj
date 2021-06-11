@@ -2,6 +2,7 @@
   (:require [bluejdbc.connectable :as conn]
             [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.instance :as instance]
+            bluejdbc.jdbc
             [bluejdbc.jdbc.row :as row]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
@@ -10,6 +11,8 @@
             [java-time :as t]
             [methodical.core :as m]
             [next.jdbc.result-set :as next.jdbc.rs]))
+
+(comment bluejdbc.jdbc/keep-me)
 
 (use-fixtures :once test/do-with-test-data)
 
@@ -149,6 +152,6 @@
 (deftest execute-reducible-test
   (testing "execute! should return a reducible query if you pass `:reducible?` in the options"
     (let [query (query/execute! :test/postgres nil "SELECT 1 AS one;" {:reducible? true})]
-      (is (instance? bluejdbc.query.ReducibleQuery query))
+      (is (instance? bluejdbc.jdbc.query.ReducibleQuery query))
       (is (= [(instance/instance :test/postgres nil {:one 1})]
              (query/all query))))))

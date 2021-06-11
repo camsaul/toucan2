@@ -4,7 +4,6 @@
             [bluejdbc.connectable :as conn]
             [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.jdbc.row :as row]
-            [bluejdbc.jdbc.statement :as stmt]
             [bluejdbc.log :as log]
             [bluejdbc.util :as u]
             [clojure.pprint :as pprint]
@@ -16,7 +15,7 @@
 ;; TODO -- should this be off by default?
 (def ^:dynamic *include-queries-in-exceptions?* true)
 
-(def ^:dynamic ^:private *call-count-thunk* (fn [])) ; no-op
+(def ^:dynamic *call-count-thunk* (fn [])) ; no-op
 
 (p/defprotocol+ All
   (all [reducible-query]
@@ -34,32 +33,6 @@
   clojure.lang.IReduceInit
   (all [this]
     (realize-all-rows this)))
-
-(p/deftype+ ReducibleSQLQuery [connectable tableable sql-params options]
-  clojure.lang.IReduceInit
-  (reduce [_ rf init]
-    (try
-      (conn/with-connection [conn connectable tableable options]
-        (log/with-trace ["Executing query %s with options %s" sql-params (:next.jdbc options)]
-          (with-open [stmt (stmt/prepare connectable tableable conn sql-params options)]
-            (let [results (stmt/reducible-statement connectable tableable stmt options)]
-              (log/with-trace ["Reducing results with rf %s and init %s" rf init]
-                (*call-count-thunk*)
-                (reduce rf init results))))))
-      (catch Throwable e
-        (throw (ex-info (ex-message e) {:sql-params sql-params} e)))))
-
-  clojure.lang.IDeref
-  (deref [this]
-    (all this))
-
-  All
-  (all [this]
-    (realize-all-rows this))
-
-  pretty/PrettyPrintable
-  (pretty [_]
-    (list (pretty/qualify-symbol-for-*ns* `->ReducibleSQLQuery) connectable tableable sql-params options)))
 
 (doseq [method [print-method pprint/simple-dispatch]]
   (prefer-method method pretty.core.PrettyPrintable clojure.lang.IDeref))
@@ -104,29 +77,24 @@
 (defmacro uncompiled {:style/indent 0} [& body]
   `(do-uncompiled (fn [] ~@body)))
 
-(defn- compile [connectable tableable queryable options]
+;; TODO -- this stuff should probably be part of `compile/compile`, not here.
+(defn ^:deprecated compile [connectable tableable queryable options]
   (when *return-uncompiled*
     (throw (u/quit-early-exception queryable)))
-  (let [sql-params (compile/compile connectable tableable queryable options)]
+  (let [compiled (compile/compile connectable tableable queryable options)]
     (when *return-compiled*
-      (throw (u/quit-early-exception sql-params)))
-    sql-params))
-
-(m/defmethod compile/compile* [:default :default ReducibleQuery]
-  [connectable tableable ^ReducibleQuery query options]
-  (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
-        sql-params            (compile connectable tableable (.queryable query) options)]
-    (->ReducibleSQLQuery connectable tableable sql-params options)))
+      (throw (u/quit-early-exception compiled)))
+    compiled))
 
 (m/defmulti reducible-query*
   {:arglists '([connectableᵈ tableableᵈ queryableᵈᵗ options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
-(m/defmethod reducible-query* :default
+(m/defmethod reducible-query* :before :default
   [connectable tableable queryable options]
   (assert (some? connectable) "connectable should not be nil; use current-connectable to get the connectable to use")
-  (->ReducibleQuery connectable tableable queryable options))
+  queryable)
 
 (defn reducible-query
   ([queryable]
