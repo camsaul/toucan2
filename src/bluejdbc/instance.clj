@@ -1,6 +1,6 @@
 (ns bluejdbc.instance
   (:require [bluejdbc.connectable.current :as conn.current]
-            [bluejdbc.row :as row]
+            [bluejdbc.jdbc.row :as row]
             [bluejdbc.util :as u]
             [camel-snake-kebab.core :as csk]
             [clojure.data :as data]

@@ -2,7 +2,7 @@
   "(Incomplete) custom impls of `IInstance` and `IRow` to make sure things are flexible enough to work with types other
   than the ones provided."
   (:require [bluejdbc.instance :as instance]
-            [bluejdbc.row :as row]
+            [bluejdbc.jdbc.row :as row]
             [potemkin :as p]
             [pretty.core :as pretty]))
 
@@ -50,7 +50,7 @@
   (keys [_]
     (keys m))
 
-  bluejdbc.row.IRow
+  bluejdbc.jdbc.row.IRow
   (thunks [_]
     m)
   (with-thunks [_ new-thunks]

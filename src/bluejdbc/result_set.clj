@@ -1,7 +1,7 @@
 (ns bluejdbc.result-set
   (:require [bluejdbc.instance :as instance]
+            [bluejdbc.jdbc.row :as row]
             [bluejdbc.log :as log]
-            [bluejdbc.row :as row]
             [bluejdbc.util :as u]
             [methodical.core :as m]
             [next.jdbc.result-set :as next.jdbc.rs]
