@@ -278,7 +278,7 @@
       [~'&connectable ~'&tableable _ ~'&options]
       ~@body))
 
-(defmacro define-hydration-keys-for-automagic-hydration
+(defmacro define-keys-for-automagic-hydration
   {:style/indent 1}
   [dispatch-value & ks]
   (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
