@@ -201,8 +201,8 @@
 
            (instance/instance nil nil :db_id 1, :TABLE_ID 2))))
   (testing "Should preserve metadata"
-    (is (= {:x 100}
-           (meta (instance/instance nil (with-meta {} {:x 100})))))))
+    (is (= {:x 100, :type :x}
+           (meta (instance/instance :x (with-meta {} {:x 100})))))))
 
 (deftest magic-keys-test
   (testing "keys"
@@ -373,3 +373,20 @@
              (instance/connectable instance)))
       (is (= "a_table"
              (instance/tableable instance))))))
+
+(deftest type-metadata-test
+  (testing "Instances should get ^:type metadata when you create them, so you can dispatch with `type`."
+    (let [tableable (u/dispatch-on "my_table" ::my-type)]
+      (doseq [instance [(instance/instance tableable)
+                        (instance/instance tableable {})
+                        (instance/instance :connectable tableable {})
+                        (instance/instance :connectable tableable :x :y)]]
+        (is (= ::my-type
+               (:type (meta instance))
+               (type instance))))))
+  (testing "e2e test: make sure instances from something like select come back with ^:type metadata"
+    (let [instance (select/select-one [:test/postgres :venues] 1)]
+      (is (some? instance))
+      (is (= :venues
+             (:type (meta instance))
+             (type instance))))))
