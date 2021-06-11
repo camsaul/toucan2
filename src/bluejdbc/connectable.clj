@@ -62,6 +62,8 @@
    :options     options})
 
 (defn connection
+  ([]
+   (connection (conn.current/current-connectable)))
   ([k]
    (connection* k nil))
 
