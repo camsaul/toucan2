@@ -51,9 +51,18 @@
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
+(defn select-args-spec [connectable tableable]
+  (letfn [(query? [x] (or (map? x) (queryable/queryable? connectable tableable x)))]
+    ;; TODO -- rename these keys, since query is not necessarily a map.
+    (s/cat :query   (s/alt :map     (s/cat :pk         (s/? ::specs/pk)
+                                           :conditions ::specs/kv-conditions
+                                           :query      (s/? query?))
+                           :non-map (s/cat :query (s/? (complement query?))))
+           :options (s/? ::specs/options))))
+
 (m/defmethod parse-select-args* :default
   [connectable tableable args _]
-  (let [spec   (specs/select-args-spec connectable tableable)
+  (let [spec   (select-args-spec connectable tableable)
         parsed (s/conform spec args)]
     (when (= parsed :clojure.spec.alpha/invalid)
       (throw (ex-info (format "Don't know how to interpret select args: %s" (s/explain-str spec args))

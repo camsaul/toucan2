@@ -20,11 +20,18 @@
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
+(s/def ::update!-args
+  (s/cat :pk            (s/? ::specs/pk)
+         :conditions    (s/? map?)
+         :kv-conditions ::specs/kv-conditions
+         :changes       map?
+         :options       (s/? ::specs/options)))
+
 (m/defmethod parse-update!-args* :default
   [_ _ args _]
-  (let [parsed (s/conform ::specs/update!-args args)]
+  (let [parsed (s/conform ::update!-args args)]
     (when (= parsed :clojure.spec.alpha/invalid)
-      (throw (ex-info (format "Don't know how to interpret update! args: %s" (s/explain-str ::specs/update!-args args))
+      (throw (ex-info (format "Don't know how to interpret update! args: %s" (s/explain-str ::update!-args args))
                       {:args args})))
     (log/tracef "-> %s" (u/pprint-to-str parsed))
     (let [{:keys [kv-conditions]} parsed]
@@ -126,11 +133,19 @@
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
+(s/def ::insert!-args
+  (s/cat :rows (s/alt :single-row-map    map?
+                      :multiple-row-maps (s/coll-of map?)
+                      :kv-pairs          ::specs/kv-conditions
+                      :columns-rows      (s/cat :columns (s/coll-of keyword?)
+                                                :rows    (s/coll-of vector?)))
+         :options (s/? ::specs/options)))
+
 (m/defmethod parse-insert!-args* :default
   [_ _ args _]
-  (let [parsed (s/conform ::specs/insert!-args args)]
+  (let [parsed (s/conform ::insert!-args args)]
     (when (= parsed :clojure.spec.alpha/invalid)
-      (throw (ex-info (format "Don't know how to interpret insert! args: %s" (s/explain-str ::specs/insert!-args args))
+      (throw (ex-info (format "Don't know how to interpret insert! args: %s" (s/explain-str ::insert!-args args))
                       {:args args})))
     (log/tracef "-> %s" (u/pprint-to-str parsed))
     (update parsed :rows (fn [[rows-type x]]
