@@ -10,7 +10,7 @@
             [pretty.core :as pretty]))
 
 (m/defmulti set-parameter!*
-  {:arglists '([connectable tableable x ^java.sql.PreparedStatement stmt ^Long i options])}
+  {:arglists '([connectableᵈ tableableᵈ valueᵈᵗ ^java.sql.PreparedStatement stmt ^Long i options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 

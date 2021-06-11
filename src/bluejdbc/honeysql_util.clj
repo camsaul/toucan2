@@ -5,7 +5,8 @@
             [bluejdbc.util :as u]
             [clojure.string :as str]
             [honeysql.helpers :as hsql.helpers]
-            [methodical.core :as m]))
+            [methodical.core :as m]
+            [methodical.impl.combo.threaded :as m.combo.threaded]))
 
 (defn merge-primary-key [kvs connectable tableable pk-vals options]
   (log/with-trace ["Adding primary key values %s" (pr-str pk-vals)]
@@ -21,10 +22,12 @@
                             pk-vals))]
       (merge kvs pk-map))))
 
+;; TODO -- this should take an additional `query` arg and dispatch on that and `k` as well.
 (m/defmulti handle-sequential-condition*
-  {:arglists '([connectable tableable k condition-vec options])}
+  {:arglists '([connectableᵈ tableableᵈ k [conditon-typeᵈ :as conditionᵗ] options])}
   (fn [connectable tableable _ [condition-type] _]
-    (u/dispatch-on-first-three-args connectable tableable condition-type)))
+    (u/dispatch-on-first-three-args connectable tableable condition-type))
+  :combo (m.combo.threaded/threading-method-combination :fourth))
 
 (m/defmethod handle-sequential-condition* :default
   [connectable tableable k [condition-type & args] options]
@@ -36,8 +39,9 @@
                             args)))
 
 (m/defmulti handle-condition*
-  {:arglists '([connectable tableable k v options])}
-  u/dispatch-on-first-four-args)
+  {:arglists '([connectableᵈ tableableᵈ kᵈ conditionᵈᵗ options])}
+  u/dispatch-on-first-four-args
+  :combo (m.combo.threaded/threading-method-combination :fourth))
 
 (m/defmethod handle-condition* :default
   [connectable tableable k v options]

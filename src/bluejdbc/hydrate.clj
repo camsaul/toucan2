@@ -9,11 +9,11 @@
             [methodical.core :as m]))
 
 (m/defmulti can-hydrate-with-strategy?*
-  {:arglists '([connectable tableable strategy k])}
+  {:arglists '([connectableᵈ tableableᵈ strategyᵈ kᵈᵗ])}
   u/dispatch-on-first-four-args)
 
 (m/defmulti hydrate-with-strategy*
-  {:arglists '([connectable tableable strategy k rows])}
+  {:arglists '([connectable tableable strategyᵈ k rowsᵗ])}
   (fn [_ _ strategy _ _]
     strategy))
 
@@ -24,7 +24,7 @@
   "The table that should be used to automagically hydrate from based on values of `k`.
 
     (table-for-automagic-hydration* :bluejdbc/default :some-table :user) :-> :myapp.models/user"
-  {:arglists '([connectable tableable k])}
+  {:arglists '([connectableᵈ tableableᵈ kᵈᵗ])}
   u/dispatch-on-first-three-args)
 
 (m/defmethod table-for-automagic-hydration* :default
@@ -36,7 +36,7 @@
   (boolean (table-for-automagic-hydration* connectable tableable dest-key)))
 
 (m/defmulti fk-keys-for-automagic-hydration*
-  {:arglists '([connectable original-tableable dest-key hydrated-tableable])}
+  {:arglists '([connectableᵈ original-tableableᵈ dest-keyᵈ hydrated-tableableᵈᵗ])}
   u/dispatch-on-first-four-args)
 
 (m/defmethod fk-keys-for-automagic-hydration* :default
@@ -134,7 +134,7 @@
 ;;; ==================================================================================================================
 
 (m/defmulti batched-hydrate*
-  {:arglists '([connectable tableable k rows])}
+  {:arglists '([connectableᵈ tableableᵈ kᵈ rowsᵗ])}
   u/dispatch-on-first-three-args)
 
 (m/defmethod can-hydrate-with-strategy?* [:default :default ::multimethod-batched :default]
@@ -152,7 +152,7 @@
 (declare simple-hydrate*)
 
 (m/defmulti simple-hydrate*
-  {:arglists '([connectable tableable k row])}
+  {:arglists '([connectableᵈ tableableᵈ kᵈ rowᵗ])}
   u/dispatch-on-first-three-args)
 
 (m/defmethod can-hydrate-with-strategy?* [:default :default ::multimethod-simple :default]

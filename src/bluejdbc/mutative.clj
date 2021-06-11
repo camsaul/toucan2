@@ -16,7 +16,7 @@
             [methodical.impl.combo.threaded :as m.combo.threaded]))
 
 (m/defmulti parse-update!-args*
-  {:arglists '([connectable tableable args options])}
+  {:arglists '([connectableᵈ tableableᵈ argsᵗ options])}
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -39,7 +39,7 @@
     (next-method connectable tableable args options)))
 
 (m/defmulti update!*
-  {:arglists '([connectable* tableable* query* options])}
+  {:arglists '([connectableᵈ tableableᵈ queryᵈᵗ options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -84,7 +84,7 @@
       (update!* connectable tableable query options))))
 
 (m/defmulti save!*
-  {:arglists '([connectable tableable obj options])}
+  {:arglists '([connectableᵈ tableableᵈ objᵈᵗ options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -113,7 +113,7 @@
     (save!* connectable tableable obj options)))
 
 (m/defmulti insert!*
-  {:arglists '([connectable tableable query options])}
+  {:arglists '([connectableᵈ tableableᵈ queryᵈᵗ options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -122,7 +122,7 @@
   (query/execute! connectable tableable query options))
 
 (m/defmulti parse-insert!-args*
-  {:arglists '([connectable tableable args options])}
+  {:arglists '([connectableᵈ tableableᵈ argsᵗ options])}
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -191,7 +191,7 @@
      reducible-query)))
 
 (m/defmulti parse-delete-args*
-  {:arglists '([connectable tableable args options])}
+  {:arglists '([connectableᵈ tableableᵈ argsᵈᵗ options])}
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
@@ -214,7 +214,7 @@
      :options     options}))
 
 (m/defmulti delete!*
-  {:arglists '([connectable tableable query options])}
+  {:arglists '([connectableᵈ tableableᵈ queryᵈᵗ options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 

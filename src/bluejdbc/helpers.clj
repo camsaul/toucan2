@@ -85,7 +85,7 @@
 ;; HELPERS BELOW ARE EXPERIMENTAL/UNTESTED
 
 (m/defmulti before-update-transform-changes*
-  {:arglists '([connectable* instance* options])}
+  {:arglists '([connectableᵈ instanceᵈᵗ options])}
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :second))
 

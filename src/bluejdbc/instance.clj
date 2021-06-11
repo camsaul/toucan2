@@ -23,7 +23,7 @@
         m))
 
 (m/defmulti key-transform-fn*
-  {:arglists '([connectable tableable])}
+  {:arglists '([connectableᵈ tableableᵈᵗ])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod key-transform-fn* :default
@@ -208,7 +208,7 @@
     this))
 
 (m/defmulti instance*
-  {:arglists '([connectable tableable original-map current-map key-xform metta])}
+  {:arglists '([connectableᵈ tableableᵈ original-map current-mapᵗ key-xform metta])}
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :fourth))
 

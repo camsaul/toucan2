@@ -6,11 +6,13 @@
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
-            [methodical.core :as m]))
+            [methodical.core :as m]
+            [methodical.impl.combo.threaded :as m.combo.threaded]))
 
 (m/defmulti transforms*
-  {:arglists '([connectable tableable options])}
-  u/dispatch-on-first-two-args)
+  {:arglists '([connectableᵈ tableableᵈᵗ options])}
+  u/dispatch-on-first-two-args
+  :combo (m.combo.threaded/threading-method-combination :second))
 
 (m/defmethod transforms* :default
   [_ _ _]

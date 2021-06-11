@@ -13,8 +13,9 @@
             [pretty.core :as pretty]))
 
 (m/defmulti compile*
-  {:arglists '([connectable tableable query options])}
-  u/dispatch-on-first-three-args)
+  {:arglists '([connectableᵈ tableableᵈ queryᵈᵗ options])}
+  u/dispatch-on-first-three-args
+  :combo (m.combo.threaded/threading-method-combination :third))
 
 ;; TODO -- not sure if `include-queries-in-exceptions?` should be something that goes in the options map or its own
 ;; dynamic variable.
@@ -103,7 +104,7 @@
   ([tableable options] (->TableIdentifier tableable options)))
 
 (m/defmulti to-sql*
-  {:arglists '([connectable tableable column v options])}
+  {:arglists '([connectableᵈ tableableᵈ columnᵈ valueᵈᵗ options])}
   u/dispatch-on-first-four-args
   :combo (m.combo.threaded/threading-method-combination :fourth))
 
@@ -153,7 +154,7 @@
 
 (m/defmulti from*
   "Add a SQL `FROM` clause or equivalent to `query`."
-  {:arglists '([connectable tableable query options])}
+  {:arglists '([connectableᵈ tableableᵈ queryᵈᵗ options])}
   u/dispatch-on-first-three-args)
 
 (m/defmethod from* :around :default

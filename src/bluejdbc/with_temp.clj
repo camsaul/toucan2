@@ -7,7 +7,7 @@
             [methodical.core :as m]))
 
 (m/defmulti with-temp-defaults*
-  {:arglists '([tableable])}
+  {:arglists '([tableableᵈᵗ])}
   u/dispatch-on-first-arg)
 
 (m/defmethod with-temp-defaults* :default
