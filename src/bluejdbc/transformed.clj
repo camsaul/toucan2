@@ -1,8 +1,8 @@
 (ns bluejdbc.transformed
   (:require [bluejdbc.instance :as instance]
-            [bluejdbc.jdbc.row :as row]
             [bluejdbc.log :as log]
             [bluejdbc.mutative :as mutative]
+            [bluejdbc.result-row :as result-row]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
@@ -104,9 +104,9 @@
      ;; themselves have underlying key->value thunks) we can compose the thunk itself rather than immediately
      ;; realizing and transforming the value. This means transforms don't get applied to values that are never
      ;; realized.
-     (if-let [thunks (row/thunks row)]
-       (row/with-thunks row (update thunks k (fn [thunk]
-                                               (comp xform thunk))))
+     (if-let [thunks (result-row/thunks row)]
+       (result-row/with-thunks row (update thunks k (fn [thunk]
+                                                      (comp xform thunk))))
        (update row k xform)))))
 
 (defn row-transform-fn [transforms]

@@ -1,6 +1,6 @@
 (ns bluejdbc.instance
   (:require [bluejdbc.connectable.current :as conn.current]
-            [bluejdbc.jdbc.row :as row]
+            [bluejdbc.realize :as realize]
             [bluejdbc.util :as u]
             [camel-snake-kebab.core :as csk]
             [clojure.data :as data]
@@ -67,7 +67,7 @@
   "True if `x` is a BlueJDBC instance, i.e. a `bluejdbc.instance.Instance` or some other class that satisfies
   `bluejdbc.instance.IInstance`."
   [x]
-  (clojure.core/instance? bluejdbc.instance.IInstance x))
+  (instance? bluejdbc.instance.IInstance x))
 
 ;; I know the args are in the opposite order of `instance?`, but it seems like a Yoda Condition to write the code as
 ;;
@@ -180,12 +180,12 @@
   (dispatch-value [_]
     (u/dispatch-value tbl))
 
-  row/RealizeRow
-  (realize-row [_]
+  realize/Realize
+  (realize [_]
     (if (identical? orig m)
-      (let [m (row/realize-row m)]
+      (let [m (realize/realize m)]
         (Instance. conn tbl m m key-xform mta))
-      (Instance. conn tbl (row/realize-row orig) (row/realize-row m) key-xform mta)))
+      (Instance. conn tbl (realize/realize orig) (realize/realize m) key-xform mta)))
 
   pretty/PrettyPrintable
   (pretty [_]

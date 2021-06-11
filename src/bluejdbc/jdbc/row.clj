@@ -1,32 +1,9 @@
 (ns bluejdbc.jdbc.row
   (:require [bluejdbc.log :as log]
+            [bluejdbc.realize :as realize]
+            [bluejdbc.result-row :as result-row]
             [potemkin :as p]
             [pretty.core :as pretty]))
-
-(p/defprotocol+ RealizeRow
-  (realize-row [row]))
-
-(extend-protocol RealizeRow
-  Object
-  (realize-row [this]
-    this)
-
-  nil
-  (realize-row [_]
-    nil))
-
-(p/defprotocol+ IRow
-  (thunks [row]
-    "Get the underlying map of `col-name->thunk` for a `Row`.")
-  (with-thunks [row new-thunks]))
-
-(extend-protocol IRow
-  nil
-  (thunks [_] nil)
-  (with-thunks [_] nil)
-
-  Object
-  (thunks [_] nil))
 
 ;; TODO -- maybe give this a better name like `ResultSetRow` that conveys the fact that it's tied to a result set.
 (p/def-map-type Row [col-name->thunk mta]
@@ -50,14 +27,14 @@
   (with-meta [_ new-meta]
     (Row. col-name->thunk new-meta))
 
-  IRow
+  result-row/ResultRow
   (thunks [_]
     col-name->thunk)
   (with-thunks [_ new-thunks]
     (Row. new-thunks mta))
 
-  RealizeRow
-  (realize-row [_]
+  realize/Realize
+  (realize [_]
     (log/with-trace "Realize entire row"
       (-> (into {} (for [[col-name thunk] col-name->thunk]
                      [col-name (thunk)]))
@@ -73,6 +50,3 @@
                        :let      [dlay (delay (thunk))]]
                    [k (fn cached-thunk [] @dlay)]))
         nil))
-
-(defn row? [x]
-  (instance? IRow x))

@@ -7,11 +7,11 @@
             [bluejdbc.honeysql-util :as honeysql-util]
             [bluejdbc.hydrate :as hydrate]
             [bluejdbc.instance :as instance]
-            [bluejdbc.jdbc.row :as row]
             [bluejdbc.log :as log]
             [bluejdbc.mutative :as mutative]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
+            [bluejdbc.realize :as realize]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
@@ -31,7 +31,7 @@
   mutative/keep-me
   query/keep-me
   queryable/keep-me
-  row/keep-me
+  realize/keep-me
   select/keep-me
   tableable/keep-me
   u/keep-me)
@@ -114,7 +114,6 @@
   #_upsert!]
 
  [query
-  all
   compiled
   execute!
   execute!*
@@ -129,8 +128,8 @@
   queryable
   queryable*]
 
- [row
-  realize-row]
+ [realize
+  realize]
 
  [select
   count

@@ -4,6 +4,7 @@
             [bluejdbc.instance :as instance]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
+            [bluejdbc.realize :as realize]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
@@ -20,8 +21,8 @@
 
 (deftest query-as-test
   (let [reducible-query (select/reducible-query-as :test/postgres :people {:select [:*], :from [:people]} nil)]
-    (doseq [[message f] {"(query/all reducible-query)" query/all
-                         "@reducible-query"            deref}
+    (doseq [[message f] {"(realize/realize reducible-query)" realize/realize
+                         "@reducible-query"                  deref}
             :let        [results (f reducible-query)]]
       (testing message
         (test-people-instances? results)

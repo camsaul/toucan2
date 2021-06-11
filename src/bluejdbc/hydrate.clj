@@ -1,7 +1,7 @@
 (ns bluejdbc.hydrate
   (:require [bluejdbc.instance :as instance]
-            [bluejdbc.jdbc.row :as row]
             [bluejdbc.log :as log]
+            [bluejdbc.realize :as realize]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
@@ -91,7 +91,7 @@
                               (cons :and clauses)
                               (first clauses)))}]
         (log/with-trace ["Fetching %s with PKs %s %s" hydrating-table pk-keys query]
-          (select/select-pk->fn row/realize-row [connectable hydrating-table] query)))
+          (select/select-pk->fn realize/realize [connectable hydrating-table] query)))
       (log/tracef "Not hydrating %s because no rows have non-nil FK values" hydrating-table))))
 
 (defn- do-automagic-batched-hydration [dest-key rows pk->fetched-instance]

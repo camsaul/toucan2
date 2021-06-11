@@ -5,10 +5,10 @@
             [bluejdbc.connectable :as conn]
             [bluejdbc.connectable.current :as conn.current]
             [bluejdbc.honeysql-util :as honeysql-util]
-            [bluejdbc.jdbc.row :as row]
             [bluejdbc.log :as log]
             [bluejdbc.query :as query]
             [bluejdbc.queryable :as queryable]
+            [bluejdbc.realize :as realize]
             [bluejdbc.specs :as specs]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.util :as u]
@@ -110,14 +110,14 @@
 (defn select
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
-  (let [result (query/all (apply select-reducible args))]
+  (let [result (realize/realize (apply select-reducible args))]
     (assert (not (instance? clojure.core.Eduction result)))
     result))
 
 (defn select-one
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
   [& args]
-  (query/reduce-first (map row/realize-row) (apply select-reducible args)))
+  (query/reduce-first (map realize/realize) (apply select-reducible args)))
 
 (defn select-fn-reducible
   {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
