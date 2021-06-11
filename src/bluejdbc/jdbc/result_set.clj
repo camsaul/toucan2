@@ -1,4 +1,4 @@
-(ns bluejdbc.result-set
+(ns bluejdbc.jdbc.result-set
   (:require [bluejdbc.instance :as instance]
             [bluejdbc.jdbc.row :as row]
             [bluejdbc.log :as log]

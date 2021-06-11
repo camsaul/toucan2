@@ -1,6 +1,6 @@
-(ns bluejdbc.statement
-  (:require [bluejdbc.log :as log]
-            [bluejdbc.result-set :as rs]
+(ns bluejdbc.jdbc.statement
+  (:require [bluejdbc.jdbc.result-set :as rs]
+            [bluejdbc.log :as log]
             [bluejdbc.util :as u]
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
