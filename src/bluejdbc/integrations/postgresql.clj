@@ -1,7 +1,7 @@
 (ns bluejdbc.integrations.postgresql
-  (:require [bluejdbc.log :as log]
-            [bluejdbc.result-set :as rs]
-            [bluejdbc.statement :as stmt]
+  (:require [bluejdbc.jdbc.result-set :as rs]
+            [bluejdbc.jdbc.statement :as stmt]
+            [bluejdbc.log :as log]
             [bluejdbc.util :as u]
             [clojure.string :as str]
             [java-time :as t]

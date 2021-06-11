@@ -1,8 +1,8 @@
 (ns bluejdbc.transformed-test
   (:require [bluejdbc.instance :as instance]
+            [bluejdbc.jdbc.result-set :as rs]
             [bluejdbc.jdbc.row :as row]
             [bluejdbc.mutative :as mutative]
-            [bluejdbc.result-set :as rs]
             [bluejdbc.select :as select]
             [bluejdbc.tableable :as tableable]
             [bluejdbc.test :as test]
