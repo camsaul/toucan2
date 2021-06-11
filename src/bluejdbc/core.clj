@@ -90,6 +90,7 @@
   changes
   instance
   instance*
+  instance-of?
   key-transform-fn*
   original
   reset-original
