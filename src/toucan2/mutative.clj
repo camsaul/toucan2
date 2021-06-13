@@ -77,9 +77,10 @@
                                                            [k (compile/maybe-wrap-value connectable tableable k v options)]))]
     {:connectable connectable
      :tableable   tableable
-     :query       (cond-> {:update (compile/table-identifier tableable options)
-                           :set    changes}
-                    (seq conditions) (honeysql-util/merge-conditions connectable tableable conditions options))
+     :query       (when (seq changes)
+                    (cond-> {:update (compile/table-identifier tableable options)
+                             :set    changes}
+                      (seq conditions) (honeysql-util/merge-conditions connectable tableable conditions options)))
      :options     options}))
 
 (defn update!
@@ -87,8 +88,12 @@
   {:arglists '([connectable-tableable pk? & conditions? changes options?])}
   [connectable-tableable & args]
   (let [{:keys [connectable tableable query options]} (parse-update-args connectable-tableable args)]
-    (log/with-trace ["UPDATE %s SET %s WHERE %s" tableable (:set query) (:where query)]
-      (update!* connectable tableable query options))))
+    (if (empty? query)
+      (do
+        (log/trace "Query has no changes, skipping update")
+        0)
+      (log/with-trace ["UPDATE %s SET %s WHERE %s" tableable (:set query) (:where query)]
+        (update!* connectable tableable query options)))))
 
 (m/defmulti save!*
   {:arglists '([connectableᵈ tableableᵈ objᵈᵗ options])}
@@ -161,12 +166,13 @@
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
         [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
         {:keys [rows options]}  (parse-insert!-args* connectable tableable args options)
-        query                   {:insert-into (compile/table-identifier tableable options)
-                                 :values      (for [row rows]
-                                                (do
-                                                  (assert (seq row) "Row cannot be empty")
-                                                  (into {} (for [[k v] row]
-                                                             [k (compile/maybe-wrap-value connectable tableable k v options)]))))}]
+        query                   (when (seq rows)
+                                  {:insert-into (compile/table-identifier tableable options)
+                                   :values      (for [row rows]
+                                                  (do
+                                                    (assert (seq row) "Row cannot be empty")
+                                                    (into {} (for [[k v] row]
+                                                               [k (compile/maybe-wrap-value connectable tableable k v options)]))))})]
     {:connectable connectable
      :tableable   tableable
      :query       query
@@ -183,12 +189,17 @@
                         e))))))
 
 (defn insert!
+  "Returns number of rows inserted."
   {:arglists '([connectable-tableable row-or-rows options?]
                [connectable-tableable k v & more options?]
                [connectable-tableable columns row-vectors options?])}
   [connectable-tableable & args]
   (let [{:keys [connectable tableable query options]} (parse-insert-args connectable-tableable args)]
-    (do-insert! connectable tableable query options)))
+    (if (empty? query)
+      (do
+        (log/trace "No rows to insert.")
+        0)
+      (do-insert! connectable tableable query options))))
 
 (defn insert-returning-keys!
   {:arglists '([connectable-tableable row-or-rows options?]
