@@ -74,7 +74,12 @@
   (is (= {:name "Hi-Dive"}
          (-> (instance/instance :venues {:id 1, :name "Tempest", :category "bar"})
              (assoc :name "Hi-Dive")
-             instance/changes))))
+             instance/changes)))
+  (testing "If there are no changes, `changes` should return `nil` for convenience."
+    (is (= nil
+           (-> (instance/instance :venues {:id 1, :name "Tempest", :category "bar"})
+               (assoc :name "Tempest")
+               instance/changes)))))
 
 (deftest contains-key-test
   (is (= true

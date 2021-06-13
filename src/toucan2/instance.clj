@@ -47,7 +47,8 @@
     "Return a copy of `instance` with its underlying `current` map set to `new-current`.")
 
   (changes [instance]
-    "Get a map with any changes made to `instance` since it came out of the DB.")
+    "Get a map with any changes made to `instance` since it came out of the DB. Only includes keys that have been
+    added or given different values; keys that were removed are not counted. Returns `nil` if there are no changes.")
 
   ;; TODO -- these should probably be renamed to `tableable` and `with-tableable` respectively.
   (tableable [instance]
@@ -158,7 +159,7 @@
       (Instance. conn tbl orig new-current key-xform mta)))
 
   (changes [_]
-    (second (data/diff orig m)))
+    (not-empty (second (data/diff orig m))))
 
   (tableable [_]
     tbl)
