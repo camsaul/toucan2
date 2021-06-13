@@ -1,9 +1,9 @@
-(defproject bluejdbc "0.9.3-alpha-SNAPSHOT"
-  :url "https://github.com/camsaul/bluejdbc"
+(defproject com.camsaul/toucan2 "0.9.3-alpha-SNAPSHOT"
+  :url "https://github.com/camsaul/toucan2"
   :min-lein-version "2.5.0"
 
   :license {:name "Eclipse Public License"
-            :url  "https://raw.githubusercontent.com/camsaul/bluejdbc/master/LICENSE"}
+            :url  "https://raw.githubusercontent.com/camsaul/toucan2/master/LICENSE"}
 
   :aliases
   {"deps"                      ["with-profile" "+deps" "deps"]
@@ -27,7 +27,7 @@
    [com.github.seancorfield/next.jdbc "1.2.659"]
    [honeysql "1.0.461" :exclusions [org.clojure/clojurescript]]
    [metabase/second-date "1.0.0"]
-   [methodical "0.11.3"]
+   [methodical "0.12.1-SNAPSHOT"]
    [org.clojure/tools.logging "1.1.0"]
    [potemkin "0.4.5"]
    [pretty "1.0.5"]]
@@ -60,10 +60,10 @@
      [[lein-environ "1.2.0"]]
 
      :repl-options
-     {:init-ns bluejdbc.core}
+     {:init-ns toucan2.core}
 
      ;; default value of JDBC_URL if no other value is set
-     :env {:jdbc-url "jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1"}
+     :env {:jdbc-url "jdbc:h2:mem:toucan2_test;DB_CLOSE_DELAY=-1"}
 
      ;; this is mostly so tests don't change answers between my local machine (on Pacific time) and CI (UTC)
      :jvm-opts
@@ -111,10 +111,10 @@
 
     :cloverage
     {:fail-threshold   65
-     :exclude-call     [bluejdbc.log/logf
-                        bluejdbc.log/logp]
-     :ns-exclude-regex [#"bluejdbc\.log"
-                        #"bluejdbc\.util\.schema"]}}
+     :exclude-call     [toucan2.log/logf
+                        toucan2.log/logp]
+     :ns-exclude-regex [#"toucan2\.log"
+                        #"toucan2\.util\.schema"]}}
 
    :eastwood
    {:plugins
@@ -124,7 +124,7 @@
 
     :eastwood
     {:config-files [".eastwood-config.clj"]
-     :exclude-namespaces [bluejdbc.util.schema]
+     :exclude-namespaces [toucan2.util.schema]
 
      :add-linters
      [:unused-private-vars
@@ -149,7 +149,7 @@
    {:plugins               [[lein-check-namespace-decls "1.0.2"]]
     :source-paths          ^:replace ["src" "test"]
     :check-namespace-decls {:prefix-rewriting false
-                            :ignore-paths [#"bluejdbc/util/schema\.clj$"]}}
+                            :ignore-paths [#"toucan2/util/schema\.clj$"]}}
 
    ;; run `lein check-reflection-warnings` to check for reflection warnings
    :reflection-warnings

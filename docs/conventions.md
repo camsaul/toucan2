@@ -18,7 +18,7 @@ The convenient function parses the args and eventually calls the underlying `met
 (instance* connectable tableable original-map current-map key-xform metta)
 ```
 
-When you're extending Blue JDBC, implement a `method*`, when you're using Blue JDBC, call a `function`.
+When you're extending Toucan 2, implement a `method*`, when you're using Toucan 2, call a `function`.
 
 ### Parameter Order
 
