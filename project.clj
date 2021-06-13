@@ -1,4 +1,4 @@
-(defproject com.camsaul/toucan2 "0.9.3-alpha-SNAPSHOT"
+(defproject com.camsaul/toucan2 "0.9.3-SNAPSHOT"
   :url "https://github.com/camsaul/toucan2"
   :min-lein-version "2.5.0"
 
