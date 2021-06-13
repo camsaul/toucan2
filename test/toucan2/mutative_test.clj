@@ -81,6 +81,13 @@
       (is (= (instance/instance :venues/custom-honeysql {:id 100, :name "Tempest"})
              (select/select-one [:test/postgres :venues/custom-honeysql] "100" {:select [:id :name]}))))))
 
+(deftest update!-no-changes-no-op-test
+  (testing "If there are no changes, update! should no-op and return zero"
+    (test/with-venues-reset
+      (is (= 0
+             (mutative/update! [:test/postgres :venues] 1 {})
+             (mutative/update! [:test/postgres :venues] {}))))))
+
 (deftest save!-test
   (test/with-venues-reset
     (test/with-default-connection
@@ -273,6 +280,12 @@
       (test/with-venues-reset
         (is (= [4]
                (mutative/insert-returning-keys! :venues/custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))))))
+
+(deftest insert!-no-changes-no-op-test
+  (testing "If there are no rows, insert! should no-op and return zero"
+      (is (= 0
+    (test/with-venues-reset
+      (mutative/insert! [:test/postgres :venues] []))))))
 
 (deftest delete!-test
   (test/with-default-connection
