@@ -6,26 +6,26 @@ version: 2.1
 
 executors:
   default:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:lein-2.9.1
 
   h2:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:lein-2.9.1
         environment:
-          JDBC_URL: jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1
+          JDBC_URL: jdbc:h2:mem:toucan2_test;DB_CLOSE_DELAY=-1
 
   java-11:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:openjdk-11-lein-2.9.1
         environment:
-          JDBC_URL: jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1
+          JDBC_URL: jdbc:h2:mem:toucan2_test;DB_CLOSE_DELAY=-1
 
   postgres-9-6:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:lein-2.9.1
         environment:
@@ -36,7 +36,7 @@ executors:
           POSTGRES_DB: circle_test
 
   postgres-latest:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:lein-2.9.1
         environment:
@@ -48,7 +48,7 @@ executors:
           POSTGRES_HOST_AUTH_METHOD: trust
 
   mysql-5-7:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:lein-2.9.1
         environment:
@@ -56,7 +56,7 @@ executors:
       - image: circleci/mysql:5.7.23
 
   mysql-latest:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:lein-2.9.1
         environment:
@@ -64,7 +64,7 @@ executors:
       - image: circleci/mysql:latest
 
   mariadb-10-2:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:lein-2.9.1
         environment:
@@ -72,7 +72,7 @@ executors:
       - image: circleci/mariadb:10.2.23
 
   mariadb-latest:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:lein-2.9.1
         environment:
@@ -84,7 +84,7 @@ executors:
           MYSQL_ALLOW_EMPTY_PASSWORD: yes
 
   sqlserver-2017:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:lein-2.9.1
         environment:
@@ -95,11 +95,11 @@ executors:
           SA_PASSWORD: 123456
 
   everything:
-    working_directory: /home/circleci/camsaul/bluejdbc/
+    working_directory: /home/circleci/camsaul/toucan2/
     docker:
       - image: circleci/clojure:lein-2.9.1
         environment:
-          # JDBC_URL_H2: jdbc:h2:mem:bluejdbc_test;DB_CLOSE_DELAY=-1
+          # JDBC_URL_H2: jdbc:h2:mem:toucan2_test;DB_CLOSE_DELAY=-1
           # JDBC_URL_SQL_SERVER: jdbc:sqlserver://localhost:1433/?user=SA&password=123456
           JDBC_URL_POSTGRES: jdbc:postgresql://localhost:5432/circle_test?user=circle_test
           # JDBC_URL_MYSQL: jdbc:mysql://localhost:3306/circle_test?user=root
@@ -155,7 +155,7 @@ jobs:
       - persist_to_workspace:
           root: /home/circleci/
           paths:
-            - camsaul/bluejdbc
+            - camsaul/toucan2
 
   deps:
     executor: default
@@ -187,7 +187,7 @@ jobs:
           no_output_timeout: 5m
       - steps: << parameters.after-steps >>
       - store_test_results:
-          path: /home/circleci/camsaul/bluejdbc/target/junit
+          path: /home/circleci/camsaul/toucan2/target/junit
 
   reflection-warnings:
     executor: default
