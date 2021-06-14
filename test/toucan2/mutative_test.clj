@@ -291,10 +291,14 @@
   (test/with-default-connection
     (testing "Delete row by PK"
       (test/with-venues-reset
+        (is (= 3
+               (select/count :venues)))
         (is (= 1
                (mutative/delete! :venues 1)))
         (is (= []
                (select/select :venues 1)))
+        (is (= 2
+               (select/count :venues)))
         (is (= #{2}
                (select/select-fn-set :id :venues 2))))
       (testing "Composite PK"

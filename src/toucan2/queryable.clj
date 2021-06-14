@@ -11,21 +11,20 @@
 
 (m/defmethod queryable* :default
   [connectable tableable queryable options]
-  (throw (ex-info (format "Don't know how to convert %s to a query. %s"
-                          queryable
+  (throw (ex-info (format "Don't know how to convert %s to a query.\n%s"
+                          (binding [*print-meta* true] (pr-str queryable))
                           (u/suggest-dispatch-values connectable tableable queryable))
                   {:tableable tableable
                    :queryable queryable
                    :options   options})))
 
-;; derive from `:toucan2/queryable` to have something be considered queryable out of the box without having to
+;; derive from `:toucan2/query` to have something be considered queryable out of the box without having to
 ;; implement any additional methods.
 
-(derive String :toucan2/queryable)
-(derive clojure.lang.IPersistentMap :toucan2/queryable)
-(derive clojure.lang.Sequential :toucan2/queryable)
+(derive String :toucan2/query)
+(derive clojure.lang.Sequential :toucan2/query)
 
-(m/defmethod queryable* [:default :default :toucan2/queryable]
+(m/defmethod queryable* [:default :default :toucan2/query]
   [_ _ x _]
   x)
 

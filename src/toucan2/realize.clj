@@ -1,6 +1,8 @@
 (ns toucan2.realize
   (:require [potemkin :as p]))
 
+;; TODO -- integrate this into protocols ?
+
 (p/defprotocol+ Realize
   (realize [row]
     "Fully realize either a reducible query, or a result row from that query."))
