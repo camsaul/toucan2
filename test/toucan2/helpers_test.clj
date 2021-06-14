@@ -2,9 +2,9 @@
   (:require [clojure.test :refer :all]
             [java-time :as t]
             [methodical.core :as m]
-            [toucan2.compile :as compile]
             [toucan2.connectable.current :as conn.current]
             [toucan2.helpers :as helpers]
+            [toucan2.honeysql.compile :as honeysql.compile]
             [toucan2.instance :as instance]
             [toucan2.mutative :as mutative]
             [toucan2.query :as query]
@@ -222,7 +222,7 @@
               (is (= 2
                      (call-count)))
               (testing "Don't add extra :where clauses if there's just one set of changes to apply to all matching rows."
-                (is (= [{:update (compile/table-identifier ::venues-capture-updates)
+                (is (= [{:update (honeysql.compile/table-identifier ::venues-capture-updates)
                          :set    {:category "dive-bar"}
                          :where  [:= :category "bar"]}]
                        @*venues-update-queries*))))))))
@@ -237,11 +237,11 @@
             (testing "Should have 3 DB calls -- one to fetch matching rows, then 2 separate updates"
               (is (= 3
                      (call-count)))
-              (is (= [{:update (compile/table-identifier ::venues-add-unique-category)
+              (is (= [{:update (honeysql.compile/table-identifier ::venues-add-unique-category)
                        :set    {:updated-at (t/local-date-time "2021-06-09T15:18:00")
                                 :category   "category-1"}
                        :where  [:and [:= :category "bar"] [:in :id [1]]]}
-                      {:update (compile/table-identifier ::venues-add-unique-category)
+                      {:update (honeysql.compile/table-identifier ::venues-add-unique-category)
                        :set    {:updated-at (t/local-date-time "2021-06-09T15:18:00")
                                 :category   "category-2"}
                        :where  [:and [:= :category "bar"] [:in :id [2]]]}]

@@ -4,14 +4,20 @@
             [methodical.core :as m]
             [toucan2.connectable :as conn]
             [toucan2.connectable.current :as conn.current]
+            toucan2.honeysql
             toucan2.integrations.postgresql
             [toucan2.log :as log]
             [toucan2.query :as query]
             [toucan2.util :as u]))
 
+(comment toucan2.honeysql/keep-me)
 (comment toucan2.integrations.postgresql/keep-me)
 
+;; :test/postgres should use the JDBC backend, with Postgres integrations
 (derive :test/postgres :toucan2.jdbc/postgresql)
+
+;; default map query type for :test/postgres should be HoneySQL
+(derive :test/postgres :toucan2/honeysql)
 
 (def test-postgres-url
   (env/env :jdbc-url-postgres "jdbc:postgresql://localhost:5432/toucan2?user=cam&password=cam"))
@@ -86,10 +92,12 @@
     (m/add-primary-method! conn/connection* :toucan2/default (fn [_ _ options]
                                                                 (conn/connection* :test/postgres options)))
     (derive :toucan2/default :toucan2.jdbc/postgresql)
+    (derive :toucan2/default :toucan2/honeysql)
     (testing "using default connection"
       (thunk))
     (finally
       (underive :toucan2/default :toucan2.jdbc/postgresql)
+      (underive :toucan2/default :toucan2/honeysql)
       (m/remove-primary-method! conn/connection* :toucan2/default))))
 
 (defmacro with-default-connection [& body]

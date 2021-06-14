@@ -147,10 +147,9 @@
            (select/select [:test/postgres :people/composite-pk] [1 "Sam"])))))
 
 ;; this could also be done as part a `:before` method.
-(m/defmethod select/select* [:default :people/no-timestamps clojure.lang.IPersistentMap]
+(m/defmethod select/select* [:default :people/no-timestamps :toucan2/honeysql]
   [connectable tableable query options]
-  (let [query (merge {:select [:id :name]}
-                     query)]
+  (let [query (assoc query :select [:id :name])]
     (next-method connectable tableable query options)))
 
 (deftest default-query-test
@@ -159,7 +158,7 @@
       (is (= [(instance/instance :people/no-timestamps {:id 1, :name "Cam"})]
              (select/select :people/no-timestamps 1))))))
 
-(m/defmethod select/select* :before [:default :people/limit-2 clojure.lang.IPersistentMap]
+(m/defmethod select/select* :before [:default :people/limit-2 :toucan2/honeysql]
   [_ _ query _]
   (assoc query :limit 2))
 

@@ -3,7 +3,6 @@
             [methodical.core :as m]
             [toucan2.compile :as compile]
             [toucan2.queryable :as queryable]
-            [toucan2.tableable :as tableable]
             [toucan2.test :as test]))
 
 (use-fixtures :once test/do-with-test-data)
@@ -23,8 +22,8 @@
            (compile/compile :test/postgres nil [{:select [:*], :from [:people], :where [:= :id 1]} 2])))))
 
 (m/defmethod queryable/queryable* [:default :default ::named-query]
-  [_ _ _ _]
-  {:select [:%count.*], :from [:people]})
+  [connectable tableable _ options]
+  (queryable/queryable* connectable tableable {:select [:%count.*], :from [:people]} options))
 
 (deftest compile-named-query-test
   (is (= ["SELECT count(*) FROM people"]
@@ -46,62 +45,6 @@
   (testing "Options passed directly to `compile` should override those from the connectable"
     (is (= ["SELECT * FROM `people`"]
            (compile/compile :test/postgres-with-quoting nil {:select [:*] :from [:people]} {:honeysql {:quoting :mysql}})))))
-
-(m/defmethod tableable/table-name* [:default ::my-amazing-table]
-  [_ _ _]
-  "wow")
-
-(deftest table-identifier-test
-  (is (= (compile/table-identifier :people nil)
-         (compile/table-identifier :people))))
-
-(m/defmethod queryable/queryable* [:default :default ::named-query-no-from]
-  [_ _ _ _]
-  {:select [:%count.*]})
-
-(deftest from-test
-  (is (= {:select [:*]
-          :from   [(compile/table-identifier :people)]}
-         (compile/from :people {:select [:*]})))
-  (is (= ["SELECT * FROM people"]
-         (compile/compile (compile/from :people {:select [:*]}))))
-
-  (testing "Should use options passed directly to `compile`"
-    (is (= ["SELECT \"field\" FROM \"people\""]
-           (compile/compile nil nil (compile/from :people {:select [:field]}) {:honeysql {:quoting :ansi}}))))
-
-  (testing "Should use options from the `connnectable` passed to `compile`"
-    (is (= ["SELECT \"field\" FROM \"people\""]
-           (compile/compile :test/postgres-with-quoting nil (compile/from :people {:select [:field]})))))
-
-  (testing "Should be able to pass options to the TableIdentifier itself"
-    (is (= {:select [:field]
-            :from   [(compile/table-identifier :people {:honeysql {:quoting :ansi}})]}
-           (compile/from nil :people {:select [:field]} {:honeysql {:quoting :ansi}})))
-    (is (= ["SELECT field FROM \"people\""]
-           (compile/compile (compile/from nil :people {:select [:field]} {:honeysql {:quoting :ansi}})))))
-
-  (testing "Options passed directly to `from` should override `compile` options")
-
-  (testing "Should use the namespace of a qualified keyword"
-    (is (= ["SELECT * FROM people"]
-           (compile/compile (compile/from :people/all-columns {:select [:*]})))))
-
-  (testing "Should work with a tableable that implements table-name"
-    (is (= {:select [:*]
-            :from   [(compile/table-identifier ::my-amazing-table)]}
-           (compile/from ::my-amazing-table {:select [:*]})))
-    (is (= ["SELECT * FROM wow"]
-           (compile/compile (compile/from ::my-amazing-table {:select [:*]})))))
-
-  (testing "named query"
-    (is (= "wow"
-           (tableable/table-name ::my-amazing-table)))
-    (is (= ["SELECT count(*) FROM wow"]
-           (compile/compile (compile/from ::my-amazing-table ::named-query-no-from))))
-    (testing "If named query already has :from, don't stomp on it"
-      (is (= ["SELECT count(*) FROM people"]
-             (compile/compile (compile/from ::my-amazing-table ::named-query)))))))
 
 (m/defmethod compile/to-sql* [:default ::my-table :k2 :default]
   [_ _ _ v _]

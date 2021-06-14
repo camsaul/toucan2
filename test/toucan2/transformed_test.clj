@@ -12,7 +12,8 @@
             [toucan2.tableable :as tableable]
             [toucan2.test :as test]
             [toucan2.test.custom-types :as test.custom-types]
-            [toucan2.transformed :as transformed]))
+            [toucan2.transformed :as transformed]
+            [toucan2.identity-query :as identity-query]))
 
 (use-fixtures :once test/do-with-test-data)
 
@@ -283,7 +284,7 @@
         (is (= nil
                (select/select-one [:test/postgres ::transformed-venues] :category nil)))))
     (testing "out"
-      (let [instance (select/select-one ::transformed-venues (query/identity-query
+      (let [instance (select/select-one ::transformed-venues (identity-query/identity-query
                                                               [{:id 1, :name "No Category", :category nil}]))]
         (is (= {:id 1, :name "No Category", :category nil}
                instance))))))

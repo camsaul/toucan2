@@ -3,7 +3,9 @@
   (:require toucan2.jdbc.query
             toucan2.jdbc.result-set
             toucan2.jdbc.row
-            toucan2.jdbc.statement))
+            toucan2.jdbc.statement
+            [methodical.core :as m]
+            [toucan2.queryable :as queryable]))
 
 (comment
   toucan2.jdbc.query/keep-me

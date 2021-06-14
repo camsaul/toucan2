@@ -1,13 +1,12 @@
 (ns toucan2.core
-  (:refer-clojure :exclude [count compile defmethod])
-  (:require [methodical.core :as m]
-            [potemkin :as p]
+  (:refer-clojure :exclude [count compile])
+  (:require [potemkin :as p]
             [toucan2.compile :as compile]
             [toucan2.connectable :as connectable]
             [toucan2.connectable.current :as conn.current]
             [toucan2.helpers :as helpers]
-            [toucan2.honeysql-util :as honeysql-util]
             [toucan2.hydrate :as hydrate]
+            [toucan2.identity-query :as identity-query]
             [toucan2.instance :as instance]
             [toucan2.log :as log]
             [toucan2.mutative :as mutative]
@@ -23,11 +22,10 @@
   conn.current/keep-me
   connectable/keep-me
   helpers/keep-me
-  honeysql-util/keep-me
   hydrate/keep-me
+  identity-query/keep-me
   instance/keep-me
   log/keep-me
-  m/keep-me
   mutative/keep-me
   query/keep-me
   queryable/keep-me
@@ -37,15 +35,9 @@
   u/keep-me)
 
 (p/import-vars
- [m
-  defmethod]
-
  [compile
   compile
-  compile*
-  from
-  from*
-  to-sql*]
+  compile*]
 
  [conn.current
   *current-connectable*
@@ -73,16 +65,15 @@
   define-table-name
   deftransforms]
 
- [honeysql-util
-  handle-condition*
-  handle-sequential-condition*]
-
  [hydrate
   batched-hydrate*
   fk-keys-for-automagic-hydration*
   hydrate
   simple-hydrate*
   table-for-automagic-hydration*]
+
+ [identity-query
+  identity-query]
 
  [instance
   #_assoc-original
@@ -117,7 +108,6 @@
   compiled
   execute!
   execute!*
-  identity-query
   query
   query-one
   reducible-query

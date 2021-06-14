@@ -3,10 +3,10 @@
   (:require [clojure.spec.alpha :as s]
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
+            [toucan2.build-query :as build-query]
             [toucan2.compile :as compile]
             [toucan2.connectable :as conn]
             [toucan2.connectable.current :as conn.current]
-            [toucan2.honeysql-util :as honeysql-util]
             [toucan2.instance :as instance]
             [toucan2.log :as log]
             [toucan2.query :as query]
@@ -71,16 +71,20 @@
   (let [[connectable tableable]                 (conn/parse-connectable-tableable connectable-tableable)
         [connectable options]                   (conn.current/ensure-connectable connectable tableable nil)
         {:keys [pk conditions changes options]} (parse-update!-args* connectable tableable args options)
-        conditions                              (cond-> conditions
-                                                  pk (honeysql-util/merge-primary-key connectable tableable pk options))
+        conditions                              (if-not pk
+                                                  conditions
+                                                  (build-query/merge-primary-key connectable tableable conditions pk options))
         changes                                 (into {} (for [[k v] changes]
-                                                           [k (compile/maybe-wrap-value connectable tableable k v options)]))]
+                                                           [k (compile/maybe-wrap-value connectable tableable k v options)]))
+        query                                   (as-> (build-query/update-query* connectable tableable options) query
+                                                  (build-query/with-changes* connectable tableable query changes options))
+        query                                   (when (seq changes)
+                                                  (if (empty? conditions)
+                                                    query
+                                                    (build-query/merge-kv-conditions* connectable tableable query conditions options)))]
     {:connectable connectable
      :tableable   tableable
-     :query       (when (seq changes)
-                    (cond-> {:update (compile/table-identifier tableable options)
-                             :set    changes}
-                      (seq conditions) (honeysql-util/merge-conditions connectable tableable conditions options)))
+     :query       query
      :options     options}))
 
 (defn update!
@@ -92,7 +96,9 @@
       (do
         (log/trace "Query has no changes, skipping update")
         0)
-      (log/with-trace ["UPDATE %s SET %s WHERE %s" tableable (:set query) (:where query)]
+      (log/with-trace ["UPDATE %s SET %s WHERE %s" tableable
+                       (build-query/changes* connectable tableable query)
+                       (build-query/conditions* connectable tableable query)]
         (update!* connectable tableable query options)))))
 
 (m/defmulti save!*
@@ -167,12 +173,8 @@
         [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
         {:keys [rows options]}  (parse-insert!-args* connectable tableable args options)
         query                   (when (seq rows)
-                                  {:insert-into (compile/table-identifier tableable options)
-                                   :values      (for [row rows]
-                                                  (do
-                                                    (assert (seq row) "Row cannot be empty")
-                                                    (into {} (for [[k v] row]
-                                                               [k (compile/maybe-wrap-value connectable tableable k v options)]))))})]
+                                  (as-> (build-query/insert-query* connectable tableable options) query
+                                    (build-query/with-rows* connectable tableable query rows options)))]
     {:connectable connectable
      :tableable   tableable
      :query       query
@@ -223,7 +225,7 @@
 
 (m/defmethod parse-delete-args* :default
   [connectable tableable args options]
-  (select/parse-select-args connectable tableable args options))
+  (select/parse-select-args* connectable tableable args options))
 
 (m/defmethod parse-delete-args* :around :default
   [connectable tableable args options]
@@ -233,7 +235,13 @@
 (defn parse-delete-args [[connectable-tableable & args]]
   (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
         [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
-        {:keys [query options]} (parse-delete-args* connectable tableable args options)]
+        parsed-select-args      (parse-delete-args* connectable tableable args options)
+        {:keys [query options]} (select/compile-select-query
+                                 connectable
+                                 tableable
+                                 (build-query/delete-query* connectable tableable options)
+                                 parsed-select-args
+                                 options)]
     {:connectable connectable
      :tableable   tableable
      :query       query
@@ -246,8 +254,8 @@
 
 (m/defmethod delete!* :default
   [connectable tableable query options]
-  (let [query (merge {:delete-from (compile/table-identifier tableable options)}
-                             query)]
+  (let [query (build-query/merge-queries* (build-query/delete-query* connectable tableable options)
+                                          query)]
     (log/with-trace ["DELETE rows: %s" query]
       (query/execute! connectable tableable query options))))
 

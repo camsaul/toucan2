@@ -1,21 +1,23 @@
 (ns toucan2.no-jdbc-poc-test
   (:require [clojure.test :refer :all]
+            [methodical.core :as m]
+            [toucan2.build-query :as build-query]
             [toucan2.core :as toucan2]
             [toucan2.select :as select]))
 
-(toucan2/defmethod toucan2/default-connectable-for-tableable* ::system-properties
+(m/defmethod toucan2/default-connectable-for-tableable* ::system-properties
   [_ _]
   ::system-properties)
 
-(toucan2/defmethod toucan2/queryable* [::system-properties :default :default]
+(m/defmethod toucan2/queryable* [::system-properties :default :default]
   [_ _ queryable _]
   queryable)
 
-(toucan2/defmethod toucan2/compile* [::system-properties :default :default]
+(m/defmethod toucan2/compile* [::system-properties :default :default]
   [_ _ query _]
   query)
 
-(toucan2/defmethod toucan2/reducible-query* [::system-properties :default :default]
+(m/defmethod toucan2/reducible-query* [::system-properties :default :default]
   [connectable tableable queryable options]
   (let [ks (toucan2/compile connectable tableable queryable options)]
     (assert (sequential? ks))
@@ -23,13 +25,17 @@
     (into {} (for [k ks]
                [(keyword k) (System/getProperty (name k))]))))
 
-(toucan2/defmethod select/parse-select-args* [::system-properties :default]
+(m/defmethod select/parse-select-args* [::system-properties :default]
   [_ _ args _]
-  {:query args, :options nil})
+  {:query (with-meta args {:type ::system-properties-query}), :options nil})
 
-(toucan2/defmethod select/compile-select* [::system-properties :default]
+(m/defmethod select/compile-select* [::system-properties :default]
   [_ _ args _]
   args)
+
+(m/defmethod build-query/merge-queries* [:default ::system-properties-query]
+  [_ query]
+  query)
 
 (deftest select-test
   (is (= {:user.language "en"}

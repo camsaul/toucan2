@@ -4,14 +4,14 @@
   (:require [clojure.spec.alpha :as s]
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
-            [toucan2.compile :as compile]
+            [toucan2.build-query :as build-query]
             [toucan2.connectable :as conn]
             [toucan2.connectable.current :as conn.current]
-            [toucan2.honeysql-util :as honeysql-util]
             [toucan2.log :as log]
             [toucan2.query :as query]
             [toucan2.queryable :as queryable]
             [toucan2.realize :as realize]
+            [toucan2.select :as select]
             [toucan2.specs :as specs]
             [toucan2.tableable :as tableable]
             [toucan2.util :as u]))
@@ -35,16 +35,13 @@
 
 (m/defmethod select* :default
   [connectable tableable query options]
-  (reducible-query-as connectable tableable (compile/from connectable tableable query options) options))
+  (let [query (build-query/merge-queries* (build-query/select-query* connectable tableable options)
+                                          query)]
+    (reducible-query-as connectable tableable query options)))
 
 (m/defmethod select* [:default :default nil]
   [connectable tableable _ options]
   (next-method connectable tableable {} options))
-
-(m/defmethod select* [:default :default clojure.lang.IPersistentMap]
-  [connectable tableable query options]
-  (let [query (merge {:select [:*]} query)]
-    (next-method connectable tableable query options)))
 
 (m/defmulti parse-select-args*
   {:arglists '([connectableᵈ tableableᵈ argsᵈᵗ options])}
@@ -81,19 +78,29 @@
   u/dispatch-on-first-two-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
-(m/defmethod compile-select* :default
-  [connectable tableable parsed-select-args options-1]
+(defn compile-select-query [connectable tableable empty-query parsed-select-args options-1]
   (let [{:keys [pk conditions query options]} parsed-select-args
         options                               (u/recursive-merge options-1 options)
-        conditions                            (cond-> conditions
-                                                pk (honeysql-util/merge-primary-key connectable tableable pk options))
-        query                                 (if query
-                                                (queryable/queryable connectable tableable query options)
-                                                {})
-        query                                 (cond-> query
-                                                (seq conditions) (honeysql-util/merge-conditions
-                                                                  connectable tableable conditions options))]
+        conditions                            (if-not pk
+                                                conditions
+                                                (build-query/merge-primary-key connectable tableable conditions pk options))
+        query                                 (build-query/merge-queries*
+                                               empty-query
+                                               (when query
+                                                 (queryable/queryable connectable tableable query options)))
+        query                                 (if (empty? conditions)
+                                                query
+                                                (build-query/merge-kv-conditions* connectable tableable query conditions options))]
     {:query query, :options options}))
+
+(m/defmethod compile-select* :default
+  [connectable tableable parsed-select-args options]
+  (compile-select-query
+   connectable
+   tableable
+   (build-query/select-query* connectable tableable options)
+   parsed-select-args
+   options))
 
 ;; TODO -- I think this should just take `& options` and do the `parse-connectable-tableable` stuff inside this fn.
 (defn parse-select-args
@@ -209,11 +216,15 @@
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
-(m/defmethod count* [:default :default clojure.lang.IPersistentMap]
-  [connectable tableable honeysql-form options]
-  (query/reduce-first
-   (map :count)
-   (select* connectable tableable (assoc honeysql-form :select [[:%count.* :count]]) options)))
+(m/defmethod count* :default
+  [connectable tableable query options]
+  (log/tracef "No efficient implementation of count* for %s, doing select-reducible and counting the rows..."
+              (u/dispatch-value query))
+  (reduce
+   (fn [acc _]
+     (inc acc))
+   0
+   (select* connectable tableable query options)))
 
 (defn count
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
@@ -228,16 +239,19 @@
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
-;; TODO -- it seems like it would be a lot more efficient if we could use some bespoke JDBC code here e.g. for example
-;; simply checking whether the `ResultSet` returns next (rather than fetching the row in the first place)
-;;
-;; At least we're avoiding the overhead of creating an actual row map since we're only fetching a single column.
-(m/defmethod exists?* [:default :default clojure.lang.IPersistentMap]
-  [connectable tableable honeysql-form options]
-  (boolean
-   (query/reduce-first
-    (map :one)
-    (select* connectable tableable (assoc honeysql-form :select [[1 :one]], :limit 1) options))))
+(m/defmethod exists?* :default
+  [connectable tableable query options]
+  (log/tracef "No efficient implementation of exists?* for %s, doing select-reducible and seeing if it returns a row..."
+              (u/dispatch-value query))
+  (transduce
+   (take 1)
+   (fn
+     ([acc]
+      acc)
+     ([_ _]
+      true))
+   false
+   (select/select* connectable tableable query options)))
 
 (defn exists?
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}

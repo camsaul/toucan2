@@ -2,9 +2,8 @@
   (:require [clojure.walk :as walk]
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
-            [toucan2.compile :as compile]
+            [toucan2.build-query :as build-query]
             [toucan2.connectable.current :as conn.current]
-            [toucan2.honeysql-util :as honeysql-util]
             [toucan2.hydrate :as hydrate]
             [toucan2.instance :as instance]
             [toucan2.log :as log]
@@ -98,9 +97,11 @@
   "Return instances of `tableable` that match conditions from a compiled `update-query` as passed to `update!*`."
   [connectable tableable update-query options]
   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
-        select-query          (-> update-query
-                                  (dissoc :update :set)
-                                  (assoc :from [(compile/table-identifier tableable options)]))]
+        table                 (build-query/table* connectable tableable update-query)
+        conditions            (build-query/conditions* connectable tableable update-query)
+        select-query          (as-> (build-query/select-query* connectable tableable options) query
+                                (build-query/with-table connectable tableable query table options)
+                                (build-query/with-conditions* connectable tableable query conditions options))]
     (log/with-trace-no-result ["Finding matching instances with query %s" select-query]
       (select/select-reducible [connectable tableable] select-query (or options {})))))
 
@@ -136,7 +137,7 @@
   `::before-update-transform-matching-rows`."
   100)
 
-(m/defmethod mutative/update!* :around [:default ::before-update-transform-matching-rows clojure.lang.IPersistentMap]
+(m/defmethod mutative/update!* :around [:default ::before-update-transform-matching-rows :toucan2/buildable-query]
   [connectable tableable {updates :set, :as query} options]
   (log/with-trace-no-result ["Doing before-update for %s" tableable]
     (if (empty? updates)
@@ -183,11 +184,10 @@
                                              #(mapv % pk-keys)))
           ;; do an update call for each distinct set of changes
           (map (fn [[changes matching-primary-keys]]
-                 (let [new-query (-> query
-                                     (assoc :set changes)
-                                     (honeysql-util/merge-conditions connectable tableable
-                                                                     {:toucan2/with-pks matching-primary-keys}
-                                                                     options))]
+                 (let [new-query (as-> (build-query/with-changes* connectable tableable query changes options) query
+                                   ;; TODO -- :toucan2/with-pks is currently only implemented for HoneySQL, don't
+                                   ;; assume it works because it might not.
+                                   (build-query/merge-kv-conditions* connectable tableable query {:toucan2/with-pks matching-primary-keys} options))]
                    (log/with-trace ["Performing updates with query %s" new-query]
                      (next-method connectable tableable new-query options))))))
          (completing (fnil + 0 0))
