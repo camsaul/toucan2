@@ -37,7 +37,7 @@ commands:
     steps:
       - restore_cache:
           keys:
-            - deps-{{ checksum "project.clj" }}
+            - deps-{{ checksum ".DEPS" }}
             - deps-
 
 jobs:
@@ -55,6 +55,12 @@ jobs:
           key: source-{{ .Branch }}-{{ .Revision }}
           paths:
             - .git
+      - run:
+          name: "Generate .DEPS"
+          command: |
+            for file in `find . -name deps.edn -type f | sort`; do
+               echo `md5sum $"file"` >> .DEPS
+            done
       - persist_to_workspace:
           root: /home/circleci/
           paths:
@@ -67,7 +73,7 @@ jobs:
       - restore-deps-cache
       - run: clojure -P -M
       - save_cache:
-          key: deps-{{ checksum "project.clj" }}
+          key: deps-{{ checksum ".DEPS" }}
           paths:
             - /home/circleci/.m2
 
