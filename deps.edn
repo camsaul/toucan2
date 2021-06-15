@@ -1,0 +1,26 @@
+{:aliases
+ {:dev
+  {:extra-deps
+   {org.postgresql/postgresql    {:mvn/version "42.2.19"}
+    com.camsaul/toucan2-core     {:local/root "../toucan2-core"}
+    com.camsaul/toucan2-honeysql {:local/root "../toucan2-honeysql"}
+    com.camsaul/toucan2-jdbc     {:local/root "../toucan2-jdbc"}
+    com.camsaul/toucan2          {:local/root "../toucan2"}}
+
+   :extra-paths
+   ["toucan2-core/test"
+    "toucan2-honeysql/test"
+    "toucan2-jdbc/test"
+    "toucan2/test"]}
+
+  ;; clojure -X:install :artifact '"target/toucan2-honeysql.jar"'
+  :install
+  {:extra-deps {slipset/deps-deploy {:mvn/version "RELEASE"}}
+   :exec-fn    deps-deploy.deps-deploy/deploy
+   :exec-args  {:installer :local}}
+
+  ;; clojure -X:deploy :artifact '"target/toucan2-honeysql.jar"'
+  :deploy
+  {:extra-deps {slipset/deps-deploy {:mvn/version "RELEASE"}}
+   :exec-fn    deps-deploy.deps-deploy/deploy
+   :exec-args  {:installer :remote, #_:sign-releases? #_true}}}}
