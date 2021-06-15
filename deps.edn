@@ -1,11 +1,13 @@
+;; This file is mostly a convenience for dev purposes (it combines all the subprojects) and also defines `:install`
+;; and `:deploy` jobs that can be used for artifacts for the various subprojects.
 {:aliases
  {:dev
   {:extra-deps
    {org.postgresql/postgresql    {:mvn/version "42.2.19"}
-    com.camsaul/toucan2-core     {:local/root "../toucan2-core"}
-    com.camsaul/toucan2-honeysql {:local/root "../toucan2-honeysql"}
-    com.camsaul/toucan2-jdbc     {:local/root "../toucan2-jdbc"}
-    com.camsaul/toucan2          {:local/root "../toucan2"}}
+    com.camsaul/toucan2-core     {:local/root "toucan2-core"}
+    com.camsaul/toucan2-honeysql {:local/root "toucan2-honeysql"}
+    com.camsaul/toucan2-jdbc     {:local/root "toucan2-jdbc"}
+    com.camsaul/toucan2          {:local/root "toucan2"}}
 
    :extra-paths
    ["toucan2-core/test"
