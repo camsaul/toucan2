@@ -188,5 +188,5 @@ workflows:
           filters:
             branches:
               only: master
-            tags:
-              ignore: /.*SNAPSHOT/
+            # tags:
+            #   ignore: /no-release/
