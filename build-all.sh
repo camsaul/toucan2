@@ -1,6 +1,6 @@
 #! /bin/bash
 
-set -eo pipefail
+set -exo pipefail
 
 rm -rf target
 rm -f pom.xml

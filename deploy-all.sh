@@ -1,6 +1,6 @@
 #! /bin/bash
 
-set -eo pipefail
+set -exo pipefail
 
 script_directory=`dirname "${BASH_SOURCE[0]}"`
 cd "$script_directory"
