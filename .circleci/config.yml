@@ -37,7 +37,8 @@ commands:
     steps:
       - restore_cache:
           keys:
-            - deps-{{ checksum ".DEPS" }}
+            - deps-v2-{{ checksum ".DEPS" }}
+            - deps-v2-
             - deps-
 
 jobs:
@@ -71,9 +72,10 @@ jobs:
     steps:
       - attach-workspace
       - restore-deps-cache
-      - run: clojure -P -M
+      - run: clojure -P -X:test:install:deploy
+      - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:jar
       - save_cache:
-          key: deps-{{ checksum ".DEPS" }}
+          key: deps-v2-{{ checksum ".DEPS" }}
           paths:
             - /home/circleci/.m2
 
@@ -90,8 +92,7 @@ jobs:
     executor: << parameters.e >>
     steps:
       - attach-workspace
-      - run: cd << parameters.dir >>
-      - run: clojure << parameters.command >>
+      - run: cd << parameters.dir >> && clojure << parameters.command >>
 
   deploy:
     executor: default
