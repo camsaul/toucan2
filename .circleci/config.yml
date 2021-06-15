@@ -174,7 +174,6 @@ workflows:
             - test-toucan2-honeysql
             - test-toucan2-jdbc
             - test-toucan2
-          command: ./
           filters:
             branches:
               only: master
