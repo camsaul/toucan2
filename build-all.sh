@@ -64,6 +64,13 @@ build_all () {
             -Spom
     build_jar
     install toucan2
+
+    echo "Build toucan2-toucan1"
+    cd "$script_directory"/toucan2-toucan-1
+    rm -f pom.xml
+    clojure -Sdeps "{:deps {com.camsaul/toucan2 {:mvn/version \"$version\"}}}" -Spom
+    build_jar
+    install toucan2-toucan1
 }
 
 build_all

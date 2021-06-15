@@ -41,7 +41,7 @@
 
 (m/defmethod parse-update!-args* :around :default
   [connectable tableable args options]
-  (log/with-trace ["Parsing update! args for %s %s" tableable args]
+  (log/with-debug ["Parsing update! args for %s %s" tableable args]
     (next-method connectable tableable args options)))
 
 (m/defmulti update!*

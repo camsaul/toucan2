@@ -75,12 +75,12 @@
 
 (defn reduce-first
   ([reducible]
-   (reduce-first identity reducible))
+   (reduce-first (map realize/realize) reducible))
 
   ([xform reducible]
    (transduce
     (comp xform (take 1))
-    (completing conj (comp first #_unreduced))
+    (completing conj (comp first))
     []
     reducible)))
 

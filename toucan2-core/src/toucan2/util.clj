@@ -223,3 +223,9 @@
   [child parent]
   (when-not (isa? child parent)
     (derive child parent)))
+
+(defn lower-case-en
+  "Locale-agnostic version of [[clojure.string/lower-case]]. `clojure.string/lower-case` uses the default locale in conversions, turning `ID` into `ıd`, in the Turkish locale.
+  This function always uses the `Locale/US` locale."
+  [^CharSequence s]
+  (.. s toString (toLowerCase (java.util.Locale/US))))

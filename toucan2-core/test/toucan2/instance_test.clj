@@ -7,9 +7,22 @@
             [toucan2.select :as select]
             [toucan2.tableable :as tableable]
             [toucan2.test :as test]
-            [toucan2.util :as u]))
+            [toucan2.util :as u])
+  (:import java.util.Locale))
 
 (use-fixtures :once test/do-with-test-data)
+
+(deftest normalize-key-turkish-test
+  (testing "Test that identifiers are correctly lower cased in Turkish locale"
+    (let [original-locale (Locale/getDefault)]
+      (try
+        (Locale/setDefault (Locale/forLanguageTag "tr"))
+        ;; if we used `clojure.string/lower-case`, `:ID` would be converted to `:ıd` in Turkish locale
+        (is (= :id
+               (instance/normalize-key "ID")
+               (instance/normalize-key :ID)))
+        (finally
+          (Locale/setDefault original-locale))))))
 
 (deftest instance-test
   (let [m (assoc (instance/instance :wow {:a 100}) :b 200)]

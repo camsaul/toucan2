@@ -148,6 +148,13 @@ workflows:
           command: -M:check
 
       - clojure:
+          name: check-toucan2-toucan1
+          requires:
+            - deps
+          dir: /home/circleci/camsaul/toucan2/toucan2-toucan1/
+          command: -M:check
+
+      - clojure:
           name: test-toucan2-core
           requires:
             - check-toucan2-core
@@ -179,14 +186,21 @@ workflows:
           dir: /home/circleci/camsaul/toucan2/toucan2/
           command: -X:test
 
+      - clojure:
+          name: test-toucan2-toucan1
+          requires:
+            - check-toucan2-toucan1
+          e: postgres
+          dir: /home/circleci/camsaul/toucan2/toucan2-toucan1/
+          command: -X:test
+
       - deploy:
           requires:
             - test-toucan2-core
             - test-toucan2-honeysql
             - test-toucan2-jdbc
             - test-toucan2
+            - test-toucan2-toucan1
           filters:
             branches:
               only: master
-            # tags:
-            #   ignore: /no-release/

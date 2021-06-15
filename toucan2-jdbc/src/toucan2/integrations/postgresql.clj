@@ -1,6 +1,5 @@
 (ns toucan2.integrations.postgresql
-  (:require [clojure.string :as str]
-            [java-time :as t]
+  (:require [java-time :as t]
             [methodical.core :as m]
             [second-date.core :as second-date]
             toucan2.jdbc
@@ -28,7 +27,7 @@
 ;; We can look at the actual column type name to distinguish between the two
 (m/defmethod rs/read-column-thunk* [:toucan2.jdbc/postgresql :default Types/TIMESTAMP]
   [_ _ ^ResultSet rs ^ResultSetMetaData rsmeta ^Long i _]
-  (let [^Class klass (if (= (str/lower-case (.getColumnTypeName rsmeta i)) "timestamptz")
+  (let [^Class klass (if (= (u/lower-case-en (.getColumnTypeName rsmeta i)) "timestamptz")
                        java.time.OffsetDateTime
                        java.time.LocalDateTime)]
     (rs/get-object-of-class-thunk rs i klass)))
