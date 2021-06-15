@@ -8,14 +8,16 @@
     com.camsaul/toucan2-honeysql {:local/root "toucan2-honeysql"}
     com.camsaul/toucan2-jdbc     {:local/root "toucan2-jdbc"}
     com.camsaul/toucan2          {:local/root "toucan2"}
-    com.camsaul/toucan2-toucan1  {:local/root "toucan2-toucan1"}}
+    com.camsaul/toucan2-toucan1  {:local/root "toucan2-toucan1"}
+    com.camsaul/toucan2-schema   {:local/root "toucan2-schema"}}
 
    :extra-paths
    ["toucan2-core/test"
     "toucan2-honeysql/test"
     "toucan2-jdbc/test"
     "toucan2/test"
-    "toucan2-toucan1/test"]}
+    "toucan2-toucan1/test"
+    "toucan2-schema/test"]}
 
   ;; test all the subprojects with clojure -X:test
   :test
@@ -23,7 +25,8 @@
                  "toucan2-honeysql/test"
                  "toucan2-jdbc/test"
                  "toucan2/test"
-                 "toucan2-toucan1/test"]
+                 "toucan2-toucan1/test"
+                 "toucan2-schema/test"]
    :extra-deps  {io.github.cognitect-labs/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git"
                                                        :sha     "705ad25bbf0228b1c38d0244a36001c2987d7337"}
                  org.postgresql/postgresql            {:mvn/version "42.2.19"}
@@ -31,14 +34,16 @@
                  com.camsaul/toucan2-honeysql         {:local/root "toucan2-honeysql"}
                  com.camsaul/toucan2-jdbc             {:local/root "toucan2-jdbc"}
                  com.camsaul/toucan2                  {:local/root "toucan2"}
-                 com.camsaul/toucan2-toucan1          {:local/root "toucan2-toucan1"}}
+                 com.camsaul/toucan2-toucan1          {:local/root "toucan2-toucan1"}
+                 com.camsaul/toucan2-schema           {:local/root "toucan2-schema"}}
    :jvm-opts    ["-Duser.timezone=UTC"]
    :exec-fn     cognitect.test-runner.api/test
    :exec-args   {:dirs ["toucan2-core/test"
                         "toucan2-honeysql/test"
                         "toucan2-jdbc/test"
                         "toucan2/test"
-                        "toucan2-toucan1/test"]}}
+                        "toucan2-toucan1/test"
+                        "toucan2-schema/test"]}}
 
   ;; clojure -X:install :artifact '"target/toucan2-honeysql.jar"'
   :install
