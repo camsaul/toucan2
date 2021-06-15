@@ -101,6 +101,7 @@ jobs:
     steps:
       - attach-workspace
       - restore-deps-cache
+      - run: ./build-all.sh "$(git describe --tags)"
       - run: ./deploy-all.sh "$(git describe --tags)"
 
 
