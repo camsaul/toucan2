@@ -187,3 +187,5 @@ workflows:
           filters:
             branches:
               only: master
+            tags:
+              ignore: some-dummy-tag-so-this-will-always-run
