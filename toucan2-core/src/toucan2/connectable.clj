@@ -1,8 +1,7 @@
 (ns toucan2.connectable
   (:require [clojure.spec.alpha :as s]
             [methodical.core :as m]
-            [next.jdbc :as next.jdbc]
-            [next.jdbc.transaction :as next.jdbc.transaction]
+            [toucan2.connectable :as conn]
             [toucan2.connectable.current :as conn.current]
             [toucan2.util :as u]))
 
@@ -30,7 +29,7 @@
                      (contains? m :new?)
                      (let [{:keys [connection]} m]
                        (or (not connection)
-                           (instance? java.sql.Connection connection))))
+                           (instance? java.lang.AutoCloseable connection))))
         (throw (ex-info "connection* should return a map with `:connection` and `:new?`."
                         {:returned m})))
       m)
@@ -52,15 +51,9 @@
   (when (keyword? connectable)
     (throw (ex-info (format "Unknown connectable %s. Did you define a connection* method for it?" connectable)
                     {:k connectable})))
-  {:connection  (next.jdbc/get-connection (u/unwrap-dispatch-on connectable))
-   :new?        true
-   :options     options})
-
-(m/defmethod connection* java.sql.Connection
-  [conn options]
-  {:connection  conn
-   :new?        true
-   :options     options})
+  (throw (ex-info (format "Don't know how to get a connection from %s. Does it derive from :toucan2/jdbc or another connectable backend?"
+                          (binding [*print-meta* true]
+                            (pr-str connectable))))))
 
 (defn connection
   ([]
@@ -78,7 +71,7 @@
       (f conn.current/*current-connection*)
       (let [options                                        (u/recursive-merge
                                                             (conn.current/default-options-for-connectable* connectable) options)
-            {:keys [^java.sql.Connection connection new?]} (connection connectable options)]
+            {:keys [^java.lang.AutoCloseable connection new?]} (connection connectable options)]
         (binding [conn.current/*current-connectable* connectable
                   conn.current/*current-connection*  connection]
           (if new?
@@ -126,7 +119,7 @@
       ~connectable
       ~tableable
       ~options
-      (fn [~(vary-meta (or binding '_) assoc :tag 'java.sql.Connection)]
+      (fn [~(vary-meta (or binding '_) assoc :tag 'java.lang.AutoCloseable)]
         ~@body))))
 
 (s/def ::connectable-tableable
@@ -150,18 +143,14 @@
            (conn.current/current-connectable tableable))
        tableable])))
 
+(m/defmulti do-with-transaction*
+  {:arglists '([connectableᵈᵗ options f])}
+  u/dispatch-on-first-arg
+  :combo (m/thread-first-method-combination))
+
 (defn do-with-transaction [connectable options f]
-  (with-connection [conn connectable options]
-    ;; "ignore" nested transactions -- we'll make it work ourselves.
-    (binding [next.jdbc.transaction/*nested-tx* :ignore]
-      (next.jdbc/with-transaction [tx-connection conn]
-        (let [save-point (.setSavepoint tx-connection)]
-          (try
-            (binding [conn.current/*current-connection* tx-connection]
-              (f conn.current/*current-connection*))
-            (catch Throwable e
-              (.rollback tx-connection save-point)
-              (throw e))))))))
+  (let [[connectable options] (conn.current/ensure-connectable connectable nil options)]
+    (do-with-transaction* connectable options f)))
 
 (defmacro with-transaction
   {:style/indent 1
@@ -172,5 +161,5 @@
     `(do-with-transaction
       ~connectable
       ~options
-      (fn [~(vary-meta (or binding '_) assoc :tag 'java.sql.Connection)]
+      (fn [~(vary-meta (or binding '_) assoc :tag 'java.lang.AutoCloseable)]
         ~@body))))
