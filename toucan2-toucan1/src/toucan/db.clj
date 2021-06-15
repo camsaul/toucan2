@@ -121,18 +121,22 @@
   `(log/with-debug-logging
      ~@body))
 
+(defn- as-honeysql [honeysql-form]
+  (vary-meta honeysql-form assoc :type :toucan2/honeysql))
+
 (defn honeysql->sql
   [honeysql-form]
-  (compile/compile (vary-meta honeysql-form assoc :type :toucan2/honeysql)))
+  (compile/compile (as-honeysql honeysql-form)))
 
 (defn query
   [honeysql-form & {:as options}]
-  (query/query honeysql-form #_(vary-meta honeysql-form assoc :type :toucan2/honeysql)))
+  (assert (map? honeysql-form))
+  (query/query nil nil (as-honeysql honeysql-form) {:next.jdbc options}))
 
 (defn reducible-query
   [honeysql-form & {:as options}]
   (assert (map? honeysql-form))
-  (query/reducible-query (vary-meta honeysql-form assoc :type :toucan2/honeysql)))
+  (query/reducible-query nil nil (as-honeysql honeysql-form) {:next.jdbc options}))
 
 (defn qualify [tableable field-name]
   (hsql/qualify (tableable/table-name tableable) field-name))

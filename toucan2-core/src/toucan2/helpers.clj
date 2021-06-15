@@ -234,8 +234,7 @@
     (log/with-debug-no-result ["Doing after-update for %s" (u/dispatch-value tableable)]
       (when (pos? result)
         (try
-          (let [query (update-query->select-query connectable tableable update-query options)
-                rows  (reducible-instances-matching-update-query connectable tableable update-query options)]
+          (let [rows (reducible-instances-matching-update-query connectable tableable update-query options)]
             (reduce
              (fn [_ instance]
                (after-update* connectable tableable instance options))

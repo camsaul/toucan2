@@ -57,8 +57,8 @@
                                    "toucan2-schema/src"   "toucan2-schema/test"]
                  :add-linters     [:unused-private-vars
                                    #_:unused-fn-args
-                                   #_:unused-locals
-                                   #_:unused-private-vars]
+                                   :unused-locals
+                                   :unused-private-vars]
                  :exclude-linters [:deprecations]
                  :config-files    [".eastwood-config.clj"]}]}
 

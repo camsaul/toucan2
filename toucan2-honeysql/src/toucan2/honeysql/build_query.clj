@@ -58,9 +58,7 @@
 
 (m/defmethod build-query/with-conditions* :toucan2/honeysql
   [query new-conditions options]
-  (let [connectable (query-connectable query)
-        tableable   (query-tableable query)]
-    (assoc query :where new-conditions)))
+  (assoc query :where new-conditions))
 
 (m/defmethod build-query/merge-kv-conditions* :toucan2/honeysql
   [query kv-conditions options]

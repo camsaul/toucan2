@@ -88,13 +88,22 @@
 
 (m/defmulti conditions*
   "Get the conditions (e.g. HoneySQL `:where` associated with a `query`. The actual representation of the conditions my
-  vary depending on the query compilation backend."
+  vary depending on the query compilation backend, so don't assume they'll be in a certain shape. Use other methods
+  like [[toucan2.build-query/merge-kv-conditions*]] to programatically build conditions maps if needed. This method is
+  intended primarily for copying the conditions from one query (e.g. an `UPDATE`) to another query (e.g. a `SELECT`)."
   {:arglists '([queryᵈᵗ])}
   u/dispatch-on-first-arg)
 
+(m/defmethod conditions* :default
+  [query]
+  (log/tracef "%s is not a buildable query; returning nil for conditions*" query)
+  nil)
+
 (m/defmulti with-conditions*
   "Return a copy of `query` with its conditions replaced with `new-conditions`. The actual representation of the
-  conditions my vary depending on the query compilation backend."
+  conditions my vary depending on the query compilation backend, so don't assume a certain shape such as HoneySQL is
+  appropriate. This is intended primarily for use in combination with [[toucan2.build-query/conditions*]], to copy
+  conditions from one query (such as an `UPDATE`) to another (such as a `SELECT`)."
   {:arglists '([queryᵈᵗ new-conditions options]), :style/indent :form}
   u/dispatch-on-first-arg
   :combo (m/thread-first-method-combination))
