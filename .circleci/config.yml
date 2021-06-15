@@ -37,7 +37,8 @@ commands:
     steps:
       - restore_cache:
           keys:
-            - deps-{{ checksum ".DEPS" }}
+            - deps-v3-{{ checksum ".DEPS" }}
+            - deps-v3-
             - deps-
 
 jobs:
@@ -77,7 +78,7 @@ jobs:
       - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:jar
       - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:check
       - save_cache:
-          key: deps-{{ checksum ".DEPS" }}
+          key: deps-v3-{{ checksum ".DEPS" }}
           paths:
             - /home/circleci/.m2
 
