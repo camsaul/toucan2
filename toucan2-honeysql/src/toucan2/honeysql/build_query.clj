@@ -2,7 +2,6 @@
   (:require [honeysql.helpers :as hsql.helpers]
             [methodical.core :as m]
             [toucan2.build-query :as build-query]
-            [toucan2.compile :as compile]
             [toucan2.honeysql.compile :as honeysql.compile]
             [toucan2.honeysql.conditions :as honeysql.conditions]
             [toucan2.log :as log]))
@@ -41,24 +40,32 @@
   [connectable tableable query query-type _]
   (buildable-query-of-type connectable tableable query query-type))
 
+(defn query-connectable [query]
+  (assert (contains? (meta query) :connectable)
+          (format "Expected query to have :connectable metadata. Got: %s"
+                  (binding [*print-meta* true] (pr-str query))))
+  (:connectable (meta query)))
+
+(defn query-tableable [query]
+  (assert (contains? (meta query) :tableable)
+          (format "Expected query to have :tableable metadata. Got: %s"
+                  (binding [*print-meta* true] (pr-str query))))
+  (:tableable (meta query)))
+
 (m/defmethod build-query/conditions* :toucan2/honeysql
   [query]
   (:where query))
 
 (m/defmethod build-query/with-conditions* :toucan2/honeysql
-  [query new-conditions _]
-  (assoc query :where new-conditions))
+  [query new-conditions options]
+  (let [connectable (query-connectable query)
+        tableable   (query-tableable query)]
+    (assoc query :where new-conditions)))
 
 (m/defmethod build-query/merge-kv-conditions* :toucan2/honeysql
   [query kv-conditions options]
-  (assert (contains? (meta query) :connectable)
-          (format "Expected query to have :connectable metadata. Got: %s"
-                  (binding [*print-meta* true] (pr-str query))))
-  (assert (contains? (meta query) :tableable)
-          (format "Expected query to have :tableable metadata. Got: %s"
-                  (binding [*print-meta* true] (pr-str query))))
-  (let [connectable (:connectable (meta query))
-        tableable   (:tableable (meta query))]
+  (let [connectable (query-connectable query)
+        tableable   (query-tableable query)]
     (log/with-trace ["Adding key-value conditions %s" kv-conditions]
       (apply hsql.helpers/merge-where query (for [[k v] kv-conditions]
                                               (honeysql.conditions/handle-condition* connectable tableable k v options))))))
@@ -69,21 +76,24 @@
 
 (m/defmethod build-query/with-rows* :toucan2/honeysql
   [query new-rows options]
-  (let [connectable (:connectable (meta query))
-        tableable   (:tableable (meta query))]
+  (let [connectable (query-connectable query)
+        tableable   (query-tableable query)]
     (assoc query :values (for [row new-rows]
                            (do
                              (assert (seq row) "Row cannot be empty")
                              (into {} (for [[k v] row]
-                                        [k (compile/maybe-wrap-value connectable tableable k v options)])))))))
+                                        [k (honeysql.compile/maybe-wrap-value connectable tableable k v options)])))))))
 
 (m/defmethod build-query/changes* :toucan2/honeysql
   [query]
   (:set query))
 
 (m/defmethod build-query/with-changes* :toucan2/honeysql
-  [query new-changes _]
-  (assoc query :set new-changes))
+  [query new-changes options]
+  (let [connectable (query-connectable query)
+        tableable   (query-tableable query)]
+    (assoc query :set (into {} (for [[k v] new-changes]
+                                 [k (honeysql.compile/maybe-wrap-value connectable tableable k v options)])))))
 
 (m/defmethod build-query/table* :toucan2.honeysql/select-query
   [query]

@@ -4,7 +4,6 @@
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
             [toucan2.build-query :as build-query]
-            [toucan2.compile :as compile]
             [toucan2.connectable :as conn]
             [toucan2.connectable.current :as conn.current]
             [toucan2.instance :as instance]
@@ -74,8 +73,6 @@
         conditions                              (if-not pk
                                                   conditions
                                                   (build-query/merge-primary-key connectable tableable conditions pk options))
-        changes                                 (into {} (for [[k v] changes]
-                                                           [k (compile/maybe-wrap-value connectable tableable k v options)]))
         query                                   (when (seq changes)
                                                   (cond-> (build-query/maybe-buildable-query connectable tableable nil :update options)
                                                     true             (build-query/with-table* tableable options)

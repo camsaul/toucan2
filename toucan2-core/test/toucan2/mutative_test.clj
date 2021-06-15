@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [java-time :as t]
             [methodical.core :as m]
-            [toucan2.compile :as compile]
+            [toucan2.honeysql.compile :as honeysql.compile]
             [toucan2.instance :as instance]
             [toucan2.mutative :as mutative]
             [toucan2.query :as query]
@@ -16,7 +16,7 @@
   [_ _]
   [:id :name])
 
-(m/defmethod compile/to-sql* [:default :venues/custom-honeysql :id String]
+(m/defmethod honeysql.compile/to-sql* [:default :venues/custom-honeysql :id String]
   [_ _ _ v _]
   (assert (string? v) (format "V should be a string, got %s" (pr-str v)))
   ["?::integer" v])
