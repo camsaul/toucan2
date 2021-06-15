@@ -19,7 +19,7 @@
   [connectable tableable query {:keys [include-queries-in-exceptions?]
                                 :or   {include-queries-in-exceptions? true}
                                 :as   options}]
-  (log/with-trace ["Compile query with table %s and options %s" tableable options]
+  (log/with-trace ["Compile %s query with table %s and options %s" (u/dispatch-value query) tableable options]
     (log/trace (u/pprint-to-str query))
     (try
       (let [sql-params (next-method connectable tableable query options)]

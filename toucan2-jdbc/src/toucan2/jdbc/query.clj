@@ -17,7 +17,7 @@
   (reduce [_ rf init]
     (try
       (conn/with-connection [conn connectable tableable options]
-        (log/with-trace ["Executing query %s with options %s" sql-params (:next.jdbc options)]
+        (log/with-trace ["Executing SQL query %s with options %s" sql-params (:next.jdbc options)]
           (with-open [stmt (stmt/prepare connectable tableable conn sql-params options)]
             (let [results (stmt/reducible-statement connectable tableable stmt options)]
               (log/with-trace ["Reducing results with rf %s and init %s" rf init]

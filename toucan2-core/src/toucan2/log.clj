@@ -1,7 +1,18 @@
 (ns toucan2.log
-  (:require [clojure.pprint :as pprint]
-            [clojure.string :as str]
-            [clojure.tools.logging :as log]))
+  (:require [clojure.string :as str]
+            [clojure.tools.logging :as log]
+            [pretty.core :as pretty]
+            [puget.printer :as puget]))
+
+(defn pprint [x]
+  ;; don't print in black. I can't see it
+  (binding [puget/*options* (assoc-in puget/*options* [:color-scheme :nil] nil)
+            *print-meta*    true
+            *print-length*  5]
+    (let [x (if (instance? pretty.core.PrettyPrintable x)
+              (with-meta (pretty/pretty x) (meta x))
+              x)]
+      (puget/cprint x))))
 
 (def ^:dynamic *enable-debug-logging*
   "Whether to print log messages to stdout. Useful for debugging things from the REPL."
@@ -31,13 +42,16 @@
   (cond
     (string? x) x
     (number? x) x
-    :else       (binding [*print-meta* true] (pr-str x))))
+    (class? x)  (symbol (.getCanonicalName ^Class x))
+    :else       (-> (binding [*print-meta* true] (with-out-str (pprint x)))
+                    (str/replace #"\s*\n\s*" " ")
+                    str/trim)))
 
 (defn- log* [f x args]
   (try
     (if (instance? Throwable x)
       (do
-        (pprint/pprint (Throwable->map x))
+        (pprint (Throwable->map x))
         (f args))
       (f (cons x args)))
     (catch Throwable e
@@ -111,10 +125,7 @@
     (str "-> " result)
     (try
       (with-out-str
-        (let [lines               (-> result pprint/pprint with-out-str str/trim str/split-lines)
-              lines               (if (meta result)
-                                    (cons (str "^" (pr-str (meta result))) lines)
-                                    lines)
+        (let [lines               (-> result pprint with-out-str str/trim str/split-lines)
               [first-line & more] lines]
           (println (str "=> " first-line))
           (doseq [line more]

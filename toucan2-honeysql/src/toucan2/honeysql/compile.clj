@@ -25,9 +25,9 @@
   hformat/ToSql
   (to-sql [_]
     (let [options (u/recursive-merge *compile-options* options)]
-      (log/with-trace (format "Convert table identifier %s to table name with options %s"
-                              (pr-str tableable)
-                              (pr-str (:honeysql options)))
+      (log/with-trace ["Convert table identifier %s to table name with options %s"
+                       tableable
+                       (:honeysql options)]
         (-> (tableable/table-name *compile-connectable* tableable options)
             (hsql/quote-identifier :style (get-in options [:honeysql :quoting])))))))
 

@@ -42,9 +42,17 @@
                                 (queryable/queryable connectable tableable queryable options)
                                 {})
         can-create-buildable? (can-create-buildable-query? connectable tableable query query-type)
-        query                 (if can-create-buildable?
-                                (log/with-trace ["Create buildable query from %s" query]
+        query                 (cond
+                                (isa? (u/dispatch-value query) :toucan2/buildable-query)
+                                (do (log/trace "Query is already a buildable query")
+                                    (buildable-query* connectable tableable query query-type options))
+
+                                can-create-buildable?
+                                (log/with-trace ["Create buildable query from"]
+                                  (log/trace (u/pprint-to-str query))
                                   (buildable-query* connectable tableable query query-type options))
+
+                                :else
                                 (do
                                   (log/tracef "Cannot create a buildable query from %s" query)
                                   query))]
@@ -73,6 +81,11 @@
   (log/tracef "%s is not a buildable query; ignoring with-table* %s" query new-table)
   query)
 
+(m/defmethod with-table* :around :default
+  [query new-table options]
+  (log/with-trace ["Set query table to %s" new-table]
+    (next-method query new-table options)))
+
 (m/defmulti conditions*
   "Get the conditions (e.g. HoneySQL `:where` associated with a `query`. The actual representation of the conditions my
   vary depending on the query compilation backend."
@@ -90,6 +103,11 @@
   [query new-conditions _]
   (log/tracef "%s is not a buildable query; ignoring with-conditions* %s" query new-conditions)
   query)
+
+(m/defmethod with-conditions* :around :default
+  [query new-conditions options]
+  (log/with-trace ["Set query conditions to %s" new-conditions]
+    (next-method query new-conditions options)))
 
 (m/defmulti merge-kv-conditions*
   "Merge `kv-conditions` into a query. `kv-conditions` are passed as a map of `column-name-keyword` -> `value`. The
@@ -113,6 +131,11 @@
                   (binding [*print-meta* true] (pr-str kv-conditions))))
   query)
 
+(m/defmethod merge-kv-conditions* :around :default
+  [query kv-conditions options]
+  (log/with-trace ["Merge key-value conditions %s into query" kv-conditions]
+    (next-method query kv-conditions options)))
+
 (m/defmulti rows*
   "Get the rows (e.g. HoneySQL `:values`) associated with an `insert-query`."
   {:arglists '([insert-queryᵈᵗ])}
@@ -128,6 +151,11 @@
   [query rows _]
   (log/tracef "%s is not a buildable query; ignoring with-rows* %s" query rows)
   query)
+
+(m/defmethod with-rows* :around :default
+  [query rows options]
+  (log/with-trace ["Set query rows to %s" rows]
+    (next-method query rows options)))
 
 (m/defmulti changes*
   "Return the updates (e.g. HoneySQL `:set`) that will be done to rows matching [[toucan2.build-query/conditions*]] for
@@ -145,6 +173,11 @@
   [query new-changes _]
   (log/tracef "%s is not a buildable query; ignoring with-changes* %s" query new-changes)
   query)
+
+(m/defmethod with-changes* :around :default
+  [query changes options]
+  (log/with-trace ["Set query changes to %s" changes]
+    (next-method query changes options)))
 
 (defn merge-primary-key
   "Merge primary key `pk-vals` either a single value like `1` for a single-column PK or a sequence of values for a PK
