@@ -32,6 +32,13 @@
    [potemkin "0.4.5"]
    [pretty "1.0.5"]]
 
+  :source-paths ["toucan2-core/src"
+                 "toucan2-jdbc/src"
+                 "toucan2-honeysql/src"]
+  :test-paths ["toucan2-core/test"
+               "toucan2-jdbc/test"
+               "toucan2-honeysql/test"]
+
   :profiles
   {:h2
    {:dependencies
@@ -69,7 +76,7 @@
      :jvm-opts
      ["-Duser.timezone=UTC"]
 
-     :source-paths ["dev/src"]
+     #_:source-paths #_["dev/src"]
 
      :injections
      [(require 'pjstadig.humane-test-output)
@@ -82,7 +89,7 @@
    ;; for local dev anything in ./local/src is added to the classpath. Entire dir is git-ignored. So you can store
    ;; local JDBC URLs for testing there
    :repl
-   {:source-paths ["local/src"]}
+   {#_:source-paths #_["local/src"]}
 
    ;; this is mostly for the benefit of fetching/caching deps on CI -- a single profile with *all* deps
    :deps
@@ -106,8 +113,8 @@
     :plugins
     [[lein-cloverage  "1.2.2"]]
 
-    ;; don't count ./dev stuff for code coverage calcualations.
-    :source-paths ^:replace ["src"]
+    ;; ;; don't count ./dev stuff for code coverage calcualations.
+    ;; :source-paths ^:replace ["src"]
 
     :cloverage
     {:fail-threshold   65
@@ -120,7 +127,7 @@
    {:plugins
     [[jonase/eastwood "0.3.11" :exclusions [org.clojure/clojure]]]
 
-    :source-paths ^:replace ["src" "test"]
+    ;; :source-paths ^:replace ["src" "test"]
 
     :eastwood
     {:config-files [".eastwood-config.clj"]
@@ -147,7 +154,7 @@
 
    :check-namespace-decls
    {:plugins               [[lein-check-namespace-decls "1.0.2"]]
-    :source-paths          ^:replace ["src" "test"]
+    ;; :source-paths          ^:replace ["src" "test"]
     :check-namespace-decls {:prefix-rewriting false
                             :ignore-paths [#"toucan2/util/schema\.clj$"]}}
 
