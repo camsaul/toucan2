@@ -1,7 +1,6 @@
 (ns toucan2.build-query
   (:require [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
-            [toucan2.compile :as compile]
             [toucan2.connectable.current :as conn.current]
             [toucan2.log :as log]
             [toucan2.queryable :as queryable]
@@ -157,9 +156,5 @@
           pk-vals (if (sequential? pk-vals)
                     pk-vals
                     [pk-vals])
-          pk-map  (into {} (map
-                            (fn [k v]
-                              [k (compile/maybe-wrap-value connectable tableable k v options)])
-                            pk-cols
-                            pk-vals))]
+          pk-map  (zipmap pk-cols pk-vals)]
       (merge kv-conditions pk-map))))

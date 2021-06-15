@@ -1,10 +1,7 @@
 (ns toucan2.compile
   (:refer-clojure :exclude [compile])
-  (:require [honeysql.format :as hformat]
-            [methodical.core :as m]
+  (:require [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
-            [potemkin :as p]
-            [pretty.core :as pretty]
             [toucan2.connectable.current :as conn.current]
             [toucan2.log :as log]
             [toucan2.queryable :as queryable]
@@ -88,56 +85,3 @@
      (when (seqable? query)
        (assert (seq query) (format "Query cannot be empty. Got: %s" (binding [*print-meta* true] (pr-str query)))))
      (compile* connectable tableable query options))))
-
-;; TODO -- this should be part of the HoneySQL stuff
-
-(m/defmulti to-sql*
-  {:arglists '([connectableᵈ tableableᵈ columnᵈ valueᵈᵗ options])}
-  u/dispatch-on-first-four-args
-  :combo (m.combo.threaded/threading-method-combination :fourth))
-
-(m/defmethod to-sql* :around :default
-  [connectable tableable column v options]
-  (let [result (next-method connectable tableable column v options)]
-    (if (sequential? result)
-      (let [[s & params] result]
-        (assert (string? s) (format "to-sql* should return either string or [string & parms], got %s" (pr-str result)))
-        (doseq [param params]
-          (hformat/add-anon-param param))
-        s)
-      result)))
-
-(p/defrecord+ Value [connectable tableable column v options]
-  pretty/PrettyPrintable
-  (pretty [_]
-    (list* (pretty/qualify-symbol-for-*ns* `value) connectable tableable column v (when options [options])))
-
-  hformat/ToSql
-  (to-sql [this]
-    (log/with-trace ["Convert %s to SQL" this]
-      (to-sql* connectable tableable column v options))))
-
-(defn value
-  ([connectable tableable column v]
-   (value connectable tableable column v nil))
-
-  ([connectable tableable column v options]
-   (assert (keyword? column) (format "column should be a keyword, got %s" (pr-str column)))
-   (when (seq options)
-     (assert (map? options) (format "options should be a map, got %s" (pr-str options))))
-   (->Value connectable tableable column v options)))
-
-(defn ^:deprecated maybe-wrap-value
-  "If there's an applicable impl of `to-sql*` for connectable + tableable + column + (class v), wrap in `v` in a
-  `Value`; if there's not one, return `v` as-is.
-
-  DEPRECATED -- this is really HoneySQL-specific and as such shouldn't be here"
-  ([connectable tableable column v]
-   (maybe-wrap-value connectable tableable column v nil))
-
-  ([connectable tableable column v options]
-   (let [dv (m/dispatch-value to-sql* connectable tableable column v)]
-     (if (m/effective-primary-method to-sql* dv)
-       (log/with-trace ["Found to-sql* method impl for dispatch value %s; wrapping in Value" dv]
-         (value connectable tableable column v options))
-       v))))

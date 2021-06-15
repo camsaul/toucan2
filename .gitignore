@@ -2,6 +2,7 @@
 *.jar
 .\#*
 .cpcache
+.nrepl-port
 /*.iml
 /.eastwood
 /.env
@@ -12,7 +13,6 @@
 /.lein-failures
 /.lein-plugins
 /.lein-repl-history
-/.nrepl-port
 /build.xml
 /checkouts
 /classes
@@ -20,9 +20,9 @@
 /config.edn
 /lib
 /local
-/pom.xml
 /pom.xml.asc
 /profiles.clj
 /tags
 /target
 \#*\#
+pom.xml

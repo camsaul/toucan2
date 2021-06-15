@@ -1,6 +1,5 @@
 (ns toucan2.test
   (:require [clojure.test :refer :all]
-            [environ.core :as env]
             [methodical.core :as m]
             [toucan2.connectable :as conn]
             [toucan2.connectable.current :as conn.current]
@@ -20,7 +19,8 @@
 (derive :test/postgres :toucan2/honeysql)
 
 (def test-postgres-url
-  (env/env :jdbc-url-postgres "jdbc:postgresql://localhost:5432/toucan2?user=cam&password=cam"))
+  (or (System/getenv "JDBC_URL_POSTGRES")
+      "jdbc:postgresql://localhost:5432/toucan2?user=cam&password=cam"))
 
 (m/defmethod conn/connection* :test/postgres
   [_ options]

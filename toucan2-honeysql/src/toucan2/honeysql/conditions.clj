@@ -2,7 +2,7 @@
   (:require [clojure.string :as str]
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
-            [toucan2.compile :as compile]
+            [toucan2.honeysql.compile :as honeysql.compile]
             [toucan2.log :as log]
             [toucan2.tableable :as tableable]
             [toucan2.util :as u]))
@@ -20,7 +20,7 @@
                             (fn ->value [arg]
                               (if (sequential? arg)
                                 (mapv ->value arg)
-                                (compile/maybe-wrap-value connectable tableable k arg options)))
+                                (honeysql.compile/maybe-wrap-value connectable tableable k arg options)))
                             args)))
 
 (m/defmulti handle-condition*
@@ -44,7 +44,7 @@
                     {:k              k
                      :v              v
                      :dispatch-value (m/dispatch-value handle-condition* connectable tableable k v)})))
-  [:= k (compile/maybe-wrap-value connectable tableable k v options)])
+  [:= k (honeysql.compile/maybe-wrap-value connectable tableable k v options)])
 
 (m/defmethod handle-condition* :around :default
   [connectable tableable k v options]

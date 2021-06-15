@@ -11,7 +11,8 @@
             [toucan2.realize :as realize]
             [toucan2.select :as select]
             [toucan2.tableable :as tableable]
-            [toucan2.test :as test]))
+            [toucan2.test :as test]
+            [toucan2.honeysql.compile :as honeysql.compile]))
 
 (use-fixtures :once test/do-with-test-data)
 
@@ -312,7 +313,7 @@
   (is (= false
          (select/exists? [:test/postgres :people] :name "Cam Era"))))
 
-(m/defmethod compile/to-sql* [:default :people/custom-honeysql :id String]
+(m/defmethod honeysql.compile/to-sql* [:default :people/custom-honeysql :id String]
   [_ _ _ v _]
   (assert (string? v) (format "V should be a string, got %s" (pr-str v)))
   ["?::integer" v])

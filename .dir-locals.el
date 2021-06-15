@@ -1,6 +1,8 @@
 ((nil . ((indent-tabs-mode . nil)       ; always use spaces for tabs
          (require-final-newline . t)))  ; add final newline on save
- (clojure-mode . ((eval . (progn
+ (clojure-mode . ((cider-preferred-build-tool . clojure-cli)
+                  (cider-clojure-cli-aliases . "dev")
+                  (eval . (progn
                             ;; Specify which arg is the docstring for certain macros
                             ;; (Add more as needed)
                             (put 's/defn 'clojure-doc-string-elt 2)
