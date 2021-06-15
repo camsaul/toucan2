@@ -71,8 +71,11 @@ jobs:
     steps:
       - attach-workspace
       - restore-deps-cache
-      - run: clojure -P -X:test:install:deploy
-      - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:jar:check
+      - run: clojure -P -X:test
+      - run: clojure -P -X:install
+      - run: clojure -P -X:deploy
+      - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:jar
+      - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:check
       - save_cache:
           key: deps-{{ checksum ".DEPS" }}
           paths:
