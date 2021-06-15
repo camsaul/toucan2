@@ -93,12 +93,14 @@ jobs:
     executor: << parameters.e >>
     steps:
       - attach-workspace
+      - restore-deps-cache
       - run: cd << parameters.dir >> && clojure << parameters.command >>
 
   deploy:
     executor: default
     steps:
       - attach-workspace
+      - restore-deps-cache
       - run: ./deploy-all.sh "$(git describe --tags)"
 
 
