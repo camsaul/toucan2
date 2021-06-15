@@ -8,37 +8,12 @@ executors:
   default:
     working_directory: /home/circleci/camsaul/toucan2/
     docker:
-      - image: circleci/clojure:lein-2.9.1
+      - image: circleci/clojure:openjdk-17-tools-deps-1.10.3.822-buster
 
-  h2:
+  postgres:
     working_directory: /home/circleci/camsaul/toucan2/
     docker:
-      - image: circleci/clojure:lein-2.9.1
-        environment:
-          JDBC_URL: jdbc:h2:mem:toucan2_test;DB_CLOSE_DELAY=-1
-
-  java-11:
-    working_directory: /home/circleci/camsaul/toucan2/
-    docker:
-      - image: circleci/clojure:openjdk-11-lein-2.9.1
-        environment:
-          JDBC_URL: jdbc:h2:mem:toucan2_test;DB_CLOSE_DELAY=-1
-
-  postgres-9-6:
-    working_directory: /home/circleci/camsaul/toucan2/
-    docker:
-      - image: circleci/clojure:lein-2.9.1
-        environment:
-          JDBC_URL_POSTGRES: jdbc:postgresql://localhost:5432/circle_test?user=circle_test
-      - image: circleci/postgres:9.6-alpine
-        environment:
-          POSTGRES_USER: circle_test
-          POSTGRES_DB: circle_test
-
-  postgres-latest:
-    working_directory: /home/circleci/camsaul/toucan2/
-    docker:
-      - image: circleci/clojure:lein-2.9.1
+      - image: circleci/clojure:openjdk-17-tools-deps-1.10.3.822-buster
         environment:
           JDBC_URL_POSTGRES: jdbc:postgresql://localhost:5432/circle_test?user=circle_test
       - image: postgres:latest
@@ -46,78 +21,6 @@ executors:
           POSTGRES_USER: circle_test
           POSTGRES_DB: circle_test
           POSTGRES_HOST_AUTH_METHOD: trust
-
-  mysql-5-7:
-    working_directory: /home/circleci/camsaul/toucan2/
-    docker:
-      - image: circleci/clojure:lein-2.9.1
-        environment:
-          JDBC_URL: jdbc:mysql://localhost:3306/circle_test?user=root
-      - image: circleci/mysql:5.7.23
-
-  mysql-latest:
-    working_directory: /home/circleci/camsaul/toucan2/
-    docker:
-      - image: circleci/clojure:lein-2.9.1
-        environment:
-          JDBC_URL: jdbc:mysql://localhost:3306/circle_test?user=root
-      - image: circleci/mysql:latest
-
-  mariadb-10-2:
-    working_directory: /home/circleci/camsaul/toucan2/
-    docker:
-      - image: circleci/clojure:lein-2.9.1
-        environment:
-          JDBC_URL: jdbc:mysql://localhost:3306/circle_test?user=root
-      - image: circleci/mariadb:10.2.23
-
-  mariadb-latest:
-    working_directory: /home/circleci/camsaul/toucan2/
-    docker:
-      - image: circleci/clojure:lein-2.9.1
-        environment:
-          JDBC_URL: jdbc:mysql://localhost:3306/circle_test?user=root
-      - image: mariadb:latest
-        environment:
-          MYSQL_DATABASE: circle_test
-          MYSQL_USER: root
-          MYSQL_ALLOW_EMPTY_PASSWORD: yes
-
-  sqlserver-2017:
-    working_directory: /home/circleci/camsaul/toucan2/
-    docker:
-      - image: circleci/clojure:lein-2.9.1
-        environment:
-          JDBC_URL: jdbc:sqlserver://localhost:1433/?user=SA&password=123456
-      - image: mcr.microsoft.com/mssql/server:2017-latest
-        environment:
-          ACCEPT_EULA: Y
-          SA_PASSWORD: 123456
-
-  everything:
-    working_directory: /home/circleci/camsaul/toucan2/
-    docker:
-      - image: circleci/clojure:lein-2.9.1
-        environment:
-          # JDBC_URL_H2: jdbc:h2:mem:toucan2_test;DB_CLOSE_DELAY=-1
-          # JDBC_URL_SQL_SERVER: jdbc:sqlserver://localhost:1433/?user=SA&password=123456
-          JDBC_URL_POSTGRES: jdbc:postgresql://localhost:5432/circle_test?user=circle_test
-          # JDBC_URL_MYSQL: jdbc:mysql://localhost:3306/circle_test?user=root
-      - image: postgres:latest
-        environment:
-          POSTGRES_USER: circle_test
-          POSTGRES_DB: circle_test
-          POSTGRES_HOST_AUTH_METHOD: trust
-      # - image: mariadb:latest
-      #   environment:
-      #     MYSQL_DATABASE: circle_test
-      #     MYSQL_USER: root
-      #     MYSQL_ALLOW_EMPTY_PASSWORD: yes
-      # - image: mcr.microsoft.com/mssql/server:2017-latest
-      #   environment:
-      #     ACCEPT_EULA: Y
-      #     SA_PASSWORD: 123456
-
 
 ########################################################################################################################
 #                                                       COMMANDS                                                       #
@@ -134,7 +37,7 @@ commands:
     steps:
       - restore_cache:
           keys:
-            - deps-{{ checksum "project.clj" }}
+            - deps-{{ checksum ".DEPS" }}
             - deps-
 
 jobs:
@@ -152,6 +55,12 @@ jobs:
           key: source-{{ .Branch }}-{{ .Revision }}
           paths:
             - .git
+      - run:
+          name: "Generate .DEPS"
+          command: |
+            for file in `find . -name deps.edn -type f | sort`; do
+               echo `md5sum "$file"` >> .DEPS
+            done
       - persist_to_workspace:
           root: /home/circleci/
           paths:
@@ -162,41 +71,37 @@ jobs:
     steps:
       - attach-workspace
       - restore-deps-cache
-      - run: lein deps
+      - run: clojure -P -X:test:install
+      - run: clojure -P -M
+      - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:jar
+      - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:check
       - save_cache:
-          key: deps-{{ checksum "project.clj" }}
+          key: deps-{{ checksum ".DEPS" }}
           paths:
             - /home/circleci/.m2
 
-  lein:
+  clojure:
     parameters:
       e:
         type: executor
         default: default
-      lein-command:
+      dir:
         type: string
-      after-steps:
-        type: steps
-        default: []
+        default: /home/circleci/camsaul/toucan2/
+      command:
+        type: string
     executor: << parameters.e >>
     steps:
       - attach-workspace
       - restore-deps-cache
-      - run:
-          command: lein << parameters.lein-command >>
-          no_output_timeout: 5m
-      - steps: << parameters.after-steps >>
-      - store_test_results:
-          path: /home/circleci/camsaul/toucan2/target/junit
+      - run: cd << parameters.dir >> && clojure << parameters.command >>
 
-  reflection-warnings:
+  deploy:
     executor: default
     steps:
       - attach-workspace
       - restore-deps-cache
-      - run:
-          command: ./check-for-reflection-warnings.sh
-          no_output_timeout: 3m
+      - run: ./deploy-all.sh "$(git describe --tags)"
 
 
 ########################################################################################################################
@@ -213,126 +118,72 @@ workflows:
           requires:
             - checkout
 
-      - lein:
-          name: postgres-9-6
+      - clojure:
+          name: check-toucan2-core
           requires:
             - deps
-          e: postgres-9-6
-          lein-command: test
+          dir: /home/circleci/camsaul/toucan2/toucan2-core/
+          command: -M:check
 
-      - lein:
-          name: postgres-latest
+      - clojure:
+          name: check-toucan2-honeysql
           requires:
             - deps
-          e: postgres-latest
-          lein-command: test
+          dir: /home/circleci/camsaul/toucan2/toucan2-honeysql/
+          command: -M:check
 
-      # - lein:
-      #     name: h2
-      #     requires:
-      #       - deps
-      #     e: h2
-      #     lein-command: test
-
-      # - lein:
-      #     name: h2-java-11
-      #     requires:
-      #       - deps
-      #     e: java-11
-      #     lein-command: test
-
-      # - lein:
-      #     name: mysql-5-7
-      #     requires:
-      #       - deps
-      #     e: mysql-5-7
-      #     lein-command: test
-
-      # - lein:
-      #     name: mysql-latest
-      #     requires:
-      #       - deps
-      #     e: mysql-latest
-      #     lein-command: test
-
-      # - lein:
-      #     name: mariadb-10-2
-      #     requires:
-      #       - deps
-      #     e: mariadb-10-2
-      #     lein-command: test
-
-      # - lein:
-      #     name: mariadb-latest
-      #     requires:
-      #       - deps
-      #     e: mariadb-latest
-      #     lein-command: test
-
-      # - lein:
-      #     name: sqlserver-2017
-      #     requires:
-      #       - deps
-      #     e: sqlserver-2017
-      #     lein-command: test
-
-      - lein:
-          name: eastwood
+      - clojure:
+          name: check-toucan2-jdbc
           requires:
             - deps
-          lein-command: eastwood
+          dir: /home/circleci/camsaul/toucan2/toucan2-jdbc/
+          command: -M:check
 
-      # - lein:
-      #     name: docstring-checker
-      #     requires:
-      #       - deps
-      #     lein-command: docstring-checker
-
-      - lein:
-          name: namespace-decls
+      - clojure:
+          name: check-toucan2
           requires:
             - deps
-          lein-command: check-namespace-decls
+          dir: /home/circleci/camsaul/toucan2/toucan2/
+          command: -M:check
 
-      - lein:
-          name: bikeshed
+      - clojure:
+          name: test-toucan2-core
           requires:
-            - deps
-          lein-command: bikeshed
+            - check-toucan2-core
+          e: postgres
+          dir: /home/circleci/camsaul/toucan2/toucan2-core/
+          command: -X:test
 
-      - lein:
-          name: cloverage
+      - clojure:
+          name: test-toucan2-honeysql
           requires:
-            - deps
-          e: everything
-          lein-command: cloverage --codecov
-          after-steps:
-            - run:
-                command: bash <(curl -s https://codecov.io/bash)
+            - check-toucan2-honeysql
+          e: postgres
+          dir: /home/circleci/camsaul/toucan2/toucan2-honeysql/
+          command: -X:test
 
-      - reflection-warnings:
+      - clojure:
+          name: test-toucan2-jdbc
           requires:
-            - deps
+            - check-toucan2-jdbc
+          e: postgres
+          dir: /home/circleci/camsaul/toucan2/toucan2-jdbc/
+          command: -X:test
 
-      - lein:
-          name: deploy
+      - clojure:
+          name: test-toucan2
           requires:
-            - bikeshed
-            # - docstring-checker
-            - eastwood
-            - namespace-decls
-            - cloverage
-            - reflection-warnings
-            - postgres-9-6
-            - postgres-latest
-            # - h2
-            # - h2-java-11
-            # - mysql-5-7
-            # - mysql-latest
-            # - mariadb-10-2
-            # - mariadb-latest
-            # - sqlserver-2017
-          lein-command: deploy clojars
+            - check-toucan2
+          e: postgres
+          dir: /home/circleci/camsaul/toucan2/toucan2/
+          command: -X:test
+
+      - deploy:
+          requires:
+            - test-toucan2-core
+            - test-toucan2-honeysql
+            - test-toucan2-jdbc
+            - test-toucan2
           filters:
             branches:
               only: master
