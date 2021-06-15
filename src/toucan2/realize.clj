@@ -13,13 +13,21 @@
     this)
 
   ;; Eduction is assumed to be for query results.
+  ;; TODO -- isn't an Eduction an IReduceInit??
   clojure.core.Eduction
   (realize [this]
     (into [] (map realize) this))
 
   clojure.lang.IReduceInit
   (realize [this]
-    (into [] (map realize) this))
+    (try
+      (into [] (map realize) this)
+      (catch Throwable e
+        (throw (ex-info (format "Error realizing IReduceInit %s: %s"
+                                (binding [*print-meta* true] (pr-str this))
+                                (ex-message e))
+                        {:this this}
+                        e)))))
 
   nil
   (realize [_]

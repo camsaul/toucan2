@@ -19,15 +19,6 @@
   [_ _ rows _]
   (u/unwrap-dispatch-on rows))
 
-;; identity query should just ignore stuff when you try to merge things in to it.
-(m/defmethod build-query/merge-queries* [:toucan2/identity-query :default]
-  [query _]
-  query)
-
-(m/defmethod build-query/merge-queries* [:default :toucan2/identity-query]
-  [_ query]
-  query)
-
 (defn identity-query
   "A queryable that returns `rows` as-is without compiling anything or running anything against a database.
   Good for mocking stuff."

@@ -84,6 +84,9 @@
    (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
          query                 (when queryable
                                  (queryable/queryable connectable tableable queryable options))]
+     (assert (some? query) "Query cannot be nil")
+     (when (seqable? query)
+       (assert (seq query) (format "Query cannot be empty. Got: %s" (binding [*print-meta* true] (pr-str query)))))
      (compile* connectable tableable query options))))
 
 ;; TODO -- this should be part of the HoneySQL stuff
@@ -124,9 +127,11 @@
      (assert (map? options) (format "options should be a map, got %s" (pr-str options))))
    (->Value connectable tableable column v options)))
 
-(defn maybe-wrap-value
+(defn ^:deprecated maybe-wrap-value
   "If there's an applicable impl of `to-sql*` for connectable + tableable + column + (class v), wrap in `v` in a
-  `Value`; if there's not one, return `v` as-is."
+  `Value`; if there's not one, return `v` as-is.
+
+  DEPRECATED -- this is really HoneySQL-specific and as such shouldn't be here"
   ([connectable tableable column v]
    (maybe-wrap-value connectable tableable column v nil))
 

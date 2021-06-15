@@ -76,12 +76,11 @@
                                                   (build-query/merge-primary-key connectable tableable conditions pk options))
         changes                                 (into {} (for [[k v] changes]
                                                            [k (compile/maybe-wrap-value connectable tableable k v options)]))
-        query                                   (as-> (build-query/update-query* connectable tableable options) query
-                                                  (build-query/with-changes* connectable tableable query changes options))
         query                                   (when (seq changes)
-                                                  (if (empty? conditions)
-                                                    query
-                                                    (build-query/merge-kv-conditions* connectable tableable query conditions options)))]
+                                                  (cond-> (build-query/maybe-buildable-query connectable tableable nil :update options)
+                                                    true             (build-query/with-table* tableable options)
+                                                    true             (build-query/with-changes* changes options)
+                                                    (seq conditions) (build-query/merge-kv-conditions* conditions options)))]
     {:connectable connectable
      :tableable   tableable
      :query       query
@@ -96,9 +95,7 @@
       (do
         (log/trace "Query has no changes, skipping update")
         0)
-      (log/with-trace ["UPDATE %s SET %s WHERE %s" tableable
-                       (build-query/changes* connectable tableable query)
-                       (build-query/conditions* connectable tableable query)]
+      (log/with-trace ["UPDATE %s SET %s WHERE %s" tableable (build-query/changes* query) (build-query/conditions* query)]
         (update!* connectable tableable query options)))))
 
 (m/defmulti save!*
@@ -173,8 +170,9 @@
         [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
         {:keys [rows options]}  (parse-insert!-args* connectable tableable args options)
         query                   (when (seq rows)
-                                  (as-> (build-query/insert-query* connectable tableable options) query
-                                    (build-query/with-rows* connectable tableable query rows options)))]
+                                  (-> (build-query/maybe-buildable-query connectable tableable nil :insert options)
+                                      (build-query/with-table* tableable options)
+                                      (build-query/with-rows* rows options)))]
     {:connectable connectable
      :tableable   tableable
      :query       query
@@ -233,15 +231,13 @@
     (next-method connectable tableable args options)))
 
 (defn parse-delete-args [[connectable-tableable & args]]
-  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
-        [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
-        parsed-select-args      (parse-delete-args* connectable tableable args options)
-        {:keys [query options]} (select/compile-select-query
-                                 connectable
-                                 tableable
-                                 (build-query/delete-query* connectable tableable options)
-                                 parsed-select-args
-                                 options)]
+  (let [[connectable tableable]            (conn/parse-connectable-tableable connectable-tableable)
+        [connectable options-1]            (conn.current/ensure-connectable connectable tableable nil)
+        {:keys [conditions query options]} (parse-delete-args* connectable tableable args options-1)
+        options                            (u/recursive-merge options-1 options)
+        query                              (cond-> (build-query/maybe-buildable-query connectable tableable query :delete options)
+                                             true             (build-query/with-table* tableable options)
+                                             (seq conditions) (build-query/merge-kv-conditions* conditions options))]
     {:connectable connectable
      :tableable   tableable
      :query       query
@@ -254,8 +250,7 @@
 
 (m/defmethod delete!* :default
   [connectable tableable query options]
-  (let [query (build-query/merge-queries* (build-query/delete-query* connectable tableable options)
-                                          query)]
+  (let [query (build-query/maybe-buildable-query connectable tableable query :delete options)]
     (log/with-trace ["DELETE rows: %s" query]
       (query/execute! connectable tableable query options))))
 

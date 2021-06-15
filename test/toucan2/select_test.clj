@@ -36,6 +36,10 @@
   [_ _ _ _]
   {:named-query? true})
 
+(m/defmethod tableable/primary-key* [:default ::tableable]
+  [_ _]
+  [:id :id-2 :id-3])
+
 (deftest parse-select-args-test
   (doseq [[query expected-query] {[]                    nil
                                   [{:query true}]       {:query true}
@@ -48,15 +52,15 @@
           [id expected-id]       (when (or (map? (first query))
                                            (= (first query) ::named-query))
                                    {[]                 nil
-                                    [1]                1
-                                    [[1 2 3]]          [1 2 3]
+                                    [1]                {:id 1}
+                                    [[1 2 3]]          {:id 1, :id-2 2, :id-3 3}
                                     ;; anything besides a keyword or map should be allowed as an id.
-                                    ["id"]             "id"
-                                    ['id]              'id
+                                    ["id"]             {:id "id"}
+                                    ['id]              {:id 'id}
                                     ;; maps and keywords are allowed inside vectors but not directly
-                                    [[{:map-id true}]] [{:map-id true}]
-                                    [[:keyword-id]]    [:keyword-id]
-                                    [[1 "id"]]         [1 "id"]})
+                                    [[{:map-id true}]] {:id {:map-id true}}
+                                    [[:keyword-id]]    {:id :keyword-id}
+                                    [[1 "id"]]         {:id 1, :id-2 "id"}})
           ;; can only have kvs if query is a map
           [kvs expected-kvs]     (when (map? (first query))
                                    {[]                      nil
@@ -70,13 +74,15 @@
                                        {[]                nil
                                         [{}]              {}
                                         [{:options true}] {:options true}})
-          :let                       [args (vec (concat id kvs query options))]]
-    (testing (pr-str (list `parse-select-args* args))
-      (is (= {:pk         expected-id
-              :conditions expected-kvs
+          :let                       [args                (vec (concat id kvs query options))
+                                      expected-conditions (merge
+                                                           expected-kvs
+                                                           expected-id)]]
+    (testing (pr-str (list `select/parse-select-args* args))
+      (is (= {:conditions expected-conditions
               :query      expected-query
               :options    expected-options}
-             (select/parse-select-args* :connectable :tableable args nil))))))
+             (select/parse-select-args* :connectable ::tableable args nil))))))
 
 (m/defmethod tableable/table-name* [:default ::people]
   [_ _ _]

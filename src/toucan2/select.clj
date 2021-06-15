@@ -35,8 +35,7 @@
 
 (m/defmethod select* :default
   [connectable tableable query options]
-  (let [query (build-query/merge-queries* (build-query/select-query* connectable tableable options)
-                                          query)]
+  (let [query (build-query/maybe-buildable-query connectable tableable query :select options)]
     (reducible-query-as connectable tableable query options)))
 
 (m/defmethod select* [:default :default nil]
@@ -60,60 +59,40 @@
 (m/defmethod parse-select-args* :default
   [connectable tableable args _]
   (let [spec   (select-args-spec connectable tableable)
-        parsed (s/conform spec args)]
+        parsed (log/with-trace ["parse-select-args* :default"]
+                 (s/conform spec args))]
     (when (= parsed :clojure.spec.alpha/invalid)
       (throw (ex-info (format "Don't know how to interpret select args: %s" (s/explain-str spec args))
                       {:args args})))
-    (log/tracef "-> %s" (u/pprint-to-str parsed))
-    (let [{[_ {:keys [pk query conditions]}] :query, :keys [options]} parsed]
-      {:pk         pk
-       :conditions (when (seq conditions)
-                     (zipmap (map :k conditions) (map :v conditions)))
+    (let [{[_ {:keys [pk query conditions]}] :query, :keys [options]} parsed
+          conditions                                                  (when (seq conditions)
+                                                                        (zipmap (map :k conditions) (map :v conditions)))
+          conditions                                                  (if-not pk
+                                                                        conditions
+                                                                        (build-query/merge-primary-key connectable tableable conditions pk options))]
+      {:conditions conditions
        ;; TODO -- should probably be `:queryable` instead of `:query` for clarity.
        :query      query
        :options    options})))
-
-(m/defmulti compile-select*
-  {:arglists '([connectableᵈ tableableᵈ parsed-select-argsᵗ options])}
-  u/dispatch-on-first-two-args
-  :combo (m.combo.threaded/threading-method-combination :third))
-
-(defn compile-select-query [connectable tableable empty-query parsed-select-args options-1]
-  (let [{:keys [pk conditions query options]} parsed-select-args
-        options                               (u/recursive-merge options-1 options)
-        conditions                            (if-not pk
-                                                conditions
-                                                (build-query/merge-primary-key connectable tableable conditions pk options))
-        query                                 (build-query/merge-queries*
-                                               empty-query
-                                               (when query
-                                                 (queryable/queryable connectable tableable query options)))
-        query                                 (if (empty? conditions)
-                                                query
-                                                (build-query/merge-kv-conditions* connectable tableable query conditions options))]
-    {:query query, :options options}))
-
-(m/defmethod compile-select* :default
-  [connectable tableable parsed-select-args options]
-  (compile-select-query
-   connectable
-   tableable
-   (build-query/select-query* connectable tableable options)
-   parsed-select-args
-   options))
 
 ;; TODO -- I think this should just take `& options` and do the `parse-connectable-tableable` stuff inside this fn.
 (defn parse-select-args
   "Parse args to the `select` family of functions. Returns a map with the parsed/combined `:query` and parsed
   `:options`."
-  [connectable tableable args options]
+  [connectable tableable args options-1]
   (log/with-trace ["Parsing select args for %s %s" tableable args]
-    (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
-          parsed-select-args    (parse-select-args* connectable tableable args options)
-          compiled              (compile-select* connectable tableable parsed-select-args options)]
-      (assert (and (map? compiled) (contains? compiled :query) (contains? compiled :options))
-              "compile-select* should return a map with :query and :options")
-      compiled)))
+    (let [[connectable options-1]            (conn.current/ensure-connectable connectable tableable options-1)
+          {:keys [conditions query options]} (parse-select-args* connectable tableable args options-1)
+          options                            (u/recursive-merge options-1 options)
+          query                              (build-query/maybe-buildable-query connectable tableable query :select options)
+          query                              (cond-> query
+                                               (not (build-query/table* query)) (build-query/with-table* tableable options)
+                                               (seq conditions)                 (build-query/merge-kv-conditions* conditions options))]
+
+      (assert (some? query) "Query should not be nil")
+      (when (seqable? query)
+        (assert (seq query) (format "Query should not be empty. Got: %s" (binding [*print-meta* true] (pr-str query)))))
+      {:query query, :options options})))
 
 (defn select-reducible
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}

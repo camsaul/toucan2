@@ -31,7 +31,7 @@
   (cond
     (string? x) x
     (number? x) x
-    :else       (pr-str x)))
+    :else       (binding [*print-meta* true] (pr-str x))))
 
 (defn- log* [f x args]
   (try
@@ -111,8 +111,12 @@
     (str "-> " result)
     (try
       (with-out-str
-        (let [[first-line & more] (-> result pprint/pprint with-out-str str/trim str/split-lines)]
-          (println (str "-> " first-line))
+        (let [lines               (-> result pprint/pprint with-out-str str/trim str/split-lines)
+              lines               (if (meta result)
+                                    (cons (str "^" (pr-str (meta result))) lines)
+                                    lines)
+              [first-line & more] lines]
+          (println (str "=> " first-line))
           (doseq [line more]
             (println (str "   " line)))))
       (catch Throwable e
