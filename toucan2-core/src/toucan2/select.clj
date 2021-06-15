@@ -11,7 +11,6 @@
             [toucan2.query :as query]
             [toucan2.queryable :as queryable]
             [toucan2.realize :as realize]
-            [toucan2.select :as select]
             [toucan2.specs :as specs]
             [toucan2.tableable :as tableable]
             [toucan2.util :as u]))
@@ -230,7 +229,7 @@
      ([_ _]
       true))
    false
-   (select/select* connectable tableable query options)))
+   (select* connectable tableable query options)))
 
 (defn exists?
   {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}

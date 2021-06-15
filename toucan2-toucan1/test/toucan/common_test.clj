@@ -19,9 +19,9 @@
   (is (thrown?
        Exception
        (common/resolve-model "User")))
-  (is (thrown?
-       Exception
-       (common/resolve-model :user)))
+  (testing "we should allow keywords as-is"
+    (is (= :user
+           (common/resolve-model :user))))
   (testing "entities symbols are NO LONGER case-sensitive"
     (is (= :models/user
            (common/resolve-model 'user)))))

@@ -26,14 +26,14 @@
                           {:k k, :v v}
                           e)))))))
 
-(defmacro add-type! [k & {:as m}]
+(defmacro add-type! [k & {:keys [in out], :as m}]
   `(def ~(vary-meta (symbol (format "%s-xform" (name k))) assoc :deprecated true)
      ~(format "The type transform formerly known as %s." k)
      ~(cond-> m
-        :in (update :in (fn [f]
-                          `(wrapped-transform ~k ~f)))
-        :out (update :out (fn [f]
-                            `(wrapped-transform ~k ~f))))))
+        in (update :in (fn [f]
+                         `(wrapped-transform ~k ~f)))
+        out (update :out (fn [f]
+                           `(wrapped-transform ~k ~f))))))
 
 (defmacro add-property!
   {:style/indent 1}

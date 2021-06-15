@@ -25,9 +25,7 @@
 
 (m/defmethod conn/connection* :test/postgres
   [_ options]
-  (next-method
-   test-postgres-url
-   options))
+  (next-method test-postgres-url options))
 
 (derive :test/postgres-with-quoting :test/postgres)
 

@@ -45,6 +45,23 @@
                         "toucan2-toucan1/test"
                         "toucan2-schema/test"]}}
 
+  ;; run Eastwood over everything with Clojure -M:eastwood:dev
+  :eastwood
+  {:extra-deps {jonase/eastwood {:mvn/version "RELEASE"}}
+   :main-opts  ["-m" "eastwood.lint"
+                {:source-paths    ["toucan2-core/src"     "toucan2-core/test"
+                                   "toucan2-honeysql/src" "toucan2-honeysql/test"
+                                   "toucan2-jdbc/src"     "toucan2-jdbc/test"
+                                   "toucan2/src"          "toucan2/test"
+                                   "toucan2-toucan1/src"  "toucan2-toucan1/test"
+                                   "toucan2-schema/src"   "toucan2-schema/test"]
+                 :add-linters     [:unused-private-vars
+                                   #_:unused-fn-args
+                                   #_:unused-locals
+                                   #_:unused-private-vars]
+                 :exclude-linters [:deprecations]
+                 :config-files    [".eastwood-config.clj"]}]}
+
   ;; clojure -X:install :artifact '"target/toucan2-honeysql.jar"'
   :install
   {:extra-deps {slipset/deps-deploy {:mvn/version "RELEASE"}}

@@ -1,7 +1,6 @@
 (ns toucan2.connectable
   (:require [clojure.spec.alpha :as s]
             [methodical.core :as m]
-            [toucan2.connectable :as conn]
             [toucan2.connectable.current :as conn.current]
             [toucan2.util :as u]))
 
@@ -53,7 +52,8 @@
                     {:k connectable})))
   (throw (ex-info (format "Don't know how to get a connection from %s. Does it derive from :toucan2/jdbc or another connectable backend?"
                           (binding [*print-meta* true]
-                            (pr-str connectable))))))
+                            (pr-str connectable)))
+                  {:connectable connectable, :options options})))
 
 (defn connection
   ([]

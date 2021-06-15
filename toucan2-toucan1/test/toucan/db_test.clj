@@ -9,7 +9,9 @@
             [toucan.test-models.user :refer [User]]
             [toucan.test-models.venue :refer [Venue]]
             [toucan.test-setup :as test]
-            [toucan2.query :as query])
+            [toucan2.query :as query]
+            [toucan2.instance :as instance]
+            [methodical.core :as m])
   (:import java.util.Locale))
 
 (use-fixtures :once test/do-with-reset-db)
@@ -45,21 +47,22 @@
 
 (defn- mangle-a-chars
   [s]
-  (-> s str/lower-case (str/replace "a" "â")))
+  (-> s name str/lower-case (str/replace "a" "â") keyword))
+
+(m/defmethod instance/key-transform-fn* [:default ::mangled-identifiers]
+  [_ _]
+  mangle-a-chars)
+
+(derive ::UserWithMangledIdentifiers :models/User)
+(derive ::UserWithMangledIdentifiers ::mangled-identifiers)
+
+(deftest custom-identifiers-test
+  (testing "Note the circumflexes over 'a's"
+    (is (= #{:first-nâme :lâst-nâme :id}
+           (-> (db/select-one ::UserWithMangledIdentifiers) keys set)))))
 
 ;; FIXME
-#_(deftest test-9
-    (is (= [mangle-a-chars #{:first-nâme :lâst-nâme :id}] ; Note the circumflexes over a's
-           (let [original-options @@(var db/toucan1-options)]
-             (try
-               (db/set-default-jdbc-options! {:next.jdbc {:identifiers mangle-a-chars}})
-               [(:identifiers @@(var db/default-jdbc-options))
-                (-> (db/select-one 'User) keys set)]
-               (finally
-                 (db/set-default-jdbc-options! original-options)))))))
-
-;; FIXME
-#_(deftest test-10
+#_(deftest default-to-lower-case-key-xform-test
   (is (= [str/lower-case #{:first-name :last-name :id}] ; Note the absence of circumflexes over a's
          (let [original-options @@(var db/default-jdbc-options)]
            (try

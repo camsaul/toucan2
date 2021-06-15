@@ -1,11 +1,13 @@
 (ns toucan.common)
 
 (defn resolve-model [model]
-  (cond
-    (symbol? model)
+  (cond (symbol? model)
     (keyword "models" (name model))
 
     (:toucan.models/model model)
+    model
+
+    (keyword? model)
     model
 
     :else

@@ -71,7 +71,7 @@ jobs:
     steps:
       - attach-workspace
       - restore-deps-cache
-      - run: clojure -P -X:test:install
+      - run: clojure -P -X:test:install:eastwood:dev
       - run: clojure -P -M
       - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:jar
       - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:check
@@ -162,6 +162,13 @@ workflows:
           command: -M:check
 
       - clojure:
+          name: eastwood
+          requires:
+            - deps
+          dir: /home/circleci/camsaul/toucan2/
+          command: -M:eastwood:dev
+
+      - clojure:
           name: test-toucan2-core
           requires:
             - check-toucan2-core
@@ -211,6 +218,7 @@ workflows:
 
       - deploy:
           requires:
+            - eastwood
             - test-toucan2-core
             - test-toucan2-honeysql
             - test-toucan2-jdbc

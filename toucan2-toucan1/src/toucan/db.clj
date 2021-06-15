@@ -6,7 +6,6 @@
             [honeysql.helpers :as h]
             [methodical.core :as m]
             [toucan.common :as common]
-            [toucan.db :as db]
             [toucan2.compile :as compile]
             [toucan2.connectable :as conn]
             [toucan2.connectable.current :as conn.current]
