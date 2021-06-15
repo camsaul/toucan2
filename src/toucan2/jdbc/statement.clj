@@ -1,5 +1,6 @@
 (ns toucan2.jdbc.statement
-  (:require [methodical.core :as m]
+  (:require [clojure.string :as str]
+            [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
             [next.jdbc :as next.jdbc]
             [next.jdbc.prepare :as next.jdbc.prepare]
@@ -62,6 +63,7 @@
   (->ReducibleStatement connectable tableable stmt options))
 
 (defn prepare ^java.sql.PreparedStatement [connectable tableable conn [sql & params] options]
+  (assert (not (str/blank? sql)) "SQL cannot be blank/empty")
   (let [params     (for [param params]
                      (parameter connectable tableable param options))
         sql-params (cons sql params)]

@@ -97,11 +97,11 @@
   "Return instances of `tableable` that match conditions from a compiled `update-query` as passed to `update!*`."
   [connectable tableable update-query options]
   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
-        table                 (build-query/table* connectable tableable update-query)
-        conditions            (build-query/conditions* connectable tableable update-query)
-        select-query          (as-> (build-query/select-query* connectable tableable options) query
-                                (build-query/with-table connectable tableable query table options)
-                                (build-query/with-conditions* connectable tableable query conditions options))]
+        table                 (build-query/table* update-query)
+        conditions            (build-query/conditions* update-query)
+        select-query          (-> (build-query/buildable-query* connectable tableable {} :select options)
+                                  (build-query/with-table* table options)
+                                  (build-query/with-conditions* conditions options))]
     (log/with-trace-no-result ["Finding matching instances with query %s" select-query]
       (select/select-reducible [connectable tableable] select-query (or options {})))))
 
@@ -184,10 +184,11 @@
                                              #(mapv % pk-keys)))
           ;; do an update call for each distinct set of changes
           (map (fn [[changes matching-primary-keys]]
-                 (let [new-query (as-> (build-query/with-changes* connectable tableable query changes options) query
+                 (let [new-query (-> query
+                                     (build-query/with-changes* changes options)
                                    ;; TODO -- :toucan2/with-pks is currently only implemented for HoneySQL, don't
                                    ;; assume it works because it might not.
-                                   (build-query/merge-kv-conditions* connectable tableable query {:toucan2/with-pks matching-primary-keys} options))]
+                                   (build-query/merge-kv-conditions* {:toucan2/with-pks matching-primary-keys} options))]
                    (log/with-trace ["Performing updates with query %s" new-query]
                      (next-method connectable tableable new-query options))))))
          (completing (fnil + 0 0))

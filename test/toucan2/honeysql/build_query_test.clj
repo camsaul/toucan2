@@ -43,21 +43,21 @@
 (deftest merge-conditions-test
   (is (= {:select [:*], :where [:and [:= :id 1] [:in :id 2 3]]}
          (build-query/merge-kv-conditions*
-          nil nil
-          ^{:type :toucan2.honeysql/select-query} {:select [:*], :where [:= :id 1]}
-          {:id [:in 2 3]} nil)))
+          (build-query/maybe-buildable-query :test/postgres nil {:select [:*], :where [:= :id 1]} :select nil)
+          {:id [:in 2 3]}
+          nil)))
   (testing "empty conditions -- no-op"
     (is (= {:where [:= :id 1]}
            (build-query/merge-kv-conditions*
-            nil nil
-            ^{:type :toucan2.honeysql/select-query} {:where [:= :id 1]}
-            nil nil))))
+            (build-query/maybe-buildable-query :test/postgres nil {:where [:= :id 1]} :select nil)
+            nil
+            nil))))
   (testing "a custom condition"
     (is (= {:where [:and [:= :id 1] [:in :id [2 3]]]}
            (build-query/merge-kv-conditions*
-            nil nil
-            ^{:type :toucan2.honeysql/select-query} {:where [:= :id 1]}
-            {:toucan2/with-pks [[2] [3]]} nil)))))
+            (build-query/maybe-buildable-query :test/postgres nil {:where [:= :id 1]} :select nil)
+            {:toucan2/with-pks [[2] [3]]}
+            nil)))))
 
 (m/defmethod tableable/table-name* [:default ::my-amazing-table]
   [_ _ _]
@@ -77,8 +77,9 @@
   ([connectable tableable queryable]
    (with-table connectable tableable queryable nil))
   ([connectable tableable queryable options]
-   (let [connectable (or connectable :test/postgres)]
-     (build-query/with-table connectable tableable queryable tableable options))))
+   (let [connectable (or connectable :test/postgres)
+         query       (build-query/maybe-buildable-query connectable tableable queryable :select options)]
+     (build-query/with-table* query tableable options))))
 
 (deftest with-table-test
   (is (= {:select [:*]

@@ -62,5 +62,6 @@
 (m/defmethod compile/compile* [:default :default ReducibleQuery]
   [connectable tableable ^ReducibleQuery query options]
   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
-        sql-params            (query/compile connectable tableable (.queryable query) options)]
+        queryable             (.queryable query)
+        sql-params            (query/compile connectable tableable queryable options)]
     (->ReducibleSQLQuery connectable tableable sql-params options)))
