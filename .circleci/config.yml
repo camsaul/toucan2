@@ -81,6 +81,7 @@ jobs:
         default: /home/circleci/camsaul/toucan2/
       command:
         type: string
+    executor: << parameters.e >>
     steps:
       - attach-workspace
       - run: cd << parameters.dir >>
