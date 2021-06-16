@@ -125,6 +125,7 @@
     (save!* connectable tableable obj options)))
 
 (m/defmulti insert!*
+  "Returns the number of rows inserted."
   {:arglists '([connectableᵈ tableableᵈ queryᵈᵗ options])}
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
@@ -205,6 +206,7 @@
   [connectable-tableable & args]
   (let [{:keys [connectable tableable query options]} (parse-insert-args connectable-tableable args)
         options                                       (-> options
+                                                          ;; TODO -- this is next.jdbc specific
                                                           (assoc-in [:next.jdbc :return-keys] true)
                                                           (assoc :reducible? true))
         reducible-query (do-insert! connectable tableable query options)]

@@ -8,6 +8,7 @@
             [toucan2.instance :as instance]
             [toucan2.log :as log]
             [toucan2.mutative :as mutative]
+            [toucan2.realize :as realize]
             [toucan2.select :as select]
             [toucan2.tableable :as tableable]
             [toucan2.tools.transformed :as transformed]
@@ -269,24 +270,49 @@
                        (fn [~instance-binding]
                          ~@body))))
 
-(defn do-after-insert [connectable tableable query options next-method f]
-  (helper "after-insert" tableable
-    (let [reducible-query (next-method connectable tableable query (-> options
-                                                                       (assoc :reducible? true)
-                                                                       (assoc-in [:next.jdbc :return-keys] true)))
-          pks             (into [] (map (select/select-pks-fn connectable tableable)) reducible-query)
-          instances       (select/select [connectable tableable]
-                                         :toucan2/with-pks pks
-                                         {}
-                                         (update options :next.jdbc dissoc :return-keys))]
-      (mapv f instances))))
+(m/defmulti after-insert*
+  {:arglists '([connectableᵈ instanceᵈᵗ options])}
+  u/dispatch-on-first-two-args
+  :combo (m.combo.threaded/threading-method-combination :second))
+
+(m/defmethod mutative/insert!* [:default ::after-insert :default]
+  [connectable tableable query options]
+  (try
+    (let [return-keys?        (get-in options [:next.jdbc :return-keys])
+          options             (-> options
+                                  ;; TODO -- this is `next.jdbc`-specific -- need a general way to specify
+                                  ;; `:return-keys` behavior.
+                                  (assoc :reducible? true)
+                                  (assoc-in [:next.jdbc :return-keys] true))
+          reducible-query     (next-method connectable tableable query options)
+          pks                 (into [] (map (select/select-pks-fn connectable tableable)) reducible-query)
+          reducible-instances (select/select-reducible
+                               [connectable tableable]
+                               :toucan2/with-pks pks
+                               {}
+                               (update options :next.jdbc dissoc :return-keys))]
+      (transduce
+       (map realize/realize)
+       (completing
+        (fn [acc instance]
+          (after-insert* connectable instance options)
+          (if return-keys?
+            (conj acc (tableable/primary-key-values instance))
+            (inc acc))))
+       (if return-keys? [] 0)
+       reducible-instances))
+    (catch Throwable e
+      (throw (ex-info (format "Error in after insert for %s: %s" (u/dispatch-value tableable) (ex-message e))
+                      {:tableable tableable, :query query, :options options}
+                      e)))))
 
 (defmacro define-after-insert {:style/indent :defn} [dispatch-value [instance-binding] & body]
-  `(m/defmethod mutative/insert!* :around ~(dispatch-value-3 dispatch-value)
-     [~'&connectable ~'&tableable ~'&query ~'&options]
-     (do-after-insert ~'&connectable ~'&tableable ~'&query ~'&options ~'next-method
-                      (fn [~instance-binding]
-                        ~@body))))
+  (let [[connectable tableable query-type] (dispatch-value-3 dispatch-value)]
+    `(do
+       (u/maybe-derive ~tableable ::after-insert)
+       (m/defmethod after-insert* [~connectable ~tableable]
+         [~'&connectable ~instance-binding ~'&options]
+         ~@body))))
 
 (defn do-before-delete [connectable tableable delete-query options f]
   (helper "before-delete" tableable
