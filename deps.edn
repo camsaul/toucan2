@@ -32,6 +32,12 @@
                         "toucan2-toucan1/test"
                         "toucan2-schema/test"]}}
 
+  ;; check everything with clojure -M:check:dev
+  :check
+  {:extra-deps {athos/clj-check {:git/url "https://github.com/athos/clj-check.git"
+                                 :sha     "518d5a1cbfcd7c952f548e6dbfcb9a4a5faf9062"}}
+   :main-opts  ["-m" "clj-check.check"]}
+
   ;; run Eastwood over everything with clojure -M:dev:eastwood
   :eastwood
   {:extra-deps {jonase/eastwood {:mvn/version "RELEASE"}}
