@@ -11,6 +11,8 @@
     com.camsaul/toucan2-toucan1  {:local/root "toucan2-toucan1"}
     com.camsaul/toucan2-schema   {:local/root "toucan2-schema"}}
 
+   :jvm-opts ["-Duser.timezone=UTC" "-XX:-OmitStackTraceInFastThrow"]
+
    :extra-paths
    ["toucan2-core/test"
     "toucan2-honeysql/test"
@@ -23,7 +25,6 @@
   :test
   {:extra-deps  {io.github.cognitect-labs/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git"
                                                        :sha     "705ad25bbf0228b1c38d0244a36001c2987d7337"}}
-   :jvm-opts    ["-Duser.timezone=UTC"]
    :exec-fn     cognitect.test-runner.api/test
    :exec-args   {:dirs ["toucan2-core/test"
                         "toucan2-honeysql/test"

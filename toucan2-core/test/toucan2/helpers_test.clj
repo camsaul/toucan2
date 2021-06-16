@@ -271,3 +271,27 @@
            :created-at (t/local-date-time "2017-01-01T00:00")
            :updated-at (t/local-date-time "2017-01-01T00:00")})
          (select/select-one [:test/postgres ::transformed-venues] "1"))))
+
+(derive ::venues-after-insert ::venues)
+
+(def ^:private ^:dynamic *venues-awaiting-moderation* nil)
+
+(helpers/define-after-insert ::venues-after-insert
+  [venue]
+  (when *venues-awaiting-moderation*
+    (swap! *venues-awaiting-moderation* conj venue))
+  (assoc venue :awaiting-moderation? true))
+
+(deftest after-insert-test
+  (test/with-venues-reset
+    (binding [*venues-awaiting-moderation* (atom [])]
+      (is (= 1
+             (mutative/insert! ::venues-after-insert {:name "Lombard Heights Market", :category "liquor-store"})))
+      (is (= [(instance/instance
+               ::venues-after-insert
+               {:id         4
+                :name       "Lombard Heights Market"
+                :category   "liquor-store"
+                :created-at (t/local-date-time "2017-01-01T00:00")
+                :updated-at (t/local-date-time "2017-01-01T00:00")})]
+             @*venues-awaiting-moderation*)))))
