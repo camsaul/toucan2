@@ -18,6 +18,17 @@ more consistent behavior, and support for different backends including non-JDBC 
 
 Documentation and examples will be added when things are a little further along.
 
+## Subprojects
+
+| Subproject | Description | Version |
+| -- | -- | -- |
+| [`toucan2-core`](https://github.com/camsaul/toucan2/tree/master/toucan2-core) | Core Toucan 2 API and utils | [![Clojars Project](https://clojars.org/com.camsaul/toucan2-core/latest-version.svg)](https://clojars.org/com.camsaul/toucan2-core) | 
+| [`toucan2-honeysql`](https://github.com/camsaul/toucan2/tree/master/toucan2-honeysql) | Toucan 2 [HoneySQL](https://github.com/seancorfield/honeysql) Integration | [![Clojars Project](https://clojars.org/com.camsaul/toucan2-honeysql/latest-version.svg)](https://clojars.org/com.camsaul/toucan2-honeysql) |
+| [`toucan2-jdbc`](https://github.com/camsaul/toucan2/tree/master/toucan2-jdbc) | Toucan 2 [`next.jdbc`](https://github.com/seancorfield/next-jdbc) Backend | [![Clojars Project](https://clojars.org/com.camsaul/toucan2-jdbc/latest-version.svg)](https://clojars.org/com.camsaul/toucan2-jdbc) |
+| [`toucan2`](https://github.com/camsaul/toucan2/tree/master/toucan2) | `toucan2-core` + `toucan2-honeysql` + `toucan2-jdbc` | [![Clojars Project](https://clojars.org/com.camsaul/toucan2/latest-version.svg)](https://clojars.org/com.camsaul/toucan2) |
+| [`toucan2-toucan1`](https://github.com/camsaul/toucan2/tree/master/toucan2-toucan1) | Legacy [Toucan 1](https://github.com/metabase/toucan) Compatibility | [![Clojars Project](https://clojars.org/com.camsaul/toucan2-toucan1/latest-version.svg)](https://clojars.org/com.camsaul/toucan2-toucan1) |
+| [`toucan2-schema`](https://github.com/camsaul/toucan2/tree/master/toucan2-schema) | [Plumatic Schema](https://github.com/plumatic/schema) integration for Toucan 2 | [![Clojars Project](https://clojars.org/com.camsaul/toucan2-schema/latest-version.svg)](https://clojars.org/com.camsaul/toucan2-schema) |
+
 ## Development
 
 Run tests for *all* subprojects with
