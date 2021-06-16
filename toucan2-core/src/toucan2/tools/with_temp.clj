@@ -1,4 +1,4 @@
-(ns toucan2.with-temp
+(ns toucan2.tools.with-temp
   (:require [clojure.test :refer [testing]]
             [methodical.core :as m]
             [toucan2.log :as log]

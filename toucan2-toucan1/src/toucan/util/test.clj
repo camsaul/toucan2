@@ -1,6 +1,6 @@
 (ns toucan.util.test
   "Utility functions for writing tests with Toucan models."
-  (:require [toucan2.with-temp :as with-temp]))
+  (:require [toucan2.tools.with-temp :as with-temp]))
 
 (defmacro ^:deprecated with-temp [tableable [binding properties] & body]
   `(with-temp/with-temp ~[tableable binding properties]
