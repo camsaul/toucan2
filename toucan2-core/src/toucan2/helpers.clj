@@ -10,7 +10,7 @@
             [toucan2.mutative :as mutative]
             [toucan2.select :as select]
             [toucan2.tableable :as tableable]
-            [toucan2.transformed :as transformed]
+            [toucan2.tools.transformed :as transformed]
             [toucan2.util :as u]))
 
 (defn dispatch-value-2 [dispatch-value]
