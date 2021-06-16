@@ -6,7 +6,6 @@
             [toucan2.connectable.current :as conn.current]
             [toucan2.helpers :as helpers]
             [toucan2.hydrate :as hydrate]
-            [toucan2.identity-query :as identity-query]
             [toucan2.instance :as instance]
             [toucan2.log :as log]
             [toucan2.mutative :as mutative]
@@ -15,6 +14,7 @@
             [toucan2.realize :as realize]
             [toucan2.select :as select]
             [toucan2.tableable :as tableable]
+            [toucan2.tools.identity-query :as tools.identity-query]
             [toucan2.util :as u]))
 
 (comment
@@ -23,7 +23,7 @@
   connectable/keep-me
   helpers/keep-me
   hydrate/keep-me
-  identity-query/keep-me
+  tools.identity-query/keep-me
   instance/keep-me
   log/keep-me
   mutative/keep-me
@@ -72,7 +72,7 @@
   simple-hydrate*
   table-for-automagic-hydration*]
 
- [identity-query
+ [tools.identity-query
   identity-query]
 
  [instance

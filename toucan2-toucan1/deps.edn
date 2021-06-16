@@ -10,8 +10,8 @@
                  "../toucan2-jdbc/test"
                  "../toucan2/test"]
    :extra-deps  {io.github.cognitect-labs/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git"
-                                                       :sha     "705ad25bbf0228b1c38d0244a36001c2987d7337"}
-                 org.postgresql/postgresql            {:mvn/version "42.2.19"}}
+                                                       :sha     "62ef1de18e076903374306060ac0e8a752e57c86"}
+                 org.postgresql/postgresql            {:mvn/version "42.2.21"}}
    :jvm-opts    ["-Duser.timezone=UTC"]
    :exec-fn     cognitect.test-runner.api/test}
 

@@ -7,13 +7,12 @@
             [toucan2.jdbc.result-set :as rs]
             [toucan2.jdbc.row :as row]
             [toucan2.mutative :as mutative]
-            [toucan2.query :as query]
             [toucan2.select :as select]
             [toucan2.tableable :as tableable]
             [toucan2.test :as test]
             [toucan2.test.custom-types :as test.custom-types]
-            [toucan2.transformed :as transformed]
-            [toucan2.identity-query :as identity-query]))
+            [toucan2.tools.identity-query :as identity-query]
+            [toucan2.transformed :as transformed]))
 
 (use-fixtures :once test/do-with-test-data)
 
