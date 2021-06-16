@@ -1,4 +1,4 @@
-(ns toucan2.transformed
+(ns toucan2.tools.transformed
   (:require [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
             [toucan2.instance :as instance]

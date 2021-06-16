@@ -1,4 +1,4 @@
-(ns toucan2.transformed-test
+(ns toucan2.tools.transformed-test
   (:require [clojure.test :refer :all]
             [java-time :as t]
             [methodical.core :as m]
@@ -12,7 +12,7 @@
             [toucan2.test :as test]
             [toucan2.test.custom-types :as test.custom-types]
             [toucan2.tools.identity-query :as identity-query]
-            [toucan2.transformed :as transformed]))
+            [toucan2.tools.transformed :as transformed]))
 
 (use-fixtures :once test/do-with-test-data)
 
@@ -145,10 +145,10 @@
       (binding [*col-read-counts*      (atom nil)
                 *thunk-resolve-counts* (atom nil)]
         (is (= [(instance/instance
-                 :toucan2.transformed-test/transformed-venues-id-is-string-track-reads
+                 ::transformed-venues-id-is-string-track-reads
                  {:id "1", :category :bar})
                 (instance/instance
-                 :toucan2.transformed-test/transformed-venues-id-is-string-track-reads
+                 ::transformed-venues-id-is-string-track-reads
                  {:id "2", :category :bar})]
                (select/select [:test/postgres ::transformed-venues-id-is-string-track-reads]
                               :id [:in ["1" "2"]]
