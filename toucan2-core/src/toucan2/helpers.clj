@@ -307,7 +307,7 @@
                       e)))))
 
 (defmacro define-after-insert {:style/indent :defn} [dispatch-value [instance-binding] & body]
-  (let [[connectable tableable query-type] (dispatch-value-3 dispatch-value)]
+  (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
     `(do
        (u/maybe-derive ~tableable ::after-insert)
        (m/defmethod after-insert* [~connectable ~tableable]
