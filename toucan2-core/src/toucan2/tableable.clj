@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
+            [toucan2.connectable.current :as conn.current]
             [toucan2.instance :as instance]
             [toucan2.util :as u]))
 
@@ -44,11 +45,15 @@
   "Return the primary key fields names, as a keywords, for a `tableable`. Always returns a sequence of keywords.
 
     (primary-key-keys :my-connection :user) ;-> [:id]"
-  [connectable tableable]
-  (let [pk-keys (primary-key* connectable tableable)]
-    (if (sequential? pk-keys)
-      pk-keys
-      [pk-keys])))
+  ([tableable]
+   (let [connectable (conn.current/current-connectable tableable)]
+     (primary-key-keys connectable tableable)))
+
+  ([connectable tableable]
+   (let [pk-keys (primary-key* connectable tableable)]
+     (if (sequential? pk-keys)
+       pk-keys
+       [pk-keys]))))
 
 (defn primary-key-values
   "Return the values of the primary key(s) of `obj` as a map.

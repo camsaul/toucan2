@@ -1,5 +1,6 @@
 (ns toucan2.test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.string :as str]
+            [clojure.test :refer :all]
             [methodical.core :as m]
             [toucan2.connectable :as conn]
             [toucan2.connectable.current :as conn.current]
@@ -24,9 +25,7 @@
 
 (m/defmethod conn/connection* :test/postgres
   [_ options]
-  (next-method
-   test-postgres-url
-   options))
+  (next-method test-postgres-url options))
 
 (derive :test/postgres-with-quoting :test/postgres)
 
@@ -41,23 +40,33 @@
                                                 (when (.next rs)
                                                   (.getString rs "TABLE_NAME")))))))))
 
-(defn- has-test-data? [connectable table-name]
+(m/defmulti has-test-data?*
+  {:arglists '([connectableᵈᵗ table-nameᵈᵗ])}
+  u/dispatch-on-first-two-args)
+
+(m/defmethod has-test-data?* :default
+  [connectable table-name]
   (contains? (table-names connectable) (name table-name)))
 
-(m/defmulti ^:private load-test-data-if-needed!
+(m/defmulti load-test-data-if-needed!*
   {:arglists '([connectableᵈ table-nameᵈᵗ])}
   u/dispatch-on-first-two-args)
 
-(m/defmethod load-test-data-if-needed! :around :default
+(m/defmethod load-test-data-if-needed!* :around :default
   [connectable table-name]
-  (when-not (has-test-data? connectable table-name)
+  (when-not (has-test-data?* connectable table-name)
     (log/tracef "creating %s table for %s" table-name connectable)
     (conn/with-connection [conn connectable]
       (with-open [stmt (.createStatement conn)]
         (doseq [sql (next-method connectable table-name)]
-          (.execute stmt sql))))))
+          (try
+            (.execute stmt sql)
+            (catch Throwable e
+              (throw (ex-info (format "Error loading test data: %s" (ex-message e))
+                              {:sql (str/replace sql #"\s+" " ")}
+                              e)))))))))
 
-(m/defmethod load-test-data-if-needed! [:default :people]
+(m/defmethod load-test-data-if-needed!* [:default :people]
   [_ _]
   ["CREATE TABLE IF NOT EXISTS people (id serial PRIMARY KEY NOT NULL, name text, created_at timestamp with time zone);"
    "INSERT INTO people (id, name, created_at)
@@ -67,14 +76,14 @@
     (3, 'Pam', '2020-01-01T13:56:00.000-08:00'::timestamptz),
     (4, 'Tam', '2020-05-25T12:56:00.000-07:00'::timestamptz)"])
 
-(m/defmethod load-test-data-if-needed! [:default :venues]
+(m/defmethod load-test-data-if-needed!* [:default :venues]
   [_ _]
   ["CREATE TABLE IF NOT EXISTS venues (
-     id SERIAL PRIMARY KEY,
-     name VARCHAR(256) UNIQUE NOT NULL,
-     category VARCHAR(256) NOT NULL,
-     created_at TIMESTAMP NOT NULL DEFAULT '2017-01-01T00:00:00Z'::timestamptz,
-     updated_at TIMESTAMP NOT NULL DEFAULT '2017-01-01T00:00:00Z'::timestamptz
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(256) UNIQUE NOT NULL,
+      category VARCHAR(256) NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT '2017-01-01T00:00:00Z'::timestamptz,
+      updated_at TIMESTAMP NOT NULL DEFAULT '2017-01-01T00:00:00Z'::timestamptz
     );"
    "INSERT INTO venues (name, category)
     VALUES
@@ -84,15 +93,15 @@
 
 (defn do-with-test-data [thunk]
   (doseq [table [:people :venues]]
-    (load-test-data-if-needed! :test/postgres table))
+    (load-test-data-if-needed!* :test/postgres table))
   (thunk))
 
 (defn do-with-default-connection [thunk]
   (try
     (m/add-primary-method! conn/connection* :toucan2/default (fn [_ _ options]
-                                                                (conn/connection* :test/postgres options)))
-    (derive :toucan2/default :toucan2.jdbc/postgresql)
-    (derive :toucan2/default :toucan2/honeysql)
+                                                               (conn/connection* :test/postgres options)))
+    (u/maybe-derive :toucan2/default :toucan2.jdbc/postgresql)
+    (u/maybe-derive :toucan2/default :toucan2/honeysql)
     (testing "using default connection"
       (thunk))
     (finally
@@ -108,7 +117,7 @@
     (thunk)
     (finally
       (query/execute! :test/postgres "DROP TABLE IF EXISTS venues;")
-      (load-test-data-if-needed! :test/postgres :venues))))
+      (load-test-data-if-needed!* :test/postgres :venues))))
 
 (defmacro with-venues-reset [& body]
   `(do-with-venues-reset (fn [] ~@body)))

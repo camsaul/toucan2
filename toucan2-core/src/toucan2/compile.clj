@@ -12,25 +12,22 @@
   u/dispatch-on-first-three-args
   :combo (m.combo.threaded/threading-method-combination :third))
 
-;; TODO -- not sure if `include-queries-in-exceptions?` should be something that goes in the options map or its own
-;; dynamic variable.
+(def ^:private ^:dynamic *recursive-compile*
+  "Whether we're in a top-level call to [[toucan2.compile/compile*]]. This is only used for logging purposes --
+  top-level calls and their results get logged as `:debug`, while recursive calls get logged as `:trace`."
+  false)
 
 (m/defmethod compile* :around :default
-  [connectable tableable query {:keys [include-queries-in-exceptions?]
-                                :or   {include-queries-in-exceptions? true}
-                                :as   options}]
-  (log/with-trace ["Compile query with table %s and options %s" tableable options]
-    (log/trace (u/pprint-to-str query))
+  [connectable tableable query options]
+  (log/with-level (if *recursive-compile* :trace :debug) ["Compile %s query with table %s and options %s"
+                                                          (u/dispatch-value query) tableable options]
+    (log/logp (if *recursive-compile* :trace :debug) (u/pprint-to-str query))
     (try
-      (let [sql-params (next-method connectable tableable query options)]
-        #_(assert (and (sequential? sql-params) (string? (first sql-params)))
-                (str "compile* should return [sql & params], got " (pr-str sql-params)))
-        sql-params)
+      (binding [*recursive-compile* true]
+        (next-method connectable tableable query options))
       (catch Throwable e
         (throw (ex-info (format "Error compiling query: %s" (ex-message e))
-                        (if include-queries-in-exceptions?
-                          {:query query}
-                          {})
+                        {:query query}
                         e))))))
 
 (m/defmethod compile* :default

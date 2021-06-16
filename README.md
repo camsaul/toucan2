@@ -18,6 +18,20 @@ more consistent behavior, and support for different backends including non-JDBC 
 
 Documentation and examples will be added when things are a little further along.
 
+## Development
+
+Run tests for *all* subprojects with
+
+```bash
+clojure -X:dev:test
+```
+
+Run the Eastwood linter for *all* subprojects with
+
+```bash
+clojure -M:dev:eastwood
+```
+
 ## License
 
 Code, documentation, and artwork copyright © 2021 [Cam Saul](https://camsaul.com).

@@ -29,6 +29,8 @@ deploy_all() {
     deploy toucan2-honeysql
     deploy toucan2-jdbc
     deploy toucan2
+    deploy toucan2-toucan1
+    deploy toucan2-schema
 }
 
 deploy_all

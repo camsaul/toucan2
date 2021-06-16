@@ -1,5 +1,5 @@
 (ns toucan2.instance
-  (:require [camel-snake-kebab.core :as csk]
+  (:require [camel-snake-kebab.internals.macros :as csk.macros]
             [clojure.data :as data]
             [methodical.core :as m]
             [methodical.impl.combo.threaded :as m.combo.threaded]
@@ -9,11 +9,13 @@
             [toucan2.realize :as realize]
             [toucan2.util :as u]))
 
+(csk.macros/defconversion "kebab-case" u/lower-case-en u/lower-case-en "-")
+
 (defn normalize-key [k]
   (when k
     (if (and (keyword? k) (namespace k))
-      (keyword (csk/->kebab-case (namespace k)) (csk/->kebab-case (name k)))
-      (keyword (csk/->kebab-case k)))))
+      (keyword (->kebab-case (namespace k)) (->kebab-case (name k)))
+      (keyword (->kebab-case k)))))
 
 (defn normalize-map [key-xform m]
   {:pre [(fn? key-xform) (map? m)]}

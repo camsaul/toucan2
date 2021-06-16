@@ -46,6 +46,10 @@
   {:arglists '([connectableᵈᵗ])}
   u/dispatch-on-first-arg)
 
+(m/defmethod default-options-for-connectable* :default
+  [_]
+  nil)
+
 ;; default impl for `default-options-for-connectable*` is in `toucan2.connectable` to avoid circular refs.
 
 (m/defmulti default-options-for-tableable*

@@ -40,11 +40,11 @@
      (or x :default)]))
 
 (defn do-helper [msg tableable thunk]
-  (log/with-trace ["Doing %s for %s" msg tableable]
+  (log/with-debug ["Doing %s for %s" msg tableable]
     (try
       (thunk)
       (catch Throwable e
-        (throw (ex-info (format "Error in %s for %s: %s" msg (pr-str tableable) (ex-message e))
+        (throw (ex-info (format "Error in %s for %s: %s" msg (pr-str (u/dispatch-value tableable)) (ex-message e))
                         {:tableable tableable}
                         e))))))
 
@@ -93,15 +93,19 @@
   [_ instance _]
   instance)
 
+(defn update-query->select-query [connectable tableable update-query options]
+  (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
+        table                 (build-query/table* update-query)
+        conditions            (build-query/conditions* update-query)]
+    (-> (build-query/buildable-query* connectable tableable {} :select options)
+        (build-query/with-table* table options)
+        (build-query/with-conditions* conditions options))))
+
 (defn reducible-instances-matching-update-query
   "Return instances of `tableable` that match conditions from a compiled `update-query` as passed to `update!*`."
   [connectable tableable update-query options]
   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
-        table                 (build-query/table* update-query)
-        conditions            (build-query/conditions* update-query)
-        select-query          (-> (build-query/buildable-query* connectable tableable {} :select options)
-                                  (build-query/with-table* table options)
-                                  (build-query/with-conditions* conditions options))]
+        select-query          (update-query->select-query connectable tableable update-query options)]
     (log/with-trace-no-result ["Finding matching instances with query %s" select-query]
       (select/select-reducible [connectable tableable] select-query (or options {})))))
 
@@ -135,65 +139,70 @@
 #_(def ^:dynamic *update-batch-size*
   "Maximum number of rows to fetch and update at a time when using `define-before-update` and
   `::before-update-transform-matching-rows`."
-  100)
+    100)
 
 (m/defmethod mutative/update!* :around [:default ::before-update-transform-matching-rows :toucan2/buildable-query]
   [connectable tableable {updates :set, :as query} options]
-  (log/with-trace-no-result ["Doing before-update for %s" tableable]
+  (log/with-debug-no-result ["Doing before update for %s" (u/dispatch-value tableable)]
     (if (empty? updates)
       (do (log/tracef "Query %s has no changes; skipping rest of update" query)
           0)
       (letfn [(f [instance]
                 (before-update-transform-changes* connectable instance options))]
-        ;; TODO -- this whole thing should be done in a transaction.
-        (transduce
-         (comp
-          ;; merge in changes for each instance
-          (map (fn [instance]
-                 (log/tracef "Found matching instance %s" instance)
-                 (merge instance updates)))
-          ;; filter out instances that don't have any changes before calling `f`
-          (filter (fn [instance]
-                    (if (seq (instance/changes instance))
-                      instance
-                      (log/tracef "Skipping row with PK %s, it has no changes" (tableable/primary-key-values instance)))))
-          ;; apply the changes-xform to each instance
-          (map (fn [instance]
-                 (log/with-trace ["Apply f to %s" instance]
-                   (let [result (f instance)]
-                     (assert (instance/toucan2-instance? result)
-                             (format "before-update method for %s should return an instance, got ^%s %s"
-                                     (u/dispatch-value tableable)
-                                     (some-> result class .getCanonicalName)
-                                     (pr-str result)))
-                     result))))
-          ;; filter out the ones that don't have any changes AFTER calling `f`.
-          (filter (fn [instance]
-                    (if (seq (instance/changes instance))
-                      instance
-                      (log/tracef "Skipping row with PK %s, it has no changes after applying f"
-                                  (tableable/primary-key-keys connectable instance)))))
-          ;; TODO -- consider whether we should batch the stuff below. e.g. if we end up matching 1 million objects,
-          ;; it might not be ideal to keep a million PK value vectors in memory at once. Also, a query with `UPDATE
-          ;; table WHERE id IN (...)` with a million ids probably isn't going to work so well.
-          #_(partition-all *update-batch-size*)
-          ;; Group all the PKs by their changes.
-          ;;
-          ;; TODO -- if we had a batched-update method, we wouldn't need this complicated transducer.
-          (group-by-xform instance/changes (let [pk-keys (vec (tableable/primary-key-keys connectable tableable))]
-                                             #(mapv % pk-keys)))
-          ;; do an update call for each distinct set of changes
-          (map (fn [[changes matching-primary-keys]]
-                 (let [new-query (-> query
-                                     (build-query/with-changes* changes options)
-                                   ;; TODO -- :toucan2/with-pks is currently only implemented for HoneySQL, don't
-                                   ;; assume it works because it might not.
-                                   (build-query/merge-kv-conditions* {:toucan2/with-pks matching-primary-keys} options))]
-                   (log/with-trace ["Performing updates with query %s" new-query]
-                     (next-method connectable tableable new-query options))))))
-         (completing (fnil + 0 0))
-         0
-         (reducible-instances-matching-update-query connectable tableable query options))))))
+        (try
+          ;; TODO -- this whole thing should be done in a transaction.
+          (transduce
+           (comp
+            ;; merge in changes for each instance
+            (map (fn [instance]
+                   (log/tracef "Found matching instance %s" instance)
+                   (merge instance updates)))
+            ;; filter out instances that don't have any changes before calling `f`
+            (filter (fn [instance]
+                      (if (seq (instance/changes instance))
+                        instance
+                        (log/tracef "Skipping row with PK %s, it has no changes" (tableable/primary-key-values instance)))))
+            ;; apply the changes-xform to each instance
+            (map (fn [instance]
+                   (log/with-trace ["Apply f to %s" instance]
+                     (let [result (f instance)]
+                       (assert (instance/toucan2-instance? result)
+                               (format "before-update method for %s should return an instance, got ^%s %s"
+                                       (u/dispatch-value tableable)
+                                       (some-> result class .getCanonicalName)
+                                       (pr-str result)))
+                       result))))
+            ;; filter out the ones that don't have any changes AFTER calling `f`.
+            (filter (fn [instance]
+                      (if (seq (instance/changes instance))
+                        instance
+                        (log/tracef "Skipping row with PK %s, it has no changes after applying f"
+                                    (tableable/primary-key-keys connectable instance)))))
+            ;; TODO -- consider whether we should batch the stuff below. e.g. if we end up matching 1 million objects,
+            ;; it might not be ideal to keep a million PK value vectors in memory at once. Also, a query with `UPDATE
+            ;; table WHERE id IN (...)` with a million ids probably isn't going to work so well.
+            #_(partition-all *update-batch-size*)
+            ;; Group all the PKs by their changes.
+            ;;
+            ;; TODO -- if we had a batched-update method, we wouldn't need this complicated transducer.
+            (group-by-xform instance/changes (let [pk-keys (vec (tableable/primary-key-keys connectable tableable))]
+                                               #(mapv % pk-keys)))
+            ;; do an update call for each distinct set of changes
+            (map (fn [[changes matching-primary-keys]]
+                   (let [new-query (-> query
+                                       (build-query/with-changes* changes options)
+                                       ;; TODO -- :toucan2/with-pks is currently only implemented for HoneySQL, don't
+                                       ;; assume it works because it might not.
+                                       (build-query/merge-kv-conditions* {:toucan2/with-pks matching-primary-keys} options))]
+                     (log/with-trace ["Performing updates with query %s" new-query]
+                       (next-method connectable tableable new-query options))))))
+           (completing (fnil + 0 0))
+           0
+           (reducible-instances-matching-update-query connectable tableable query options))
+          (catch Throwable e
+            (throw (ex-info (format "Error in after-update for %s: %s" (u/dispatch-value tableable) (ex-message e))
+                            {:tableable tableable, :query query}
+                            e))))))))
 
 (defn disallow-next-method-calls [body]
   (walk/postwalk
@@ -214,16 +223,36 @@
          (let [result# ~(disallow-next-method-calls `(do ~@body))]
            (~'next-method ~'&connectable result# ~'&options))))))
 
-(defn do-after-update [connectable tableable result options f]
-  (helper "after-update" tableable
-    (f result)))
+(m/defmulti after-update*
+  {:arglists '([connectableᵈ tableableᵈ instanceᵗ options])}
+  u/dispatch-on-first-two-args
+  :combo (m.combo.threaded/threading-method-combination :third))
+
+(m/defmethod mutative/update!* :around [:default ::after-update :default]
+  [connectable tableable update-query options]
+  (let [result (next-method connectable tableable update-query options)]
+    (log/with-debug-no-result ["Doing after-update for %s" (u/dispatch-value tableable)]
+      (when (pos? result)
+        (try
+          (let [rows (reducible-instances-matching-update-query connectable tableable update-query options)]
+            (reduce
+             (fn [_ instance]
+               (after-update* connectable tableable instance options))
+             nil
+             rows))
+          (catch Throwable e
+            (throw (ex-info (format "Error in after-update for %s: %s" (u/dispatch-value tableable) (ex-message e))
+                            {:tableable tableable, :update-query update-query, :options options}
+                            e))))))
+    result))
 
 (defmacro define-after-update {:style/indent :defn} [dispatch-value [result-binding] & body]
-  `(m/defmethod mutative/update!* :after ~(dispatch-value-3 dispatch-value)
-     [~'&connectable ~'&tableable ~'&result ~'&options]
-     (do-after-update ~'&connectable ~'&tableable ~'&result ~'&options
-                      (fn [~result-binding]
-                        ~@body))))
+  (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
+    `(do
+       (u/maybe-derive ~tableable ::after-update)
+       (m/defmethod after-update* [~connectable ~tableable]
+         [~'&connectable ~'&tableable ~result-binding ~'&options]
+         ~@body))))
 
 (defn do-before-insert [connectable tableable query options f]
   (helper "before-insert" tableable
@@ -259,11 +288,18 @@
                       (fn [~instance-binding]
                         ~@body))))
 
-(defn do-before-delete [connectable tableable query options f]
+(defn do-before-delete [connectable tableable delete-query options f]
   (helper "before-delete" tableable
-    (let [instances (select/select [connectable tableable] (select-keys query [:where]))]
-      (doseq [instance instances]
-        (f instance)))))
+    (let [query (-> (build-query/buildable-query* connectable tableable {} :select options)
+                    (build-query/with-table* tableable options)
+                    (build-query/with-conditions* (build-query/conditions* delete-query) options))]
+      (log/with-trace ["Fetching matching rows with query %s" query]
+        (reduce
+         (fn [_ instance]
+           (f instance))
+         nil
+         (select/select-reducible [connectable tableable] query)))))
+  delete-query)
 
 (defmacro define-before-delete {:style/indent :defn} [dispatch-value [instance-binding] & body]
   `(m/defmethod mutative/delete!* :before ~(dispatch-value-3 dispatch-value)

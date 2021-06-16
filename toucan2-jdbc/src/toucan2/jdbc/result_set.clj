@@ -22,8 +22,8 @@
   {:arglists '([connectableᵈ tableableᵈ ^ResultSet rs ^ResultSetMetaData rsmeta ^Long i optionsᵗ])}
   (fn [connectable tableable _ ^ResultSetMetaData rsmeta ^Long i _]
     (let [col-type (.getColumnType rsmeta i)]
-      (log/tracef "Column %d %s is of JDBC type %s, native type %s"
-                  i (pr-str (.getColumnLabel rsmeta i)) (type-name col-type) (.getColumnTypeName rsmeta i))
+      (log/tracef "Column! %d %s is of JDBC type %s, native type %s"
+                  i (u/pprint-to-str (.getColumnLabel rsmeta i)) (type-name col-type) (.getColumnTypeName rsmeta i))
       ;; TODO -- enable this only if some `*log-connectable*` flag is set. (TBD)
       #_(log/tracef "Using read-column-thunk* impl for dispatch value %s"
                     [(u/dispatch-value connectable) (u/dispatch-value tableable) col-type])
@@ -31,12 +31,12 @@
 
 (m/defmethod read-column-thunk* :default
   [_ _ ^ResultSet rs _ ^Long i options]
-  (log/tracef "Fetching values in column %d with (.getObject rs %d) and options %s" i i (pr-str options))
+  (log/tracef "Fetching values in column %d with %s and options %s" i (list '.getObject 'rs i) (pr-str options))
   (fn default-read-column-thunk* []
     (.getObject rs i)))
 
 (defn get-object-of-class-thunk [^ResultSet rs ^Long i ^Class klass]
-  (log/tracef "Fetching values in column %d with (.getObject rs %d %s)" i i (.getCanonicalName klass))
+  (log/tracef "Fetching values in column %d with %s" i (list '.getObject 'rs i (symbol (.getCanonicalName klass))))
   (u/pretty-printable-fn
    (fn []
      (list '.getObject 'rs i klass))
