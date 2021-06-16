@@ -277,81 +277,61 @@
 (defn hydrate
   "Hydrate a single object or sequence of objects.
 
+  #### Automagic Batched Hydration (via [[toucan2.hydrate/table-for-automagic-hydration*]])
 
-  #### Automagic Batched Hydration (via `table-for-automagic-hydration*`)
-
-  `hydrate` attempts to do a *batched hydration* where possible.
-  If the key being hydrated is defined as one of some table's `table-for-automagic-hydration*`,
-  `hydrate` will do a batched `db/select` if a corresponding key ending with `_id`
-  is found in the objects being batch hydrated.
+  [[toucan2.hydrate/hydrate]] attempts to do a *batched hydration* where possible. If the key being hydrated is
+  defined as one of some table's [[toucan2.hydrate/table-for-automagic-hydration*]], `hydrate` will do a batched
+  [[toucan2.select/select]] if a corresponding key (by default, the same key suffixed by `-id`) is found in the
+  objects being batch hydrated. The corresponding key can be customized by
+  implementing [[toucan2.hydrate/fk-keys-for-automagic-hydration*]].
 
     (hydrate [{:user_id 100}, {:user_id 101}] :user)
 
-  Since `:user` is a hydration key for `User`, a single `db/select` will used to
-  fetch `Users`:
+  Since `:user` is a hydration key for `:models/User`, a single [[toucan2.select/select]] will used to fetch Users:
 
-    (db/select User :id [:in #{100 101}])
+    (db/select :models/User :id [:in #{100 101}])
 
-  The corresponding `Users` are then added under the key `:user`.
+  The corresponding Users are then added under the key `:user`.
 
+  #### Function-Based Batched Hydration (via [[toucan2.hydrate/batched-hydrate*]] methods)
 
-  #### Function-Based Batched Hydration (via functions marked ^:batched-hydrate*)
+  If the key can't be hydrated auto-magically with the appropriate [[toucan2.hydrate/table-for-automagic-hydration*]],
+  [[toucan2.hydrate/hydrate]] will attempt to do batched hydration if it can find a matching method
+  for [[toucan2.hydrate/batched-hydrate*]]. If a matching function is found, it is called with a collection of
+  objects, e.g.
 
-  If the key can't be hydrated auto-magically with the appropriate `:table-for-automagic-hydration*`,
-  `hydrate` will look for a function tagged with `:batched-hydrate`* in its metadata, and
-  use that instead. If a matching function is found, it is called with a collection of objects,
-  e.g.
-
-    (defn with-fields
-      \"Efficiently add `:fields` to a collection of `tables`.\"
-      {:batched-hydrate* :fields}
-      [tables]
+    (m/defmethod hydrate/batched-hydrate* [:default :default :fields]
+      [_ _ _ tables]
       ...)
 
     (let [tables (get-some-tables)]
-      (hydrate tables :fields))     ; uses with-fields
+      (hydrate tables :fields))
 
-  By default, the function will be used to hydrate keys that match its name; as in the example above,
-  you can specify a different key to hydrate for in the metadata instead.
+  #### Simple Hydration (via [[toucan2.hydrate/simple-hydrate*]] methods)
 
+  If the key is *not* eligible for batched hydration, [[toucan2.hydrate/hydrate]] will look for a matching
+  [[toucan2.hydrate/simple-hydrate*]] method. `simple-hydrate*` is called with a single row.
 
-#### Simple Hydration (via functions marked ^:hydrate)
+    (m/defmethod simple-hydrate* [:default :default :dashboard]
+      [_ _ _ {:keys [dashboard-id], :as row}]
+      (assoc row :dashboard (select/select-one :models/Dashboard dashboard-id)))
 
-  If the key is *not* eligible for batched hydration, `hydrate` will look for a function or method
-  tagged with `:hydrate` in its metadata, and use that instead; if a matching function
-  is found, it is called on the object being hydrated and the result is `assoc`ed:
-
-    (defn ^:hydrate dashboard [{:keys [dashboard_id]}]
-      (Dashboard dashboard_id))
-
-    (let [dc (DashboardCard ...)]
-      (hydrate dc :dashboard))    ; roughly equivalent to (assoc dc :dashboard (dashboard dc))
-
-  As with `:batched-hydrate`* functions, by default, the function will be used to hydrate keys that
-  match its name; you can specify a different key to hydrate instead as the metadata value of `:hydrate`:
-
-    (defn ^{:hydrate :pk_field} pk-field-id [obj] ...) ; hydrate :pk_field with pk-field-id
-
-  Keep in mind that you can only define a single function/method to hydrate each key; move functions into the
-  `IModel` interface as needed.
-
-
-#### Hydrating Multiple Keys
+  #### Hydrating Multiple Keys
 
   You can hydrate several keys at one time:
 
     (hydrate {...} :a :b)
       -> {:a 1, :b 2}
 
-#### Nested Hydration
+  #### Nested Hydration
 
   You can do recursive hydration by listing keys inside a vector:
 
     (hydrate {...} [:a :b])
       -> {:a {:b 1}}
 
-  The first key in a vector will be hydrated normally, and any subsequent keys
-  will be hydrated *inside* the corresponding values for that key.
+  The first key in a vector will be hydrated normally, and any subsequent keys will be hydrated *inside* the
+  corresponding values for that key.
 
     (hydrate {...}
              [:a [:b :c] :e])

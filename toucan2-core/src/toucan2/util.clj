@@ -1,9 +1,9 @@
 (ns toucan2.util
-  (:require [clojure.pprint :as pprint]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [methodical.impl.combo.threaded :as m.combo.threaded]
             [potemkin :as p]
-            [pretty.core :as pretty]))
+            [pretty.core :as pretty]
+            [toucan2.log :as log]))
 
 (defn qualify-symbol-for-*ns* [symb]
   (let [qualified (pretty/qualify-symbol-for-*ns* symb)]
@@ -145,10 +145,7 @@
 (defn pprint-to-str
   "Pretty-print `x` to a string. Mostly used for log message purposes."
   ^String [x]
-  (with-open [w (java.io.StringWriter.)]
-    (binding [pprint/*print-right-margin* 120]
-      (pprint/pprint x w))
-    (str w)))
+  (str/trim (with-out-str (log/pprint x))))
 
 (defn qualified-name
   "Return `k` as a string, qualified by its namespace, if any (unlike `name`). Handles `nil` values gracefully as well
@@ -226,3 +223,9 @@
   [child parent]
   (when-not (isa? child parent)
     (derive child parent)))
+
+(defn lower-case-en
+  "Locale-agnostic version of [[clojure.string/lower-case]]. `clojure.string/lower-case` uses the default locale in conversions, turning `ID` into `ıd`, in the Turkish locale.
+  This function always uses the `Locale/US` locale."
+  [^CharSequence s]
+  (.. s toString (toLowerCase (java.util.Locale/US))))

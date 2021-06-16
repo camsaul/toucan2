@@ -1,18 +1,13 @@
 {:deps
- {com.camsaul/toucan2-core     {:local/root "../toucan2-core"}
-  com.camsaul/toucan2-honeysql {:local/root "../toucan2-honeysql"}
-  com.camsaul/toucan2-jdbc     {:local/root "../toucan2-jdbc"}}
+ {com.camsaul/toucan2 {:local/root "../toucan2"}
+  prismatic/schema    {:mvn/version "1.1.12"}}
 
  :aliases
  ;; clojure -X:test
  {:test
-  {:extra-paths ["test"
-                 "../toucan2-core/test"
-                 "../toucan2-honeysql/test"
-                 "../toucan2-jdbc/test"]
+  {:extra-paths ["test"]
    :extra-deps  {io.github.cognitect-labs/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git"
-                                                       :sha     "705ad25bbf0228b1c38d0244a36001c2987d7337"}
-                 org.postgresql/postgresql            {:mvn/version "42.2.19"}}
+                                                       :sha     "705ad25bbf0228b1c38d0244a36001c2987d7337"}}
    :jvm-opts    ["-Duser.timezone=UTC"]
    :exec-fn     cognitect.test-runner.api/test}
 
@@ -26,7 +21,7 @@
   {:replace-deps {com.github.seancorfield/depstar {:mvn/version "2.0.216"}}
    :exec-fn      hf.depstar/jar
    :exec-args    {:group-id    "com.camsaul"
-                  :artifact-id "toucan2"
-                  :jar         "../target/toucan2.jar"
+                  :artifact-id "toucan2-schema"
+                  :jar         "../target/toucan2-schema.jar"
                   :sync-pom    true
                   :paths-only  true}}}}

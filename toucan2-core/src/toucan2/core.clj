@@ -90,7 +90,8 @@
   update-original-and-current]
 
  [log
-  with-debug-logging]
+  with-debug-logging
+  with-trace-logging]
 
  [mutative
   delete!*

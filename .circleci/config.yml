@@ -71,7 +71,7 @@ jobs:
     steps:
       - attach-workspace
       - restore-deps-cache
-      - run: clojure -P -X:test:install
+      - run: clojure -P -X:test:install:eastwood:dev
       - run: clojure -P -M
       - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:jar
       - run: cd /home/circleci/camsaul/toucan2/toucan2/ && clojure -P -X:check
@@ -148,6 +148,27 @@ workflows:
           command: -M:check
 
       - clojure:
+          name: check-toucan2-toucan1
+          requires:
+            - deps
+          dir: /home/circleci/camsaul/toucan2/toucan2-toucan1/
+          command: -M:check
+
+      - clojure:
+          name: check-toucan2-schema
+          requires:
+            - deps
+          dir: /home/circleci/camsaul/toucan2/toucan2-schema/
+          command: -M:check
+
+      - clojure:
+          name: eastwood
+          requires:
+            - deps
+          dir: /home/circleci/camsaul/toucan2/
+          command: -M:eastwood:dev
+
+      - clojure:
           name: test-toucan2-core
           requires:
             - check-toucan2-core
@@ -179,14 +200,31 @@ workflows:
           dir: /home/circleci/camsaul/toucan2/toucan2/
           command: -X:test
 
+      - clojure:
+          name: test-toucan2-toucan1
+          requires:
+            - check-toucan2-toucan1
+          e: postgres
+          dir: /home/circleci/camsaul/toucan2/toucan2-toucan1/
+          command: -X:test
+
+      - clojure:
+          name: test-toucan2-schema
+          requires:
+            - check-toucan2-schema
+          e: postgres
+          dir: /home/circleci/camsaul/toucan2/toucan2-schema/
+          command: -X:test
+
       - deploy:
           requires:
+            - eastwood
             - test-toucan2-core
             - test-toucan2-honeysql
             - test-toucan2-jdbc
             - test-toucan2
+            - test-toucan2-toucan1
+            - test-toucan2-schema
           filters:
             branches:
               only: master
-            # tags:
-            #   ignore: /no-release/
