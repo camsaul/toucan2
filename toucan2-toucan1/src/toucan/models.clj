@@ -8,11 +8,11 @@
             [toucan.common :as common]
             [toucan2.helpers :as helpers]
             [toucan2.honeysql.compile :as honeysql.compile]
-            [toucan2.identity-query :as identity-query]
             [toucan2.instance :as instance]
             [toucan2.log :as log]
             [toucan2.select :as select]
             [toucan2.tableable :as tableable]
+            [toucan2.tools.identity-query :as identity-query]
             [toucan2.util :as u])
   (:import honeysql.format.ToSql))
 

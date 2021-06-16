@@ -1,4 +1,4 @@
-(ns toucan2.identity-query
+(ns toucan2.tools.identity-query
   (:require [methodical.core :as m]
             [toucan2.build-query :as build-query]
             [toucan2.compile :as compile]
