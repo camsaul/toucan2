@@ -74,6 +74,14 @@
        :query      query
        :options    options})))
 
+(defn- assert-buildable-or-not-empty [query]
+  (when (and (empty? query)
+             (not (build-query/buildable-query? query)))
+    (throw (ex-info (str (format "Query %s is not buildable; cannot add table or conditions."
+                                 (binding [*print-meta* true] (pr-str query)))
+                         "\nDoes connectable and/or tableable derive from a query building backend, e.g. `:toucan2/honeysql`?")
+                    {:query query}))))
+
 ;; TODO -- I think this should just take `& options` and do the `parse-connectable-tableable` stuff inside this fn.
 (defn parse-select-args
   "Parse args to the `select` family of functions. Returns a map with the parsed/combined `:query` and parsed
@@ -84,6 +92,7 @@
           {:keys [conditions query options]} (parse-select-args* connectable tableable args options-1)
           options                            (u/recursive-merge options-1 options)
           query                              (build-query/maybe-buildable-query connectable tableable query :select options)
+          _                                  (assert-buildable-or-not-empty query)
           query                              (cond-> query
                                                (not (build-query/table* query)) (build-query/with-table* tableable options)
                                                (seq conditions)                 (build-query/merge-kv-conditions* conditions options))]
