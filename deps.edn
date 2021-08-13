@@ -56,6 +56,13 @@
                  :exclude-linters [:deprecations]
                  :config-files    [".eastwood-config.clj"]}]}
 
+
+  ;; :namespace-checker
+  ;; {:extra-deps {lein-check-namespace-decls/lein-check-namespace-decls {:mvn/version "1.0.4"}}
+  ;;  :exec-fn    check-namespace-decls.core/check-namespace-decls
+  ;;  :exec-args  {:prefix-rewriting false
+  ;;               :source-paths     ["src" "test"]}}
+
   ;; clojure -X:install :artifact '"target/toucan2-honeysql.jar"'
   :install
   {:extra-deps {slipset/deps-deploy {:mvn/version "RELEASE"}}
