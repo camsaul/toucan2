@@ -1,6 +1,7 @@
 *.class
 *.jar
 .\#*
+.cache
 .cpcache
 .nrepl-port
 /*.iml
