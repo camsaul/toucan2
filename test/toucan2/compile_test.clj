@@ -11,4 +11,12 @@
                                                :from   [[:people]]
                                                :where  [:= :id 1]}]]
       (is (= ["SELECT * FROM people WHERE id = ?" 1]
-             query)))))
+             query)))
+    (testing "Options"
+      (compile/with-compiled-query [query [conn
+                                           {:select [:*]
+                                            :from   [[:people]]
+                                            :where  [:= :id 1]}
+                                           {:honeysql {:quoted true}}]]
+        (is (= ["SELECT * FROM \"people\" WHERE \"id\" = ?" 1]
+               query))))))
