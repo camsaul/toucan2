@@ -1,1 +1,5 @@
-{:linters {:missing-docstring {:level :warning}}}
+{:lint-as
+ {methodical.macros/defmulti  clojure.core/defmulti
+  methodical.core/defmulti    clojure.core/defmulti
+  methodical.macros/defmethod clj-kondo.lint-as/def-catch-all
+  methodical.core/defmethod   clj-kondo.lint-as/def-catch-all}}
