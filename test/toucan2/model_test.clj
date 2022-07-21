@@ -30,26 +30,26 @@
 (deftest ^:parallel default-build-select-query-test
   (is (= {:select [:*]
           :from   [[:default]]}
-         (model/build-select-query :default {} nil nil nil)))
+         (model/build-select-query :default {} nil nil)))
   (testing "don't override existing"
     (is (= {:select [:a :b]
             :from   [[:my_table]]}
-           (model/build-select-query :default {:select [:a :b], :from [[:my_table]]} nil nil nil))))
+           (model/build-select-query :default {:select [:a :b], :from [[:my_table]]} nil nil))))
   (testing "columns"
     (is (= {:select [:a :b]
             :from   [[:default]]}
-           (model/build-select-query :default {} [:a :b] nil nil)))
+           (model/build-select-query :default {} [:a :b] nil)))
     (testing "existing"
       (is (= {:select [:a]
               :from   [[:default]]}
-             (model/build-select-query :default {:select [:a]} [:a :b] nil nil)))))
+             (model/build-select-query :default {:select [:a]} [:a :b] nil)))))
   (testing "conditions"
     (is (= {:select [:*]
             :from   [[:default]]
             :where  [:= :id 1]}
-           (model/build-select-query :default {} nil {:id 1} nil)))
+           (model/build-select-query :default {} nil {:id 1})))
     (testing "merge with existing"
       (is (= {:select [:*]
               :from   [[:default]]
               :where  [:and [:= :a :b] [:= :id 1]]}
-             (model/build-select-query :default {:where [:= :a :b]} nil {:id 1} nil))))))
+             (model/build-select-query :default {:where [:= :a :b]} nil {:id 1}))))))

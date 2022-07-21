@@ -54,10 +54,10 @@
       :done)))
 
 (m/defmethod conn/do-with-connection ::db
-  [_connectable options f]
+  [_connectable f]
   (set-up-test-db!)
-  (conn/do-with-connection (test-db-url) options f))
+  (conn/do-with-connection (test-db-url) f))
 
 (m/defmethod model/default-connectable ::people
-  [_model _options]
+  [_model]
   ::db)

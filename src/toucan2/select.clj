@@ -1,10 +1,9 @@
 (ns toucan2.select
-  (:require [clojure.spec.alpha :as s]
-            [methodical.core :as m]
-            [toucan2.util :as u]
-            [toucan2.model :as model]
-            [toucan2.connection :as conn]
-            [toucan2.compile :as compile]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [methodical.core :as m]
+   [toucan2.model :as model]
+   [toucan2.util :as u]))
 
 (s/def ::default-select-args
   (s/cat ;; :modelable  (s/or
@@ -15,8 +14,7 @@
          :conditions (s/* (s/cat
                            :k keyword?
                            :v (complement map?)))
-         :query      (s/? any?)
-         :options    (s/? map?)))
+         :query      (s/? any?)))
 
 (defn parse-select-args [args]
   (let [parsed (s/conform ::default-select-args args)]
@@ -34,14 +32,14 @@
 
 (m/defmethod select-reducible* :default
   [model columns args]
-  (let [{:keys [conditions query options]} (parse-select-args args)
-        query                              (model/build-select-query model query columns conditions options)
-        connectable                        (model/default-connectable model options)]
+  (let [{:keys [conditions query]} (parse-select-args args)
+        query                      (model/build-select-query model query columns conditions)
+        connectable                (model/default-connectable model)]
     (model/reducible-model-query connectable model query)))
 
 (defn select-reducible [modelable & args]
-  {:arglists '([modelable & conditions? compileable? options?]
-               [[modelable & columns] & conditions? compileable? options?])}
+  {:arglists '([modelable & conditions? compileable?]
+               [[modelable & columns] & conditions? compileable?])}
   (let [[modelable & columns] (if (sequential? modelable)
                                 modelable
                                 [modelable])]
@@ -49,8 +47,8 @@
       (select-reducible* model columns args))))
 
 (defn select
-  {:arglists '([modelable & conditions? compileable? options?]
-               [[modelable & columns] & conditions? compileable? options?])}
+  {:arglists '([modelable & conditions? compileable?]
+               [[modelable & columns] & conditions? compileable?])}
   [modelable & args]
   (let [reducible-query (apply select-reducible modelable args)]
     (reduce conj [] reducible-query)
