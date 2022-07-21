@@ -11,7 +11,8 @@
  :aliases
  {:dev
   {:extra-deps
-   {org.postgresql/postgresql {:mvn/version "42.4.0"}}
+   {com.h2database/h2         {:mvn/version "2.1.214"}
+    org.postgresql/postgresql {:mvn/version "42.4.0"}}
 
    :extra-paths
    ["test"]}

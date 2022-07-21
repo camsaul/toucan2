@@ -53,6 +53,6 @@
       :done)))
 
 (m/defmethod conn/do-with-connection ::db
-  [_connectable f]
+  [_connectable options f]
   (set-up-test-db!)
-  (conn/do-with-connection (test-db-url) f))
+  (conn/do-with-connection (test-db-url) options f))

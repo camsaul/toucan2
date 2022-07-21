@@ -1,7 +1,8 @@
 (ns toucan2.compile
-  (:require [methodical.core :as m]
-            [honey.sql :as hsql]
-            [toucan2.util :as u]))
+  (:require
+   [honey.sql :as hsql]
+   [methodical.core :as m]
+   [toucan2.util :as u]))
 
 (m/defmulti do-with-compiled-query
   {:arglists '([connection compileable options f])}
