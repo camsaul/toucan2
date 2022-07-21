@@ -7,16 +7,18 @@
 
 (deftest compile-honeysql-test
   (conn/with-connection [conn ::test/db]
-    (compile/with-compiled-query [query [conn {:select [:*]
-                                               :from   [[:people]]
-                                               :where  [:= :id 1]}]]
-      (is (= ["SELECT * FROM people WHERE id = ?" 1]
-             query)))
-    (testing "Options"
-      (binding [compile/*honeysql-options* {:quoted true}]
-        (compile/with-compiled-query [query [conn
-                                             {:select [:*]
-                                              :from   [[:people]]
-                                              :where  [:= :id 1]}]]
-          (is (= ["SELECT * FROM \"people\" WHERE \"id\" = ?" 1]
-                 query)))))))
+    (doseq [conn [conn :default]]
+      (testing (format "Connection = %s" (pr-str conn))
+        (compile/with-compiled-query [query [conn {:select [:*]
+                                                   :from   [[:people]]
+                                                   :where  [:= :id 1]}]]
+          (is (= ["SELECT * FROM people WHERE id = ?" 1]
+                 query)))
+        (testing "Options"
+          (binding [compile/*honeysql-options* {:quoted true}]
+            (compile/with-compiled-query [query [conn
+                                                 {:select [:*]
+                                                  :from   [[:people]]
+                                                  :where  [:= :id 1]}]]
+              (is (= ["SELECT * FROM \"people\" WHERE \"id\" = ?" 1]
+                     query)))))))))

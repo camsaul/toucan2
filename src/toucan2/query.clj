@@ -11,15 +11,17 @@
   {:arglists '([connection compiled-query rf init])}
   u/dispatch-on-keyword-or-type-2)
 
-(def ^:dynamic *jdbc-options*
-  {:builder-fn jdbc.rset/as-unqualified-kebab-maps})
+(def global-jdbc-options
+  (atom {:builder-fn jdbc.rset/as-unqualified-kebab-maps}))
+
+(def ^:dynamic *jdbc-options* nil)
 
 (m/defmethod reduce-compiled-query [java.sql.Connection clojure.lang.Sequential]
   [conn sql-args rf init]
   (reduce
    rf
    init
-   (jdbc/plan conn sql-args  *jdbc-options*)))
+   (jdbc/plan conn sql-args (merge @global-jdbc-options *jdbc-options*))))
 
 (defrecord ReducibleQuery [connectable compileable]
   clojure.lang.IReduceInit
