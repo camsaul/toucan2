@@ -1,5 +1,11 @@
-{:lint-as
- {methodical.macros/defmulti  clojure.core/defmulti
-  methodical.core/defmulti    clojure.core/defmulti
-  methodical.macros/defmethod clj-kondo.lint-as/def-catch-all
-  methodical.core/defmethod   clj-kondo.lint-as/def-catch-all}}
+{:linters
+ {:refer-all
+  {:exclude [clojure.test]}}
+
+ :lint-as
+ {methodical.macros/defmulti          clojure.core/defmulti
+  methodical.core/defmulti            clojure.core/defmulti
+  methodical.macros/defmethod         clj-kondo.lint-as/def-catch-all
+  methodical.core/defmethod           clj-kondo.lint-as/def-catch-all
+  toucan2.compile/with-compiled-query clojure.core/let
+  toucan2.connection/with-connection  clojure.core/let}}
