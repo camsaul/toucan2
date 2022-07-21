@@ -28,19 +28,23 @@
     ~query
     (^:once fn* [~query-binding] ~@body)))
 
-(m/defmethod do-with-compiled-query [java.sql.Connection String]
+(m/defmethod do-with-compiled-query [:default String]
   [_conn sql f]
   (f [sql]))
 
-(m/defmethod do-with-compiled-query [java.sql.Connection clojure.lang.Sequential]
+(m/defmethod do-with-compiled-query [:default clojure.lang.Sequential]
   [_conn sql-args f]
   (f sql-args))
 
 ;;;; HoneySQL options
 
+(def global-honeysql-options
+  (atom nil))
+
 (def ^:dynamic *honeysql-options* nil)
 
-(m/defmethod do-with-compiled-query [java.sql.Connection clojure.lang.IPersistentMap]
+(m/defmethod do-with-compiled-query [:default clojure.lang.IPersistentMap]
   [conn honeysql f]
-  (let [sql-args (hsql/format honeysql *honeysql-options*)]
+  (let [sql-args (hsql/format honeysql (merge @global-honeysql-options
+                                              *honeysql-options*))]
     (do-with-compiled-query conn sql-args f)))
