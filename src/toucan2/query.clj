@@ -3,6 +3,7 @@
    [methodical.core :as m]
    [next.jdbc :as jdbc]
    [next.jdbc.result-set :as jdbc.rset]
+   [pretty.core :as pretty]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
    [toucan2.util :as u]))
@@ -23,20 +24,24 @@
    init
    (jdbc/plan conn sql-args (merge @global-jdbc-options *jdbc-options*))))
 
-(defrecord ReducibleQuery [connectable compileable]
+(defrecord ReducibleQuery [connectable query]
   clojure.lang.IReduceInit
   (reduce [_ rf init]
     (conn/with-connection [conn connectable]
-      (compile/with-compiled-query [query [conn compileable]]
-        (reduce-compiled-query conn query rf init)))))
+      (compile/with-compiled-query [query [conn query]]
+        (reduce-compiled-query conn query rf init))))
 
-(defn reducible-query [connectable compileable]
-  (->ReducibleQuery connectable compileable))
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `reducible-query connectable query)))
 
-#_(defn query [connectable compileable]
+(defn reducible-query [connectable query]
+  (->ReducibleQuery connectable query))
+
+#_(defn query [connectable query]
   (transduce
    (map (fn [row]
           (into {} row)))
    conj
    []
-   (reducible-query connectable compileable)))
+   (reducible-query connectable query)))

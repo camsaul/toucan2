@@ -38,8 +38,8 @@
     (model/reducible-model-query connectable model query)))
 
 (defn select-reducible [modelable & args]
-  {:arglists '([modelable & conditions? compileable?]
-               [[modelable & columns] & conditions? compileable?])}
+  {:arglists '([modelable & conditions? query?]
+               [[modelable & columns] & conditions? query?])}
   (let [[modelable & columns] (if (sequential? modelable)
                                 modelable
                                 [modelable])]
@@ -47,8 +47,8 @@
       (select-reducible* model columns args))))
 
 (defn select
-  {:arglists '([modelable & conditions? compileable?]
-               [[modelable & columns] & conditions? compileable?])}
+  {:arglists '([modelable & conditions? query?]
+               [[modelable & columns] & conditions? query?])}
   [modelable & args]
   (let [reducible-query (apply select-reducible modelable args)]
     (reduce conj [] reducible-query)
