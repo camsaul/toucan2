@@ -19,7 +19,7 @@
 (defmacro with-model [[model-binding modelable] & body]
   `(do-with-model ~modelable (^:once fn* [~model-binding] ~@body)))
 
-(defrecord ReducibleModelQuery [connectable modelable compileable]
+(defrecord ReducibleModelQuery [connectable modelable query]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (reduce
@@ -29,14 +29,14 @@
        (eduction
         (map (fn [row]
                (list 'magic-map model (into {} row))))
-        (query/reducible-query connectable compileable)))))
+        (query/reducible-query connectable query)))))
 
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `reducible-model-query connectable modelable compileable)))
+    (list `reducible-model-query connectable modelable query)))
 
-(defn reducible-model-query [connectable modelable compileable]
-  (->ReducibleModelQuery connectable modelable compileable))
+(defn reducible-model-query [connectable modelable query]
+  (->ReducibleModelQuery connectable modelable query))
 
 (m/defmulti default-connectable
   {:arglists '([model])}
