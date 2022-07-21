@@ -16,8 +16,13 @@
 
 (deftest with-connection-test
   (conn/with-connection [conn-from-keyword ::test/db]
-    (is (instance? java.sql.Connection conn-from-keyword))
+    (testing "Connection from keyword"
+      (is (instance? java.sql.Connection conn-from-keyword)))
     (conn/with-connection [conn-from-conn conn-from-keyword]
-      (is (instance? java.sql.Connection conn-from-conn)))
-    ;; TODO -- DataSource
-    ))
+      (testing "Connection from Connection"
+        (is (instance? java.sql.Connection conn-from-conn))))))
+
+(deftest jdbc-spec-test
+  (conn/with-connection [conn {:dbtype   "h2:mem"
+                               :dbname   "spec_test"}]
+    (is (instance? org.h2.jdbc.JdbcConnection conn))))
