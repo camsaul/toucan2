@@ -2,7 +2,8 @@
   (:require
    [clojure.string :as str]
    [methodical.core :as m]
-   [toucan2.connection :as conn]))
+   [toucan2.connection :as conn]
+   [toucan2.model :as model]))
 
 (defn- test-db-url []
   (or (System/getenv "JDBC_URL_POSTGRES")
@@ -56,3 +57,7 @@
   [_connectable options f]
   (set-up-test-db!)
   (conn/do-with-connection (test-db-url) options f))
+
+(m/defmethod model/default-connectable ::people
+  [_model _options]
+  ::db)

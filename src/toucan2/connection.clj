@@ -8,6 +8,7 @@
   {:arglists '([connectable options f])}
   u/dispatch-on-keyword-or-type-1)
 
+;; TODO -- don't love this syntax.
 (defmacro with-connection
   {:arglists '([[connection-binding connectable] & body]
                [[connection-binding connectable options] & body])}

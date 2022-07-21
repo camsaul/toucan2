@@ -3,11 +3,11 @@
 
 (def ^:dynamic *debug* false)
 
-(def ^:dynamic ^:private *recursive-debug-result-level* 0)
+(def ^:dynamic *debug-indent-level* 0)
 
 (defn println-debug* [s]
   (let [lines       (str/split-lines (str/trim s))
-        indentation (str/join (repeat *recursive-debug-result-level* "  "))]
+        indentation (str/join (repeat *debug-indent-level* "  "))]
     (doseq [line lines]
       (print indentation)
       (println line))))
@@ -18,7 +18,7 @@
 
 (defn do-with-debug-result [message thunk]
   (println-debug message)
-  (let [result (binding [*recursive-debug-result-level* (inc *recursive-debug-result-level*)]
+  (let [result (binding [*debug-indent-level* (inc *debug-indent-level*)]
                  (thunk))]
     (println-debug '=> (pr-str result))
     result))
