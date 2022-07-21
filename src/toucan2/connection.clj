@@ -5,31 +5,30 @@
    [next.jdbc :as jdbc]))
 
 (m/defmulti do-with-connection
-  {:arglists '([connectable options f])}
+  {:arglists '([connectable f])}
   u/dispatch-on-keyword-or-type-1)
 
 ;; TODO -- don't love this syntax.
 (defmacro with-connection
   {:arglists '([[connection-binding connectable] & body]
-               [[connection-binding connectable options] & body])}
-  [[connection-binding connectable options] & body]
+               [[connection-binding connectable] & body])}
+  [[connection-binding connectable] & body]
   `(do-with-connection
     ~connectable
-    ~options
     (^:once fn* [~connection-binding] ~@body)))
 
 (m/defmethod do-with-connection java.sql.Connection
-  [conn _options f]
+  [conn f]
   (f conn))
 
 (m/defmethod do-with-connection javax.sql.DataSource
-  [^javax.sql.DataSource data-source _options f]
+  [^javax.sql.DataSource data-source f]
   (with-open [conn (.getConnection data-source)]
     (f conn)))
 
 (m/defmethod do-with-connection clojure.lang.IPersistentMap
-  [m options f]
-  (do-with-connection (jdbc/get-datasource m) options f))
+  [m f]
+  (do-with-connection (jdbc/get-datasource m) f))
 
 ;;;; connection string support
 
@@ -38,15 +37,15 @@
     (second (re-find #"^(?:([^:]+):)" connection-string))))
 
 (m/defmulti do-with-connection-string
-  {:arglists '([^java.lang.String connection-string options f])}
-  (fn [connection-string _options _f]
+  {:arglists '([^java.lang.String connection-string f])}
+  (fn [connection-string _f]
     (connection-string-protocol connection-string)))
 
 (m/defmethod do-with-connection String
-  [connection-string options f]
-  (do-with-connection-string connection-string options f))
+  [connection-string f]
+  (do-with-connection-string connection-string f))
 
 (m/defmethod do-with-connection-string "jdbc"
-  [^String connection-string _options f]
+  [^String connection-string f]
   (with-open [conn (java.sql.DriverManager/getConnection connection-string)]
     (f conn)))

@@ -18,10 +18,7 @@
                            {:conditions {:name "Cam"}, :query {:where [:= :id 1]}}
 
                            [::my-query]
-                           {:query ::my-query}
-
-                           [::my-query {:options? true}]
-                           {:query ::my-query, :options {:options? true}}}]
+                           {:query ::my-query}}]
     (testing `(select/parse-select-args ~args)
       (is (= expected
              (select/parse-select-args args))))))

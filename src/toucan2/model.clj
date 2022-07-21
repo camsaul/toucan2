@@ -7,7 +7,7 @@
    [toucan2.query :as query]
    [toucan2.util :as u]))
 
-;; TODO -- this should probably also support options.
+;; TODO -- this should probably also support.
 (m/defmulti do-with-model
   {:arglists '([modelable f])}
   u/dispatch-on-keyword-or-type-1)
@@ -39,7 +39,7 @@
   (->ReducibleModelQuery connectable modelable compileable))
 
 (m/defmulti default-connectable
-  {:arglists '([model options])}
+  {:arglists '([model])}
   u/dispatch-on-keyword-or-type-1)
 
 (m/defmulti table-name
@@ -62,16 +62,16 @@
 ;;;; [[build-select-query]]
 
 (m/defmulti build-select-query
-  {:arglists '([model query columns conditions options])}
+  {:arglists '([model query columns conditions])}
   u/dispatch-on-keyword-or-type-2)
 
 (m/defmethod build-select-query :around :default
-  [model query columns conditions options]
-  (u/with-debug-result (pr-str (list `build-select-query model query columns conditions options))
-    (next-method model query columns conditions options)))
+  [model query columns conditions]
+  (u/with-debug-result (pr-str (list `build-select-query model query columns conditions))
+    (next-method model query columns conditions)))
 
 (m/defmethod build-select-query :default
-  [model query columns conditions _options]
+  [model query columns conditions]
   (when (or (seq columns)
             (seq conditions))
     (throw (ex-info (format (str "Don't know how to build select query for %s from query ^%s %s with columns or "
@@ -96,7 +96,7 @@
         (into [:and] clauses)))))
 
 (m/defmethod build-select-query [:default clojure.lang.IPersistentMap]
-  [model query columns conditions _options]
+  [model query columns conditions]
   (cond-> (merge {:select (or (not-empty columns)
                               [:*])}
                  (when model
@@ -107,10 +107,10 @@
                                                                   (conditions->honeysql-where-clause conditions)))))))
 
 (m/defmethod build-select-query [:default Long]
-  [model id columns conditions options]
+  [model id columns conditions]
   (let [pks (primary-keys model)]
     (assert (= (count pks) 1)
             (format "Cannot build query for model %s from integer %d: expected one primary key, got %s"
                     (pr-str model) id (pr-str pks)))
     (let [pk (first pks)]
-      (build-select-query model {} columns (assoc conditions pk id) options))))
+      (build-select-query model {} columns (assoc conditions pk id)))))
