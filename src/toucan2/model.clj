@@ -3,9 +3,12 @@
    [honey.sql.helpers :as hsql.helpers]
    [methodical.core :as m]
    [pretty.core :as pretty]
+   [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.query :as query]
-   [toucan2.util :as u]))
+   [toucan2.util :as u]
+   [toucan2.realize :as realize]
+   [next.jdbc.result-set :as jdbc.rset]))
 
 ;; TODO -- this should probably also support.
 (m/defmulti do-with-model
@@ -22,14 +25,11 @@
 (defrecord ReducibleModelQuery [connectable modelable query]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (reduce
-     rf
-     init
-     (with-model [model modelable]
-       (eduction
-        (map (fn [row]
-               (list 'magic-map model (into {} row))))
-        (query/reducible-query connectable query)))))
+    (with-model [model modelable]
+      (binding [query/*jdbc-options* (merge
+                                      {:builder-fn (instance/instance-result-set-builder model)}
+                                      query/*jdbc-options*)]
+        (reduce rf init (query/reducible-query connectable query)))))
 
   pretty/PrettyPrintable
   (pretty [_this]

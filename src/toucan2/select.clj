@@ -3,7 +3,8 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.model :as model]
-   [toucan2.util :as u]))
+   [toucan2.util :as u]
+   [toucan2.realize :as realize]))
 
 (s/def ::default-select-args
   (s/cat ;; :modelable  (s/or
@@ -50,6 +51,13 @@
   {:arglists '([modelable & conditions? query?]
                [[modelable & columns] & conditions? query?])}
   [modelable & args]
-  (let [reducible-query (apply select-reducible modelable args)]
-    (reduce conj [] reducible-query)
-    #_(into [] reducible-query)))
+  (realize/realize (apply select-reducible modelable args)))
+
+(defn select-one {:arglists '([modelable & conditions? query?]
+                              [[modelable & columns] & conditions? query?])}
+  [modelable & args]
+  (first
+   (realize/realize
+    (eduction
+     (take 1)
+     (apply select-reducible modelable args)))))
