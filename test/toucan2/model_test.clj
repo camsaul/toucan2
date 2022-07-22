@@ -8,9 +8,16 @@
    [toucan2.realize :as realize]
    [toucan2.test :as test]))
 
-(deftest reducible-model-query-test
+(deftest reducible-query-as-test
   (is (= [(instance/instance :people {:id 1, :name "Cam", :created-at #inst "2020-04-21T23:56:00.000000000-00:00"})]
-         (realize/realize (model/reducible-model-query ::test/db :people "SELECT * FROM people WHERE id = 1;")))))
+         (realize/realize (model/reducible-query-as ::test/db :people "SELECT * FROM people WHERE id = 1;")))))
+
+(deftest query-as-test
+  (is (= [(instance/instance :people {:id 1, :name "Cam"})
+          (instance/instance :people {:id 2, :name "Sam"})
+          (instance/instance :people {:id 3, :name "Pam"})
+          (instance/instance :people {:id 4, :name "Tam"})]
+         (model/query-as ::test/db :people {:select [:id :name], :from [:people]}))))
 
 (deftest ^:parallel default-table-name-test
   (doseq [[model expected] {"ABC"   "ABC"
