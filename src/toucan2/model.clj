@@ -3,30 +3,34 @@
    [honey.sql.helpers :as hsql.helpers]
    [methodical.core :as m]
    [pretty.core :as pretty]
+   [toucan2.dynamic :as dynamic]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.query :as query]
-   [toucan2.util :as u]
    [toucan2.realize :as realize]
-   [next.jdbc.result-set :as jdbc.rset]))
+   [toucan2.util :as u]))
 
 ;; TODO -- this should probably also support.
 (m/defmulti do-with-model
   {:arglists '([modelable f])}
-  u/dispatch-on-keyword-or-type-1)
+  u/dispatch-on-first-arg)
 
 (m/defmethod do-with-model :default
   [model f]
   (f model))
 
 (defmacro with-model [[model-binding modelable] & body]
-  `(do-with-model ~modelable (^:once fn* [~model-binding] ~@body)))
+  `(do-with-model ~modelable (^:once fn* [model#]
+                              (binding [dynamic/*model* model#]
+                                (let [~model-binding model#]
+                                  ~@body)))))
 
 (defrecord ReducibleQueryAs [connectable modelable query]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (with-model [model modelable]
-      (binding [query/*jdbc-options* (merge
+    (with-model [_model modelable]
+      (reduce rf init (query/reducible-query connectable query))
+      #_(binding [query/*jdbc-options* (merge
                                       {:builder-fn (instance/instance-result-set-builder model)}
                                       query/*jdbc-options*)]
         (reduce rf init (query/reducible-query connectable query)))))
@@ -43,11 +47,11 @@
 
 (m/defmulti default-connectable
   {:arglists '([model])}
-  u/dispatch-on-keyword-or-type-1)
+  u/dispatch-on-first-arg)
 
 (m/defmulti table-name
   {:arglists '([model])}
-  u/dispatch-on-keyword-or-type-1)
+  u/dispatch-on-first-arg)
 
 (m/defmethod table-name :default
   [model]
@@ -55,7 +59,7 @@
 
 (m/defmulti primary-keys
   {:arglists '([model])}
-  u/dispatch-on-keyword-or-type-1)
+  u/dispatch-on-first-arg)
 
 (m/defmethod primary-keys :default
   [_model]
@@ -65,7 +69,7 @@
 
 (m/defmulti build-select-query
   {:arglists '([model query columns conditions])}
-  u/dispatch-on-keyword-or-type-2)
+  u/dispatch-on-first-two-args)
 
 (m/defmethod build-select-query :around :default
   [model query columns conditions]
@@ -81,7 +85,7 @@
                             (pr-str model)
                             (some-> query class .getCanonicalName)
                             (pr-str query)
-                            (pr-str (u/dispatch-on-keyword-or-type-2 model query)))
+                            (pr-str (u/dispatch-on-first-two-args model query)))
                     {:model model, :query query, :columns columns, :conditions conditions})))
   query)
 

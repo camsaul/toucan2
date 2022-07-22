@@ -9,7 +9,7 @@
    [toucan2.test :as test]))
 
 (deftest reducible-query-as-test
-  (is (= [(instance/instance :people {:id 1, :name "Cam", :created-at #inst "2020-04-21T23:56:00.000000000-00:00"})]
+  (is (= [(instance/instance :people {:id 1, :name "Cam", :created-at (java.time.OffsetDateTime/parse "2020-04-21T23:56Z")})]
          (realize/realize (model/reducible-query-as ::test/db :people "SELECT * FROM people WHERE id = 1;")))))
 
 (deftest query-as-test

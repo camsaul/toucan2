@@ -29,7 +29,7 @@
 
 (m/defmulti select-reducible*
   {:arglists '([model columns args])}
-  u/dispatch-on-keyword-or-type-1)
+  u/dispatch-on-first-arg)
 
 (m/defmethod select-reducible* :default
   [model columns args]
@@ -62,28 +62,28 @@
      (take 1)
      (apply select-reducible modelable args)))))
 
-#_(defn select-fn-reducible
-  {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
+(defn select-fn-reducible
+  {:arglists '([f modelable & conditions? query?])}
   [f & args]
   (eduction
    (map f)
    (apply select-reducible args)))
 
-#_(defn select-fn-set
+(defn select-fn-set
   "Like `select`, but returns a set of values of `(f instance)` for the results. Returns `nil` if the set is empty."
-  {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
+  {:arglists '([f modelable & conditions? query?])}
   [& args]
   (not-empty (reduce conj #{} (apply select-fn-reducible args))))
 
-#_(defn select-fn-vec
+(defn select-fn-vec
   "Like `select`, but returns a vector of values of `(f instance)` for the results. Returns `nil` if the vector is
   empty."
-  {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
+  {:arglists '([f modelable & conditions? query?])}
   [& args]
   (not-empty (reduce conj [] (apply select-fn-reducible args))))
 
 #_(defn select-one-fn
-  {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
+  {:arglists '([f modelable & conditions? query?])}
   [& args]
   (query/reduce-first (apply select-fn-reducible args)))
 
@@ -94,29 +94,29 @@
       (apply juxt pk-keys))))
 
 #_(defn select-pks-reducible
-  {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
-  [connectable-tableable & args]
-  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+  {:arglists '([modelable & conditions? query?])}
+  [modelable & args]
+  (let [[connectable tableable] (conn/parse-modelable modelable)
         f                       (select-pks-fn connectable tableable)]
     (apply select-fn-reducible f [connectable tableable] args)))
 
 #_(defn select-pks-set
-  {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
+  {:arglists '([modelable & conditions? query?])}
   [& args]
   (not-empty (reduce conj #{} (apply select-pks-reducible args))))
 
 #_(defn select-pks-vec
-  {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
+  {:arglists '([modelable & conditions? query?])}
   [& args]
   (not-empty (reduce conj [] (apply select-pks-reducible args))))
 
 #_(defn select-one-pk
-  {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
+  {:arglists '([modelable & conditions? query?])}
   [& args]
   (query/reduce-first (apply select-pks-reducible args)))
 
 #_(defn select-fn->fn
-  {:arglists '([f1 f2 connectable-tableable pk? & conditions? queryable? options?])}
+  {:arglists '([f1 f2 modelable & conditions? query?])}
   [f1 f2 & args]
   (not-empty
    (into
@@ -125,16 +125,16 @@
     (apply select-reducible args))))
 
 #_(defn select-fn->pk
-  {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
-  [f connectable-tableable & args]
-  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+  {:arglists '([f modelable & conditions? query?])}
+  [f modelable & args]
+  (let [[connectable tableable] (conn/parse-modelable modelable)
         pks-fn                  (select-pks-fn connectable tableable)]
     (apply select-fn->fn f pks-fn [connectable tableable] args)))
 
 #_(defn select-pk->fn
-  {:arglists '([f connectable-tableable pk? & conditions? queryable? options?])}
-  [f connectable-tableable & args]
-  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+  {:arglists '([f modelable & conditions? query?])}
+  [f modelable & args]
+  (let [[connectable tableable] (conn/parse-modelable modelable)
         pks-fn                  (select-pks-fn connectable tableable)]
     (apply select-fn->fn pks-fn f [connectable tableable] args)))
 
@@ -154,9 +154,9 @@
    (select* connectable tableable query options)))
 
 #_(defn count
-  {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
-  [connectable-tableable & args]
-  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+  {:arglists '([modelable & conditions? query?])}
+  [modelable & args]
+  (let [[connectable tableable] (conn/parse-modelable modelable)
         [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
         {:keys [query options]} (parse-select-args connectable tableable args options)]
     (count* connectable tableable query options)))
@@ -181,9 +181,9 @@
    (select* connectable tableable query options)))
 
 #_(defn exists?
-  {:arglists '([connectable-tableable pk? & conditions? queryable? options?])}
-  [connectable-tableable & args]
-  (let [[connectable tableable] (conn/parse-connectable-tableable connectable-tableable)
+  {:arglists '([modelable & conditions? query?])}
+  [modelable & args]
+  (let [[connectable tableable] (conn/parse-modelable modelable)
         [connectable options]   (conn.current/ensure-connectable connectable tableable nil)
         {:keys [query options]} (parse-select-args connectable tableable args options)]
     (exists?* connectable tableable query options)))

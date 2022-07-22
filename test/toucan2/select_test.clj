@@ -25,7 +25,7 @@
              (select/parse-select-args args))))))
 
 (deftest select-test
-  (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at #inst "2020-04-21T23:56:00.000000000-00:00"})]]
+  (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (java.time.OffsetDateTime/parse "2020-04-21T23:56Z")})]]
     (testing "plain SQL"
       (is (= expected
              (select/select ::test/people "SELECT * FROM people WHERE id = 1;"))))
@@ -45,72 +45,6 @@
       (is (= [(instance/instance ::test/people {:id 1})]
              (select/select [::test/people :id] :id 1))))))
 
-(deftest select-one-test
-  (is (= (instance/instance ::test/people {:id 1, :name "Cam", :created-at #inst "2020-04-21T23:56:00.000000000-00:00"})
-         (select/select-one ::test/people 1))))
-
-#_
-
-#_(m/defmethod queryable/queryable* [:default :default ::named-query]
-  [_ _ _ _]
-  {:named-query? true})
-
-#_(m/defmethod tableable/primary-key* [:default ::tableable]
-  [_ _]
-  [:id :id-2 :id-3])
-
-#_(deftest parse-select-args-test
-  (doseq [[query expected-query] {[]                    nil
-                                  [{:query true}]       {:query true}
-                                  ["query"]             "query"
-                                  [[{:query true} 1 2]] [{:query true} 1 2]
-                                  [["query" 1 2]]       ["query" 1 2]
-                                  [:keyword-query]      :keyword-query
-                                  [::named-query]       {:named-query? true}}
-          ;; can only have id if query is a map
-          [id expected-id]       (when (or (map? (first query))
-                                           (= (first query) ::named-query))
-                                   {[]                 nil
-                                    [1]                {:id 1}
-                                    [[1 2 3]]          {:id 1, :id-2 2, :id-3 3}
-                                    ;; anything besides a keyword or map should be allowed as an id.
-                                    ["id"]             {:id "id"}
-                                    ['id]              {:id 'id}
-                                    ;; maps and keywords are allowed inside vectors but not directly
-                                    [[{:map-id true}]] {:id {:map-id true}}
-                                    [[:keyword-id]]    {:id :keyword-id}
-                                    [[1 "id"]]         {:id 1, :id-2 "id"}})
-          ;; can only have kvs if query is a map
-          [kvs expected-kvs]     (when (map? (first query))
-                                   {[]                      nil
-                                    [:k 1]                  {:k 1}
-                                    [:k1 1, :k2 2]          {:k1 1, :k2, 2}
-                                    [:k "v"]                {:k "v"}
-                                    [:k1 1, :k2 2, :k3 "v"] {:k1 1, :k2 2, :k3 "v"}})
-
-          ;; can only have options if you have a query.
-          [options expected-options] (when (seq query)
-                                       {[]                nil
-                                        [{}]              {}
-                                        [{:options true}] {:options true}})
-          :let                       [args                (vec (concat id kvs query options))
-                                      expected-conditions (merge
-                                                           expected-kvs
-                                                           expected-id)]]
-    (testing (pr-str (list `select/parse-select-args* args))
-      (is (= {:conditions expected-conditions
-              :query      expected-query
-              :options    expected-options}
-             (select/parse-select-args* :connectable ::tableable args nil))))))
-
-#_(m/defmethod tableable/table-name* [:default ::people]
-  [_ _ _]
-  "people")
-
-#_(m/defmethod conn.current/default-connectable-for-tableable* ::people
-  [_ _]
-  :test/postgres)
-
 #_(deftest select-test
   (let [all-rows [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}
                   {:id 2, :name "Sam", :created-at (t/offset-date-time "2019-01-11T23:56:00Z")}
@@ -120,8 +54,8 @@
       (is (= all-rows
              (sort-by :id (select/select ::people))))
       (is (= all-rows
-             (sort-by :id (select/select [:test/postgres :people]))))
-      (test-people-instances? (select/select [:test/postgres :people] {:order-by [[:id :asc]]})))
+             (sort-by :id (select/select ::test/people))))
+      (test-people-instances? (select/select ::test/people {:order-by [[:id :asc]]})))
     (testing "using current connection (dynamic binding)"
       (binding [conn.current/*current-connectable* :test/postgres]
         (is (= all-rows
@@ -140,16 +74,16 @@
 
   (testing "one arg (query)"
     (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (select/select [:test/postgres :people] {:where [:= :id 1]})))
+           (select/select ::test/people {:where [:= :id 1]})))
     (is (= [{:id 1, :name "Tempest", :category "bar"}]
            (select/select [:test/postgres :venues] {:select [:id :name :category], :limit 1, :where [:= :id 1]}))))
 
   (testing "two args (k v)"
     (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-           (select/select [:test/postgres :people] :id 1)))
+           (select/select ::test/people :id 1)))
     (testing "sequential v"
       (is (= [{:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56:00Z")}]
-             (select/select [:test/postgres :people] :id [:= 1]))))))
+             (select/select ::test/people :id [:= 1]))))))
 
 #_(m/defmethod tableable/primary-key* [:default :people/name-is-pk]
   [_ _]
@@ -225,42 +159,43 @@
           (instance/instance :people/no-timestamps-limit-2 {:id 2, :name "Sam"})]
          (select/select [:test/postgres :people/no-timestamps-limit-2]))))
 
-#_(deftest select-one-test
-  (is (= {:id 1, :name "Cam", :created-at (t/offset-date-time "2020-04-21T23:56Z")}
-         (select/select-one [:test/postgres :people])))
+(deftest select-one-test
+  (is (= (instance/instance ::test/people {:id 1, :name "Cam", :created-at (java.time.OffsetDateTime/parse "2020-04-21T23:56Z")})
+         (select/select-one ::test/people 1)))
   (is (= nil
-         (select/select-one [:test/postgres :people] :id 1000))))
+         (select/select-one ::test/people :id 1000))))
 
-#_(deftest select-fn-test
+(deftest select-fn-test
   (testing "Equivalent of Toucan select-field"
     (is (= #{1 2 3 4}
-           (select/select-fn-set :id [:test/postgres :people]))))
+           (select/select-fn-set :id ::test/people))))
   (testing "Return vector instead of a set"
     (is (= [1 2 3 4]
-           (select/select-fn-vec :id [:test/postgres :people]))))
+           (select/select-fn-vec :id ::test/people))))
   (testing "Arbitrary function instead of a key"
     (is (= [2 3 4 5]
-           (select/select-fn-vec (comp inc :id) [:test/postgres :people]))))
+           (select/select-fn-vec (comp inc :id) ::test/people))))
   (testing "Should work with magical keys"
-    (is (= [(t/offset-date-time "2020-04-21T23:56Z")
-            (t/offset-date-time "2019-01-11T23:56Z")
-            (t/offset-date-time "2020-01-01T21:56Z")
-            (t/offset-date-time "2020-05-25T19:56Z")]
-           (select/select-fn-vec :created-at [:test/postgres :people] {:order-by [[:id :asc]]})
-           (select/select-fn-vec :created_at [:test/postgres :people] {:order-by [[:id :asc]]}))))
+    (doseq [k [:created-at :created_at]]
+      (testing k
+        (is (= [(java.time.OffsetDateTime/parse "2020-04-21T23:56Z")
+                (java.time.OffsetDateTime/parse "2019-01-11T23:56Z")
+                (java.time.OffsetDateTime/parse "2020-01-01T21:56Z")
+                (java.time.OffsetDateTime/parse "2020-05-25T19:56Z")]
+               (select/select-fn-vec k ::test/people {:order-by [[:id :asc]]}))))))
   (testing "Should return nil if the result is empty"
-    (is (nil? (select/select-fn-set :id [:test/postgres :people] :id 100)))
-    (is (nil? (select/select-fn-vec :id [:test/postgres :people] :id 100)))))
+    (is (nil? (select/select-fn-set :id ::test/people :id 100)))
+    (is (nil? (select/select-fn-vec :id ::test/people :id 100)))))
 
 #_(deftest select-one-fn-test
   (is (= 1
-         (select/select-one-fn :id [:test/postgres :people] :name "Cam"))))
+         (select/select-one-fn :id ::test/people :name "Cam"))))
 
 #_(deftest select-pks-test
   (is (= #{1 2 3 4}
-         (select/select-pks-set [:test/postgres :people])))
+         (select/select-pks-set ::test/people)))
   (is (= [1 2 3 4]
-         (select/select-pks-vec [:test/postgres :people])))
+         (select/select-pks-vec ::test/people)))
   (testing "non-integer PK"
     (is (= #{"Cam" "Sam" "Pam" "Tam"}
            (select/select-pks-set [:test/postgres :people/name-is-pk])))
@@ -272,12 +207,12 @@
     (is (= [[1 "Cam"] [2 "Sam"] [3 "Pam"] [4 "Tam"]]
            (select/select-pks-vec [:test/postgres :people/composite-pk]))))
   (testing "Should return nil if the result is empty"
-    (is (nil? (select/select-pks-set [:test/postgres :people] :id 100)))
-    (is (nil? (select/select-pks-vec [:test/postgres :people] :id 100)))))
+    (is (nil? (select/select-pks-set ::test/people :id 100)))
+    (is (nil? (select/select-pks-vec ::test/people :id 100)))))
 
 #_(deftest select-one-pk-test
   (is (= 1
-         (select/select-one-pk [:test/postgres :people] :name "Cam")))
+         (select/select-one-pk ::test/people :name "Cam")))
   (testing "non-integer PK"
     (is (= "Cam"
            (select/select-one-pk [:test/postgres :people/name-is-pk] :id 1))))
@@ -287,28 +222,28 @@
 
 #_(deftest select-fn->fn-test
   (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
-         (select/select-fn->fn :id :name [:test/postgres :people])))
+         (select/select-fn->fn :id :name ::test/people)))
   (is (= {2 "cam", 3 "sam", 4 "pam", 5 "tam"}
-         (select/select-fn->fn (comp inc :id) (comp str/lower-case :name) [:test/postgres :people])))
+         (select/select-fn->fn (comp inc :id) (comp str/lower-case :name) ::test/people)))
   (testing "Should return nil if the result is empty"
-    (is (nil? (select/select-fn->fn :id :name [:test/postgres :people] :id 100)))))
+    (is (nil? (select/select-fn->fn :id :name ::test/people :id 100)))))
 
 #_(deftest select-pk->fn-test
   (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
-         (select/select-pk->fn :name [:test/postgres :people])))
+         (select/select-pk->fn :name ::test/people)))
   (is (= {1 "cam", 2 "sam", 3 "pam", 4 "tam"}
-         (select/select-pk->fn (comp str/lower-case :name) [:test/postgres :people])))
+         (select/select-pk->fn (comp str/lower-case :name) ::test/people)))
   (testing "Composite PKs"
     (is (= {[1 "Cam"] "Cam", [2 "Sam"] "Sam", [3 "Pam"] "Pam", [4 "Tam"] "Tam"}
            (select/select-pk->fn :name [:test/postgres :people/composite-pk]))))
   (testing "Should return nil if the result is empty"
-    (is (nil? (select/select-pk->fn :name [:test/postgres :people] :id 100)))))
+    (is (nil? (select/select-pk->fn :name ::test/people :id 100)))))
 
 #_(deftest select-fn->pk-test
   (is (= {"Cam" 1, "Sam" 2, "Pam" 3, "Tam" 4}
-         (select/select-fn->pk :name [:test/postgres :people])))
+         (select/select-fn->pk :name ::test/people)))
   (is (= {"cam" 1, "sam" 2, "pam" 3, "tam" 4}
-         (select/select-fn->pk (comp str/lower-case :name) [:test/postgres :people])))
+         (select/select-fn->pk (comp str/lower-case :name) ::test/people)))
   (testing "Composite PKs"
     (is (= {"Cam" [1 "Cam"], "Sam" [2 "Sam"], "Pam" [3 "Pam"], "Tam" [4 "Tam"]}
   (testing "Should return nil if the result is empty"
@@ -317,9 +252,9 @@
 
 #_(deftest count-test
   (is (= 4
-         (select/count [:test/postgres :people])))
+         (select/count ::test/people)))
   (is (= 1
-         (select/count [:test/postgres :people] 1)))
+         (select/count ::test/people 1)))
   (is (= 3
          (select/count [:test/postgres :venues])))
   (is (= 2
@@ -327,9 +262,9 @@
 
 #_(deftest exists?-test
   (is (= true
-         (select/exists? [:test/postgres :people] :name "Cam")))
+         (select/exists? ::test/people :name "Cam")))
   (is (= false
-         (select/exists? [:test/postgres :people] :name "Cam Era"))))
+         (select/exists? ::test/people :name "Cam Era"))))
 
 #_(m/defmethod honeysql.compile/to-sql* [:default :people/custom-honeysql :id String]
   [_ _ _ v _]

@@ -9,7 +9,8 @@
   pretty/pretty                       {:mvn/version "1.0.5"}}
 
  :jvm-opts
- [ ;; Exceptions that get thrown repeatedly are created without stacktraces as a performance optimization in newer Java
+ ["-Duser.timezone=UTC"
+  ;; Exceptions that get thrown repeatedly are created without stacktraces as a performance optimization in newer Java
   ;; versions. This makes debugging pretty hard when working on stuff locally -- prefer debuggability over performance
   ;; for local dev work.
   "-XX:-OmitStackTraceInFastThrow"]

@@ -6,7 +6,7 @@
 
 (m/defmulti do-with-compiled-query
   {:arglists '([connection query f])}
-  u/dispatch-on-keyword-or-type-2)
+  u/dispatch-on-first-two-args)
 
 (m/defmethod do-with-compiled-query :around :default
   [connection query f]

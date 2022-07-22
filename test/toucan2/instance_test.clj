@@ -5,7 +5,8 @@
    [methodical.core :as m]
    [toucan2.instance :as instance]
    [toucan2.select :as select]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.util :as u])
   (:import
    (java.util Locale)))
 
@@ -240,10 +241,10 @@
 (derive :toucan2.instance-test.no-key-transform/venues ::test/venues)
 
 (deftest no-key-xform-test
-  (is (= (instance/instance ::test/venues {:id 1, :created-at #inst "2017-01-01"})
+  (is (= (instance/instance ::test/venues {:id 1, :created-at (java.time.LocalDateTime/parse "2016-12-31T16:00")})
          (select/select-one ::test/venues {:select [:id :created-at]})))
   (testing "Should be able to disable key transforms by overriding `key-transform-fn*`"
-    (is (= {"id" 1, "created_at" #inst "2017-01-01T00:00:00.000000000-00:00"}
+    (is (= {:id 1, :created_at (java.time.LocalDateTime/parse "2016-12-31T16:00")}
            (select/select-one :toucan2.instance-test.no-key-transform/venues {:select [:id :created-at]})))))
 
 (deftest pretty-print-test
@@ -314,6 +315,11 @@
                  (instance/current m2)))
           (is (identical? (instance/original m2)
                           (instance/current m2))))))))
+
+(deftest dispatch-value-test
+  (testing "Instance should implement dispatch-value"
+    (is (= :wow
+           (u/dispatch-value (instance/instance :wow {}))))))
 
 (derive ::toucan ::bird)
 
