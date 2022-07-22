@@ -58,6 +58,9 @@
   (set-up-test-db!)
   (conn/do-with-connection (test-db-url) f))
 
-(m/defmethod model/default-connectable ::people
+(derive ::people ::models)
+(derive ::venues ::models)
+
+(m/defmethod model/default-connectable ::models
   [_model]
   ::db)

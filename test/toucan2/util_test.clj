@@ -45,7 +45,7 @@
     (binding [u/*debug* true]
       (let [message-form-evaled? (atom false)]
         (is (= ["DEBUG"
-                "=> {:cans 2}"]
+                "+-> {:cans 2}"]
                (out-str-lines
                 (u/with-debug-result (do
                                        (reset! message-form-evaled? true)
@@ -56,11 +56,11 @@
   (testing "Nested debug results"
     (binding [u/*debug* true]
       (is (= ["A"
-              "  B"
-              "  => 2"
-              "  C"
-              "  => :cans"
-              "=> [2 :cans]"]
+              "|  B"
+              "|  +-> 2"
+              "|  C"
+              "|  +-> :cans"
+              "+-> [2 :cans]"]
              (out-str-lines
               (u/with-debug-result "A"
                 [(u/with-debug-result "B"

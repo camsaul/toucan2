@@ -2,7 +2,8 @@
   (:require
    [clojure.test :refer :all]
    [toucan2.select :as select]
-   [toucan2.test :as test]))
+   [toucan2.test :as test]
+   [toucan2.instance :as instance]))
 
 (deftest ^:parallel parse-select-args-test
   (doseq [[args expected] {[1]
@@ -24,7 +25,7 @@
              (select/parse-select-args args))))))
 
 (deftest select-test
-  (let [expected [(list 'magic-map ::test/people {:id 1, :name "Cam", :created-at #inst "2020-04-21T23:56:00.000000000-00:00"})]]
+  (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at #inst "2020-04-21T23:56:00.000000000-00:00"})]]
     (testing "plain SQL"
       (is (= expected
              (select/select ::test/people "SELECT * FROM people WHERE id = 1;"))))
@@ -39,4 +40,11 @@
              (select/select ::test/people 1))))
     (testing "conditions"
       (is (= expected
-             (select/select ::test/people :id 1))))))
+             (select/select ::test/people :id 1))))
+    (testing "columns"
+      (is (= [(instance/instance ::test/people {:id 1})]
+             (select/select [::test/people :id] :id 1))))))
+
+(deftest select-one-test
+  (is (= (instance/instance ::test/people {:id 1, :name "Cam", :created-at #inst "2020-04-21T23:56:00.000000000-00:00"})
+         (select/select-one ::test/people 1))))

@@ -19,8 +19,8 @@
       (binding [u/*debug-indent-level* (inc u/*debug-indent-level*)]
         (next-method connection query (fn [compiled-query]
                                         (binding [u/*debug-indent-level* (dec u/*debug-indent-level*)]
-                                          (u/println-debug '=> (pr-str compiled-query)))
-                                        (f compiled-query)))))))
+                                          (u/print-debug-result (pr-str compiled-query))
+                                          (f compiled-query))))))))
 
 (defmacro with-compiled-query [[query-binding [connection query]] & body]
   `(do-with-compiled-query
