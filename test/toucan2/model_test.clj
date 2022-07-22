@@ -27,16 +27,16 @@
       (is (= expected
              (model/table-name model))))))
 
-(deftest ^:parallel conditions->honeysql-where-clause-test
-  (doseq [[conditions expected] {nil                 nil
-                                 {:id 1}             [:= :id 1]
-                                 {:a 1, :b 2}        [:and [:= :a 1] [:= :b 2]]
-                                 {:id [:> 1]}        [:> :id 1]
-                                 {:a 1, :b [:> 2]}   [:and [:= :a 1] [:> :b 2]]
-                                 {:a [:between 1 2]} [:between :a 1 2]}]
-    (testing (pr-str `(model/conditions->honeysql-where-clause ~conditions))
+(deftest ^:parallel condition->honeysql-where-clause-test
+  (doseq [[[k v] expected] {[:id :id]           [:= :id :id]
+                            [1 :id]             [:= 1 :id]
+                            [:id 1]             [:= :id 1]
+                            [:a 1]              [:= :a 1]
+                            [:id [:> 1]]        [:> :id 1]
+                            [:a [:between 1 2]] [:between :a 1 2]}]
+    (testing (pr-str `(model/condition->honeysql-where-clause ~k ~v))
       (is (= expected
-             (model/conditions->honeysql-where-clause conditions))))))
+             (model/condition->honeysql-where-clause k v))))))
 
 (deftest ^:parallel default-build-select-query-test
   (is (= {:select [:*]
@@ -64,6 +64,25 @@
               :from   [[:default]]
               :where  [:and [:= :a :b] [:= :id 1]]}
              (model/build-select-query :default {:where [:= :a :b]} nil {:id 1}))))))
+
+(deftest built-in-pk-condition-test
+  (is (= {:select [:*], :from [[:default]], :where [:= :id 1]}
+         (model/build-select-query :default {} nil {:toucan2/pk 1})))
+  (is (= {:select [:*], :from [[:default]], :where [:and
+                                                    [:= :name "Cam"]
+                                                    [:= :id 1]]}
+         (model/build-select-query :default {:where [:= :name "Cam"]} nil {:toucan2/pk 1}))))
+
+(m/defmethod model/apply-condition [:default clojure.lang.IPersistentMap ::custom.limit]
+  [_model honeysql-form _k limit]
+  (assoc honeysql-form :limit limit))
+
+(deftest custom-condition-test
+  (is (= {:select [:*]
+          :from   [[:default]]
+          :limit  100}
+         (model/build-select-query :default {} nil {::custom.limit 100})
+         (model/build-select-query :default {:limit 1} nil {::custom.limit 100}))))
 
 (m/defmethod model/do-with-model :toucan2.model-test.quoted/people
   [modelable f]

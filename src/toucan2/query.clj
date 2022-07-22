@@ -32,5 +32,3 @@
 
 (defn query [connectable query]
   (realize/realize (reducible-query connectable query)))
-
-;; TODO -- query-as ?

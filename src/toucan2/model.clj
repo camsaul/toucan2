@@ -61,6 +61,14 @@
   {:arglists '([model])}
   u/dispatch-on-first-arg)
 
+;; if the PK comes back unwrapped, wrap it.
+(m/defmethod primary-keys :around :default
+  [model]
+  (let [pk (next-method model)]
+    (if (sequential? pk)
+      pk
+      [pk])))
+
 (m/defmethod primary-keys :default
   [_model]
   [:id])
@@ -89,28 +97,50 @@
                     {:model model, :query query, :columns columns, :conditions conditions})))
   query)
 
-(defn condition->honeysql-where-clause [[k v]]
+(m/defmulti apply-condition
+  {:arglists '([model query k v])}
+  u/dispatch-on-first-three-args)
+
+(defn condition->honeysql-where-clause [k v]
   (if (sequential? v)
     (vec (list* (first v) k (rest v)))
     [:= k v]))
 
-(defn conditions->honeysql-where-clause [conditions]
-  (when (seq conditions)
-    (let [clauses (map condition->honeysql-where-clause conditions)]
-      (if (= (count clauses) 1)
-        (first clauses)
-        (into [:and] clauses)))))
+(m/defmethod apply-condition [:default clojure.lang.IPersistentMap :default]
+  [_model honeysql k v]
+  (update honeysql :where (fn [existing-where]
+                            (:where (hsql.helpers/where existing-where
+                                                        (condition->honeysql-where-clause k v))))))
+
+(m/defmethod apply-condition [:default clojure.lang.IPersistentMap :toucan2/pk]
+  [model honeysql _k v]
+  (let [pk-columns (primary-keys model)
+        v          (if (sequential? v)
+                     v
+                     [v])]
+    (assert (= (count pk-columns)
+               (count v))
+            (format "Expected %s primary key values for %s, got %d values %s"
+                    (count pk-columns) (pr-str pk-columns)
+                    (count v) (pr-str v)))
+    (reduce
+     (fn [honeysql [k v]]
+       (apply-condition model honeysql k v))
+     honeysql
+     (zipmap pk-columns v))))
 
 (m/defmethod build-select-query [:default clojure.lang.IPersistentMap]
   [model query columns conditions]
-  (cond-> (merge {:select (or (not-empty columns)
-                              [:*])}
-                 (when model
-                   {:from [[(keyword (table-name model))]]})
-                 query)
-    (seq conditions) (update :where (fn [existing-where]
-                                      (:where (hsql.helpers/where existing-where
-                                                                  (conditions->honeysql-where-clause conditions)))))))
+  (let [honeysql (merge {:select (or (not-empty columns)
+                                     [:*])}
+                        (when model
+                          {:from [[(keyword (table-name model))]]})
+                        query)]
+    (reduce
+     (fn [honeysql [k v]]
+       (apply-condition model honeysql k v))
+     honeysql
+     conditions)))
 
 (m/defmethod build-select-query [:default Long]
   [model id columns conditions]
