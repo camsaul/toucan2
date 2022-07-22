@@ -4,7 +4,6 @@
    [camel-snake-kebab.internals.macros :as csk.macros]
    [clojure.data :as data]
    [methodical.core :as m]
-   [next.jdbc.result-set :as jdbc.rset]
    [potemkin :as p]
    [pretty.core :as pretty]
    [toucan2.realize :as realize]
@@ -20,7 +19,7 @@
 
 (m/defmulti key-transform-fn
   {:arglists '([model])}
-  u/dispatch-on-keyword-or-type-1)
+  u/dispatch-on-first-arg)
 
 (m/defmethod key-transform-fn :default
   [_model]
@@ -100,10 +99,10 @@
         this
         (Instance. mdl orig new-m key-xform mta))))
 
-  (keys [_]
+  (keys [_this]
     (keys m))
 
-  (meta [_]
+  (meta [_this]
     mta)
 
   (with-meta [this new-meta]
@@ -132,11 +131,11 @@
     (.containsKey m (key-xform k)))
 
   clojure.lang.IEditableCollection
-  (asTransient [_]
+  (asTransient [_this]
     (->TransientInstance mdl (transient m) key-xform mta))
 
   IInstance
-  (original [_]
+  (original [_this]
     orig)
 
   (with-original [this new-original]
@@ -144,7 +143,7 @@
       this
       (Instance. mdl new-original m key-xform mta)))
 
-  (current [_]
+  (current [_this]
     m)
 
   (with-current [this new-current]
@@ -152,10 +151,10 @@
       this
       (Instance. mdl orig new-current key-xform mta)))
 
-  (changes [_]
+  (changes [_this]
     (not-empty (second (data/diff orig m))))
 
-  (model [_]
+  (model [_this]
     mdl)
 
   (with-model [this new-model]
@@ -163,15 +162,19 @@
       this
       (Instance. new-model orig m key-xform mta)))
 
+  u/DispatchValue
+  (dispatch-value [_this]
+    (u/dispatch-value mdl))
+
   realize/Realize
-  (realize [_]
+  (realize [_this]
     (if (identical? orig m)
       (let [m (realize/realize m)]
         (Instance. mdl m m key-xform mta))
       (Instance. mdl (realize/realize orig) (realize/realize m) key-xform mta)))
 
   pretty/PrettyPrintable
-  (pretty [_]
+  (pretty [_this]
     (list `instance mdl m)))
 
 (deftype ^:private TransientInstance [mdl ^clojure.lang.ITransientMap m key-xform mta]
@@ -179,7 +182,7 @@
   (conj [this v]
     (.conj m v)
     this)
-  (persistent [_]
+  (persistent [_this]
     (let [m (persistent! m)]
       (Instance. mdl m m key-xform mta)))
   (assoc [this k v]
@@ -208,13 +211,13 @@
 
 (extend-protocol IInstance
   nil
-  (original [_]
+  (original [_this]
     nil)
-  (current [_]
+  (current [_this]
     nil)
-  (changes [_]
+  (changes [_this]
     nil)
-  (model [_]
+  (model [_this]
     nil)
   (with-model [_ new-model]
     (instance new-model))
@@ -223,7 +226,7 @@
   ;; throw an Exception rather than returning nil, because that makes no sense.
   ;;
   Object
-  (model [_]
+  (model [_this]
     nil)
 
   ;; generally just treat a plain map like an instance with nil model/and original = nil,
@@ -235,11 +238,11 @@
   ;;
   ;;    (= (f plain-map) (f instance))
   clojure.lang.IPersistentMap
-  (model [_]
+  (model [_this]
     nil)
   (with-model [m a-model]
     (instance a-model m))
-  (original [_]
+  (original [_this]
     nil)
   (current [m]
     m)
@@ -247,7 +250,7 @@
     new-current)
   (with-original [m _]
     m)
-  (changes [_]
+  (changes [_this]
     nil))
 
 (defn reset-original
@@ -287,7 +290,7 @@
       (apply update-original instance f args)
       (apply update-current  instance f args))))
 
-(p/defrecord+ InstanceResultSetBuilder [mdl key-xform ^java.sql.ResultSet rset rsmeta cols]
+#_(p/defrecord+ InstanceResultSetBuilder [mdl key-xform ^java.sql.ResultSet rset rsmeta cols]
   jdbc.rset/RowBuilder
   (->row [_this]
     (->TransientInstance mdl (transient {}) key-xform nil))
@@ -310,7 +313,7 @@
   (rs! [_this mrs]
     (persistent! mrs)))
 
-(defn instance-result-set-builder [a-model]
+#_(defn instance-result-set-builder [a-model]
   (let [key-xform (key-transform-fn a-model)]
     (fn [^java.sql.ResultSet rset _opts]
       (let [rsmeta (.getMetaData rset)

@@ -6,7 +6,7 @@
 
 (m/defmulti do-with-connection
   {:arglists '([connectable f])}
-  u/dispatch-on-keyword-or-type-1)
+  u/dispatch-on-first-arg)
 
 ;; TODO -- don't love this syntax.
 (defmacro with-connection

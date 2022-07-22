@@ -1,5 +1,6 @@
 (ns toucan2.util
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [potemkin :as p]))
 
 (def ^:dynamic *debug* false)
 
@@ -32,23 +33,35 @@
        (thunk#)
        (do-with-debug-result ~message thunk#))))
 
+;; TODO -- consider renaming to dispatch-value
 (defn keyword-or-type [x]
   (if (keyword? x)
     x
     (type x)))
 
-;; TODO (maybe) `u/dispatch-value`
+(p/defprotocol+ DispatchValue
+  (dispatch-value [x]))
 
-;; TODO -- rename to `dispatch-on-first-arg` or `dispatch-on-keyword-or-type-of-first-arg`
-(defn dispatch-on-keyword-or-type-1
+(extend-protocol DispatchValue
+  Object
+  (dispatch-value [x]
+    (type x))
+
+  nil
+  (dispatch-value [_nil]
+    nil)
+
+  clojure.lang.Keyword
+  (dispatch-value [k]
+    k))
+
+(defn dispatch-on-first-arg
   [x & _]
-  (keyword-or-type x))
+  (dispatch-value x))
 
-;; TODO -- rename to `u/dispatch-on-first-two-args`
-(defn dispatch-on-keyword-or-type-2
+(defn dispatch-on-first-two-args
   [x y & _]
-  [(keyword-or-type x)
-   (keyword-or-type y)])
+  [(dispatch-value x) (dispatch-value y)])
 
 (defn lower-case-en
   "Locale-agnostic version of [[clojure.string/lower-case]]. `clojure.string/lower-case` uses the default locale in conversions, turning `ID` into `ıd`, in the Turkish locale.
