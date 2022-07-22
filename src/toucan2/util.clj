@@ -63,6 +63,10 @@
   [x y & _]
   [(dispatch-value x) (dispatch-value y)])
 
+(defn dispatch-on-first-three-args
+  [x y z & _]
+  [(dispatch-value x) (dispatch-value y) (dispatch-value z)])
+
 (defn lower-case-en
   "Locale-agnostic version of [[clojure.string/lower-case]]. `clojure.string/lower-case` uses the default locale in conversions, turning `ID` into `ıd`, in the Turkish locale.
   This function always uses the `Locale/US` locale."
