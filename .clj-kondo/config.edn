@@ -1,4 +1,7 @@
-{:linters
+{:config-paths
+ ["macros"]
+
+ :linters
  {:refer-all
   {:exclude [clojure.test]}
 
@@ -7,12 +10,17 @@
    [->kebab-case]}}
 
  :lint-as
- {methodical.core/defmethod           clojure.core/defmethod
-  methodical.core/defmulti            clojure.core/defmulti
+ {methodical.core/defmulti            clojure.core/defmulti
   potemkin/def-map-type               clojure.core/defrecord
   potemkin/defprotocol+               clojure.core/defprotocol
   potemkin/defrecord+                 clojure.core/defrecord
   potemkin/deftype+                   clojure.core/deftype
   toucan2.compile/with-compiled-query clojure.core/let
   toucan2.connection/with-connection  clojure.core/let
-  toucan2.model/with-model            clojure.core/let}}
+  toucan2.model/with-model            clojure.core/let}
+
+ :hooks
+ {:macroexpand
+  {methodical.core/defmethod macros.methodical.core/defmethod}}
+
+ :skip-comments true}
