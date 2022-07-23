@@ -64,7 +64,7 @@
                                                 ;; once even with multiple rows.
                                                 read-thunk   (delay (read-column-thunk conn model rset rsmeta i))
                                                 result-thunk (fn []
-                                                               (u/with-debug-result ["Realize column %d %s" i col-name]
+                                                               (u/with-debug-result (format "Realize column %d %s" i col-name)
                                                                  (jdbc.rs/read-column-by-index (@read-thunk) rsmeta i)))]]
                                    [col-name result-thunk]))]
     (fn row-instance-thunk []

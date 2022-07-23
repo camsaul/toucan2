@@ -45,3 +45,14 @@
   nil
   (realize [_]
     nil))
+
+(defn reduce-first
+  ([reducible]
+   (reduce-first (map realize) reducible))
+
+  ([xform reducible]
+   (transduce
+    (comp xform (take 1))
+    (completing conj (comp first))
+    []
+    reducible)))
