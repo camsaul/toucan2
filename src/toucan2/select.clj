@@ -1,4 +1,5 @@
 (ns toucan2.select
+  (:refer-clojure :exclude [count])
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
@@ -11,11 +12,7 @@
   u/dispatch-on-first-arg)
 
 (s/def ::default-select-args
-  (s/cat ;; :modelable  (s/or
-   ;;              :model          (complement sequential?)
-   ;;              :model-and-cols (s/cat
-   ;;                               :model any?
-   ;;                               :cols  (s/* any?)))
+  (s/cat
    :conditions (s/* (s/cat
                      :k keyword?
                      :v (complement map?)))
@@ -27,19 +24,18 @@
     (when (s/invalid? parsed)
       (throw (ex-info (format "Don't know how to interpret select args: %s" (s/explain-str ::default-select-args args))
                       (s/explain-data ::default-select-args args))))
-    (let [{:keys [query conditions]} parsed]
-      [(into {} (map (juxt :k :v)) conditions)
-       (if (nil? query)
-         {}
-         query)])))
+    (cond-> parsed
+      (nil? (:query parsed))     (assoc :query {})
+      (seq (:conditions parsed)) (update :conditions (fn [conditions]
+                                                       (into {} (map (juxt :k :v)) conditions))))))
 
 (m/defmulti select-reducible*
   ;; the actual args depend on what [[parse-args]] returns
-  {:arglists '([model columns & args])}
+  {:arglists '([model columns args])}
   u/dispatch-on-first-arg)
 
 (m/defmethod select-reducible* :default
-  [model columns conditions query]
+  [model columns {:keys [conditions query], :as _args}]
   (let [query       (model/build-select-query model query columns conditions)
         connectable (model/default-connectable model)]
     (model/reducible-query-as connectable model query)))
@@ -51,9 +47,8 @@
                                 modelable
                                 [modelable])]
     (model/with-model [model modelable]
-      (let [args (parse-args model args)]
-        ;; TODO -- should we TRACE when debugging is enabled?
-        (apply #_methodical.util.trace/trace* select-reducible* model columns args)))))
+      ;; TODO -- should we [[m/trace]] when debugging is enabled?
+      (select-reducible* model columns (parse-args model args)))))
 
 (defn select
   {:arglists '([modelable & conditions? query?]
@@ -139,39 +134,34 @@
   (let [pks-fn (select-pks-fn modelable)]
     (apply select-fn->fn pks-fn f modelable args)))
 
-#_(m/defmulti count*
-  {:arglists '([connectableᵈ modelableᵈ queryableᵈᵗ options])}
-  u/dispatch-on-first-three-args
-  :combo (m.combo.threaded/threading-method-combination :third))
+(m/defmulti count*
+  {:arglists '([model args])}
+  u/dispatch-on-first-arg)
 
-#_(m/defmethod count* :default
-  [modelable query options]
-  (log/tracef "No efficient implementation of count* for %s, doing select-reducible and counting the rows..."
-              (u/dispatch-value query))
+(m/defmethod count* :default
+  [model args]
+  (u/println-debug (format "No efficient implementation of count* for %s, doing select-reducible and counting the rows..."
+                           (pr-str model)))
   (reduce
    (fn [acc _]
      (inc acc))
    0
-   (select* modelable query options)))
+   (select-reducible* model nil args)))
 
-#_(defn count
+(defn count
   {:arglists '([modelable & conditions? query?])}
   [modelable & args]
-  (let [
+  (model/with-model [model modelable]
+    (count* model (parse-args model args))))
 
-        [connectable options]   (conn.current/ensure-connectable modelable nil)
-        {:keys [query options]} (parse-args modelable args options)]
-    (count* modelable query options)))
+(m/defmulti exists?*
+  {:arglists '([model args])}
+  u/dispatch-on-first-arg)
 
-#_(m/defmulti exists?*
-  {:arglists '([connectableᵈ modelableᵈ queryableᵈᵗ options])}
-  u/dispatch-on-first-three-args
-  :combo (m.combo.threaded/threading-method-combination :third))
-
-#_(m/defmethod exists?* :default
-  [modelable query options]
-  (log/tracef "No efficient implementation of exists?* for %s, doing select-reducible and seeing if it returns a row..."
-              (u/dispatch-value query))
+(m/defmethod exists?* :default
+  [model args]
+  (u/println-debug (format "No efficient implementation of exists?* for %s, doing select-reducible and seeing if it returns a row..."
+                           (pr-str model)))
   (transduce
    (take 1)
    (fn
@@ -180,13 +170,10 @@
      ([_ _]
       true))
    false
-   (select* modelable query options)))
+   (select-reducible* model nil args)))
 
-#_(defn exists?
+(defn exists?
   {:arglists '([modelable & conditions? query?])}
   [modelable & args]
-  (let [
-
-        [connectable options]   (conn.current/ensure-connectable modelable nil)
-        {:keys [query options]} (parse-args modelable args options)]
-    (exists?* modelable query options)))
+  (model/with-model [model modelable]
+    (exists?* model (parse-args model args))))
