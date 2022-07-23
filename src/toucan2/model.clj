@@ -3,8 +3,7 @@
    [honey.sql.helpers :as hsql.helpers]
    [methodical.core :as m]
    [pretty.core :as pretty]
-   [toucan2.dynamic :as dynamic]
-   [toucan2.instance :as instance]
+   [toucan2.current :as current]
    [toucan2.model :as model]
    [toucan2.query :as query]
    [toucan2.realize :as realize]
@@ -21,7 +20,7 @@
 
 (defmacro with-model [[model-binding modelable] & body]
   `(do-with-model ~modelable (^:once fn* [model#]
-                              (binding [dynamic/*model* model#]
+                              (binding [current/*model* model#]
                                 (let [~model-binding model#]
                                   ~@body)))))
 

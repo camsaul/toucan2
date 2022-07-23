@@ -2,7 +2,8 @@
   (:require
    [methodical.core :as m]
    [toucan2.util :as u]
-   [next.jdbc :as jdbc]))
+   [next.jdbc :as jdbc]
+   [toucan2.current :as current]))
 
 (m/defmulti do-with-connection
   {:arglists '([connectable f])}
@@ -28,7 +29,10 @@
 
 (m/defmethod do-with-connection clojure.lang.IPersistentMap
   [m f]
-  (do-with-connection (jdbc/get-datasource m) f))
+  (do-with-connection (jdbc/get-datasource m)
+                      (^:once fn* [conn]
+                       (binding [current/*connection* conn]
+                         (f conn)))))
 
 ;;;; connection string support
 

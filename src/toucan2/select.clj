@@ -14,8 +14,8 @@
 (s/def ::default-select-args
   (s/cat
    :conditions (s/* (s/cat
-                     :k keyword?
-                     :v (complement map?)))
+                     :k any?
+                     :v any?))
    :query      (s/? any?)))
 
 (m/defmethod parse-args :default
