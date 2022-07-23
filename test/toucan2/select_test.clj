@@ -13,23 +13,22 @@
 
 (deftest ^:parallel parse-args-test
   (doseq [[args expected] {[1]
-                           [{} 1]
+                           {:query 1}
 
                            [:id 1]
-                           [{:id 1} {}]
+                           {:conditions {:id 1}, :query {}}
 
                            [{:where [:= :id 1]}]
-                           [{} {:where [:= :id 1]}]
+                           {:query {:where [:= :id 1]}}
 
                            [:name "Cam" {:where [:= :id 1]}]
-                           [{:name "Cam"} {:where [:= :id 1]}]
+                           {:conditions {:name "Cam"}, :query {:where [:= :id 1]}}
 
                            [::my-query]
-                           [{} ::my-query]}]
+                           {:query ::my-query}}]
     (testing `(select/parse-args :default ~args)
       (is (= expected
              (select/parse-args :default args))))))
-
 (deftest select-test
   (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]]
     (testing "plain SQL"
@@ -110,12 +109,12 @@
 
 ;; this could also be done as part a `:before` method.
 (m/defmethod select/select-reducible* ::people.no-timestamps
-  [model columns conditions query]
+  [model columns args]
   (let [columns (or columns [:id :name])]
-    (next-method model columns conditions query)))
+    (next-method model columns args)))
 
 (m/defmethod select/select-reducible* :after ::people.no-timestamps
-  [_model _columns _conditions reducible-query]
+  [_model _columns {reducible-query :query, :as args}]
   (testing "should not be an eduction yet -- if it is it means this method is getting called more than once"
     (is (not (instance? clojure.core.Eduction reducible-query))))
   (assert (not (instance? clojure.core.Eduction reducible-query)))
@@ -126,7 +125,7 @@
           (testing "instance table should be a ::people.no-timestamps"
             (is (isa? (instance/model person) ::people.no-timestamps)))
           (assoc person :after-select? true)))
-   reducible-query))
+   args))
 
 (deftest default-query-test
   (testing "Should be able to set some defaults by implementing `select*`"
@@ -148,9 +147,9 @@
 ;; to implement [[toucan2.model/build-select-query]] for `[::people.limit-2 clojure.lang.IPersistentMap]` instead. But
 ;; it does do a good job of letting us test that combining aux methods work like we'd expect.
 (m/defmethod select/select-reducible* :before ::people.limit-2
-  [_model _columns _conditions query]
-  (cond-> query
-    (map? query) (assoc :limit 2)))
+  [_model _columns {:keys [query], :as args}]
+  (cond-> args
+    (map? query) (update :query assoc :limit 2)))
 
 (deftest pre-select-test
   (testing "Should be able to do cool stuff in pre-select (select* :before)"
@@ -258,7 +257,7 @@
            (select/select-fn->pk :name ::people.composite-pk))))
     (is (nil? (select/select-fn->pk :name ::people.composite-pk :id 100)))))
 
-#_(deftest count-test
+(deftest count-test
   (is (= 4
          (select/count ::test/people)))
   (is (= 1
@@ -268,7 +267,7 @@
   (is (= 2
          (select/count ::test/venues :category "bar"))))
 
-#_(deftest exists?-test
+(deftest exists?-test
   (is (= true
          (select/exists? ::test/people :name "Cam")))
   (is (= false
