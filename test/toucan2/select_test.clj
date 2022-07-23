@@ -273,10 +273,12 @@
   (is (= false
          (select/exists? ::test/people :name "Cam Era"))))
 
+;; TODO
+
 #_(m/defmethod honeysql.compile/to-sql* [:default :people/custom-honeysql :id String]
-  [_ _ _ v _]
-  (assert (string? v) (format "V should be a string, got %s" (pr-str v)))
-  ["?::integer" v])
+    [_ _ _ v _]
+    (assert (string? v) (format "V should be a string, got %s" (pr-str v)))
+    ["?::integer" v])
 
 #_(deftest custom-honeysql-test
   (test/with-default-connection
