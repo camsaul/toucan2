@@ -54,14 +54,14 @@
              (query/reducible-query ::test/db "SELECT * FROM people;")))))))
 
 (deftest query-test
-  (let [expected [{:id 1, :created-at (LocalDateTime/parse "2016-12-31T16:00")}
-                  {:id 2, :created-at (LocalDateTime/parse "2016-12-31T16:00")}
-                  {:id 3, :created-at (LocalDateTime/parse "2016-12-31T16:00")}]]
+  (let [expected [{:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")}
+                  {:id 2, :created-at (LocalDateTime/parse "2017-01-01T00:00")}
+                  {:id 3, :created-at (LocalDateTime/parse "2017-01-01T00:00")}]]
     (testing "SQL"
-      (query/query :toucan2.test/db "SELECT * FROM venues ORDER BY id ASC;"))
+      (query/query ::test/db "SELECT * FROM venues ORDER BY id ASC;"))
     (testing "HoneySQL"
       (is (= expected
-             (query/query :toucan2.test/db {:select [:id :created_at], :from [:venues], :order-by [[:id :asc]]}))))))
+             (query/query ::test/db {:select [:id :created_at], :from [:venues], :order-by [[:id :asc]]}))))))
 
 (m/defmethod compile/do-with-compiled-query [:default ::named-query]
   [_conn _query f]
