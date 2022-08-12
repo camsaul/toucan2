@@ -77,10 +77,6 @@
       (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
              (select/select ::test/people :id [:= 1]))))))
 
-(m/defmethod model/table-name ::people
-  [_model]
-  "people")
-
 (derive ::people.name-is-pk ::people)
 
 (m/defmethod model/primary-keys ::people.name-is-pk

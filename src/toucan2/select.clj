@@ -11,7 +11,7 @@
   {:arglists '([model args])}
   u/dispatch-on-first-arg)
 
-(s/def ::default-select-args
+(s/def ::default-args
   (s/cat
    :conditions (s/* (s/cat
                      :k any?
@@ -20,10 +20,10 @@
 
 (m/defmethod parse-args :default
   [_model args]
-  (let [parsed (s/conform ::default-select-args args)]
+  (let [parsed (s/conform ::default-args args)]
     (when (s/invalid? parsed)
-      (throw (ex-info (format "Don't know how to interpret select args: %s" (s/explain-str ::default-select-args args))
-                      (s/explain-data ::default-select-args args))))
+      (throw (ex-info (format "Don't know how to interpret select args: %s" (s/explain-str ::default-args args))
+                      (s/explain-data ::default-args args))))
     (cond-> parsed
       (nil? (:query parsed))     (assoc :query {})
       (seq (:conditions parsed)) (update :conditions (fn [conditions]

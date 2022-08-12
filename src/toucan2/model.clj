@@ -74,6 +74,8 @@
 
 ;;;; [[build-select-query]]
 
+;; TODO -- I think this belongs in [[toucan2.select]]
+
 (m/defmulti build-select-query
   {:arglists '([model query columns conditions])}
   u/dispatch-on-first-two-args)
@@ -128,6 +130,13 @@
      honeysql
      (zipmap pk-columns v))))
 
+(defn apply-conditions [model query conditions]
+  (reduce
+   (fn [query [k v]]
+     (apply-condition model query k v))
+   query
+   conditions))
+
 (m/defmethod build-select-query [:default clojure.lang.IPersistentMap]
   [model query columns conditions]
   (let [honeysql (merge {:select (or (not-empty columns)
@@ -135,11 +144,7 @@
                         (when model
                           {:from [[(keyword (table-name model))]]})
                         query)]
-    (reduce
-     (fn [honeysql [k v]]
-       (apply-condition model honeysql k v))
-     honeysql
-     conditions)))
+    (apply-conditions model honeysql conditions)))
 
 (m/defmethod build-select-query [:default Long]
   [model id columns conditions]
