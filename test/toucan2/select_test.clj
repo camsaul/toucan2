@@ -29,6 +29,7 @@
     (testing `(select/parse-args :default ~args)
       (is (= expected
              (select/parse-args :default args))))))
+
 (deftest select-test
   (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]]
     (testing "plain SQL"
@@ -75,7 +76,10 @@
            (select/select ::test/people :id 1)))
     (testing "sequential v"
       (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
-             (select/select ::test/people :id [:= 1]))))))
+             (select/select ::test/people :id [:= 1])))))
+  (testing "k v conditions + query"
+    (is (= [(instance/instance ::test/venues {:id 3, :name "BevMo"})]
+           (select/select ::test/venues :id [:>= 3] {:select [:id :name], :order-by [[:id :asc]]})))))
 
 (derive ::people.name-is-pk ::people)
 
