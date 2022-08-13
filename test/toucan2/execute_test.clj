@@ -5,11 +5,11 @@
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
    [toucan2.current :as current]
-   [toucan2.instance :as instance]
    [toucan2.execute :as execute]
+   [toucan2.instance :as instance]
    [toucan2.realize :as realize]
-   [toucan2.test :as test]
-   [toucan2.model :as model])
+   [toucan2.select :as select]
+   [toucan2.test :as test])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -150,6 +150,10 @@
            (execute/query ::test/db "SELECT * FROM execute_test_table;")))
     (finally
       (execute/query ::test/db "DROP TABLE IF EXISTS execute_test_table;"))))
+
+(deftest compile-test
+  (is (= ["SELECT * FROM people WHERE id > ?" 1]
+         (execute/compile (select/select ::test/people :id [:> 1])))))
 
 ;;; TODO
 
