@@ -2,21 +2,47 @@
   (:require
    [next.jdbc :as jdbc]
    [toucan2.current :as current]
-   [toucan2.jdbc.result-set :as t2.jdbc.rs]))
+   [toucan2.jdbc.result-set :as t2.jdbc.rs]
+   [toucan2.util :as u]))
 
 (def global-options
+  "Default options automatically passed to all [[next.jdbc]] queries."
   (atom nil))
 
-(def ^:dynamic *options* nil)
+(def ^:dynamic *options*
+  "Options to pass to [[next.jdbc]] when executing queries or statements."
+  nil)
 
 (defn- options []
   (merge @global-options *options*))
 
 (defn reduce-jdbc-query [^java.sql.Connection conn sql-args rf init]
-  (with-open [stmt (jdbc/prepare conn sql-args (options))
-              rset (.executeQuery stmt)]
-    (reduce rf init (t2.jdbc.rs/reducible-result-set conn current/*model* rset))))
+  (let [opts (options)]
+    (u/println-debug "Preparing JDBC query with next.jdbc options" (pr-str opts))
+    (with-open [stmt (jdbc/prepare conn sql-args opts)]
+      (u/println-debug "Executing statement")
+      (let [result-set? (.execute stmt)]
+        (cond
+          (:return-keys opts)
+          (do
+            (u/println-debug "Query was executed with :return-keys; returning generated keys")
+            (with-open [rset (.getGeneratedKeys stmt)]
+              (reduce rf init (t2.jdbc.rs/reducible-result-set conn current/*model* rset))))
 
+          result-set?
+          (with-open [rset (.getResultSet stmt)]
+            (reduce rf init (t2.jdbc.rs/reducible-result-set conn current/*model* rset)))
+
+          :else
+          (do
+            (u/println-debug "Query did not return a ResultSet; nothing to reduce. Returning init value" (pr-str init))
+            init
+            #_(reduce rf init nil)
+            #_(.getUpdateCount stmt)))))))
+
+;;; TODO -- we could easily use `executeUpdate` here instead to get the number of rows updated instead of having JDBC do
+;;; it and then discarding the map they wrap in in.
 (defn execute-jdbc-query! [^java.sql.Connection conn sql-args]
-  (let [options (options)]
-    (jdbc/execute! conn sql-args options)))
+  (let [opts (options)]
+    (u/with-debug-result (format "Executing JDBC query with options %s" (pr-str opts))
+      (jdbc/execute! conn sql-args opts))))
