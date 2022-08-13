@@ -141,7 +141,11 @@
   (with-original [this new-original]
     (if (identical? orig new-original)
       this
-      (Instance. mdl new-original m key-xform mta)))
+      (let [new-original (if (nil? new-original)
+                           {}
+                           new-original)]
+        (assert (map? new-original))
+        (Instance. mdl new-original m key-xform mta))))
 
   (current [_this]
     m)
@@ -149,7 +153,11 @@
   (with-current [this new-current]
     (if (identical? m new-current)
       this
-      (Instance. mdl orig new-current key-xform mta)))
+      (let [new-current (if (nil? new-current)
+                          {}
+                          new-current)]
+        (assert (map? new-current))
+        (Instance. mdl orig new-current key-xform mta))))
 
   (changes [_this]
     (not-empty (second (data/diff orig m))))
