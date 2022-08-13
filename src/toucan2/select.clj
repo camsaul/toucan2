@@ -31,8 +31,6 @@
       (seq (:conditions parsed)) (update :conditions (fn [conditions]
                                                        (into {} (map (juxt :k :v)) conditions))))))
 
-;;; TODO -- consider whether this needs to be a multimethod, or should just be a function like it is for update and
-;;; insert.
 (m/defmulti build-query
   {:arglists '([model query columns conditions])}
   u/dispatch-on-first-two-args)
@@ -80,9 +78,8 @@
 
 (m/defmethod select-reducible* :default
   [model columns {:keys [conditions query], :as _args}]
-  (let [query       (build-query model query columns conditions)
-        connectable (model/default-connectable model)]
-    (query/reducible-query-as connectable model query)))
+  (let [query (build-query model query columns conditions)]
+    (query/reducible-query-as model query)))
 
 (defn select-reducible [modelable & args]
   {:arglists '([modelable & conditions? query?]

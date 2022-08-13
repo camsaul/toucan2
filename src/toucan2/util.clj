@@ -59,6 +59,10 @@
   [x & _]
   (dispatch-value x))
 
+(defn dispatch-on-second-arg
+  [_ y & _]
+  (dispatch-value y))
+
 (defn dispatch-on-first-two-args
   [x y & _]
   [(dispatch-value x) (dispatch-value y)])
