@@ -17,7 +17,7 @@
 ;;   "venues")
 
 ;; (derive ::venues-no-select ::venues)
-;; (derive ::venues-no-select :toucan2/disallow-select)
+;; (derive ::venues-no-select :toucan/disallow-select)
 
 ;; (deftest disallow-select-test
 ;;   (is (thrown-with-msg?
@@ -27,7 +27,7 @@
 
 
 ;; (derive ::venues-no-delete ::venues)
-;; (derive ::venues-no-delete :toucan2/disallow-delete)
+;; (derive ::venues-no-delete :toucan/disallow-delete)
 
 ;; (deftest disallow-delete-test
 ;;   (is (thrown-with-msg?
@@ -36,7 +36,7 @@
 ;;        (mutative/delete! ::venues-no-delete))))
 
 ;; (derive ::venues-no-insert ::venues)
-;; (derive ::venues-no-insert :toucan2/disallow-insert)
+;; (derive ::venues-no-insert :toucan/disallow-insert)
 
 ;; (deftest disallow-insert-test
 ;;   (is (thrown-with-msg?
@@ -45,7 +45,7 @@
 ;;        (mutative/insert! ::venues-no-insert {:a 1, :b 2}))))
 
 ;; (derive ::venues-no-update ::venues)
-;; (derive ::venues-no-update :toucan2/disallow-update)
+;; (derive ::venues-no-update :toucan/disallow-update)
 
 ;; (deftest disallow-update-test
 ;;   (is (thrown-with-msg?

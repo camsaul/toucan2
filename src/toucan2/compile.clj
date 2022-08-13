@@ -68,7 +68,7 @@
                             (:where (hsql.helpers/where existing-where
                                                         (condition->honeysql-where-clause k v))))))
 
-(m/defmethod apply-condition [:default clojure.lang.IPersistentMap :toucan2/pk]
+(m/defmethod apply-condition [:default clojure.lang.IPersistentMap :toucan/pk]
   [model honeysql _k v]
   (let [pk-columns (model/primary-keys model)
         v          (if (sequential? v)

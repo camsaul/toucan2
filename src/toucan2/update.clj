@@ -34,7 +34,7 @@
     {:conditions (merge (:conditions parsed)
                         (into {} (map (juxt :k :v)) (:kv-conditions parsed))
                         (when-let [pk (:pk parsed)]
-                          {:toucan2/pk pk}))
+                          {:toucan/pk pk}))
      :changes    (:changes parsed)}))
 
 (m/defmulti update!*

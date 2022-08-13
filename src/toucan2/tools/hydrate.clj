@@ -310,7 +310,7 @@
 
     (m/defmethod simple-hydrate [:default :dashboard]
       [_model _k {:keys [dashboard-id], :as row}]
-      (assoc row :dashboard (select/select-one :models/Dashboard :toucan2/pk dashboard-id)))
+      (assoc row :dashboard (select/select-one :models/Dashboard :toucan/pk dashboard-id)))
 
   #### Hydrating Multiple Keys
 

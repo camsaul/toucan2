@@ -355,7 +355,7 @@
 ;;   [dispatch-value transforms]
 ;;   (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
 ;;     `(do
-;;        (u/maybe-derive ~tableable :toucan2/transformed)
+;;        (u/maybe-derive ~tableable :toucan/transformed)
 ;;        (m/defmethod transformed/transforms* [~connectable ~tableable]
 ;;          [~'&connectable ~'&tableable ~'&options]
 ;;          ~transforms))))
