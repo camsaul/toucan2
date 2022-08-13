@@ -6,11 +6,12 @@
    [pretty.core :as pretty]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
+   [toucan2.current :as current]
    [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.model :as model]
+   [toucan2.query :as query]
    [toucan2.realize :as realize]
-   [toucan2.util :as u]
-   [toucan2.query :as query]))
+   [toucan2.util :as u]))
 
 ;;;; Reducible query and pipeline.
 
@@ -97,9 +98,15 @@
 
 ;;;; [[compile]]
 
+;;; TODO -- `execute/compile` seems a little weird. Should this go somewhere else maybe?
+
+(m/defmethod conn/do-with-connection ::compile
+  [connectable f]
+  (f connectable))
+
 (m/defmethod reduce-compiled-query-with-connection [::compile :default :default]
-  [_connection _model compiled-query rf init]
-  (rf init [compiled-query]))
+  [_connectable _model compiled-query rf init]
+  (reduce rf init [{::query compiled-query}]))
 
 (defmacro compile
   "Return the compiled query that would be executed by a form, rather than executing that form itself.
@@ -109,8 +116,9 @@
     [\"DELETE FROM table WHERE ID = ?\" 1]"
   {:style/indent 0}
   [& body]
-  `(let [query# (do ~@body)]
-     (query-one ::compile query#)))
+  `(binding [current/*connection* ::compile]
+     (let [query# (do ~@body)]
+       (::query (realize/reduce-first query#)))))
 
 ;;;; [[with-call-count]]
 
