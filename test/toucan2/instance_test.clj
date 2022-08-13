@@ -346,3 +346,37 @@
       (is (= :venues
              (:type (meta instance))
              (type instance))))))
+
+(deftest no-nil-maps-test
+  (testing "Shouldn't be able to make the maps in an instance nil"
+    (let [m1 (instance/instance ::birbs {:a 1})]
+      (is (= {:a 1}
+             (instance/original m1)
+             (instance/current m1)))
+      (testing "using"
+        (testing "with-original"
+          (let [m2 (instance/with-original m1 nil)]
+            (is (= {}
+                   (instance/original m2)))))
+        (testing "with-current"
+          (let [m2 (instance/with-current m1 nil)]
+            (is (= {}
+                   (instance/current m2)))))))))
+
+(deftest validate-new-maps-test
+  (testing "Shouldn't be able to make the maps something invalid"
+    (let [m1 (instance/instance ::birbs {:a 1})]
+      (is (= {:a 1}
+             (instance/original m1)
+             (instance/current m1)))
+      (testing "using"
+        (testing "with-original"
+          (is (thrown-with-msg?
+               java.lang.AssertionError
+               #"Assert failed: \(map\? new-original\)"
+               (instance/with-original m1 1))))
+        (testing "with-current"
+          (is (thrown-with-msg?
+               java.lang.AssertionError
+               #"Assert failed: \(map\? new-current\)"
+               (instance/with-current m1 1))))))))
