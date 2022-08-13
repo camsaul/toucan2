@@ -5,22 +5,33 @@
             [methodical.core :as m]
             [toucan2.model :as model]
             [toucan2.select :as select]
-            [toucan2.instance :as instance])
+            [toucan2.instance :as instance]
+            [toucan2.query :as query])
   (:import java.time.LocalDateTime))
 
 (deftest ^:parallel parse-update-args-test
-  (is (= {:changes {:a 1}, :conditions {:toucan/pk 1}}
-         (update/parse-args nil [1 {:a 1}])))
-  (is (= {:conditions {:id 1}, :changes {:a 1}}
-         (update/parse-args nil [:id 1 {:a 1}])))
+  (is (= {:changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
+         (query/parse-args ::update/update nil [1 {:a 1}])))
+  (is (= {:kv-args {:id 1}, :changes {:a 1}, :queryable {}}
+         (query/parse-args ::update/update nil [:id 1 {:a 1}])))
   (testing "composite PK"
-    (is (= {:changes {:a 1}, :conditions {:toucan/pk [1 2]}}
-           (update/parse-args nil [[1 2] {:a 1}]))))
+    (is (= {:changes {:a 1}, :kv-args {:toucan/pk [1 2]}, :queryable {}}
+           (query/parse-args ::update/update nil [[1 2] {:a 1}]))))
   (testing "key-value conditions"
-    (is (= {:conditions {:name "Cam", :toucan/pk 1}, :changes {:a 1}}
-           (update/parse-args nil [1 :name "Cam" {:a 1}]))))
-  (is (= {:changes {:name "Hi-Dive"}, :conditions {:id 1}}
-         (update/parse-args nil [{:id 1} {:name "Hi-Dive"}]))))
+    (is (= {:kv-args {:name "Cam", :toucan/pk 1}, :changes {:a 1}, :queryable {}}
+           (query/parse-args ::update/update nil [1 :name "Cam" {:a 1}]))))
+  (is (= {:changes {:name "Hi-Dive"}, :queryable {:id 1}}
+         (query/parse-args ::update/update nil [{:id 1} {:name "Hi-Dive"}]))))
+
+(deftest build-test
+  (is (= {:update [:venues]
+          :set    {:name "Hi-Dive"}
+          :where  [:and
+                   [:= :name "Tempest"]
+                   [:= :id 1]]}
+         (query/build ::update/update ::test/venues {:changes {:name "Hi-Dive"}
+                                                     :query   {:id 1}
+                                                     :kv-args {:name "Tempest"}}))))
 
 (deftest pk-and-map-conditions-test
   (test/with-discarded-table-changes :venues
@@ -85,3 +96,16 @@
       (is (= 0
              (update/update! ::test/venues 1 {})
              (update/update! ::test/venues {}))))))
+
+(m/defmethod query/do-with-query [:default ::named-conditions]
+  [model _queryable f]
+  (query/do-with-query model {:id 1} f))
+
+(deftest named-conditions-test
+  (test/with-discarded-table-changes :venues
+    (is (= "Tempest"
+           (select/select-one-fn :name ::test/venues 1)))
+    (is (= 1
+           (update/update! ::test/venues ::named-conditions {:name "Grant & Green"})))
+    (is (= "Grant & Green"
+           (select/select-one-fn :name ::test/venues 1)))))

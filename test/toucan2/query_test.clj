@@ -1,195 +1,46 @@
 (ns toucan2.query-test
-  (:require
-   [clojure.test :refer :all]
-   [methodical.core :as m]
-   [toucan2.compile :as compile]
-   [toucan2.connection :as conn]
-   [toucan2.current :as current]
-   [toucan2.instance :as instance]
-   [toucan2.query :as query]
-   [toucan2.realize :as realize]
-   [toucan2.test :as test])
-  (:import
-   (java.time LocalDateTime OffsetDateTime)))
+  (:require [toucan2.query :as query]
+            [clojure.test :refer :all]
+            [methodical.core :as m]
+            [toucan2.model :as model]))
 
-;; TODO -- not 100% sure it makes sense for Toucan to be doing the magic key transformations automatically here without
-;; us even asking!
-
-(deftest reducible-query-test
-  (testing "raw SQL"
-    (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56-00:00")}
-            {:id 2, :name "Sam", :created-at (OffsetDateTime/parse "2019-01-11T23:56-00:00")}
-            {:id 3, :name "Pam", :created-at (OffsetDateTime/parse "2020-01-01T21:56-00:00")}
-            {:id 4, :name "Tam", :created-at (OffsetDateTime/parse "2020-05-25T19:56-00:00")}]
-           (transduce
-            (map (fn [row] (into {} row)))
-            conj
-            []
-            (query/reducible-query ::test/db "SELECT * FROM people ORDER BY id ASC;")))))
-  (testing "SQL + params"
-    (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}]
-           (transduce
-            (map (fn [row] (into {} row)))
-            conj
-            []
-            (query/reducible-query ::test/db ["SELECT * FROM people WHERE id = ?" 1]))))))
-
-(deftest reducible-query-test-2
-  (is (= [{:count 4}]
-         (let [query (query/reducible-query ::test/db "SELECT count(*) FROM people;")]
-           (into [] (map realize/realize) query))))
-
-  (testing "with current connection"
-    (binding [current/*connection* ::test/db]
-      (is (= [{:count 4}]
-             (into [] (map #(select-keys % [:count])) (query/reducible-query "SELECT count(*) FROM people;"))))))
-
-  (testing "eductions"
-    (is (= [{:id 2, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}]
-           (into
-            []
-            (map realize/realize)
-            (eduction
-             (comp (map #(update % :id inc))
-                   (take 1))
-             (query/reducible-query ::test/db "SELECT * FROM people;")))))))
-
-(deftest query-test
-  (let [expected [{:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")}
-                  {:id 2, :created-at (LocalDateTime/parse "2017-01-01T00:00")}
-                  {:id 3, :created-at (LocalDateTime/parse "2017-01-01T00:00")}]]
-    (testing "SQL"
-      (query/query ::test/db "SELECT * FROM venues ORDER BY id ASC;"))
-    (testing "HoneySQL"
+(deftest ^:parallel condition->honeysql-where-clause-test
+  (doseq [[[k v] expected] {[:id :id]           [:= :id :id]
+                            [1 :id]             [:= 1 :id]
+                            [:id 1]             [:= :id 1]
+                            [:a 1]              [:= :a 1]
+                            [:id [:> 1]]        [:> :id 1]
+                            [:a [:between 1 2]] [:between :a 1 2]}]
+    (testing (pr-str `(query/condition->honeysql-where-clause ~k ~v))
       (is (= expected
-             (query/query ::test/db {:select [:id :created_at], :from [:venues], :order-by [[:id :asc]]}))))))
+             (query/condition->honeysql-where-clause k v))))))
 
-(m/defmethod compile/do-with-compiled-query ::named-query
-  [_query f]
-  (f ["SELECT count(*) FROM people;"]))
+(deftest build-test
+  (is (= {:where [:= :a 1]}
+         (query/build ::my-query-type nil {:query {}, :kv-args {:a 1}}))))
 
-(deftest query-test-2
-  (is (= [{:count 4}]
-         (query/query ::test/db "SELECT count(*) FROM people;")))
-  (testing "with current connection"
-    (binding [current/*connection* ::test/db]
-      (is (= [{:count 4}]
-             (query/query "SELECT count(*) FROM people;")))))
-  (testing "HoneySQL query"
-    (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}
-            {:id 2, :name "Sam", :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")}
-            {:id 3, :name "Pam", :created-at (OffsetDateTime/parse "2020-01-01T21:56Z")}
-            {:id 4, :name "Tam", :created-at (OffsetDateTime/parse "2020-05-25T19:56Z")}]
-           (query/query ::test/db {:select [:*], :from [:people]}))))
-  (testing "named query"
-    (is (= [{:count 4}]
-           (query/query ::test/db ::named-query)))))
+(m/defmethod model/primary-keys ::model-with-non-id-pk
+  [_model]
+  [:uuid])
 
-(deftest query-one-test
-  (is (= {:count 4}
-         (query/query-one ::test/db "SELECT count(*) FROM people")))
+(deftest build-query-for-int-test
+  (testing "Raw integer PK as query"
+    (is (= {:where [:= :id 1]}
+           (query/build ::my-query-type nil {:query 1})
+           (query/build ::my-query-type nil {:kv-args {:toucan/pk 1}}))))
+  (testing "custom non-:id PK"
+    (is (= {:where [:= :uuid 1]}
+           (query/build ::my-query-type ::model-with-non-id-pk {:query 1})
+           (query/build ::my-query-type ::model-with-non-id-pk {:kv-args {:toucan/pk 1}})))))
 
-  (testing "with current connection"
-    (binding [current/*connection* ::test/db]
-      (is (= {:count 4}
-             (query/query-one "SELECT count(*) FROM people;"))))))
-
-(deftest reducible-query-as-test
-  (is (= [(instance/instance :people {:id 1, :name "Cam", :created-at (java.time.OffsetDateTime/parse "2020-04-21T23:56Z")})]
-         (realize/realize (query/reducible-query-as ::test/db :people "SELECT * FROM people WHERE id = 1;")))))
-
-(deftest query-as-test
-  (is (= [(instance/instance :people {:id 1, :name "Cam"})
-          (instance/instance :people {:id 2, :name "Sam"})
-          (instance/instance :people {:id 3, :name "Pam"})
-          (instance/instance :people {:id 4, :name "Tam"})]
-         (query/query-as ::test/db :people {:select [:id :name], :from [:people]}))))
-
-(m/defmethod conn/do-with-connection ::not-even-jdbc
-  [connectable f]
-  (f connectable))
-
-;;; TODO -- not super happy we can't just use a plain map or arbitrary query here, because it will try to get compiled
-;;; as HoneySQL. There is currently no way to define custom compilation behavior on the basis of the connectable. Not
-;;; sure how this would actually work tho without realizing the connection *first*; that causes its own problems because
-;;; it breaks [[toucan2.tools.identity-query/identity-query]]
-
-(m/defmethod query/reduce-query-with-connection [::not-even-jdbc :default]
-  [_connectable [{k :key}] rf init]
-  (reduce rf init [{k 1} {k 2} {k 3}]))
-
-(deftest wow-dont-even-need-to-use-jdbc-test
-  (is (= [{:a 1} {:a 2} {:a 3}]
-         (query/query ::not-even-jdbc [{:key :a}]))))
-
-(deftest execute!-test
-  (try
-    ;; TODO -- should this just return the number of rows affected?
-    (is (= [{:next.jdbc/update-count 0}]
-           (query/execute! ::test/db "CREATE TABLE execute_test_table (id INTEGER NOT NULL);")))
-    (is (= []
-           (query/query ::test/db "SELECT * FROM execute_test_table;")))
-    (finally
-      (query/execute! ::test/db "DROP TABLE IF EXISTS execute_test_table;"))))
-
-;; TODO
-
-#_(deftest with-call-counts-test
-    (query/with-call-count [call-count]
-      (is (= 0
-             (call-count)))
-      (query/query ::test/db "SELECT 1;")
-      (is (= 1
-             (call-count)))
-      (query/execute! ::test/db "DELETE FROM people WHERE id = 1000;")
-      (is (= 2
-             (call-count)))
-      (testing "Should be able to do nested calls to with-call-count"
-        (query/with-call-count [nested-call-count]
-          (is (= 2
-                 (call-count)))
-          (is (= 0
-                 (nested-call-count)))
-          (query/query ::test/db "SELECT 1;")
-          (is (= 3
-                 (call-count)))
-          (is (= 1
-                 (nested-call-count)))))
-      (is (= 3
-             (call-count)))))
-
-#_(m/defmethod conn.current/default-connectable-for-tableable* ::venues
-    [_ _]
-    ::test/db)
-
-#_(deftest default-connectable-for-tableable-test
-  (is (= [{:one 1}]
-         (query/query nil ::venues "SELECT 1 AS one;")))
-  (test/with-venues-reset
-    (is (= 1
-           (query/execute! nil ::venues "DELETE FROM venues WHERE id = 1;")))))
-
-#_(deftest readable-column-test
-  (testing "Toucan 2 should call next.jdbc.result-set/read-column-by-index"
-    (is (= [{:n 100.0M}]
-           (query/query ::test/db "SELECT '100.0'::decimal AS n;")))
-    (try
-      (extend-protocol next.jdbc.rs/ReadableColumn
-        java.math.BigDecimal
-        (read-column-by-index [n _ _]
-          (str n)))
-      (is (= [{:n "100.0"}]
-             (query/query ::test/db "SELECT '100.0'::decimal AS n;")))
-      (finally
-        ;; reverse the changes.
-        (extend-protocol next.jdbc.rs/ReadableColumn
-          java.math.BigDecimal
-          (read-column-by-index [n _ _]
-            n))))))
-
-#_(deftest execute-reducible-test
-  (testing "execute! should return a reducible query if you pass `:reducible?` in the options"
-    (let [query (query/execute! ::test/db nil "SELECT 1 AS one;" {:reducible? true})]
-      (is (instance? toucan2.jdbc.query.ReducibleQuery query))
-      (is (= [(instance/instance ::test/db nil {:one 1})]
-             (realize/realize query))))))
+(deftest plain-sql-query-test
+  (doseq [query ["SELECT *"
+                 ["SELECT *"]]]
+    (testing (pr-str query)
+      (is (= ["SELECT *"]
+             (query/build nil nil {:query query})))
+      (testing "disallow kv-args"
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"key-value args are not supported for plain SQL queries"
+             (query/build nil nil {:query query, :kv-args {:toucan/pk 1}})))))))

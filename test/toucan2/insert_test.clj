@@ -1,35 +1,43 @@
 (ns toucan2.insert-test
-  (:require [clojure.test :refer :all]
-            [toucan2.insert :as insert]
-            [toucan2.test :as test]
-            [toucan2.select :as select]
-            [toucan2.instance :as instance]
-            [toucan2.model :as model]
-            [methodical.core :as m])
-  (:import java.time.LocalDateTime))
+  (:require
+   [clojure.test :refer :all]
+   [methodical.core :as m]
+   [toucan2.insert :as insert]
+   [toucan2.instance :as instance]
+   [toucan2.model :as model]
+   [toucan2.query :as query]
+   [toucan2.select :as select]
+   [toucan2.test :as test])
+  (:import
+   (java.time LocalDateTime)))
 
 (set! *warn-on-reflection* true)
 
 (deftest parse-args-test
   (testing "single map row"
     (is (= [{:row 1}]
-           (insert/parse-args nil [{:row 1}]))))
+           (query/parse-args ::insert/insert nil [{:row 1}]))))
   (testing "multiple map rows"
     (is (= [{:row 1} {:row 2}]
-           (insert/parse-args nil [[{:row 1} {:row 2}]]))))
+           (query/parse-args ::insert/insert nil [[{:row 1} {:row 2}]]))))
   (testing "kv args"
     (is (= [{:a 1, :b 2, :c 3}]
-           (insert/parse-args nil [:a 1, :b 2, :c 3])))
+           (query/parse-args ::insert/insert nil [:a 1, :b 2, :c 3])))
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
-         #"Don't know how to interpret insert\! args: \(\) - failed: Insufficient input"
-         (insert/parse-args nil [:a 1, :b 2, :c]))))
+         #"Don't know how to interpret :toucan2.insert/insert args for model nil:"
+         (query/parse-args ::insert/insert nil [:a 1, :b 2, :c]))))
   (testing "columns + vector rows"
     (is (= [{:a 1, :b 2, :c 3} {:a 4, :b 5, :c 6}]
-           (insert/parse-args nil [[:a :b :c] [[1 2 3] [4 5 6]]])))
+           (query/parse-args ::insert/insert nil [[:a :b :c] [[1 2 3] [4 5 6]]])))
     (is (= [{:name "The Ramp", :category "bar"}
             {:name "Louie's", :category "bar"}]
-           (insert/parse-args nil [[:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]])))))
+           (query/parse-args ::insert/insert nil [[:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]])))))
+
+(deftest build-query-test
+  (is (= {:insert-into [:venues]
+          :values      [{:name "Grant & Green", :category "bar"}]}
+         (query/build ::insert/insert ::test/venues [{:name "Grant & Green", :category "bar"}]))))
 
 (defn- do-both-types-of-insert [f]
   (testing "Should be no Venue 4 yet"

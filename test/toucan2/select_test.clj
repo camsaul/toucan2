@@ -1,64 +1,65 @@
 (ns toucan2.select-test
   (:require
-   [clojure.test :refer :all]
-   [toucan2.select :as select]
-   [toucan2.test :as test]
-   [toucan2.instance :as instance]
    [clojure.string :as str]
+   [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.instance :as instance]
    [toucan2.model :as model]
-   [toucan2.compile :as compile])
-  (:import java.time.OffsetDateTime))
+   [toucan2.query :as query]
+   [toucan2.select :as select]
+   [toucan2.test :as test])
+  (:import
+   (java.time OffsetDateTime)))
 
 (derive ::people ::test/people)
 
 (deftest ^:parallel parse-args-test
   (doseq [[args expected] {[1]
-                           {:query 1}
+                           {:queryable 1}
 
                            [:id 1]
-                           {:conditions {:id 1}, :query {}}
+                           {:kv-args {:id 1}, :queryable {}}
 
                            [{:where [:= :id 1]}]
-                           {:query {:where [:= :id 1]}}
+                           {:queryable {:where [:= :id 1]}}
 
                            [:name "Cam" {:where [:= :id 1]}]
-                           {:conditions {:name "Cam"}, :query {:where [:= :id 1]}}
+                           {:kv-args {:name "Cam"}, :queryable {:where [:= :id 1]}}
 
                            [::my-query]
-                           {:query ::my-query}}]
-    (testing `(select/parse-args :default ~args)
+                           {:queryable ::my-query}}]
+    (testing `(query/parse-args ::select/select :default ~args)
       (is (= expected
-             (select/parse-args :default args))))))
+             (query/parse-args ::select/select :default args))))))
 
 (deftest ^:parallel default-build-query-test
   (is (= {:select [:*]
           :from   [[:default]]}
-         (select/build-query :default {} nil nil)))
+         (query/build ::select/select :default {:query {}})))
   (testing "don't override existing"
     (is (= {:select [:a :b]
             :from   [[:my_table]]}
-           (select/build-query :default {:select [:a :b], :from [[:my_table]]} nil nil))))
+           (query/build ::select/select :default {:query {:select [:a :b], :from [[:my_table]]}}))))
   (testing "columns"
     (is (= {:select [:a :b]
             :from   [[:default]]}
-           (select/build-query :default {} [:a :b] nil)))
+           (query/build ::select/select :default {:query {}, :columns [:a :b]})))
     (testing "existing"
       (is (= {:select [:a]
               :from   [[:default]]}
-             (select/build-query :default {:select [:a]} [:a :b] nil)))))
+             (query/build ::select/select :default {:query {:select [:a]}, :columns [:a :b]})))))
   (testing "conditions"
     (is (= {:select [:*]
             :from   [[:default]]
             :where  [:= :id 1]}
-           (select/build-query :default {} nil {:id 1})))
+           (query/build ::select/select :default {:query {}, :kv-args {:id 1}})))
     (testing "merge with existing"
       (is (= {:select [:*]
               :from   [[:default]]
               :where  [:and [:= :a :b] [:= :id 1]]}
-             (select/build-query :default {:where [:= :a :b]} nil {:id 1}))))))
+             (query/build ::select/select :default {:query {:where [:= :a :b]}, :kv-args {:id 1}}))))))
 
-(m/defmethod compile/apply-condition [:default clojure.lang.IPersistentMap ::custom.limit]
+(m/defmethod query/apply-kv-arg [:default clojure.lang.IPersistentMap ::custom.limit]
   [_model honeysql-form _k limit]
   (assoc honeysql-form :limit limit))
 
@@ -66,16 +67,16 @@
   (is (= {:select [:*]
           :from   [[:default]]
           :limit  100}
-         (select/build-query :default {} nil {::custom.limit 100})
-         (select/build-query :default {:limit 1} nil {::custom.limit 100}))))
+         (query/build ::select/select :default {:query {}, :kv-args {::custom.limit 100}})
+         (query/build ::select/select :default {:query {:limit 1}, :kv-args {::custom.limit 100}}))))
 
 (deftest built-in-pk-condition-test
   (is (= {:select [:*], :from [[:default]], :where [:= :id 1]}
-         (select/build-query :default {} nil {:toucan/pk 1})))
+         (query/build ::select/select :default {:query {}, :kv-args {:toucan/pk 1}})))
   (is (= {:select [:*], :from [[:default]], :where [:and
                                                     [:= :name "Cam"]
                                                     [:= :id 1]]}
-         (select/build-query :default {:where [:= :name "Cam"]} nil {:toucan/pk 1}))))
+         (query/build ::select/select :default {:query {:where [:= :name "Cam"]}, :kv-args {:toucan/pk 1}}))))
 
 (deftest select-test
   (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]]
@@ -128,6 +129,24 @@
     (is (= [(instance/instance ::test/venues {:id 3, :name "BevMo"})]
            (select/select ::test/venues :id [:>= 3] {:select [:id :name], :order-by [[:id :asc]]})))))
 
+(m/defmethod query/do-with-query [:default ::count-query]
+  [model _queryable f]
+  (query/do-with-query model
+                       {:select [[:%count.* :count]]
+                        :from   [(keyword (model/table-name model))]}
+                       f))
+
+(deftest named-query-test
+  (testing "venues"
+    (is (= [{:count 3}]
+           (select/select ::test/venues ::count-query))))
+  (testing "people"
+    (is (= [{:count 4}]
+           (select/select ::test/people ::count-query))))
+  (testing "with additional conditions"
+    (is (= [{:count 1}]
+           (select/select ::test/venues :id 1 ::count-query)))))
+
 (derive ::people.name-is-pk ::people)
 
 (m/defmethod model/primary-keys ::people.name-is-pk
@@ -154,14 +173,15 @@
 
 (derive ::people.no-timestamps ::people)
 
-;; this could also be done as part a `:before` method.
-(m/defmethod select/select-reducible* ::people.no-timestamps
-  [model columns args]
-  (let [columns (or columns [:id :name])]
-    (next-method model columns args)))
+;;; this could also be done as part a `:before` method.
+(m/defmethod select/select-reducible* [::people.no-timestamps :default]
+  [model args]
+  (let [args (update args :columns (fn [columns]
+                                     (or columns [:id :name])))]
+    (next-method model args)))
 
-(m/defmethod select/select-reducible* :after ::people.no-timestamps
-  [_model _columns {reducible-query :query, :as args}]
+(m/defmethod select/select-reducible* :after [::people.no-timestamps :default]
+  [_model {reducible-query :query, :as args}]
   (testing "should not be an eduction yet -- if it is it means this method is getting called more than once"
     (is (not (instance? clojure.core.Eduction reducible-query))))
   (assert (not (instance? clojure.core.Eduction reducible-query)))
@@ -191,12 +211,11 @@
 (derive ::people.limit-2 ::people)
 
 ;; TODO this is probably not the way you'd want to accomplish this in real life -- I think you'd probably actually want
-;; to implement [[toucan2.select/build-query]] for `[::people.limit-2 clojure.lang.IPersistentMap]` instead. But
-;; it does do a good job of letting us test that combining aux methods work like we'd expect.
-(m/defmethod select/select-reducible* :before ::people.limit-2
-  [_model _columns {:keys [query], :as args}]
-  (cond-> args
-    (map? query) (update :query assoc :limit 2)))
+;; to implement [[toucan2.query/build]] instead. But it does do a good job of letting us test that combining aux methods
+;; work like we'd expect.
+(m/defmethod select/select-reducible* :before [::people.limit-2 clojure.lang.IPersistentMap]
+  [_model args]
+  (update args :query assoc :limit 2))
 
 (deftest pre-select-test
   (testing "Should be able to do cool stuff in pre-select (select* :before)"

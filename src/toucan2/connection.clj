@@ -28,6 +28,10 @@
                           (u/dispatch-value connectable))
                   {:connectable connectable})))
 
+(m/defmethod do-with-connection ::current
+  [_connectable f]
+  (do-with-connection current/*connection* f))
+
 ;;; method called with the default value of [[toucan2.current/*connection*]] if no value of `:toucan2/default` is
 ;;; defined.
 (m/defmethod do-with-connection :toucan/default

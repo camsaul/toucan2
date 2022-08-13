@@ -5,11 +5,12 @@
    [toucan2.delete :as delete]
    [toucan2.model :as model]
    [toucan2.select :as select]
-   [toucan2.test :as test]))
+   [toucan2.test :as test]
+   [toucan2.query :as query]))
 
 (deftest parse-args-test
-  (is (= {:query 1}
-         (delete/parse-args nil [1]))))
+  (is (= {:queryable 1}
+         (query/parse-args ::delete nil [1]))))
 
 (deftest row-by-pk-test
   (test/with-discarded-table-changes :venues

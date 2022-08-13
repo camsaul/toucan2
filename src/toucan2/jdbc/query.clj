@@ -35,14 +35,12 @@
 
           :else
           (do
-            (u/println-debug "Query did not return a ResultSet; nothing to reduce. Returning init value" (pr-str init))
-            init
-            #_(reduce rf init nil)
-            #_(.getUpdateCount stmt)))))))
+            (u/println-debug "Query did not return a ResultSet; nothing to reduce. Returning update count." (pr-str init))
+            (reduce rf init [(.getUpdateCount stmt)])
+            #_init
+            #_(reduce rf init nil)))))))
 
-;;; TODO -- we could easily use `executeUpdate` here instead to get the number of rows updated instead of having JDBC do
-;;; it and then discarding the map they wrap in in.
-(defn execute-jdbc-query! [^java.sql.Connection conn sql-args]
-  (let [opts (options)]
-    (u/with-debug-result (format "Executing JDBC query with options %s" (pr-str opts))
-      (jdbc/execute! conn sql-args opts))))
+;; (defn execute-jdbc-query! [^java.sql.Connection conn sql-args]
+;;   (let [opts (options)]
+;;     (u/with-debug-result (format "Executing JDBC query with options %s" (pr-str opts))
+;;       (jdbc/execute! conn sql-args opts))))

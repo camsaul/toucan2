@@ -4,7 +4,8 @@
    [toucan2.current :as current]
    [toucan2.model :as model]
    [toucan2.util :as u]
-   [toucan2.connection :as conn]))
+   [toucan2.connection :as conn]
+   [pretty.core :as pretty]))
 
 ;; TODO -- this should probably also support.
 (m/defmulti do-with-model
@@ -29,12 +30,22 @@
   [_model]
   :toucan/default)
 
-(defn current-connectable [model]
+(defn- current-connectable [model]
   (if (= current/*connection* :toucan/default)
     (default-connectable model)
     current/*connection*))
 
-::default-connectable
+(defrecord DeferredCurrentConnectable [model]
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `deferred-current-connectable model)))
+
+(m/defmethod conn/do-with-connection DeferredCurrentConnectable
+  [{:keys [model]} f]
+  (conn/do-with-connection (current-connectable model) f))
+
+(defn deferred-current-connectable [model]
+  (->DeferredCurrentConnectable model))
 
 (m/defmulti table-name
   {:arglists '([model])}

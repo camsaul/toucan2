@@ -1,109 +1,59 @@
 (ns toucan2.select
   (:refer-clojure :exclude [count])
   (:require
-   [clojure.spec.alpha :as s]
    [methodical.core :as m]
-   [toucan2.compile :as compile]
+   [toucan2.execute :as execute]
    [toucan2.model :as model]
    [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
-(m/defmulti parse-args
-  {:arglists '([model args])}
-  u/dispatch-on-first-arg)
-
-(s/def ::default-args
-  (s/cat
-   :conditions (s/* (s/cat
-                     :k any?
-                     :v any?))
-   :query      (s/? any?)))
-
-(m/defmethod parse-args :default
-  [_model args]
-  (let [parsed (s/conform ::default-args args)]
-    (when (s/invalid? parsed)
-      (throw (ex-info (format "Don't know how to interpret select args: %s" (s/explain-str ::default-args args))
-                      (s/explain-data ::default-args args))))
-    (cond-> parsed
-      (nil? (:query parsed))     (assoc :query {})
-      (seq (:conditions parsed)) (update :conditions (fn [conditions]
-                                                       (into {} (map (juxt :k :v)) conditions))))))
-
-;;; TODO -- not 100% sure this needs to be a separate multimethod -- the equivalents for `update!`, `insert!`, and
-;;; `delete!` are not.
-;;;
-;;; TODO -- this should probably avoid destructuring the `args` map in case another implementation has different args.
-(m/defmulti build-query
-  {:arglists '([model query columns conditions])}
-  u/dispatch-on-first-two-args)
-
-(m/defmethod build-query :around :default
-  [model query columns conditions]
-  (u/with-debug-result (pr-str (list `build-query model query columns conditions))
-    (next-method model query columns conditions)))
-
-(m/defmethod build-query :default
-  [model query columns conditions]
-  (when (or (seq columns)
-            (seq conditions))
-    (throw (ex-info (format (str "Don't know how to build select query for %s from query ^%s %s with columns or "
-                                 "conditions. Do you need to implement %s for %s?")
-                            (pr-str model)
-                            (some-> query class .getCanonicalName)
-                            (pr-str query)
-                            `build-query
-                            (pr-str (u/dispatch-on-first-two-args model query)))
-                    {:model model, :query query, :columns columns, :conditions conditions})))
-  query)
-
-(m/defmethod build-query [:default clojure.lang.IPersistentMap]
-  [model query columns conditions]
-  (let [honeysql (merge {:select (or (not-empty columns)
-                                     [:*])}
-                        (when model
-                          {:from [[(keyword (model/table-name model))]]})
-                        query)]
-    (compile/apply-conditions model honeysql conditions)))
-
-(m/defmethod build-query [:default Long]
-  [model pk columns conditions]
-  (build-query model {} columns (assoc conditions :toucan/pk pk)))
+(m/defmethod query/build [::select :default clojure.lang.IPersistentMap]
+  [query-type model {:keys [columns], :as args}]
+  (let [args (update args :query (fn [query]
+                                   (merge {:select (or (not-empty columns)
+                                                       [:*])}
+                                          (when model
+                                            {:from [[(keyword (model/table-name model))]]})
+                                          query)))]
+    (next-method query-type model args)))
 
 (m/defmulti select-reducible*
-  ;; the actual args depend on what [[parse-args]] returns
-  {:arglists '([model columns args])}
-  u/dispatch-on-first-arg)
+  "The actual args depend on what [[query/parse-args]] returns."
+  {:arglists '([model parsed-args])}
+  (fn [model {:keys [query], :as _parsed-args}]
+    [(u/dispatch-value model) (u/dispatch-value query)]))
 
 (m/defmethod select-reducible* :default
-  [model columns {:keys [conditions query], :as _args}]
-  (let [query (build-query model query columns conditions)]
-    (query/reducible-query-as model query)))
+  [model parsed-args]
+  (let [query (query/build ::select model parsed-args)]
+    (execute/reducible-query (model/deferred-current-connectable model)
+                             model
+                             query)))
 
-(defn select-reducible [modelable & args]
-  {:arglists '([modelable & conditions? query?]
-               [[modelable & columns] & conditions? query?])}
+(defn select-reducible [modelable & unparsed-args]
+  {:arglists '([modelable & kv-args? query?]
+               [[modelable & columns] & kv-args? query?])}
   (let [[modelable & columns] (if (sequential? modelable)
                                 modelable
                                 [modelable])]
     (model/with-model [model modelable]
-      ;; TODO -- should we [[m/trace]] when debugging is enabled?
-      (select-reducible* model columns (parse-args model args)))))
+      (query/with-parsed-args-with-query [parsed-args [::select model unparsed-args]]
+        (select-reducible* model (assoc parsed-args :columns columns))))))
 
 (defn select
-  {:arglists '([modelable & conditions? query?]
-               [[modelable & columns] & conditions? query?])}
+  {:arglists '([modelable & kv-args? query?]
+               [[modelable & columns] & kv-args? query?])}
   [modelable & args]
   (realize/realize (apply select-reducible modelable args)))
 
-(defn select-one {:arglists '([modelable & conditions? query?]
-                              [[modelable & columns] & conditions? query?])}
+(defn select-one {:arglists '([modelable & kv-args? query?]
+                              [[modelable & columns] & kv-args? query?])}
   [modelable & args]
   (realize/reduce-first (apply select-reducible modelable args)))
 
 (defn select-fn-reducible
-  {:arglists '([f modelable & conditions? query?])}
+  {:arglists '([f modelable & kv-args? query?])}
   [f & args]
   (eduction
    (map f)
@@ -111,19 +61,19 @@
 
 (defn select-fn-set
   "Like `select`, but returns a set of values of `(f instance)` for the results. Returns `nil` if the set is empty."
-  {:arglists '([f modelable & conditions? query?])}
+  {:arglists '([f modelable & kv-args? query?])}
   [& args]
   (not-empty (reduce conj #{} (apply select-fn-reducible args))))
 
 (defn select-fn-vec
   "Like `select`, but returns a vector of values of `(f instance)` for the results. Returns `nil` if the vector is
   empty."
-  {:arglists '([f modelable & conditions? query?])}
+  {:arglists '([f modelable & kv-args? query?])}
   [& args]
   (not-empty (reduce conj [] (apply select-fn-reducible args))))
 
 (defn select-one-fn
-  {:arglists '([f modelable & conditions? query?])}
+  {:arglists '([f modelable & kv-args? query?])}
   [& args]
   (realize/reduce-first (apply select-fn-reducible args)))
 
@@ -139,28 +89,28 @@
       (apply juxt pk-keys))))
 
 (defn select-pks-reducible
-  {:arglists '([modelable & conditions? query?])}
+  {:arglists '([modelable & kv-args? query?])}
   [modelable & args]
   (let [f (select-pks-fn modelable)]
     (apply select-fn-reducible f modelable args)))
 
 (defn select-pks-set
-  {:arglists '([modelable & conditions? query?])}
+  {:arglists '([modelable & kv-args? query?])}
   [& args]
   (not-empty (reduce conj #{} (apply select-pks-reducible args))))
 
 (defn select-pks-vec
-  {:arglists '([modelable & conditions? query?])}
+  {:arglists '([modelable & kv-args? query?])}
   [& args]
   (not-empty (reduce conj [] (apply select-pks-reducible args))))
 
 (defn select-one-pk
-  {:arglists '([modelable & conditions? query?])}
+  {:arglists '([modelable & kv-args? query?])}
   [& args]
   (realize/reduce-first (apply select-pks-reducible args)))
 
 (defn select-fn->fn
-  {:arglists '([f1 f2 modelable & conditions? query?])}
+  {:arglists '([f1 f2 modelable & kv-args? query?])}
   [f1 f2 & args]
   (not-empty
    (into
@@ -169,43 +119,46 @@
     (apply select-reducible args))))
 
 (defn select-fn->pk
-  {:arglists '([f modelable & conditions? query?])}
+  {:arglists '([f modelable & kv-args? query?])}
   [f modelable & args]
   (let [pks-fn (select-pks-fn modelable)]
     (apply select-fn->fn f pks-fn modelable args)))
 
 (defn select-pk->fn
-  {:arglists '([f modelable & conditions? query?])}
+  {:arglists '([f modelable & kv-args? query?])}
   [f modelable & args]
   (let [pks-fn (select-pks-fn modelable)]
     (apply select-fn->fn pks-fn f modelable args)))
 
+;;; TODO -- [[count]] and [[exists?]] implementations seem kinda dumb, maybe we should just hand off to
+;;; [[select-reducible]] by default so it can handle the parsing and stuff.
+
 (m/defmulti count*
-  {:arglists '([model args])}
+  {:arglists '([model unparsed-args])}
   u/dispatch-on-first-arg)
 
 (m/defmethod count* :default
-  [model args]
+  [model unparsed-args]
   (u/println-debug (format "No efficient implementation of count* for %s, doing select-reducible and counting the rows..."
                            (pr-str model)))
   (reduce
    (fn [acc _]
      (inc acc))
    0
-   (select-reducible* model nil args)))
+   (apply select-reducible model unparsed-args)))
 
 (defn count
-  {:arglists '([modelable & conditions? query?])}
-  [modelable & args]
+  {:arglists '([modelable & kv-args? query?])}
+  [modelable & unparsed-args]
   (model/with-model [model modelable]
-    (count* model (parse-args model args))))
+    (count* model unparsed-args)))
 
 (m/defmulti exists?*
-  {:arglists '([model args])}
+  {:arglists '([model unparsed-args])}
   u/dispatch-on-first-arg)
 
 (m/defmethod exists?* :default
-  [model args]
+  [model unparsed-args]
   (u/println-debug (format "No efficient implementation of exists?* for %s, doing select-reducible and seeing if it returns a row..."
                            (pr-str model)))
   (transduce
@@ -216,10 +169,10 @@
      ([_ _]
       true))
    false
-   (select-reducible* model nil args)))
+   (apply select-reducible model unparsed-args)))
 
 (defn exists?
-  {:arglists '([modelable & conditions? query?])}
-  [modelable & args]
+  {:arglists '([modelable & kv-args? query?])}
+  [modelable & unparsed-args]
   (model/with-model [model modelable]
-    (exists?* model (parse-args model args))))
+    (exists?* model unparsed-args)))

@@ -6,7 +6,9 @@
    [toucan2.model :as model]
    [toucan2.select :as select]
    [toucan2.update :as update]
-   [toucan2.util :as u]))
+   [toucan2.util :as u]
+   [toucan2.query :as query]
+   [toucan2.execute :as execute]))
 
 (m/defmulti transforms*
   {:arglists '([model])}
@@ -54,9 +56,9 @@
                       {:v v, :transform xform}
                       e)))))
 
-(defn transform-conditions [conditions transforms]
+(defn transform-kv-args [kv-args transforms]
   {:pre [(seq transforms)]}
-  (into {} (for [[k v] conditions]
+  (into {} (for [[k v] kv-args]
              [k (if-let [xform (get transforms k)]
                   (transform-condition-value xform v)
                   v)])))
@@ -98,18 +100,18 @@
   (wrapped-transforms model :in))
 
 (defn apply-in-transforms
-  [model {:keys [conditions], :as args}]
-  (if-let [transforms (not-empty (when (seq conditions)
+  [model {:keys [kv-args], :as args}]
+  (if-let [transforms (not-empty (when (seq kv-args)
                                    (in-transforms model)))]
-    (u/with-debug-result (format "Apply transforms to conditions %s" (pr-str conditions))
+    (u/with-debug-result (format "Apply transforms to kv-args %s" (pr-str kv-args))
       (u/println-debug (pr-str transforms))
       (cond-> args
-        (seq conditions)                (update :conditions transform-conditions transforms)
-        (some? (:toucan/pk conditions)) (update-in [:conditions :toucan/pk] transform-pk model transforms)))
+        (seq kv-args)                (update :kv-args transform-kv-args transforms)
+        (some? (:toucan/pk kv-args)) (update-in [:kv-args :toucan/pk] transform-pk model transforms)))
     args))
 
-(m/defmethod select/parse-args :after :toucan/transformed
-  [model args]
+(m/defmethod query/parse-args :after [::select/select :toucan/transformed]
+  [_query-type model args]
   (apply-in-transforms model args))
 
 (defn apply-row-transform [instance k xform]
@@ -155,17 +157,20 @@
        reducible-query))
     reducible-query))
 
-(m/defmethod select/select-reducible* :around :toucan/transformed
-  [model columns args]
-  (let [reducible-query (next-method model columns args)]
+(m/defmethod select/select-reducible* :around [:toucan/transformed :default]
+  [model parsed-args]
+  (let [reducible-query (next-method model parsed-args)]
     (transform-results model reducible-query)))
 
-(m/defmethod update/parse-args :after :toucan/transformed
-  [model args]
-  (if-let [transforms (in-transforms model)]
+(m/defmethod query/build :before [::update/update :toucan/transformed :default]
+  [_query-type model {:keys [query], :as args}]
+  (if-let [transforms (not-empty (in-transforms model))]
     (u/with-debug-result (format "Apply %s transforms to %s" transforms args)
-      (cond-> (apply-in-transforms model args)
-        transforms (update :changes transform-conditions transforms)))
+      (let [args (-> args
+                     (update :kv-args merge query)
+                     (dissoc :query))]
+        (-> (apply-in-transforms model args)
+            (update :changes transform-kv-args transforms))))
     args))
 
 (defn transform-insert-rows [[first-row :as rows] transforms]
@@ -181,8 +186,8 @@
         row-xform (apply comp row-xforms)]
     (map row-xform rows)))
 
-(m/defmethod insert/parse-args :after :toucan/transformed
-  [model {:keys [rows], :as args}]
+(m/defmethod query/parse-args :after [::insert/insert :toucan/transformed]
+  [_query-type model {:keys [rows], :as args}]
   (if-let [transforms (in-transforms model)]
     (u/with-debug-result (format "Apply %s transforms to %s" transforms rows)
       (update args :rows transform-insert-rows transforms))

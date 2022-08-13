@@ -3,11 +3,12 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.execute :as execute]
+   [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.model :as model]
    [toucan2.query :as query]
-   [toucan2.util :as u]
-   [toucan2.jdbc.query :as t2.jdbc.query]
-   [toucan2.select :as select]))
+   [toucan2.select :as select]
+   [toucan2.util :as u]))
 
 (s/def ::default-args
   (s/alt :single-row-map    map?
@@ -18,29 +19,25 @@
          :columns-rows      (s/cat :columns (s/coll-of keyword?)
                                    :rows    (s/coll-of vector?))))
 
-(m/defmulti parse-args
-  {:arglists '([model args])}
-  u/dispatch-on-first-arg)
+(m/defmethod query/args-spec [::insert :default]
+  [_query-type _model]
+  ::default-args)
 
-(m/defmethod parse-args :after :default
-  [_model parsed]
-  (u/println-debug (format "Parsed args: %s" (pr-str parsed)))
-  parsed)
+(m/defmethod query/parse-args [::insert :default]
+  [query-type model unparsed-args]
+  (let [[rows-type x] (next-method query-type model unparsed-args)]
+    (condp = rows-type
+      :single-row-map    [x]
+      :multiple-row-maps x
+      :kv-pairs          [(into {} (map (juxt :k :v)) x)]
+      :columns-rows      (let [{:keys [columns rows]} x]
+                           (for [row rows]
+                             (zipmap columns row))))))
 
-(m/defmethod parse-args :default
-  [_model args]
-  (let [parsed (s/conform ::default-args args)]
-    (when (s/invalid? parsed)
-      (throw (ex-info (format "Don't know how to interpret insert! args: %s" (s/explain-str ::default-args args))
-                      {:args args})))
-    (let [[rows-type x] parsed]
-      (condp = rows-type
-        :single-row-map    [x]
-        :multiple-row-maps x
-        :kv-pairs          [(into {} (map (juxt :k :v)) x)]
-        :columns-rows      (let [{:keys [columns rows]} x]
-                             (for [row rows]
-                               (zipmap columns row)))))))
+(m/defmethod query/build [::insert :default :default]
+  [_query-type model rows]
+  {:insert-into [(keyword (model/table-name model))]
+   :values      rows})
 
 (m/defmulti insert!*
   "Returns the number of rows inserted."
@@ -52,29 +49,20 @@
   (u/with-debug-result (pr-str (list 'insert!* model args))
     (next-method model args)))
 
-(defn build-query
-  "Default way of building queries for the default impl of [[insert!]]."
-  [model rows]
-  (u/with-debug-result (pr-str (list `build-query model rows))
-    {:insert-into [(keyword (model/table-name model))]
-     :values      rows}))
-
 (def ^:dynamic *result-type*
   "Type of results we want when inserting something. Either `:reducible` for reducible results, or `:row-count` for the
-  number of rows inserted. `:reducible` executes the query with [[query/reducible-query]] while `:row-count`
+  number of rows inserted. `:reducible` executes the query with [[execute/reducible-query]] while `:row-count`
   uses [[query/execute!]]."
   :row-count)
 
 (defn- execute! [model query]
-  (let [connectable (model/current-connectable model)]
+  (let [connectable (model/deferred-current-connectable model)]
     (case *result-type*
       :reducible
-      (query/reducible-query connectable query)
+      (execute/reducible-query connectable query)
 
       :row-count
-      (let [result (query/execute! connectable query)]
-        (or (-> result first :next.jdbc/update-count)
-            result)))))
+      (execute/query-one connectable query))))
 
 (m/defmethod insert!* :default
   [model rows]
@@ -83,7 +71,7 @@
       (u/println-debug "No rows to insert.")
       0)
     (u/with-debug-result (format "Inserting %d rows into %s" (count rows) (pr-str model))
-      (let [query (build-query model rows)]
+      (let [query (query/build ::insert model rows)]
         (try
           (execute! model query)
           (catch Throwable e
@@ -99,7 +87,7 @@
   [modelable & args]
   (u/with-debug-result (pr-str (list* 'insert! modelable args))
     (model/with-model [model modelable]
-      (insert!* model (parse-args model args)))))
+      (insert!* model (query/parse-args ::insert model args)))))
 
 (m/defmulti insert-returning-keys!*
   {:arglists '([model & args])}
