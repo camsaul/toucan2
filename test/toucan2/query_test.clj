@@ -64,10 +64,9 @@
       (is (= expected
              (query/query ::test/db {:select [:id :created_at], :from [:venues], :order-by [[:id :asc]]}))))))
 
-(m/defmethod compile/do-with-compiled-query [:default ::named-query]
-  [_conn _query f]
-  (f ["SELECT count(*) FROM people;"])
-  #_(compile/do-with-compiled-query conn ))
+(m/defmethod compile/do-with-compiled-query ::named-query
+  [_query f]
+  (f ["SELECT count(*) FROM people;"]))
 
 (deftest query-test-2
   (is (= [{:count 4}]
@@ -110,17 +109,13 @@
   [connectable f]
   (f connectable))
 
-(m/defmethod compile/do-with-compiled-query [::not-even-jdbc :default]
-  [_conn query f]
-  (f query))
-
-(m/defmethod query/reduce-query [::not-even-jdbc :default]
-  [_connectable k rf init]
+(m/defmethod query/reduce-query-with-connection [::not-even-jdbc :default]
+  [_connectable [{k :key}] rf init]
   (reduce rf init [{k 1} {k 2} {k 3}]))
 
 (deftest wow-dont-even-need-to-use-jdbc-test
   (is (= [{:a 1} {:a 2} {:a 3}]
-         (query/query ::not-even-jdbc :a))))
+         (query/query ::not-even-jdbc [{:key :a}]))))
 
 (deftest execute!-test
   (try

@@ -7,35 +7,28 @@
    [toucan2.util :as u]))
 
 (m/defmulti do-with-compiled-query
-  {:arglists '([connection query f])}
-  u/dispatch-on-first-two-args)
+  {:arglists '([queryable f])}
+  u/dispatch-on-first-arg)
 
 (m/defmethod do-with-compiled-query :around :default
-  [connection query f]
-  (if-not u/*debug*
-    (next-method connection query f)
-    (do
-      (u/println-debug (format "Compile query for %s connection %s"
-                               (some-> connection class .getCanonicalName)
-                               (pr-str query)))
-      (binding [u/*debug-indent-level* (inc u/*debug-indent-level*)]
-        (next-method connection query (fn [compiled-query]
-                                        (binding [u/*debug-indent-level* (dec u/*debug-indent-level*)]
-                                          (u/print-debug-result (pr-str compiled-query))
-                                          (f compiled-query))))))))
+  [queryable f]
+  (u/println-debug (format "Compiling query ^%s %s" (some-> queryable class .getCanonicalName) (pr-str queryable)))
+  (next-method queryable (fn [compiled-query]
+                           (binding [u/*debug-indent-level* (inc u/*debug-indent-level*)]
+                             (u/print-debug-result (pr-str compiled-query)))
+                           (f compiled-query))))
 
-(defmacro with-compiled-query [[query-binding [connection query]] & body]
+(defmacro with-compiled-query [[query-binding queryable] & body]
   `(do-with-compiled-query
-    ~connection
-    ~query
+    ~queryable
     (^:once fn* [~query-binding] ~@body)))
 
-(m/defmethod do-with-compiled-query [:default String]
-  [_conn sql f]
+(m/defmethod do-with-compiled-query String
+  [sql f]
   (f [sql]))
 
-(m/defmethod do-with-compiled-query [:default clojure.lang.Sequential]
-  [_conn sql-args f]
+(m/defmethod do-with-compiled-query clojure.lang.Sequential
+  [sql-args f]
   (f sql-args))
 
 ;;;; HoneySQL options
@@ -45,11 +38,11 @@
 
 (def ^:dynamic *honeysql-options* nil)
 
-(m/defmethod do-with-compiled-query [:default clojure.lang.IPersistentMap]
-  [conn honeysql f]
+(m/defmethod do-with-compiled-query clojure.lang.IPersistentMap
+  [honeysql f]
   (let [sql-args (hsql/format honeysql (merge @global-honeysql-options
                                               *honeysql-options*))]
-    (do-with-compiled-query conn sql-args f)))
+    (do-with-compiled-query sql-args f)))
 
 ;;;; Applying conditions
 

@@ -18,6 +18,25 @@
     ~connectable
     (^:once fn* [~connection-binding] ~@body)))
 
+;;; method if this is called with something we don't know how to handle
+(m/defmethod do-with-connection :default
+  [connectable _f]
+  (throw (ex-info (format "Don't know how to get a connection from ^%s %s. Do you need to implement %s for %s?"
+                          (some-> connectable class .getCanonicalName)
+                          (pr-str connectable)
+                          `do-with-connection
+                          (u/dispatch-value connectable))
+                  {:connectable connectable})))
+
+;;; method called with the default value of [[toucan2.current/*connection*]] if no value of `:toucan2/default` is
+;;; defined.
+(m/defmethod do-with-connection :toucan/default
+  [_connectable _f]
+  ;; TODO -- link to appropriate documentation page online in the error once we actually have dox.
+  (throw (ex-info (format "No default Toucan connection defined. You can define one by implementing %s for :toucan/default."
+                          `do-with-connection)
+                  {})))
+
 (m/defmethod do-with-connection java.sql.Connection
   [conn f]
   (f conn))
