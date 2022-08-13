@@ -31,7 +31,8 @@
                        (realize row))))
               this))
       (catch Throwable e
-        (throw (ex-info (format "Error realizing IReduceInit %s: %s"
+        (throw (ex-info (format "Error reducing ^%s %s: %s"
+                                (.getCanonicalName (class this))
                                 (binding [*print-meta* true] (pr-str this))
                                 (ex-message e))
                         {:this this}

@@ -1,166 +1,170 @@
 (ns toucan2.query
-  (:refer-clojure :exclude [compile])
   (:require
    [methodical.core :as m]
-   [pretty.core :as pretty]
-   [toucan2.compile :as compile]
-   [toucan2.connection :as conn]
-   [toucan2.current :as current]
-   [toucan2.jdbc.query :as t2.jdbc.query]
-   [toucan2.realize :as realize]
    [toucan2.util :as u]
-   [toucan2.model :as model]))
+   [honey.sql.helpers :as hsql.helpers]
+   [toucan2.model :as model]
+   [clojure.spec.alpha :as s]
+   [toucan2.query :as query]))
 
-(m/defmulti reduce-query-with-connection
-  "Reduce `compiled-query` with an opened `connection`."
-  {:arglists '([connection compiled-query rf init])}
+;;;; [[do-with-query]] and [[with-query]]
+
+(m/defmulti do-with-query
+  "Impls should resolve `queryable` to a query and call
+
+    (f query)"
+  {:arglists '([model queryable f])}
   u/dispatch-on-first-two-args)
 
-;; TODO -- should this live in [[t2.jdbc.query]] instead?
-(m/defmethod reduce-query-with-connection [java.sql.Connection clojure.lang.Sequential]
-  [conn sql-args rf init]
-  (t2.jdbc.query/reduce-jdbc-query conn sql-args rf init))
+(m/defmethod do-with-query :default
+  [_model queryable f]
+  (f queryable))
 
-(m/defmulti reduce-query
-  "Reduce `compiled-query`. `connectable` has not been realized yet. Normally this hands off
-  to [[reduce-query-with-connection]]."
-  {:arglists '([connectable compiled-query rf init])}
-  u/dispatch-on-second-arg)
+(defmacro with-query [[query-binding [model queryable]] & body]
+  `(do-with-query ~model ~queryable (^:once fn* [~query-binding] ~@body)))
 
-(m/defmethod reduce-query :default
-  [connectable compiled-query rf init]
-  (conn/with-connection [conn connectable]
-    (try
-      (reduce-query-with-connection conn compiled-query rf init)
-      (catch Throwable e
-        (throw (ex-info (format "Error reducing query: %s" (ex-message e))
-                        {:query compiled-query, :rf rf, :init init}
-                        e))))))
+;;;; [[build]]
 
-(defrecord ReducibleQuery [connectable queryable]
-  clojure.lang.IReduceInit
-  (reduce [_ rf init]
-    (compile/with-compiled-query [compiled-query queryable]
-      (reduce-query connectable compiled-query rf init)))
+(m/defmulti build
+  "Dispatches on `query-type`, `model`, and the `:query` in `args`."
+  {:arglists '([query-type model args])}
+  (fn [query-type model {:keys [query], :as _args}]
+    (mapv u/dispatch-value [query-type model query])))
 
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `reducible-query connectable queryable)))
+(m/defmethod build :around :default
+  [query-type model args]
+  (u/with-debug-result (pr-str (list `build query-type model args))
+    (next-method query-type model args)))
 
-(defn reducible-query
-  ([queryable]
-   (reducible-query current/*connection* queryable))
-  ([connectable queryable]
-   (->ReducibleQuery connectable queryable)))
+(m/defmethod build :default
+  [query-type model args]
+  (throw (ex-info (format "Don't know how to build a %s query for %s from args %s. Do you need to implement %s for %s?"
+                          (pr-str query-type)
+                          (pr-str model)
+                          (pr-str args)
+                          `build
+                          (pr-str (m/dispatch-value build query-type model args)))
+                  {:query-type query-type, :model model, :args args})))
 
-(defn query
-  ([queryable]
-   (query current/*connection* queryable))
-  ([connectable queryable]
-   (realize/realize (reducible-query connectable queryable))))
+(m/defmethod build [:default :default nil]
+  [query-type model args]
+  (build query-type model (assoc args :query {})))
 
-(defn query-one
-  "Like [[query]], but returns only the first row. Does not fetch additional rows regardless of whether the query would
-  have yielded them."
-  ([queryable]
-   (query-one current/*connection* queryable))
-  ([connectable queryable]
-   (realize/reduce-first (reducible-query connectable queryable))))
+(m/defmethod build [:default :default Long]
+  [query-type model {pk :query, :as args}]
+  (build query-type model (-> args
+                              (assoc :query {})
+                              (update :kv-args assoc :toucan/pk pk))))
 
-(m/defmulti execute!*
-  {:arglists '([connection compiled-query])}
+(m/defmethod build [:default :default String]
+  [query-type model args]
+  (build query-type model (update args :query (fn [sql]
+                                                [sql]))))
+
+(m/defmethod build [:default :default clojure.lang.Sequential]
+  [query-type model {sql-args :query, :keys [kv-args], :as args}]
+  (when (seq kv-args)
+    (throw (ex-info "key-value args are not supported for plain SQL queries."
+                    {:query-type query-type, :model model, :args args})))
+  sql-args)
+
+;;;; Default [[build]] impl for maps; applying key-value args.
+
+(m/defmulti apply-kv-arg
+  {:arglists '([model query k v])}
+  u/dispatch-on-first-three-args)
+
+(defn condition->honeysql-where-clause [k v]
+  (if (sequential? v)
+    (vec (list* (first v) k (rest v)))
+    [:= k v]))
+
+(m/defmethod apply-kv-arg [:default clojure.lang.IPersistentMap :default]
+  [_model honeysql k v]
+  (update honeysql :where (fn [existing-where]
+                            (:where (hsql.helpers/where existing-where
+                                                        (condition->honeysql-where-clause k v))))))
+
+(m/defmethod apply-kv-arg [:default clojure.lang.IPersistentMap :toucan/pk]
+  [model honeysql _k v]
+  (let [pk-columns (model/primary-keys model)
+        v          (if (sequential? v)
+                     v
+                     [v])]
+    (assert (= (count pk-columns)
+               (count v))
+            (format "Expected %s primary key values for %s, got %d values %s"
+                    (count pk-columns) (pr-str pk-columns)
+                    (count v) (pr-str v)))
+    (reduce
+     (fn [honeysql [k v]]
+       (apply-kv-arg model honeysql k v))
+     honeysql
+     (zipmap pk-columns v))))
+
+(defn apply-kv-args [model query kv-args]
+  (reduce
+   (fn [query [k v]]
+     (apply-kv-arg model query k v))
+   query
+   kv-args))
+
+(m/defmethod build [:default :default clojure.lang.IPersistentMap]
+  [_query-type model {:keys [kv-args query], :as _args}]
+  (apply-kv-args model query kv-args))
+
+;;;; [[parse-args]]
+
+(m/defmulti args-spec
+  {:arglists '([query-type model])}
   u/dispatch-on-first-two-args)
 
-(m/defmethod execute!* [java.sql.Connection clojure.lang.Sequential]
-  [conn sql-args]
-  (t2.jdbc.query/execute-jdbc-query! conn sql-args))
+(s/def ::default-args
+  (s/cat
+   :kv-args (s/* (s/cat
+                  :k keyword?
+                  :v any?))
+   :queryable  (s/? any?)))
 
-(defn execute!
-  "Compile and execute a `query` such as a String SQL statement, `[sql & params]` vector, or HoneySQL map. Intended for
-  use with statements such as `UPDATE`, `INSERT`, or `DELETE`, or DDL statements like `CREATE TABLE`; for queries like
-  `SELECT`, use [[query]] instead."
-  ([queryable]
-   (execute! current/*connection* queryable))
+(m/defmethod args-spec :default
+  [_query-type _model]
+  ::default-args)
 
-  ([connectable queryable]
-   (compile/with-compiled-query [compiled-query queryable]
-     (conn/with-connection [conn connectable]
-       (try
-         (execute!* conn compiled-query)
-         (catch Throwable e
-           (throw (ex-info (format "Error executing query: %s" (ex-message e))
-                           {:query compiled-query}
-                           e))))))))
+(m/defmulti parse-args
+  {:arglists '([query-type model unparsed-args])}
+  u/dispatch-on-first-two-args)
 
-(defrecord ReducibleQueryAs [connectable modelable queryable]
-  clojure.lang.IReduceInit
-  (reduce [_this rf init]
-    ;; TODO -- I don't love the fact that [[current/*model*]] being bound means we get instances of that model when
-    ;; querying stuff... seems a little TOO magical. This would be nicer if we could use an eduction or transducer to
-    ;; convert results to instances instead
-    (model/with-model [_model modelable]
-      (reduce rf init (reducible-query connectable queryable))
-      #_(binding [query/*jdbc-options* (merge
-                                        {:builder-fn (instance/instance-result-set-builder model)}
-                                        query/*jdbc-options*)]
-          (reduce rf init (query/reducible-query connectable query)))))
+(m/defmethod parse-args :around :default
+  [query-type model unparsed-args]
+  (u/with-debug-result (pr-str (list 'parse-args query-type model unparsed-args))
+    (next-method query-type model unparsed-args)))
 
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `reducible-query-as connectable modelable query)))
+(m/defmethod parse-args :default
+  [query-type model unparsed-args]
+  (let [spec   (args-spec query-type model)
+        parsed (s/conform spec unparsed-args)]
+    (when (s/invalid? parsed)
+      (throw (ex-info (format "Don't know how to interpret %s args for model %s: %s"
+                              (pr-str query-type)
+                              (pr-str model)
+                              (s/explain-str spec unparsed-args))
+                      (s/explain-data spec unparsed-args))))
+    (if-not (map? parsed)
+      parsed
+      (cond-> parsed
+        (nil? (:queryable parsed)) (assoc :queryable {})
+        (seq (:kv-args parsed))    (update :kv-args (fn [kv-args]
+                                                      (into {} (map (juxt :k :v)) kv-args)))))))
 
-(defn reducible-query-as
-  ([modelable queryable]
-   (model/with-model [model modelable]
-     (reducible-query-as (model/current-connectable model) model queryable)))
+(defn do-with-parsed-args-with-query
+  [query-type model unparsed-args f]
+  (let [{:keys [queryable], :as parsed} (parse-args query-type model unparsed-args)]
+    (query/with-query [query [model queryable]]
+      (f (-> parsed
+             (dissoc :queryable)
+             (assoc :query query))))))
 
-  ([connectable modelable queryable]
-   (->ReducibleQueryAs connectable modelable queryable)))
-
-(defn query-as
-  ([modelable queryable]
-   (model/with-model [model modelable]
-     (query-as (model/current-connectable model) model queryable)))
-
-  ([connectable modelable queryable]
-   (realize/realize (reducible-query-as connectable modelable queryable))))
-
-;;; TODO
-
-#_(defn do-with-call-counts
-    "Impl for [[with-call-count]] macro; don't call this directly."
-    [f]
-    (let [call-count (atom 0)
-          old-thunk  *call-count-thunk*]
-      (binding [*call-count-thunk* #(do
-                                      (old-thunk)
-                                      (swap! call-count inc))]
-        (f (fn [] @call-count)))))
-
-#_(defmacro with-call-count
-  "Execute `body`, trackingthe number of database queries and statements executed. This number can be fetched at any
-  time withing `body` by calling function bound to `call-count-fn-binding`:
-
-    (with-call-count [call-count]
-      (select ...)
-      (println \"CALLS:\" (call-count))
-      (insert! ...)
-      (println \"CALLS:\" (call-count)))
-    ;; -> CALLS: 1
-    ;; -> CALLS: 2"
-  [[call-count-fn-binding] & body]
-  `(do-with-call-counts (fn [~call-count-fn-binding] ~@body)))
-
-(m/defmethod reduce-query-with-connection [::compile :default]
-  [_connection compiled-query _rf _init]
-  compiled-query)
-
-(defmacro compile
-  "Return the compiled query that would be executed by a form, rather than executing that form itself.
-
-    (delete/delete :table :id 1)
-    =>
-    [\"DELETE FROM table WHERE ID = ?\" 1]"
-  [& body]
-  `(binding [current/*connection* ::compile]
-     ~@body))
+(defmacro with-parsed-args-with-query
+  {:style/indent 1}
+  [[parsed-args-binding [query-type model unparsed-args]] & body]
+  `(do-with-parsed-args-with-query ~query-type ~model ~unparsed-args (^:once fn* [~parsed-args-binding] ~@body)))

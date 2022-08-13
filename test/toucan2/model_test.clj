@@ -24,9 +24,9 @@
 (deftest default-honeysql-options-for-a-model-test
   (testing "There should be a way to specify 'default options' for a specific model"
     (model/with-model [_model ::people.quoted]
-      (compile/with-compiled-query [query {:select [:*]
-                                           :from   [[:people]]
-                                           :where  [:= :id 1]}]
+      (compile/with-compiled-query [query [nil {:select [:*]
+                                                :from   [[:people]]
+                                                :where  [:= :id 1]}]]
         ;; this is what HoneySQL normally does with a namespaced keyword
         (is (= ["SELECT * FROM \"people\" WHERE \"id\" = ?" 1]
                query))))))

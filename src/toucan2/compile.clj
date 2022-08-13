@@ -1,34 +1,37 @@
 (ns toucan2.compile
   (:require
    [honey.sql :as hsql]
-   [honey.sql.helpers :as hsql.helpers]
    [methodical.core :as m]
-   [toucan2.model :as model]
    [toucan2.util :as u]))
 
 (m/defmulti do-with-compiled-query
-  {:arglists '([queryable f])}
-  u/dispatch-on-first-arg)
+  {:arglists '([model query f])}
+  u/dispatch-on-first-two-args)
 
 (m/defmethod do-with-compiled-query :around :default
-  [queryable f]
-  (u/println-debug (format "Compiling query ^%s %s" (some-> queryable class .getCanonicalName) (pr-str queryable)))
-  (next-method queryable (fn [compiled-query]
-                           (binding [u/*debug-indent-level* (inc u/*debug-indent-level*)]
-                             (u/print-debug-result (pr-str compiled-query)))
-                           (f compiled-query))))
+  [model query f]
+  (u/println-debug (format "Compile %s query ^%s %s"
+                           (pr-str model)
+                           (some-> query class .getCanonicalName)
+                           (pr-str query)))
+  (binding [u/*debug-indent-level* (inc u/*debug-indent-level*)]
+    (next-method model query (fn [compiled-query]
+                               (binding [u/*debug-indent-level* (dec u/*debug-indent-level*)]
+                                 (u/print-debug-result (pr-str compiled-query))
+                                 (f compiled-query))))))
 
-(defmacro with-compiled-query [[query-binding queryable] & body]
+(defmacro with-compiled-query [[query-binding [model query]] & body]
   `(do-with-compiled-query
-    ~queryable
+    ~model
+    ~query
     (^:once fn* [~query-binding] ~@body)))
 
-(m/defmethod do-with-compiled-query String
-  [sql f]
+(m/defmethod do-with-compiled-query [:default String]
+  [_model sql f]
   (f [sql]))
 
-(m/defmethod do-with-compiled-query clojure.lang.Sequential
-  [sql-args f]
+(m/defmethod do-with-compiled-query [:default clojure.lang.Sequential]
+  [_model sql-args f]
   (f sql-args))
 
 ;;;; HoneySQL options
@@ -38,49 +41,12 @@
 
 (def ^:dynamic *honeysql-options* nil)
 
-(m/defmethod do-with-compiled-query clojure.lang.IPersistentMap
-  [honeysql f]
+;;; TODO -- should there be a model-specific HoneySQL options method as well? Or can model just bind
+;;; [[*honeysql-options*]] inside of [[toucan2.model/with-model]] if they need to do something special? I'm leaning
+;;; towards the latter.
+
+(m/defmethod do-with-compiled-query [:default clojure.lang.IPersistentMap]
+  [model honeysql f]
   (let [sql-args (hsql/format honeysql (merge @global-honeysql-options
                                               *honeysql-options*))]
-    (do-with-compiled-query sql-args f)))
-
-;;;; Applying conditions
-
-(m/defmulti apply-condition
-  {:arglists '([model query k v])}
-  u/dispatch-on-first-three-args)
-
-(defn condition->honeysql-where-clause [k v]
-  (if (sequential? v)
-    (vec (list* (first v) k (rest v)))
-    [:= k v]))
-
-(m/defmethod apply-condition [:default clojure.lang.IPersistentMap :default]
-  [_model honeysql k v]
-  (update honeysql :where (fn [existing-where]
-                            (:where (hsql.helpers/where existing-where
-                                                        (condition->honeysql-where-clause k v))))))
-
-(m/defmethod apply-condition [:default clojure.lang.IPersistentMap :toucan/pk]
-  [model honeysql _k v]
-  (let [pk-columns (model/primary-keys model)
-        v          (if (sequential? v)
-                     v
-                     [v])]
-    (assert (= (count pk-columns)
-               (count v))
-            (format "Expected %s primary key values for %s, got %d values %s"
-                    (count pk-columns) (pr-str pk-columns)
-                    (count v) (pr-str v)))
-    (reduce
-     (fn [honeysql [k v]]
-       (apply-condition model honeysql k v))
-     honeysql
-     (zipmap pk-columns v))))
-
-(defn apply-conditions [model query conditions]
-  (reduce
-   (fn [query [k v]]
-     (apply-condition model query k v))
-   query
-   conditions))
+    (do-with-compiled-query model sql-args f)))

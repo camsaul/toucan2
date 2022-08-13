@@ -2,20 +2,11 @@
   (:require
    [methodical.core :as m]
    [pretty.core :as pretty]
+   [toucan2.execute :as execute]
+   [toucan2.instance :as instance]
    [toucan2.query :as query]
    [toucan2.realize :as realize]
-   [toucan2.select :as select]
-   [toucan2.current :as current]
-   [toucan2.instance :as instance]
-   [toucan2.compile :as compile]))
-
-#_(m/defmethod compile/compile* [:default :default :toucan/identity-query]
-  [_ _ rows _]
-  rows)
-
-#_(m/defmethod compile/from* [:default :default :toucan/identity-query]
-  [_ _ rows _]
-  rows)
+   [toucan2.select :as select]))
 
 (defrecord IdentityQuery [rows]
   pretty/PrettyPrintable
@@ -32,21 +23,15 @@
   [rows]
   (->IdentityQuery rows))
 
-(m/defmethod compile/do-with-compiled-query IdentityQuery
-  [query f]
-  (f query))
-
-(m/defmethod query/reduce-query IdentityQuery
-  [_connectable {:keys [rows]} rf init]
+(m/defmethod execute/reduce-uncompiled-query [:default IdentityQuery]
+  [_connectable model {:keys [rows]} rf init]
   (reduce
    rf
    init
-   (if current/*model*
-     (eduction (map (fn [row]
-                      (instance/instance current/*model* row)))
-               rows)
-     rows)))
+   (cond->> rows
+     model (eduction (map (fn [row]
+                            (instance/instance model row)))))))
 
-(m/defmethod select/build-query [:default IdentityQuery]
-  [_model query _columns _conditions]
+(m/defmethod query/build [::select/select :default IdentityQuery]
+  [_query-type _model {:keys [query], :as _args}]
   query)
