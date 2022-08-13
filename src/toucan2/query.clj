@@ -23,7 +23,12 @@
   (reduce [_ rf init]
     (conn/with-connection [conn connectable]
       (compile/with-compiled-query [compiled-query [conn query]]
-        (reduce-query conn compiled-query rf init))))
+        (try
+          (reduce-query conn compiled-query rf init)
+          (catch Throwable e
+            (throw (ex-info (format "Error reducing query: %s" (ex-message e))
+                            {:query compiled-query, :rf rf, :init init}
+                            e)))))))
 
   pretty/PrettyPrintable
   (pretty [_this]
@@ -67,7 +72,12 @@
   ([connectable query]
    (conn/with-connection [conn connectable]
      (compile/with-compiled-query [compiled-query [conn query]]
-       (execute!* conn compiled-query)))))
+       (try
+         (execute!* conn compiled-query)
+         (catch Throwable e
+           (throw (ex-info (format "Error executing query: %s" (ex-message e))
+                           {:query compiled-query}
+                           e))))))))
 
 ;; TODO
 

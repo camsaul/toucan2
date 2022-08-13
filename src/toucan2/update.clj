@@ -1,11 +1,11 @@
 (ns toucan2.update
-  "Implementation of `update!`."
-  (:require [methodical.core :as m]
-            [toucan2.util :as u]
-            [clojure.spec.alpha :as s]
-            [toucan2.query :as query]
-            [toucan2.model :as model]
-            [toucan2.connection :as conn]))
+  "Implementation of [[update!]]."
+  (:require
+   [clojure.spec.alpha :as s]
+   [methodical.core :as m]
+   [toucan2.model :as model]
+   [toucan2.query :as query]
+   [toucan2.util :as u]))
 
 (m/defmulti parse-args
   {:arglists '([model args])}
@@ -36,24 +36,6 @@
                           {:toucan2/pk pk}))
      :changes    (:changes parsed)}))
 
-(m/defmulti build-update-query
-  "Return a query that can be executed with The value of `args` depends on what [[parse-args]] returns for the model. This
-should return an empty query if there are no changes to perform."
-  {:arglists '([model args])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod build-update-query :after :default
-  [_model query]
-  (u/println-debug (format "Built update query: %s" (pr-str query)))
-  query)
-
-(m/defmethod build-update-query :default
-  [model {:keys [conditions changes]}]
-  (when (seq changes)
-    (let [honeysql {:update [(keyword (model/table-name model))]
-                    :set    changes}]
-      (model/apply-conditions model honeysql conditions))))
-
 (m/defmulti update!*
   "The value of `args` depends on what [[parse-args]] returns for the model."
   {:arglists '([model args])}
@@ -64,16 +46,30 @@ should return an empty query if there are no changes to perform."
   (u/with-debug-result (pr-str (list 'update!* model args))
     (next-method model args)))
 
+(defn build-query
+  "Default way of building queries for the default impl of [[update!*]]."
+  [model {:keys [conditions changes]}]
+  (let [honeysql {:update [(keyword (model/table-name model))]
+                  :set    changes}
+        query    (model/apply-conditions model honeysql conditions)]
+    (u/println-debug (format "Built update query: %s" (pr-str query)))
+    query))
+
 (m/defmethod update!* :default
-  [model args]
-  (let [query (build-update-query model args)]
-    (if (empty? query)
-      (do
-        (u/println-debug "Query has no changes, skipping update")
-        0)
-      (let [result (query/execute! (model/default-connectable model) query)]
-        (or (-> result first :next.jdbc/update-count)
-            result)))))
+  [model {:keys [changes], :as query}]
+  (if (empty? changes)
+    (do
+      (u/println-debug "Query has no changes, skipping update")
+      0)
+    (let [query (build-query model query)]
+      (try
+        (let [result (query/execute! (model/default-connectable model) query)]
+          (or (-> result first :next.jdbc/update-count)
+              result))
+        (catch Throwable e
+          (throw (ex-info (format "Error updating rows: %s" (ex-message e))
+                          {:model model, :query query}
+                          e)))))))
 
 (defn update!
   "Returns number of rows updated."
