@@ -3,7 +3,9 @@
             [toucan2.insert :as insert]
             [toucan2.test :as test]
             [toucan2.select :as select]
-            [toucan2.instance :as instance])
+            [toucan2.instance :as instance]
+            [toucan2.model :as model]
+            [methodical.core :as m])
   (:import java.time.LocalDateTime))
 
 (set! *warn-on-reflection* true)
@@ -34,7 +36,7 @@
     (is (= nil
            (select/select-one ::test/venues 4))))
   (doseq [[returning-keys? insert!] {false #'insert/insert!
-                                     #_true #_#'insert/insert-returning-keys!}]
+                                     true  #'insert/insert-returning-keys!}]
     (testing (str insert!)
       (test/with-discarded-table-changes :venues
         (f returning-keys? insert!)))))
@@ -104,42 +106,47 @@
                  (instance/instance ::test/venues {:id 5, :name "Louie's"})]
                 (select/select ::test/venues :id [:> 3] {:select [:id :name], :order-by [[:id :asc]]}))))))))
 
-;; (deftest insert-returning-keys!-composite-pk-test
-;;   (test/with-discarded-table-changes :venues
-;;     (test/with-default-connection
-;;       (is (= [[4 "Grant & Green"]]
-;;              (mutative/insert-returning-keys! ::test/venues/composite-pk {:name "Grant & Green", :category "bar"}))))))
+(derive ::venues.composite-pk ::test/venues)
+
+(m/defmethod model/primary-keys ::venues.composite-pk
+  [_model]
+  [:id :name])
+
+(deftest insert-returning-keys!-composite-pk-test
+  (test/with-discarded-table-changes :venues
+    (is (= [[4 "Grant & Green"]]
+           (insert/insert-returning-keys! ::venues.composite-pk {:name "Grant & Green", :category "bar"})))))
 
 ;; (deftest insert!-custom-honeysql-test
 ;;   (test/with-default-connection
 ;;     (testing "single map row"
 ;;       (test/with-discarded-table-changes :venues
 ;;         (is (= 1
-;;                (insert/insert! ::test/venues/custom-honeysql {:id "4", :name "Hi-Dive", :category "bar"})))
+;;                (insert/insert! ::venues.custom-honeysql {:id "4", :name "Hi-Dive", :category "bar"})))
 ;;         (is (= {:id 4, :name "Hi-Dive"}
 ;;                (select/select-one ::test/venues :id 4 {:select [:id :name]})))))
 ;;     (testing "multiple map rows"
 ;;       (test/with-discarded-table-changes :venues
 ;;         (is (= 1
-;;                (insert/insert! ::test/venues/custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))
+;;                (insert/insert! ::venues.custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))
 ;;         (is (= {:id 4, :name "Hi-Dive"}
 ;;                (select/select-one ::test/venues :id 4 {:select [:id :name]})))))
 ;;     (testing "kv args"
 ;;       (test/with-discarded-table-changes :venues
 ;;         (is (= 1
-;;                (insert/insert! ::test/venues/custom-honeysql :id "4", :name "Hi-Dive", :category "bar")))
+;;                (insert/insert! ::venues.custom-honeysql :id "4", :name "Hi-Dive", :category "bar")))
 ;;         (is (= {:id 4, :name "Hi-Dive"}
 ;;                (select/select-one ::test/venues :id 4 {:select [:id :name]})))))
 ;;     (testing "columns + vector rows"
 ;;       (test/with-discarded-table-changes :venues
 ;;         (is (= 1
-;;                (insert/insert! ::test/venues/custom-honeysql [:id :name :category] [["4" "Hi-Dive" "bar"]])))
+;;                (insert/insert! ::venues.custom-honeysql [:id :name :category] [["4" "Hi-Dive" "bar"]])))
 ;;         (is (= {:id 4, :name "Hi-Dive"}
 ;;                (select/select-one ::test/venues :id 4 {:select [:id :name]})))))
 ;;     (testing "returning-keys"
 ;;       (test/with-discarded-table-changes :venues
 ;;         (is (= [4]
-;;                (mutative/insert-returning-keys! ::test/venues/custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))))))
+;;                (insert/insert-returning-keys! ::venues.custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))))))
 
 (deftest insert!-no-changes-no-op-test
   (testing "If there are no rows, insert! should no-op and return zero"

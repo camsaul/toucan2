@@ -86,7 +86,12 @@
   [& args]
   (realize/reduce-first (apply select-fn-reducible args)))
 
-(defn select-pks-fn [modelable]
+(defn select-pks-fn
+  "Return a function to get the value(s) of the primary key(s) from a row. Used by [[select-pks-reducible]] and thus
+  by [[select-pks-set]], [[select-pks-vec]], etc.
+
+  The primary keys are determined by [[model/primary-keys]]. By default this is simply the keyword `:id`."
+  [modelable]
   (let [pk-keys (model/primary-keys modelable)]
     (if (= (clojure.core/count pk-keys) 1)
       (first pk-keys)
