@@ -66,7 +66,7 @@
   :row-count)
 
 (defn- execute! [model query]
-  (let [connectable (model/default-connectable model)]
+  (let [connectable (model/current-connectable model)]
     (case *result-type*
       :reducible
       (query/reducible-query connectable query)

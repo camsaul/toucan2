@@ -1,4 +1,5 @@
 (ns toucan2.query
+  (:refer-clojure :exclude [compile])
   (:require
    [methodical.core :as m]
    [pretty.core :as pretty]
@@ -94,6 +95,9 @@
 (defrecord ReducibleQueryAs [connectable modelable queryable]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
+    ;; TODO -- I don't love the fact that [[current/*model*]] being bound means we get instances of that model when
+    ;; querying stuff... seems a little TOO magical. This would be nicer if we could use an eduction or transducer to
+    ;; convert results to instances instead
     (model/with-model [_model modelable]
       (reduce rf init (reducible-query connectable queryable))
       #_(binding [query/*jdbc-options* (merge
@@ -107,14 +111,17 @@
 
 (defn reducible-query-as
   ([modelable queryable]
-   (reducible-query-as :toucan/current-connectable-for-current-model modelable queryable))
+   (model/with-model [model modelable]
+     (reducible-query-as (model/current-connectable model) model queryable)))
+
   ([connectable modelable queryable]
    (->ReducibleQueryAs connectable modelable queryable)))
 
-;;; TODO -- should this only have a three arity, like [[reducible-query-as]] does?
 (defn query-as
   ([modelable queryable]
-   (query-as :toucan/current-connectable-for-current-model modelable queryable))
+   (model/with-model [model modelable]
+     (query-as (model/current-connectable model) model queryable)))
+
   ([connectable modelable queryable]
    (realize/realize (reducible-query-as connectable modelable queryable))))
 
@@ -143,3 +150,17 @@
     ;; -> CALLS: 2"
   [[call-count-fn-binding] & body]
   `(do-with-call-counts (fn [~call-count-fn-binding] ~@body)))
+
+(m/defmethod reduce-query-with-connection [::compile :default]
+  [_connection compiled-query _rf _init]
+  compiled-query)
+
+(defmacro compile
+  "Return the compiled query that would be executed by a form, rather than executing that form itself.
+
+    (delete/delete :table :id 1)
+    =>
+    [\"DELETE FROM table WHERE ID = ?\" 1]"
+  [& body]
+  `(binding [current/*connection* ::compile]
+     ~@body))
