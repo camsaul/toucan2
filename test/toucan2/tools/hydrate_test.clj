@@ -11,19 +11,11 @@
 
 (derive ::venues ::test/venues)
 
-(m/defmethod model/table-name ::venues
-  [_model]
-  "venues")
-
 (derive ::venues.category-keyword ::venues)
 ;; TODO
 #_(derive ::venues.category-keyword :toucan2/transformed)
 
 (derive ::people ::test/people)
-
-(m/defmethod model/table-name ::people
-  [_model]
-  "people")
 
 #_(helpers/deftransforms ::venues.category-keyword
     {:category {:in  name
