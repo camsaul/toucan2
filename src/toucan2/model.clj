@@ -29,16 +29,12 @@
   [_model]
   :toucan/default)
 
-(m/defmethod conn/do-with-connection :toucan/default-connectable-for-current-model
-  [_connectable f]
-  (conn/do-with-connection (default-connectable current/*model*) f))
+(defn current-connectable [model]
+  (if (= current/*connection* :toucan/default)
+    (default-connectable model)
+    current/*connection*))
 
-(m/defmethod conn/do-with-connection :toucan/current-connectable-for-current-model
-  [_connectable f]
-  (let [connectable (if (= current/*connection* :toucan/default)
-                      :toucan/default-connectable-for-current-model
-                      current/*connection*)]
-    (conn/do-with-connection connectable f)))
+::default-connectable
 
 (m/defmulti table-name
   {:arglists '([model])}

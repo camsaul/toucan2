@@ -31,6 +31,10 @@
       (seq (:conditions parsed)) (update :conditions (fn [conditions]
                                                        (into {} (map (juxt :k :v)) conditions))))))
 
+;;; TODO -- not 100% sure this needs to be a separate multimethod -- the equivalents for `update!`, `insert!`, and
+;;; `delete!` are not.
+;;;
+;;; TODO -- this should probably avoid destructuring the `args` map in case another implementation has different args.
 (m/defmulti build-query
   {:arglists '([model query columns conditions])}
   u/dispatch-on-first-two-args)
@@ -45,10 +49,11 @@
   (when (or (seq columns)
             (seq conditions))
     (throw (ex-info (format (str "Don't know how to build select query for %s from query ^%s %s with columns or "
-                                 "conditions. Do you need to implement build-query for %s?")
+                                 "conditions. Do you need to implement %s for %s?")
                             (pr-str model)
                             (some-> query class .getCanonicalName)
                             (pr-str query)
+                            `build-query
                             (pr-str (u/dispatch-on-first-two-args model query)))
                     {:model model, :query query, :columns columns, :conditions conditions})))
   query)
@@ -63,13 +68,8 @@
     (compile/apply-conditions model honeysql conditions)))
 
 (m/defmethod build-query [:default Long]
-  [model id columns conditions]
-  (let [pks (model/primary-keys model)]
-    (assert (= (clojure.core/count pks) 1)
-            (format "Cannot build query for model %s from integer %d: expected one primary key, got %s"
-                    (pr-str model) id (pr-str pks)))
-    (let [pk (first pks)]
-      (build-query model {} columns (assoc conditions pk id)))))
+  [model pk columns conditions]
+  (build-query model {} columns (assoc conditions :toucan/pk pk)))
 
 (m/defmulti select-reducible*
   ;; the actual args depend on what [[parse-args]] returns

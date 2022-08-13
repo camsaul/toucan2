@@ -40,7 +40,7 @@
 (m/defmulti update!*
   "The value of `args` depends on what [[parse-args]] returns for the model."
   {:arglists '([model args])}
-  u/dispatch-on-first-two-args)
+  u/dispatch-on-first-arg)
 
 (m/defmethod update!* :around :default
   [model args]
@@ -63,7 +63,7 @@
       0)
     (let [query (build-query model query)]
       (try
-        (let [result (query/execute! (model/default-connectable model) query)]
+        (let [result (query/execute! (model/current-connectable model) query)]
           (or (-> result first :next.jdbc/update-count)
               result))
         (catch Throwable e
