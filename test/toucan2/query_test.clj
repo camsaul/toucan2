@@ -109,6 +109,11 @@
   [connectable f]
   (f connectable))
 
+;;; TODO -- not super happy we can't just use a plain map or arbitrary query here, because it will try to get compiled
+;;; as HoneySQL. There is currently no way to define custom compilation behavior on the basis of the connectable. Not
+;;; sure how this would actually work tho without realizing the connection *first*; that causes its own problems because
+;;; it breaks [[toucan2.tools.identity-query/identity-query]]
+
 (m/defmethod query/reduce-query-with-connection [::not-even-jdbc :default]
   [_connectable [{k :key}] rf init]
   (reduce rf init [{k 1} {k 2} {k 3}]))
