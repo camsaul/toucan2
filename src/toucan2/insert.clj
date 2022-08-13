@@ -55,10 +55,9 @@
 (defn build-query
   "Default way of building queries for the default impl of [[insert!]]."
   [model rows]
-  (let [query {:insert-into [(keyword (model/table-name model))]
-               :values      rows}]
-    (u/println-debug (format "Build insert query: %s" (pr-str query)))
-    query))
+  (u/with-debug-result (pr-str (list `build-query model rows))
+    {:insert-into [(keyword (model/table-name model))]
+     :values      rows}))
 
 (def ^:dynamic *result-type*
   "Type of results we want when inserting something. Either `:reducible` for reducible results, or `:row-count` for the

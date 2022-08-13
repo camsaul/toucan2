@@ -3,9 +3,11 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.compile :as compile]
    [toucan2.model :as model]
-   [toucan2.util :as u]
-   [toucan2.realize :as realize]))
+   [toucan2.query :as query]
+   [toucan2.realize :as realize]
+   [toucan2.util :as u]))
 
 (m/defmulti parse-args
   {:arglists '([model args])}
@@ -29,6 +31,48 @@
       (seq (:conditions parsed)) (update :conditions (fn [conditions]
                                                        (into {} (map (juxt :k :v)) conditions))))))
 
+;;; TODO -- consider whether this needs to be a multimethod, or should just be a function like it is for update and
+;;; insert.
+(m/defmulti build-query
+  {:arglists '([model query columns conditions])}
+  u/dispatch-on-first-two-args)
+
+(m/defmethod build-query :around :default
+  [model query columns conditions]
+  (u/with-debug-result (pr-str (list `build-query model query columns conditions))
+    (next-method model query columns conditions)))
+
+(m/defmethod build-query :default
+  [model query columns conditions]
+  (when (or (seq columns)
+            (seq conditions))
+    (throw (ex-info (format (str "Don't know how to build select query for %s from query ^%s %s with columns or "
+                                 "conditions. Do you need to implement build-query for %s?")
+                            (pr-str model)
+                            (some-> query class .getCanonicalName)
+                            (pr-str query)
+                            (pr-str (u/dispatch-on-first-two-args model query)))
+                    {:model model, :query query, :columns columns, :conditions conditions})))
+  query)
+
+(m/defmethod build-query [:default clojure.lang.IPersistentMap]
+  [model query columns conditions]
+  (let [honeysql (merge {:select (or (not-empty columns)
+                                     [:*])}
+                        (when model
+                          {:from [[(keyword (model/table-name model))]]})
+                        query)]
+    (compile/apply-conditions model honeysql conditions)))
+
+(m/defmethod build-query [:default Long]
+  [model id columns conditions]
+  (let [pks (model/primary-keys model)]
+    (assert (= (clojure.core/count pks) 1)
+            (format "Cannot build query for model %s from integer %d: expected one primary key, got %s"
+                    (pr-str model) id (pr-str pks)))
+    (let [pk (first pks)]
+      (build-query model {} columns (assoc conditions pk id)))))
+
 (m/defmulti select-reducible*
   ;; the actual args depend on what [[parse-args]] returns
   {:arglists '([model columns args])}
@@ -36,9 +80,9 @@
 
 (m/defmethod select-reducible* :default
   [model columns {:keys [conditions query], :as _args}]
-  (let [query       (model/build-select-query model query columns conditions)
+  (let [query       (build-query model query columns conditions)
         connectable (model/default-connectable model)]
-    (model/reducible-query-as connectable model query)))
+    (query/reducible-query-as connectable model query)))
 
 (defn select-reducible [modelable & args]
   {:arglists '([modelable & conditions? query?]

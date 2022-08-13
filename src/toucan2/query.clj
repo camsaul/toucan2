@@ -7,7 +7,8 @@
    [toucan2.current :as current]
    [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.realize :as realize]
-   [toucan2.util :as u]))
+   [toucan2.util :as u]
+   [toucan2.model :as model]))
 
 (m/defmulti reduce-query
   {:arglists '([connection compiled-query rf init])}
@@ -78,6 +79,26 @@
            (throw (ex-info (format "Error executing query: %s" (ex-message e))
                            {:query compiled-query}
                            e))))))))
+
+(defrecord ReducibleQueryAs [connectable modelable query]
+  clojure.lang.IReduceInit
+  (reduce [_this rf init]
+    (model/with-model [_model modelable]
+      (reduce rf init (reducible-query connectable query))
+      #_(binding [query/*jdbc-options* (merge
+                                        {:builder-fn (instance/instance-result-set-builder model)}
+                                        query/*jdbc-options*)]
+          (reduce rf init (query/reducible-query connectable query)))))
+
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `reducible-query-as connectable modelable query)))
+
+(defn reducible-query-as [connectable modelable query]
+  (->ReducibleQueryAs connectable modelable query))
+
+(defn query-as [connectable modelable query]
+  (realize/realize (reducible-query-as connectable modelable query)))
 
 ;; TODO
 

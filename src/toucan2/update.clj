@@ -3,6 +3,7 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.compile :as compile]
    [toucan2.model :as model]
    [toucan2.query :as query]
    [toucan2.util :as u]))
@@ -48,12 +49,11 @@
 
 (defn build-query
   "Default way of building queries for the default impl of [[update!*]]."
-  [model {:keys [conditions changes]}]
-  (let [honeysql {:update [(keyword (model/table-name model))]
-                  :set    changes}
-        query    (model/apply-conditions model honeysql conditions)]
-    (u/println-debug (format "Built update query: %s" (pr-str query)))
-    query))
+  [model {:keys [conditions changes], :as args}]
+  (u/with-debug-result (pr-str (list `build-query model args))
+    (let [honeysql {:update [(keyword (model/table-name model))]
+                    :set    changes}]
+      (compile/apply-conditions model honeysql conditions))))
 
 (m/defmethod update!* :default
   [model {:keys [changes], :as query}]
