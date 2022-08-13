@@ -33,8 +33,9 @@
 (m/defmethod do-with-connection :toucan/default
   [_connectable _f]
   ;; TODO -- link to appropriate documentation page online in the error once we actually have dox.
-  (throw (ex-info (format "No default Toucan connection defined. You can define one by implementing %s for :toucan/default."
-                          `do-with-connection)
+  (throw (ex-info (format "No default Toucan connection defined. You can define one by implementing %s for :toucan/default. You can also implement %s for a model."
+                          `do-with-connection
+                          'toucan2.model/default-connectable)
                   {})))
 
 (m/defmethod do-with-connection java.sql.Connection
