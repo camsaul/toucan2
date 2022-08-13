@@ -1,9 +1,4 @@
-(ns toucan2.tools.identity-query
-  #_(:require [methodical.core :as m]
-            [toucan2.build-query :as build-query]
-            [toucan2.compile :as compile]
-            [toucan2.query :as query]
-            [toucan2.util :as u]))
+(ns toucan2.tools.identity-query)
 
 ;; (derive :toucan2/identity-query :toucan2/query)
 

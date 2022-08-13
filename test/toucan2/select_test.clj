@@ -6,7 +6,8 @@
    [toucan2.instance :as instance]
    [clojure.string :as str]
    [methodical.core :as m]
-   [toucan2.model :as model])
+   [toucan2.model :as model]
+   [toucan2.compile :as compile])
   (:import java.time.OffsetDateTime))
 
 (derive ::people ::test/people)
@@ -29,6 +30,52 @@
     (testing `(select/parse-args :default ~args)
       (is (= expected
              (select/parse-args :default args))))))
+
+(deftest ^:parallel default-build-query-test
+  (is (= {:select [:*]
+          :from   [[:default]]}
+         (select/build-query :default {} nil nil)))
+  (testing "don't override existing"
+    (is (= {:select [:a :b]
+            :from   [[:my_table]]}
+           (select/build-query :default {:select [:a :b], :from [[:my_table]]} nil nil))))
+  (testing "columns"
+    (is (= {:select [:a :b]
+            :from   [[:default]]}
+           (select/build-query :default {} [:a :b] nil)))
+    (testing "existing"
+      (is (= {:select [:a]
+              :from   [[:default]]}
+             (select/build-query :default {:select [:a]} [:a :b] nil)))))
+  (testing "conditions"
+    (is (= {:select [:*]
+            :from   [[:default]]
+            :where  [:= :id 1]}
+           (select/build-query :default {} nil {:id 1})))
+    (testing "merge with existing"
+      (is (= {:select [:*]
+              :from   [[:default]]
+              :where  [:and [:= :a :b] [:= :id 1]]}
+             (select/build-query :default {:where [:= :a :b]} nil {:id 1}))))))
+
+(m/defmethod compile/apply-condition [:default clojure.lang.IPersistentMap ::custom.limit]
+  [_model honeysql-form _k limit]
+  (assoc honeysql-form :limit limit))
+
+(deftest custom-condition-test
+  (is (= {:select [:*]
+          :from   [[:default]]
+          :limit  100}
+         (select/build-query :default {} nil {::custom.limit 100})
+         (select/build-query :default {:limit 1} nil {::custom.limit 100}))))
+
+(deftest built-in-pk-condition-test
+  (is (= {:select [:*], :from [[:default]], :where [:= :id 1]}
+         (select/build-query :default {} nil {:toucan2/pk 1})))
+  (is (= {:select [:*], :from [[:default]], :where [:and
+                                                    [:= :name "Cam"]
+                                                    [:= :id 1]]}
+         (select/build-query :default {:where [:= :name "Cam"]} nil {:toucan2/pk 1}))))
 
 (deftest select-test
   (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]]
@@ -144,7 +191,7 @@
 (derive ::people.limit-2 ::people)
 
 ;; TODO this is probably not the way you'd want to accomplish this in real life -- I think you'd probably actually want
-;; to implement [[toucan2.model/build-select-query]] for `[::people.limit-2 clojure.lang.IPersistentMap]` instead. But
+;; to implement [[toucan2.select/build-query]] for `[::people.limit-2 clojure.lang.IPersistentMap]` instead. But
 ;; it does do a good job of letting us test that combining aux methods work like we'd expect.
 (m/defmethod select/select-reducible* :before ::people.limit-2
   [_model _columns {:keys [query], :as args}]

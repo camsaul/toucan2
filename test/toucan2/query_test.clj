@@ -2,12 +2,13 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.compile :as compile]
    [toucan2.connection :as conn]
    [toucan2.current :as current]
+   [toucan2.instance :as instance]
    [toucan2.query :as query]
    [toucan2.realize :as realize]
-   [toucan2.test :as test]
-   [toucan2.compile :as compile])
+   [toucan2.test :as test])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -93,6 +94,17 @@
     (binding [current/*connection* ::test/db]
       (is (= {:count 4}
              (query/query-one "SELECT count(*) FROM people;"))))))
+
+(deftest reducible-query-as-test
+  (is (= [(instance/instance :people {:id 1, :name "Cam", :created-at (java.time.OffsetDateTime/parse "2020-04-21T23:56Z")})]
+         (realize/realize (query/reducible-query-as ::test/db :people "SELECT * FROM people WHERE id = 1;")))))
+
+(deftest query-as-test
+  (is (= [(instance/instance :people {:id 1, :name "Cam"})
+          (instance/instance :people {:id 2, :name "Sam"})
+          (instance/instance :people {:id 3, :name "Pam"})
+          (instance/instance :people {:id 4, :name "Tam"})]
+         (query/query-as ::test/db :people {:select [:id :name], :from [:people]}))))
 
 (m/defmethod conn/do-with-connection ::not-even-jdbc
   [connectable f]
