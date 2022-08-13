@@ -110,7 +110,7 @@
 ;;         pk               (update :pk transform-pk connectable tableable transforms)))
 ;;     args))
 
-;; (m/defmethod select/parse-select-args* :after [:default :toucan2/transformed]
+;; (m/defmethod select/parse-select-args* :after [:default :toucan/transformed]
 ;;   [connectable tableable args options]
 ;;   (apply-in-transforms connectable tableable args options))
 
@@ -153,11 +153,11 @@
 ;;        reducible-query))
 ;;     reducible-query))
 
-;; (m/defmethod select/select* :after [:default :toucan2/transformed :default]
+;; (m/defmethod select/select* :after [:default :toucan/transformed :default]
 ;;   [connectable tableable reducible-query options]
 ;;   (transform-results connectable tableable reducible-query options))
 
-;; (m/defmethod mutative/parse-update!-args* :after [:default :toucan2/transformed]
+;; (m/defmethod mutative/parse-update!-args* :after [:default :toucan/transformed]
 ;;   [connectable tableable args options]
 ;;   (if-let [transforms (in-transforms connectable tableable options)]
 ;;     (log/with-trace ["Apply %s transforms to %s" transforms args]
@@ -178,14 +178,14 @@
 ;;         row-xform (apply comp row-xforms)]
 ;;     (map row-xform rows)))
 
-;; (m/defmethod mutative/parse-insert!-args* :after [:default :toucan2/transformed]
+;; (m/defmethod mutative/parse-insert!-args* :after [:default :toucan/transformed]
 ;;   [connectable tableable {:keys [rows], :as args} options]
 ;;   (if-let [transforms (in-transforms connectable tableable options)]
 ;;     (log/with-trace ["Apply %s transforms to %s" transforms rows]
 ;;       (update args :rows transform-insert-rows transforms))
 ;;     args))
 
-;; (m/defmethod mutative/insert!* :after [:default :toucan2/transformed :default]
+;; (m/defmethod mutative/insert!* :after [:default :toucan/transformed :default]
 ;;   [connectable tableable results options]
 ;;   (if (integer? results)
 ;;     results

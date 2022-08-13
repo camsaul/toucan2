@@ -9,15 +9,15 @@
   (:import java.time.LocalDateTime))
 
 (deftest ^:parallel parse-update-args-test
-  (is (= {:changes {:a 1}, :conditions {:toucan2/pk 1}}
+  (is (= {:changes {:a 1}, :conditions {:toucan/pk 1}}
          (update/parse-args nil [1 {:a 1}])))
   (is (= {:conditions {:id 1}, :changes {:a 1}}
          (update/parse-args nil [:id 1 {:a 1}])))
   (testing "composite PK"
-    (is (= {:changes {:a 1}, :conditions {:toucan2/pk [1 2]}}
+    (is (= {:changes {:a 1}, :conditions {:toucan/pk [1 2]}}
            (update/parse-args nil [[1 2] {:a 1}]))))
   (testing "key-value conditions"
-    (is (= {:conditions {:name "Cam", :toucan2/pk 1}, :changes {:a 1}}
+    (is (= {:conditions {:name "Cam", :toucan/pk 1}, :changes {:a 1}}
            (update/parse-args nil [1 :name "Cam" {:a 1}]))))
   (is (= {:changes {:name "Hi-Dive"}, :conditions {:id 1}}
          (update/parse-args nil [{:id 1} {:name "Hi-Dive"}]))))

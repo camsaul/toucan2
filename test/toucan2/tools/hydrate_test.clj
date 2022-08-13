@@ -13,7 +13,7 @@
 
 (derive ::venues.category-keyword ::venues)
 ;; TODO
-#_(derive ::venues.category-keyword :toucan2/transformed)
+#_(derive ::venues.category-keyword :toucan/transformed)
 
 (derive ::people ::test/people)
 

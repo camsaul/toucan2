@@ -21,7 +21,7 @@
 ;;   "venues")
 
 ;; (derive ::transformed-venues ::venues)
-;; (derive ::transformed-venues :toucan2/transformed)
+;; (derive ::transformed-venues :toucan/transformed)
 
 ;; (m/defmethod transformed/transforms* [:default ::transformed-venues]
 ;;   [_ _ _]

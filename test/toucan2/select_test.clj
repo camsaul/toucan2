@@ -71,11 +71,11 @@
 
 (deftest built-in-pk-condition-test
   (is (= {:select [:*], :from [[:default]], :where [:= :id 1]}
-         (select/build-query :default {} nil {:toucan2/pk 1})))
+         (select/build-query :default {} nil {:toucan/pk 1})))
   (is (= {:select [:*], :from [[:default]], :where [:and
                                                     [:= :name "Cam"]
                                                     [:= :id 1]]}
-         (select/build-query :default {:where [:= :name "Cam"]} nil {:toucan2/pk 1}))))
+         (select/build-query :default {:where [:= :name "Cam"]} nil {:toucan/pk 1}))))
 
 (deftest select-test
   (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]]
@@ -143,14 +143,14 @@
 (deftest select-non-integer-pks-test
   (testing "non-integer PK"
     (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
-           (select/select ::people.name-is-pk :toucan2/pk "Cam"))))
+           (select/select ::people.name-is-pk :toucan/pk "Cam"))))
 
   (testing "composite PK"
     (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
-           (select/select ::people.composite-pk :toucan2/pk [1 "Cam"])))
+           (select/select ::people.composite-pk :toucan/pk [1 "Cam"])))
     (is (= []
-           (select/select ::people.composite-pk :toucan2/pk [2 "Cam"])
-           (select/select ::people.composite-pk :toucan2/pk [1 "Sam"])))))
+           (select/select ::people.composite-pk :toucan/pk [2 "Cam"])
+           (select/select ::people.composite-pk :toucan/pk [1 "Sam"])))))
 
 (derive ::people.no-timestamps ::people)
 
@@ -367,7 +367,7 @@
 
 #_(deftest dont-add-from-if-it-already-exists-test
   (testing "Select shouldn't add a :from clause if one is passed in explicitly already"
-    (is (= (instance/instance :toucan2.select-test/people {:id 1})
+    (is (= (instance/instance ::people {:id 1})
            (select/select-one ::people {:select [:p.id], :from [[::people :p]], :where [:= :p.id 1]})))
     (is (= ["SELECT p.id FROM people p WHERE p.id = ?" 1]
            (query/compiled
