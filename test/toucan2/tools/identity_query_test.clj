@@ -40,3 +40,8 @@
 (deftest select-fn-test
   (is (= #{"Parroty" "Green Friend"}
          (select/select-fn-set :name ::birb parrot-query))))
+
+(deftest select-one-test
+  (is (= [(instance/instance ::venues {:id 1, :name "No Category", :category nil})]
+         (select/select ::venues (identity-query/identity-query
+                                  [{:id 1, :name "No Category", :category nil}])))))
