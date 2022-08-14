@@ -7,7 +7,8 @@
 
   :unresolved-symbol
   {:exclude
-   [->kebab-case]}}
+   [->kebab-case
+    (toucan2.tools.transformed-test/test-both-normal-and-magic-keys)]}}
 
  :lint-as
  {methodical.core/defmulti                  clojure.core/defmulti
@@ -22,7 +23,10 @@
   toucan2.query/with-query                  clojure.core/let}
 
  :hooks
- {:macroexpand
-  {methodical.core/defmethod macros.methodical.core/defmethod}}
+ {:analyze-call
+  {methodical.core/defmethod hooks.methodical.core/defmethod}
+
+  :macroexpand
+  {}}
 
  :skip-comments true}

@@ -54,12 +54,12 @@
     "('BevMo', 'store');"]])
 
 (defn- create-table! [^java.sql.Connection conn table-name]
-  (let [#_start-time-ms #_(System/currentTimeMillis)]
-    (doseq [^String sql (create-table-statements table-name)]
-      #_(println sql)
-      (with-open [stmt (.createStatement conn)]
-        (.execute stmt sql)))
-    #_(printf "✔ done in %d ms\n\n" (- (System/currentTimeMillis) start-time-ms))))
+  #_(let [start-time-ms (System/currentTimeMillis)])
+  (doseq [^String sql (create-table-statements table-name)]
+    #_(println sql)
+    (with-open [stmt (.createStatement conn)]
+      (.execute stmt sql)))
+  #_(printf "✔ done in %d ms\n\n" (- (System/currentTimeMillis) start-time-ms)))
 
 (defn do-with-discarded-table-changes [table-name thunk]
   (try

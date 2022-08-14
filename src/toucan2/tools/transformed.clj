@@ -91,8 +91,8 @@
                                                  (pr-str model)
                                                  (pr-str k)
                                                  (pr-str v)
-                                                 (ex-message e)
-                                                 {:model model, :k k, :v v, :xform xform})
+                                                 (ex-message e))
+                                         {:model model, :k k, :v v, :xform xform}
                                          e)))))])))))
 
 (defn in-transforms [model]

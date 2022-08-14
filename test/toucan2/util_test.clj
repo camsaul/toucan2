@@ -9,8 +9,6 @@
            not-empty
            str/split-lines))
 
-(defmacro ^:private println-debug [& args])
-
 (deftest println-debug-test
   (testing "debugging disabled"
     (let [evaled? (atom false)]
