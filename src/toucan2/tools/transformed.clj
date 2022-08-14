@@ -1,6 +1,7 @@
 (ns toucan2.tools.transformed
   (:require
    [methodical.core :as m]
+   [toucan2.delete :as delete]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
@@ -113,6 +114,10 @@
   [_query-type model args]
   (apply-in-transforms model args))
 
+(m/defmethod query/parse-args :after [::delete/delete ::transformed]
+  [_query-type model args]
+  (apply-in-transforms model args))
+
 (defn apply-row-transform [instance k xform]
   ;; The "Special Optimizations" below *should* be the default case, but if some other aux methods are in place or
   ;; custom impls it might not be; things should still work normally either way.
@@ -130,9 +135,9 @@
      ;; TODO FIXME -- need to copy over the magic result-row code from the old Toucan 2 codebase or figure out a
      ;; different way to get this magical optimization.
      #_(if-let [thunks (result-row/thunks row)]
-       (result-row/with-thunks row (update thunks k (fn [thunk]
+         (result-row/with-thunks row (update thunks k (fn [thunk]
                                                         (comp xform thunk))))
-       (update row k xform))
+         (update row k xform))
      (update row k xform))))
 
 (defn out-transforms [model]
