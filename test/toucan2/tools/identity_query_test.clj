@@ -32,7 +32,7 @@
           (instance/instance ::parrot {:id 2, :name "Green Friend"})]
          (select/select ::parrot ::parrot-query))))
 
-(deftest select-test
+(deftest select-test-2
   (is (= [(instance/instance ::birb {:id 1, :name "Parroty"})
           (instance/instance ::birb {:id 2, :name "Green Friend"})]
          (select/select ::birb parrot-query))))
