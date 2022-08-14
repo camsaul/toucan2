@@ -9,7 +9,8 @@
    [toucan2.test :as test]
    [toucan2.tools.helpers :as helpers]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update])
+   [toucan2.update :as update]
+   [toucan2.tools.identity-query :as identity-query])
   (:import
    (java.time LocalDateTime)))
 
@@ -263,30 +264,28 @@
             (is (= []
                    (select/select ::transformed-venues category-key :bar))))))))
 
-;; TODO
-#_(deftest no-npes-test
-    (testing "Don't apply transforms to values that are nil (avoid NPEs)"
-      (testing "in"
-        (testing "insert rows"
-          (test/with-discarded-table-changes :venues
-            ;; this should still throw an error, but it shouldn't be an NPE from the transform.
-            (is (thrown-with-msg?
-                 clojure.lang.ExceptionInfo
-                 #"ERROR: null value in column .* violates not-null constraint"
-                 (insert/insert! ::transformed-venues {:name "No Category", :category nil})))))
-        (testing "conditions"
-          (is (= nil
-                 (select/select-one ::transformed-venues :category nil)))))
-      (testing "out"
-        (let [instance (select/select-one ::transformed-venues (identity-query/identity-query
-                                                                [{:id 1, :name "No Category", :category nil}]))]
-          (is (= {:id 1, :name "No Category", :category nil}
-                 instance))))))
+(deftest no-npes-test
+  (testing "Don't apply transforms to values that are nil (avoid NPEs)"
+    (testing "in"
+      (testing "insert rows"
+        (test/with-discarded-table-changes :venues
+          ;; this should still throw an error, but it shouldn't be an NPE from the transform.
+          (is (thrown-with-msg?
+               clojure.lang.ExceptionInfo
+               #"ERROR: null value in column .* violates not-null constraint"
+               (insert/insert! ::transformed-venues {:name "No Category", :category nil})))))
+      (testing "conditions"
+        (is (= nil
+               (select/select-one ::transformed-venues :category nil)))))
+    (testing "out"
+      (let [instance (select/select-one ::transformed-venues (identity-query/identity-query
+                                                              [{:id 1, :name "No Category", :category nil}]))]
+        (is (= {:id 1, :name "No Category", :category nil}
+               instance))))))
 
 (derive ::venues-transform-in-only ::test/venues)
 (derive ::venues-transform-out-only ::test/venues)
 
-;; TODO
 (helpers/deftransforms ::venues-transform-in-only
   {:category {:in name}})
 
