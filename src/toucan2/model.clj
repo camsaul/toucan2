@@ -36,11 +36,9 @@
                                `current/*connection*
                                (pr-str current/*connection*))
     (if (= current/*connection* :toucan/default)
-      (do
-        (u/println-debug "Current connection is default; using %s for model" `default-connectable)
+      (u/with-debug-result (format "Current connection is default; using %s for model" `default-connectable)
         (default-connectable model))
-      (do
-        (u/println-debug "Current connection is *NOT* default. Using that")
+      (u/with-debug-result "Current connection is *NOT* default. Using that"
         current/*connection*))))
 
 (defrecord DeferredCurrentConnectable [model]

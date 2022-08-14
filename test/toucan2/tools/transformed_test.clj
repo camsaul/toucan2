@@ -2,14 +2,16 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.delete :as delete]
+   [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.select :as select]
    [toucan2.test :as test]
-   [toucan2.tools.transformed :as transformed]
    [toucan2.tools.helpers :as helpers]
-   [toucan2.update :as update]
-   [toucan2.insert :as insert])
-  (:import java.time.LocalDateTime))
+   [toucan2.tools.transformed :as transformed]
+   [toucan2.update :as update])
+  (:import
+   (java.time LocalDateTime)))
 
 (derive ::transformed-venues ::test/venues)
 (derive ::transformed-venues ::transformed/transformed)
@@ -238,27 +240,26 @@
         (is (= ["4"]
                (insert/insert-returning-keys! ::transformed-venues-id-is-string [{:name "Hi-Dive", category-key "bar"}])))))))
 
-;; TODO
-#_(deftest delete!-test
+(deftest delete!-test
     (testing "Delete row by PK"
       (test/with-discarded-table-changes :venues
         (is (= 1
-               (mutative/delete! ::transformed-venues-id-is-string "1")))
+               (delete/delete! ::transformed-venues-id-is-string :toucan/pk "1")))
         (is (= []
-               (select/select :venues 1)))
+               (select/select ::test/venues 1)))
         (is (= #{2}
-               (select/select-fn-set :id :venues 2)))))
+               (select/select-fn-set :id ::test/venues 2)))))
     (test-both-normal-and-magic-keys [category-key]
       (testing "Delete row by key-value conditions"
         (test/with-discarded-table-changes :venues
           (is (= 2
-                 (mutative/delete! ::transformed-venues category-key :bar)))
+                 (delete/delete! ::transformed-venues category-key :bar)))
           (is (= []
                  (select/select ::transformed-venues category-key :bar))))
         (testing "Toucan-style fn-args vector"
           (test/with-discarded-table-changes :venues
             (is (= 2
-                   (mutative/delete! ::transformed-venues category-key [:in [:bar]])))
+                   (delete/delete! ::transformed-venues category-key [:in [:bar]])))
             (is (= []
                    (select/select ::transformed-venues category-key :bar))))))))
 
