@@ -4,11 +4,10 @@
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.update :as update]
-   [toucan2.util :as u]
-   [toucan2.query :as query]
-   [toucan2.execute :as execute]))
+   [toucan2.util :as u]))
 
 (m/defmulti transforms*
   {:arglists '([model])}
@@ -110,7 +109,7 @@
         (some? (:toucan/pk kv-args)) (update-in [:kv-args :toucan/pk] transform-pk model transforms)))
     args))
 
-(m/defmethod query/parse-args :after [::select/select :toucan/transformed]
+(m/defmethod query/parse-args :after [::select/select ::transformed]
   [_query-type model args]
   (apply-in-transforms model args))
 
@@ -157,12 +156,12 @@
        reducible-query))
     reducible-query))
 
-(m/defmethod select/select-reducible* :around [:toucan/transformed :default]
+(m/defmethod select/select-reducible* :around [::transformed :default]
   [model parsed-args]
   (let [reducible-query (next-method model parsed-args)]
     (transform-results model reducible-query)))
 
-(m/defmethod query/build :before [::update/update :toucan/transformed :default]
+(m/defmethod query/build :before [::update/update ::transformed :default]
   [_query-type model {:keys [query], :as args}]
   (if-let [transforms (not-empty (in-transforms model))]
     (u/with-debug-result (format "Apply %s transforms to %s" transforms args)
@@ -186,14 +185,14 @@
         row-xform (apply comp row-xforms)]
     (map row-xform rows)))
 
-(m/defmethod query/parse-args :after [::insert/insert :toucan/transformed]
-  [_query-type model {:keys [rows], :as args}]
+(m/defmethod query/parse-args :after [::insert/insert ::transformed]
+  [_query-type model rows]
   (if-let [transforms (in-transforms model)]
     (u/with-debug-result (format "Apply %s transforms to %s" transforms rows)
-      (update args :rows transform-insert-rows transforms))
-    args))
+      (transform-insert-rows rows transforms))
+    rows))
 
-(m/defmethod insert/insert!* :after :toucan/transformed :default
+(m/defmethod insert/insert!* :after ::transformed :default
   [model results]
   (if (integer? results)
     results

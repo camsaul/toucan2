@@ -28,26 +28,48 @@
 (m/defmulti build
   "Dispatches on `query-type`, `model`, and the `:query` in `args`."
   {:arglists '([query-type model args])}
-  (fn [query-type model {:keys [query], :as _args}]
-    (mapv u/dispatch-value [query-type model query])))
+  (fn [query-type model args]
+    (mapv u/dispatch-value [query-type
+                            model
+                            (when (map? args)
+                              (:query args))])))
 
 (m/defmethod build :around :default
   [query-type model args]
-  (u/with-debug-result (pr-str (list `build query-type model args))
-    (next-method query-type model args)))
+  (try
+    (u/with-debug-result (pr-str (list `build query-type model args))
+      (next-method query-type model args))
+    (catch Throwable e
+      (throw (ex-info (format "Error building %s query for model %s: %s"
+                              (pr-str query-type)
+                              (pr-str model)
+                              (ex-message e))
+                      {:query-type     query-type
+                       :model          model
+                       :args           args
+                       :method #'build
+                       :dispatch-value (m/dispatch-value build query-type model args)}
+                      e)))))
 
 (m/defmethod build :default
   [query-type model args]
-  (throw (ex-info (format "Don't know how to build a %s query for %s from args %s. Do you need to implement %s for %s?"
-                          (pr-str query-type)
-                          (pr-str model)
+  (throw (ex-info (format "Don't know how to build a query from args %s. Do you need to implement %s for %s?"
                           (pr-str args)
                           `build
                           (pr-str (m/dispatch-value build query-type model args)))
-                  {:query-type query-type, :model model, :args args})))
+                  {:query-type     query-type
+                   :model          model
+                   :args           args
+                   :method         #'build
+                   :dispatch-value (m/dispatch-value build query-type model args)})))
 
 (m/defmethod build [:default :default nil]
   [query-type model args]
+  (assert (map? args)
+          (format "Default %s method expects map args, got %s. If you want to use non-map args, implement a method for %s"
+                  `build
+                  (pr-str args)
+                  (pr-str (m/dispatch-value build query-type model args))))
   (build query-type model (assoc args :query {})))
 
 (m/defmethod build [:default :default Long]
@@ -65,7 +87,11 @@
   [query-type model {sql-args :query, :keys [kv-args], :as args}]
   (when (seq kv-args)
     (throw (ex-info "key-value args are not supported for plain SQL queries."
-                    {:query-type query-type, :model model, :args args})))
+                    {:query-type     query-type
+                     :model          model
+                     :args           args
+                     :method         #'build
+                     :dispatch-value (m/dispatch-value build query-type model args)})))
   sql-args)
 
 ;;;; Default [[build]] impl for maps; applying key-value args.

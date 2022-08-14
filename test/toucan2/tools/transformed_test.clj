@@ -6,10 +6,13 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update]))
+   [toucan2.tools.helpers :as helpers]
+   [toucan2.update :as update]
+   [toucan2.insert :as insert])
+  (:import java.time.LocalDateTime))
 
 (derive ::transformed-venues ::test/venues)
-(derive ::transformed-venues :toucan/transformed)
+(derive ::transformed-venues ::transformed/transformed)
 
 (m/defmethod transformed/transforms* ::transformed-venues
   [_model]
@@ -194,47 +197,46 @@
           (is (= {:id         1
                   :name       "Tempest"
                   :category   :dive-bar
-                  :created-at (t/local-date-time "2017-01-01T00:00")
-                  :updated-at (t/local-date-time  "2017-01-01T00:00")}
+                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                  :updated-at (LocalDateTime/parse  "2017-01-01T00:00")}
                  (mutative/save! (assoc venue category-key :dive-bar))))
           (is (= {:id         1
                   :name       "Tempest"
                   :category   :dive-bar
-                  :created-at (t/local-date-time "2017-01-01T00:00")
-                  :updated-at (t/local-date-time "2017-01-01T00:00")}
+                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
                  (select/select-one ::transformed-venues 1)))))))
 
-;; TODO
-#_(deftest insert!-test
-    (test-both-normal-and-magic-keys [category-key]
-      (testing "single map row"
-        (test/with-discarded-table-changes :venues
-          (is (= 1
-                 (insert/insert! ::transformed-venues {:name "Hi-Dive", category-key :bar})))
-          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-                 (select/select-fn-set :name ::transformed-venues category-key :bar)))))
-      (testing "multiple map rows"
-        (test/with-discarded-table-changes :venues
-          (is (= 1
-                 (insert/insert! ::transformed-venues [{:name "Hi-Dive", category-key :bar}])))
-          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-                 (select/select-fn-set :name ::transformed-venues category-key :bar)))))
-      (testing "kv args"
-        (test/with-discarded-table-changes :venues
-          (is (= 1
-                 (insert/insert! ::transformed-venues :name "Hi-Dive", category-key :bar)))
-          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-                 (select/select-fn-set :name ::transformed-venues category-key :bar)))))
-      (testing "columns + vector rows"
-        (test/with-discarded-table-changes :venues
-          (is (= 1
-                 (insert/insert! ::transformed-venues [:name category-key] [["Hi-Dive" :bar]])))
-          (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-                 (select/select-fn-set :name ::transformed-venues category-key :bar)))))
-      (testing "returning-keys"
-        (test/with-discarded-table-changes :venues
-          (is (= ["4"]
-                 (insert/insert-returning-keys! ::transformed-venues-id-is-string [{:name "Hi-Dive", category-key "bar"}])))))))
+(deftest insert!-test
+  (test-both-normal-and-magic-keys [category-key]
+    (testing "single map row"
+      (test/with-discarded-table-changes :venues
+        (is (= 1
+               (insert/insert! ::transformed-venues {:name "Hi-Dive", category-key :bar})))
+        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+               (select/select-fn-set :name ::transformed-venues category-key :bar)))))
+    (testing "multiple map rows"
+      (test/with-discarded-table-changes :venues
+        (is (= 1
+               (insert/insert! ::transformed-venues [{:name "Hi-Dive", category-key :bar}])))
+        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+               (select/select-fn-set :name ::transformed-venues category-key :bar)))))
+    (testing "kv args"
+      (test/with-discarded-table-changes :venues
+        (is (= 1
+               (insert/insert! ::transformed-venues :name "Hi-Dive", category-key :bar)))
+        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+               (select/select-fn-set :name ::transformed-venues category-key :bar)))))
+    (testing "columns + vector rows"
+      (test/with-discarded-table-changes :venues
+        (is (= 1
+               (insert/insert! ::transformed-venues [:name category-key] [["Hi-Dive" :bar]])))
+        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+               (select/select-fn-set :name ::transformed-venues category-key :bar)))))
+    (testing "returning-keys"
+      (test/with-discarded-table-changes :venues
+        (is (= ["4"]
+               (insert/insert-returning-keys! ::transformed-venues-id-is-string [{:name "Hi-Dive", category-key "bar"}])))))))
 
 ;; TODO
 #_(deftest delete!-test
@@ -280,17 +282,17 @@
           (is (= {:id 1, :name "No Category", :category nil}
                  instance))))))
 
-#_(derive ::venues-transform-in-only ::venues)
-#_(derive ::venues-transform-out-only ::venues)
+(derive ::venues-transform-in-only ::test/venues)
+(derive ::venues-transform-out-only ::test/venues)
 
 ;; TODO
-#_(helpers/deftransforms ::venues-transform-in-only
-    {:category {:in name}})
+(helpers/deftransforms ::venues-transform-in-only
+  {:category {:in name}})
 
-#_(helpers/deftransforms ::venues-transform-out-only
+(helpers/deftransforms ::venues-transform-out-only
   {:category {:out keyword}})
 
-#_(deftest one-way-transforms-test
+(deftest one-way-transforms-test
   (testing "Transforms should still work if you only specify `:in` or only specify `:out`"
     (testing "in"
       (testing "insert rows"
@@ -306,6 +308,6 @@
               {:id         3
                :name       "BevMo"
                :category   "store"
-               :created-at (t/local-date-time "2017-01-01T00:00")
-               :updated-at (t/local-date-time "2017-01-01T00:00")})
+               :created-at (LocalDateTime/parse "2017-01-01T00:00")
+               :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
              (select/select-one ::venues-transform-in-only :category :store))))))

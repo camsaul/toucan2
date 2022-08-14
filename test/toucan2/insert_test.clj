@@ -35,9 +35,12 @@
            (query/parse-args ::insert/insert nil [[:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]])))))
 
 (deftest build-query-test
-  (is (= {:insert-into [:venues]
-          :values      [{:name "Grant & Green", :category "bar"}]}
-         (query/build ::insert/insert ::test/venues [{:name "Grant & Green", :category "bar"}]))))
+  (doseq [rows-fn [list vector]
+          :let    [rows (rows-fn {:name "Grant & Green", :category "bar"})]]
+    (testing (pr-str (list `query/build ::insert/insert ::test/venues rows))
+      (is (= {:insert-into [:venues]
+              :values      [{:name "Grant & Green", :category "bar"}]}
+             (query/build ::insert/insert ::test/venues rows))))))
 
 (defn- do-both-types-of-insert [f]
   (testing "Should be no Venue 4 yet"
@@ -65,25 +68,29 @@
               (select/select-one ::test/venues 4)))))))
 
 (deftest multiple-rows-test
-  (do-both-types-of-insert
-   (fn [returning-keys? insert!]
-     (is (= (if returning-keys?
-              [4 5]
-              2)
-            (insert! ::test/venues [{:name "Black Horse London Pub", :category "bar"}
-                                    {:name "Nick's Crispy Tacos", :category "bar"}])))
-     (testing "Venues 4 and 6 should exist now"
-       (is (= [(instance/instance ::test/venues {:id         4
-                                                 :name       "Black Horse London Pub"
-                                                 :category   "bar"
-                                                 :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-               (instance/instance ::test/venues {:id         5
-                                                 :name       "Nick's Crispy Tacos"
-                                                 :category   "bar"
-                                                 :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
-              (select/select ::test/venues :id [:>= 4] {:order-by [[:id :asc]]})))))))
+  (doseq [rows-fn [#'list #'vector]
+          :let [rows (rows-fn
+                      {:name "Black Horse London Pub", :category "bar"}
+                      {:name "Nick's Crispy Tacos", :category "bar"})]]
+    (testing (format "rows = %s %s\n" rows-fn (pr-str rows))
+      (do-both-types-of-insert
+       (fn [returning-keys? insert!]
+         (is (= (if returning-keys?
+                  [4 5]
+                  2)
+                (insert! ::test/venues rows)))
+         (testing "Venues 4 and 6 should exist now"
+           (is (= [(instance/instance ::test/venues {:id         4
+                                                     :name       "Black Horse London Pub"
+                                                     :category   "bar"
+                                                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                   (instance/instance ::test/venues {:id         5
+                                                     :name       "Nick's Crispy Tacos"
+                                                     :category   "bar"
+                                                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                  (select/select ::test/venues :id [:>= 4] {:order-by [[:id :asc]]})))))))))
 
 (deftest key-values-test
   (do-both-types-of-insert
