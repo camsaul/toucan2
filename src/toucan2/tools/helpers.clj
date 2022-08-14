@@ -1,18 +1,10 @@
 (ns toucan2.tools.helpers
-  #_(:require [clojure.walk :as walk]
-            [methodical.core :as m]
-            [methodical.impl.combo.threaded :as m.combo.threaded]
-            [toucan2.build-query :as build-query]
-            [toucan2.connectable.current :as conn.current]
-            [toucan2.hydrate :as hydrate]
-            [toucan2.instance :as instance]
-            [toucan2.log :as log]
-            [toucan2.mutative :as mutative]
-            [toucan2.realize :as realize]
-            [toucan2.select :as select]
-            [toucan2.tableable :as tableable]
-            [toucan2.tools.transformed :as transformed]
-            [toucan2.util :as u]))
+  (:require [toucan2.tools.transformed :as transformed]))
+
+(defn maybe-derive
+  [child parent]
+  (when-not (isa? child parent)
+    (derive child parent)))
 
 ;; (defn dispatch-value-2 [dispatch-value]
 ;;   (let [{:keys [connectable tableable]}
@@ -350,12 +342,11 @@
 ;;               [~'_ ~'_ ~'_]
 ;;               ~tableable)))))
 
-;; (defmacro deftransforms
-;;   {:style/indent 1}
-;;   [dispatch-value transforms]
-;;   (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
-;;     `(do
-;;        (u/maybe-derive ~tableable :toucan/transformed)
-;;        (m/defmethod transformed/transforms* [~connectable ~tableable]
-;;          [~'&connectable ~'&tableable ~'&options]
-;;          ~transforms))))
+(defmacro deftransforms
+  {:style/indent 1}
+  [model transforms]
+  `(let [model# ~model]
+     (maybe-derive model# ::transformed/transformed)
+     (m/defmethod transformed/transforms* model#
+       [~'&model]
+       ~transforms)))

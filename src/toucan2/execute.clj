@@ -43,6 +43,15 @@
   (fn [_connectable model compiled-query _rf _init]
     [(u/dispatch-value model) (u/dispatch-value compiled-query)]))
 
+(m/defmethod reduce-compiled-query :around :default
+  [connectable model compiled-query rf init]
+  (try
+    (next-method connectable model compiled-query rf init)
+    (catch Throwable e
+      (throw (ex-info (str "Error reducing compiled query: " (ex-message e))
+                      {:model model, :compiled-query compiled-query}
+                      e)))))
+
 (m/defmethod reduce-compiled-query :default
   [connectable model compiled-query rf init]
   (conn/with-connection [conn connectable]
