@@ -1,38 +1,25 @@
 (ns toucan2.tools.helpers-test
-  #_(:require [clojure.test :refer :all]
-            [java-time :as t]
-            [methodical.core :as m]
-            [toucan2.connectable.current :as conn.current]
-            [toucan2.helpers :as helpers]
-            [toucan2.honeysql.compile :as honeysql.compile]
-            [toucan2.instance :as instance]
-            [toucan2.mutative :as mutative]
-            [toucan2.query :as query]
-            [toucan2.select :as select]
-            [toucan2.tableable :as tableable]
-            [toucan2.test :as test]))
+  (:require
+   [clojure.test :refer :all]
+   [toucan2.instance :as instance]
+   [toucan2.select :as select]
+   [toucan2.test :as test]
+   [toucan2.tools.helpers :as helpers]))
 
-;; (use-fixtures :once test/do-with-test-data)
+(derive ::people ::test/people)
 
-;; (m/defmethod tableable/table-name* [:default ::people]
-;;   [_ _ _]
-;;   "people")
+(helpers/define-before-select ::people
+  [args]
+  (assoc args :columns [:id :name]))
 
-;; (m/defmethod conn.current/default-connectable-for-tableable* ::people
-;;   [_ _]
-;;   :test/postgres)
+(helpers/define-after-select-each ::people [person]
+  (assoc person ::after-select? true))
 
-;; (helpers/define-before-select ::people [query]
-;;   (assoc query :select [:id :name]))
-
-;; (helpers/define-after-select ::people [person]
-;;   (assoc person ::after-select? true))
-
-;; (deftest select-helpers-test
-;;   (is (= (instance/instance ::people {:id                                  1
-;;                                       :name                                "Cam"
-;;                                       :toucan2.helpers-test/after-select? true})
-;;          (select/select-one ::people 1))))
+(deftest select-helpers-test
+  (is (= (instance/instance ::people {:id             1
+                                      :name           "Cam"
+                                      ::after-select? true})
+         (select/select-one ::people 1))))
 
 ;; (deftest group-by-xform-test
 ;;   (is (= {false [2 4], true [3 5]}
@@ -41,10 +28,6 @@
 ;;          (into {} (comp (take 2) (toucan2.helpers/group-by-xform even? inc)) [1 2 3 4]))))
 
 ;; (helpers/define-table-name ::venues "venues")
-
-;; (m/defmethod conn.current/default-connectable-for-tableable* ::venues
-;;   [_ _]
-;;   :test/postgres)
 
 ;; (def ^:dynamic ^:private *updated-venues* nil)
 
