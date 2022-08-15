@@ -70,6 +70,7 @@
     (do
       (u/println-debug "No rows to insert.")
       0)
+    ;; TODO -- should this stuff be in an `:around` method?
     (u/with-debug-result (format "Inserting %d rows into %s" (count rows) (pr-str model))
       (let [query (query/build ::insert model rows)]
         (try
