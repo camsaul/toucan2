@@ -21,8 +21,7 @@
 (m/defmulti select-reducible*
   "The actual args depend on what [[query/parse-args]] returns."
   {:arglists '([model parsed-args])}
-  (fn [model {:keys [query], :as _parsed-args}]
-    [(u/dispatch-value model) (u/dispatch-value query)]))
+  u/dispatch-on-first-arg)
 
 (m/defmethod select-reducible* :default
   [model parsed-args]
