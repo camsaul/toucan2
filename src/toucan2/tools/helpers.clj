@@ -1,80 +1,60 @@
 (ns toucan2.tools.helpers
-  (:require [toucan2.tools.transformed :as transformed]))
+  (:require
+   [methodical.core :as m]
+   [toucan2.query :as query]
+   [toucan2.select :as select]
+   [toucan2.tools.transformed :as transformed]
+   [toucan2.util :as u]))
 
 (defn maybe-derive
   [child parent]
   (when-not (isa? child parent)
     (derive child parent)))
 
-;; (defn dispatch-value-2 [dispatch-value]
-;;   (let [{:keys [connectable tableable]}
-;;         (if-not (sequential? dispatch-value)
-;;           {:tableable dispatch-value}
-;;           (zipmap
-;;            (condp = (count dispatch-value)
-;;              1 [:tableable]
-;;              [:connectable :tableable])
-;;            dispatch-value))]
-;;     [(or connectable :default)
-;;      (or tableable :default)]))
+(defn do-before-select [model thunk]
+  (u/with-debug-result (format "%s %s" `define-before-select (pr-str model))
+    (try
+      (thunk)
+      (catch Throwable e
+        (throw (ex-info (format "Error in %s for %s: %s" `define-before-select (pr-str model) (ex-message e))
+                        {:model model}
+                        e))))))
 
-;; (defn dispatch-value-3 [dispatch-value]
-;;   (let [{:keys [connectable tableable x]}
-;;         (if-not (sequential? dispatch-value)
-;;           {:tableable dispatch-value}
-;;           (zipmap
-;;            (condp = (count dispatch-value)
-;;              1 [:tableable]
-;;              2 [:connectable :tableable]
-;;              [:connectable :tableable :x])
-;;            dispatch-value))]
-;;     [(or connectable :default)
-;;      (or tableable :default)
-;;      (or x :default)]))
+(defmacro define-before-select
+  {:style/indent :defn, :arglists '([model [args-binding] & body]
+                                    [[model query-class] [args-binding] & body])}
+  [dispatch-value [args-binding] & body]
+  (let [[model query-class] (if (vector? dispatch-value)
+                              dispatch-value
+                              [dispatch-value clojure.lang.IPersistentMap])]
+    `(m/defmethod query/build :before [::select/select ~model ~query-class]
+       [~'&query-type ~'&model ~args-binding]
+       (do-before-select ~'&model (^:once fn* [] ~@body)))))
 
-;; (defn do-helper [msg tableable thunk]
-;;   (log/with-debug ["Doing %s for %s" msg tableable]
-;;     (try
-;;       (thunk)
-;;       (catch Throwable e
-;;         (throw (ex-info (format "Error in %s for %s: %s" msg (pr-str (u/dispatch-value tableable)) (ex-message e))
-;;                         {:tableable tableable}
-;;                         e))))))
+(defmacro define-after-select-reducible
+  {:style/indent :defn}
+  [model [reducible-query-binding] & body]
+  `(m/defmethod select/select-reducible* :after ~model
+     [~'&model ~reducible-query-binding]
+     ~@body))
 
-;; (defmacro helper {:style/indent 2} [msg tableable & body]
-;;   `(do-helper ~msg ~tableable (fn [] ~@body)))
+(defn do-after-select-each [model reducible-query f]
+  (eduction (map (fn [instance]
+                   (u/with-debug-result (format "%s %s %s" `define-after-select-each (pr-str model) (pr-str instance))
+                     (try
+                       (f instance)
+                       (catch Throwable e
+                         (throw (ex-info (format "Error in %s for %s: %s"
+                                                 `define-after-select-each (pr-str model) (ex-message e))
+                                         {:model model, :instance instance}
+                                         e)))))))
+            reducible-query))
 
-;; (defmacro define-table-name {:style/indent :defn} [dispatch-value & body]
-;;   `(m/defmethod tableable/table-name* ~(dispatch-value-2 dispatch-value)
-;;      [~'&connectable ~'&tableable ~'&options]
-;;      ~@body))
-
-;; (defn do-before-select
-;;   [connectable tableable query options f]
-;;   (helper "before-select" tableable
-;;     (f query)))
-
-;; (defmacro define-before-select {:style/indent :defn} [dispatch-value [query-binding] & body]
-;;   `(m/defmethod select/select* :before ~(dispatch-value-3 dispatch-value)
-;;      [~'&connectable ~'&tableable ~'&query ~'&options]
-;;      (do-before-select ~'&connectable ~'&tableable ~'&query ~'&options
-;;                        (fn [~query-binding]
-;;                          ~@body))))
-
-;; (defn do-after-select [connectable tableable reducible-query options f]
-;;   (helper "after-select" tableable
-;;     (eduction
-;;      (map f)
-;;      reducible-query)))
-
-;; (defmacro define-after-select {:style/indent :defn} [dispatch-value [instance-binding] & body]
-;;   `(m/defmethod select/select* :after ~(dispatch-value-3 dispatch-value)
-;;      [~'&connectable ~'&tableable ~'&reducible-query ~'&options]
-;;      (do-after-select ~'&connectable ~'&tableable ~'&reducible-query ~'&options
-;;                       (fn [~instance-binding]
-;;                         ~@body))))
-
-;; ;; HELPERS BELOW ARE EXPERIMENTAL/UNTESTED
+(defmacro define-after-select-each
+  {:style/indent :defn}
+  [model [instance-binding] & body]
+  `(define-after-select-reducible ~model [reducible-query#]
+     (do-after-select-each ~'&model reducible-query# (fn [~instance-binding] ~@body))))
 
 ;; (m/defmulti before-update-transform-changes*
 ;;   {:arglists '([connectableᵈ instanceᵈᵗ options])}
@@ -86,21 +66,21 @@
 ;;   [_ instance _]
 ;;   instance)
 
-;; (defn update-query->select-query [connectable tableable update-query options]
-;;   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
+;; (defn update-query->select-query [connectable model update-query options]
+;;   (let [[connectable options] (conn.current/ensure-connectable connectable model options)
 ;;         table                 (build-query/table* update-query)
 ;;         conditions            (build-query/conditions* update-query)]
-;;     (-> (build-query/buildable-query* connectable tableable {} :select options)
+;;     (-> (build-query/buildable-query* connectable model {} :select options)
 ;;         (build-query/with-table* table options)
 ;;         (build-query/with-conditions* conditions options))))
 
 ;; (defn reducible-instances-matching-update-query
-;;   "Return instances of `tableable` that match conditions from a compiled `update-query` as passed to `update!*`."
-;;   [connectable tableable update-query options]
-;;   (let [[connectable options] (conn.current/ensure-connectable connectable tableable options)
-;;         select-query          (update-query->select-query connectable tableable update-query options)]
+;;   "Return instances of `model` that match conditions from a compiled `update-query` as passed to `update!*`."
+;;   [connectable model update-query options]
+;;   (let [[connectable options] (conn.current/ensure-connectable connectable model options)
+;;         select-query          (update-query->select-query connectable model update-query options)]
 ;;     (log/with-trace-no-result ["Finding matching instances with query %s" select-query]
-;;       (select/select-reducible [connectable tableable] select-query (or options {})))))
+;;       (select/select-reducible [connectable model] select-query (or options {})))))
 
 ;; (defn group-by-xform
 ;;   "Transducer that groups together values into a map of `(key-fn x)` -> `[(val-fn x) ...]`, then reduces that map.
@@ -135,8 +115,8 @@
 ;;     100)
 
 ;; (m/defmethod mutative/update!* :around [:default ::before-update-transform-matching-rows :toucan2/buildable-query]
-;;   [connectable tableable {updates :set, :as query} options]
-;;   (log/with-debug-no-result ["Doing before update for %s" (u/dispatch-value tableable)]
+;;   [connectable model {updates :set, :as query} options]
+;;   (log/with-debug-no-result ["Doing before update for %s" (u/dispatch-value model)]
 ;;     (if (empty? updates)
 ;;       (do (log/tracef "Query %s has no changes; skipping rest of update" query)
 ;;           0)
@@ -154,14 +134,14 @@
 ;;             (filter (fn [instance]
 ;;                       (if (seq (instance/changes instance))
 ;;                         instance
-;;                         (log/tracef "Skipping row with PK %s, it has no changes" (tableable/primary-key-values instance)))))
+;;                         (log/tracef "Skipping row with PK %s, it has no changes" (model/primary-key-values instance)))))
 ;;             ;; apply the changes-xform to each instance
 ;;             (map (fn [instance]
 ;;                    (log/with-trace ["Apply f to %s" instance]
 ;;                      (let [result (f instance)]
 ;;                        (assert (instance/toucan2-instance? result)
 ;;                                (format "before-update method for %s should return an instance, got ^%s %s"
-;;                                        (u/dispatch-value tableable)
+;;                                        (u/dispatch-value model)
 ;;                                        (some-> result class .getCanonicalName)
 ;;                                        (pr-str result)))
 ;;                        result))))
@@ -170,7 +150,7 @@
 ;;                       (if (seq (instance/changes instance))
 ;;                         instance
 ;;                         (log/tracef "Skipping row with PK %s, it has no changes after applying f"
-;;                                     (tableable/primary-key-keys connectable instance)))))
+;;                                     (model/primary-key-keys connectable instance)))))
 ;;             ;; TODO -- consider whether we should batch the stuff below. e.g. if we end up matching 1 million objects,
 ;;             ;; it might not be ideal to keep a million PK value vectors in memory at once. Also, a query with `UPDATE
 ;;             ;; table WHERE id IN (...)` with a million ids probably isn't going to work so well.
@@ -178,7 +158,7 @@
 ;;             ;; Group all the PKs by their changes.
 ;;             ;;
 ;;             ;; TODO -- if we had a batched-update method, we wouldn't need this complicated transducer.
-;;             (group-by-xform instance/changes (let [pk-keys (vec (tableable/primary-key-keys connectable tableable))]
+;;             (group-by-xform instance/changes (let [pk-keys (vec (model/primary-key-keys connectable model))]
 ;;                                                #(mapv % pk-keys)))
 ;;             ;; do an update call for each distinct set of changes
 ;;             (map (fn [[changes matching-primary-keys]]
@@ -188,13 +168,13 @@
 ;;                                        ;; assume it works because it might not.
 ;;                                        (build-query/merge-kv-conditions* {:toucan2/with-pks matching-primary-keys} options))]
 ;;                      (log/with-trace ["Performing updates with query %s" new-query]
-;;                        (next-method connectable tableable new-query options))))))
+;;                        (next-method connectable model new-query options))))))
 ;;            (completing (fnil + 0 0))
 ;;            0
-;;            (reducible-instances-matching-update-query connectable tableable query options))
+;;            (reducible-instances-matching-update-query connectable model query options))
 ;;           (catch Throwable e
-;;             (throw (ex-info (format "Error in after-update for %s: %s" (u/dispatch-value tableable) (ex-message e))
-;;                             {:tableable tableable, :query query}
+;;             (throw (ex-info (format "Error in after-update for %s: %s" (u/dispatch-value model) (ex-message e))
+;;                             {:model model, :query query}
 ;;                             e))))))))
 
 ;; (defn disallow-next-method-calls [body]
@@ -208,57 +188,57 @@
 ;;    body))
 
 ;; (defmacro define-before-update {:style/indent :defn} [dispatch-value [instance-binding] & body]
-;;   (let [[connectable-dv tableable-dv] (dispatch-value-2 dispatch-value)]
+;;   (let [[connectable-dv model-dv] (dispatch-value-2 dispatch-value)]
 ;;     `(do
-;;        (u/maybe-derive ~tableable-dv ::before-update-transform-matching-rows)
-;;        (m/defmethod before-update-transform-changes* [~connectable-dv ~tableable-dv]
+;;        (u/maybe-derive ~model-dv ::before-update-transform-matching-rows)
+;;        (m/defmethod before-update-transform-changes* [~connectable-dv ~model-dv]
 ;;          [~'&connectable ~instance-binding ~'&options]
 ;;          (let [result# ~(disallow-next-method-calls `(do ~@body))]
 ;;            (~'next-method ~'&connectable result# ~'&options))))))
 
 ;; (m/defmulti after-update*
-;;   {:arglists '([connectableᵈ tableableᵈ instanceᵗ options])}
+;;   {:arglists '([connectableᵈ modelᵈ instanceᵗ options])}
 ;;   u/dispatch-on-first-two-args
 ;;   :combo (m.combo.threaded/threading-method-combination :third))
 
 ;; (m/defmethod mutative/update!* :around [:default ::after-update :default]
-;;   [connectable tableable update-query options]
-;;   (let [result (next-method connectable tableable update-query options)]
-;;     (log/with-debug-no-result ["Doing after-update for %s" (u/dispatch-value tableable)]
+;;   [connectable model update-query options]
+;;   (let [result (next-method connectable model update-query options)]
+;;     (log/with-debug-no-result ["Doing after-update for %s" (u/dispatch-value model)]
 ;;       (when (pos? result)
 ;;         (try
-;;           (let [rows (reducible-instances-matching-update-query connectable tableable update-query options)]
+;;           (let [rows (reducible-instances-matching-update-query connectable model update-query options)]
 ;;             (reduce
 ;;              (fn [_ instance]
-;;                (after-update* connectable tableable instance options))
+;;                (after-update* connectable model instance options))
 ;;              nil
 ;;              rows))
 ;;           (catch Throwable e
-;;             (throw (ex-info (format "Error in after-update for %s: %s" (u/dispatch-value tableable) (ex-message e))
-;;                             {:tableable tableable, :update-query update-query, :options options}
+;;             (throw (ex-info (format "Error in after-update for %s: %s" (u/dispatch-value model) (ex-message e))
+;;                             {:model model, :update-query update-query, :options options}
 ;;                             e))))))
 ;;     result))
 
 ;; (defmacro define-after-update {:style/indent :defn} [dispatch-value [result-binding] & body]
-;;   (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
+;;   (let [[connectable model] (dispatch-value-2 dispatch-value)]
 ;;     `(do
-;;        (u/maybe-derive ~tableable ::after-update)
-;;        (m/defmethod after-update* [~connectable ~tableable]
-;;          [~'&connectable ~'&tableable ~result-binding ~'&options]
+;;        (u/maybe-derive ~model ::after-update)
+;;        (m/defmethod after-update* [~connectable ~model]
+;;          [~'&connectable ~'&model ~result-binding ~'&options]
 ;;          ~@body))))
 
-;; (defn do-before-insert [connectable tableable query options f]
-;;   (helper "before-insert" tableable
+;; (defn do-before-insert [connectable model query options f]
+;;   (helper "before-insert" model
 ;;     (update query :values (fn [rows]
 ;;                             (mapv
 ;;                              (fn [row]
-;;                                (f (instance/instance connectable tableable row)))
+;;                                (f (instance/instance connectable model row)))
 ;;                              rows)))))
 
 ;; (defmacro define-before-insert {:style/indent :defn} [dispatch-value [instance-binding] & body]
 ;;   `(m/defmethod mutative/insert!* :before ~(dispatch-value-3 dispatch-value)
-;;      [~'&connectable ~'&tableable ~'&query ~'&options]
-;;      (do-before-insert ~'&connectable ~'&tableable ~'&query ~'&options
+;;      [~'&connectable ~'&model ~'&query ~'&options]
+;;      (do-before-insert ~'&connectable ~'&model ~'&query ~'&options
 ;;                        (fn [~instance-binding]
 ;;                          ~@body))))
 
@@ -268,7 +248,7 @@
 ;;   :combo (m.combo.threaded/threading-method-combination :second))
 
 ;; (m/defmethod mutative/insert!* [:default ::after-insert :default]
-;;   [connectable tableable query options]
+;;   [connectable model query options]
 ;;   (try
 ;;     (let [return-keys?        (get-in options [:next.jdbc :return-keys])
 ;;           options             (-> options
@@ -276,10 +256,10 @@
 ;;                                   ;; `:return-keys` behavior.
 ;;                                   (assoc :reducible? true)
 ;;                                   (assoc-in [:next.jdbc :return-keys] true))
-;;           reducible-query     (next-method connectable tableable query options)
-;;           pks                 (into [] (map (select/select-pks-fn connectable tableable)) reducible-query)
+;;           reducible-query     (next-method connectable model query options)
+;;           pks                 (into [] (map (select/select-pks-fn connectable model)) reducible-query)
 ;;           reducible-instances (select/select-reducible
-;;                                [connectable tableable]
+;;                                [connectable model]
 ;;                                :toucan2/with-pks pks
 ;;                                {}
 ;;                                (update options :next.jdbc dissoc :return-keys))]
@@ -289,58 +269,58 @@
 ;;         (fn [acc instance]
 ;;           (after-insert* connectable instance options)
 ;;           (if return-keys?
-;;             (conj acc (tableable/primary-key-values instance))
+;;             (conj acc (model/primary-key-values instance))
 ;;             (inc acc))))
 ;;        (if return-keys? [] 0)
 ;;        reducible-instances))
 ;;     (catch Throwable e
-;;       (throw (ex-info (format "Error in after insert for %s: %s" (u/dispatch-value tableable) (ex-message e))
-;;                       {:tableable tableable, :query query, :options options}
+;;       (throw (ex-info (format "Error in after insert for %s: %s" (u/dispatch-value model) (ex-message e))
+;;                       {:model model, :query query, :options options}
 ;;                       e)))))
 
 ;; (defmacro define-after-insert {:style/indent :defn} [dispatch-value [instance-binding] & body]
-;;   (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
+;;   (let [[connectable model] (dispatch-value-2 dispatch-value)]
 ;;     `(do
-;;        (u/maybe-derive ~tableable ::after-insert)
-;;        (m/defmethod after-insert* [~connectable ~tableable]
+;;        (u/maybe-derive ~model ::after-insert)
+;;        (m/defmethod after-insert* [~connectable ~model]
 ;;          [~'&connectable ~instance-binding ~'&options]
 ;;          ~@body))))
 
-;; (defn do-before-delete [connectable tableable delete-query options f]
-;;   (helper "before-delete" tableable
-;;     (let [query (-> (build-query/buildable-query* connectable tableable {} :select options)
-;;                     (build-query/with-table* tableable options)
+;; (defn do-before-delete [connectable model delete-query options f]
+;;   (helper "before-delete" model
+;;     (let [query (-> (build-query/buildable-query* connectable model {} :select options)
+;;                     (build-query/with-table* model options)
 ;;                     (build-query/with-conditions* (build-query/conditions* delete-query) options))]
 ;;       (log/with-trace ["Fetching matching rows with query %s" query]
 ;;         (reduce
 ;;          (fn [_ instance]
 ;;            (f instance))
 ;;          nil
-;;          (select/select-reducible [connectable tableable] query)))))
+;;          (select/select-reducible [connectable model] query)))))
 ;;   delete-query)
 
 ;; (defmacro define-before-delete {:style/indent :defn} [dispatch-value [instance-binding] & body]
 ;;   `(m/defmethod mutative/delete!* :before ~(dispatch-value-3 dispatch-value)
-;;      [~'&connectable ~'&tableable ~'&query ~'&options]
-;;      (do-before-delete ~'&connectable ~'&tableable ~'&query ~'&options
+;;      [~'&connectable ~'&model ~'&query ~'&options]
+;;      (do-before-delete ~'&connectable ~'&model ~'&query ~'&options
 ;;                        (fn [~instance-binding]
 ;;                          ~@body))))
 
 ;; ;; TODO
 ;; #_(defmacro define-after-delete {:style/indent :defn} [dispatch-value [a-binding] & body]
 ;;     (m/defmethod mutative/delete!* :after ~(dispatch-value-3 dispatch-value)
-;;       [~'&connectable ~'&tableable _ ~'&options]
+;;       [~'&connectable ~'&model _ ~'&options]
 ;;       ~@body))
 
 ;; (defmacro define-keys-for-automagic-hydration
 ;;   {:style/indent 1}
 ;;   [dispatch-value & ks]
-;;   (let [[connectable tableable] (dispatch-value-2 dispatch-value)]
+;;   (let [[connectable model] (dispatch-value-2 dispatch-value)]
 ;;     `(do
 ;;        ~@(for [k ks]
-;;            `(m/defmethod hydrate/table-for-automagic-hydration* [~connectable ~tableable ~k]
+;;            `(m/defmethod hydrate/table-for-automagic-hydration* [~connectable ~model ~k]
 ;;               [~'_ ~'_ ~'_]
-;;               ~tableable)))))
+;;               ~model)))))
 
 (defmacro deftransforms
   {:style/indent 1}

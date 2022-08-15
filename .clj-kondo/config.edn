@@ -27,6 +27,9 @@
   {methodical.core/defmethod hooks.methodical.core/defmethod}
 
   :macroexpand
-  {toucan2.execute/with-call-count macros.toucan2.execute/with-call-count}}
+  {toucan2.execute/with-call-count                     macros.toucan2.execute/with-call-count
+   toucan2.tools.helpers/define-before-select          macros.toucan2.tools.helpers/define-before-select
+   toucan2.tools.helpers/define-after-select-reducible macros.toucan2.tools.helpers/define-after-select-reducible
+   toucan2.tools.helpers/define-after-select-each      macros.toucan2.tools.helpers/define-after-select-each}}
 
  :skip-comments true}
