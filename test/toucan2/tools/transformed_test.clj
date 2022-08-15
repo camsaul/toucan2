@@ -94,22 +94,23 @@
 (deftest normalize-transform-keys-test
   (testing "Should work if transform keys are defined in snake_case or whatever (for legacy compatibility purposes)"))
 
-;; TODO -- huh?
-#_(deftest apply-row-transform-test
+(deftest apply-row-transform-test
     (doseq [[message m] {"plain map"        {:id 1}
                          "Instance"         (instance/instance :x {:id 1})
                          ;; TODO
                          #_"custom IInstance" #_(test.custom-types/->CustomIInstance {:id 1} {:id 1})}
             [message m] (list*
                          [message m]
-                         (when (instance/instance? m)
-                           (for [[row-message row] {"wrapping Row"         (row/row {:id (constantly 1)})
-                                                    "wrapping custom IRow" (test.custom-types/->CustomIRow
-                                                                            {:id (constantly 1)})}]
-                             [(str message " " row-message)
-                              (-> m
-                                  (instance/with-original row)
-                                  (instance/with-current row))])))]
+                         ;; TODO
+                         nil
+                         #_(when (instance/instance? m)
+                             (for [[row-message row] {"wrapping Row"         (row/row {:id (constantly 1)})
+                                                      "wrapping custom IRow" (test.custom-types/->CustomIRow
+                                                                              {:id (constantly 1)})}]
+                               [(str message " " row-message)
+                                (-> m
+                                    (instance/with-original row)
+                                    (instance/with-current row))])))]
       (testing message
         (let [m2 (transformed/apply-row-transform m :id str)]
           (testing "current value"
