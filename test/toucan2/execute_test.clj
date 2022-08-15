@@ -155,31 +155,31 @@
   (is (= ["SELECT * FROM people WHERE id > ?" 1]
          (execute/compile (select/select ::test/people :id [:> 1])))))
 
-;;; TODO
+(deftest with-call-counts-test
+  (execute/with-call-count [call-count]
+    (is (= 0
+           (call-count)))
+    (execute/query ::test/db "SELECT 1;")
+    (is (= 1
+           (call-count)))
+    (execute/query ::test/db "DELETE FROM people WHERE id = 1000;")
+    (is (= 2
+           (call-count)))
+    (testing "Should be able to do nested calls to with-call-count"
+      (execute/with-call-count [nested-call-count]
+        (is (= 2
+               (call-count)))
+        (is (= 0
+               (nested-call-count)))
+        (execute/query ::test/db "SELECT 1;")
+        (is (= 3
+               (call-count)))
+        (is (= 1
+               (nested-call-count)))))
+    (is (= 3
+           (call-count)))))
 
-#_(deftest with-call-counts-test
-    (execute/with-call-count [call-count]
-      (is (= 0
-             (call-count)))
-      (execute/query ::test/db "SELECT 1;")
-      (is (= 1
-             (call-count)))
-      (execute/query ::test/db "DELETE FROM people WHERE id = 1000;")
-      (is (= 2
-             (call-count)))
-      (testing "Should be able to do nested calls to with-call-count"
-        (execute/with-call-count [nested-call-count]
-          (is (= 2
-                 (call-count)))
-          (is (= 0
-                 (nested-call-count)))
-          (execute/query ::test/db "SELECT 1;")
-          (is (= 3
-                 (call-count)))
-          (is (= 1
-                 (nested-call-count)))))
-      (is (= 3
-             (call-count)))))
+;;; TODO
 
 #_(m/defmethod conn.current/default-connectable-for-tableable* ::venues
     [_ _]

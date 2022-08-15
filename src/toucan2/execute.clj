@@ -30,9 +30,19 @@
 ;;; [[reduce-compiled-query-with-connection]]
 ;;; Execute and reduce the query with the open connection.
 
+(def ^:dynamic *call-count-thunk*
+  "Thunk function to call every time a query is executed if [[with-call-count]] is in use."
+  nil)
+
 (m/defmulti reduce-compiled-query-with-connection
   {:arglists '([conn model compiled-query rf init])}
   u/dispatch-on-first-three-args)
+
+(m/defmethod reduce-compiled-query-with-connection :before :default
+  [_conn _model _compiled-query _rf init]
+  (when *call-count-thunk*
+    (*call-count-thunk*))
+  init)
 
 (m/defmethod reduce-compiled-query-with-connection [java.sql.Connection :default clojure.lang.Sequential]
   [conn _model sql-args rf init]
@@ -131,19 +141,18 @@
 
 ;;;; [[with-call-count]]
 
-;;; TODO
+(defn do-with-call-counts
+  "Impl for [[with-call-count]] macro; don't call this directly."
+  [f]
+  (let [call-count (atom 0)
+        old-thunk  *call-count-thunk*]
+    (binding [*call-count-thunk* (fn []
+                                   (when old-thunk
+                                     (old-thunk))
+                                   (swap! call-count inc))]
+      (f (fn [] @call-count)))))
 
-#_(defn do-with-call-counts
-    "Impl for [[with-call-count]] macro; don't call this directly."
-    [f]
-    (let [call-count (atom 0)
-          old-thunk  *call-count-thunk*]
-      (binding [*call-count-thunk* #(do
-                                      (old-thunk)
-                                      (swap! call-count inc))]
-        (f (fn [] @call-count)))))
-
-#_(defmacro with-call-count
+(defmacro with-call-count
   "Execute `body`, trackingthe number of database queries and statements executed. This number can be fetched at any
   time withing `body` by calling function bound to `call-count-fn-binding`:
 
@@ -155,4 +164,4 @@
     ;; -> CALLS: 1
     ;; -> CALLS: 2"
   [[call-count-fn-binding] & body]
-  `(do-with-call-counts (fn [~call-count-fn-binding] ~@body)))
+  `(do-with-call-counts (^:once fn* [~call-count-fn-binding] ~@body)))

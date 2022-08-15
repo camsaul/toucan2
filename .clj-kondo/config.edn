@@ -27,6 +27,6 @@
   {methodical.core/defmethod hooks.methodical.core/defmethod}
 
   :macroexpand
-  {}}
+  {toucan2.execute/with-call-count macros.toucan2.execute/with-call-count}}
 
  :skip-comments true}
