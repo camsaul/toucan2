@@ -161,7 +161,7 @@
        reducible-query))
     reducible-query))
 
-(m/defmethod select/select-reducible* :around [::transformed :default]
+(m/defmethod select/select-reducible* :around ::transformed
   [model parsed-args]
   (let [reducible-query (next-method model parsed-args)]
     (transform-results model reducible-query)))

@@ -174,13 +174,13 @@
 (derive ::people.no-timestamps ::people)
 
 ;;; this could also be done as part a `:before` method.
-(m/defmethod select/select-reducible* [::people.no-timestamps :default]
+(m/defmethod select/select-reducible* ::people.no-timestamps
   [model args]
   (let [args (update args :columns (fn [columns]
                                      (or columns [:id :name])))]
     (next-method model args)))
 
-(m/defmethod select/select-reducible* :after [::people.no-timestamps :default]
+(m/defmethod select/select-reducible* :after ::people.no-timestamps
   [_model {reducible-query :query, :as args}]
   (testing "should not be an eduction yet -- if it is it means this method is getting called more than once"
     (is (not (instance? clojure.core.Eduction reducible-query))))
@@ -213,9 +213,10 @@
 ;; TODO this is probably not the way you'd want to accomplish this in real life -- I think you'd probably actually want
 ;; to implement [[toucan2.query/build]] instead. But it does do a good job of letting us test that combining aux methods
 ;; work like we'd expect.
-(m/defmethod select/select-reducible* :before [::people.limit-2 clojure.lang.IPersistentMap]
+(m/defmethod select/select-reducible* :before ::people.limit-2
   [_model args]
-  (update args :query assoc :limit 2))
+  (cond-> args
+    (map? args) (update :query assoc :limit 2)))
 
 (deftest pre-select-test
   (testing "Should be able to do cool stuff in pre-select (select* :before)"
