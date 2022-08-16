@@ -40,12 +40,12 @@
                 "lowercases strings as they come in")
     (test/with-discarded-table-changes Category
       (is (= {:id 5, :name "wine-bar", :parent-category-id nil}
-             (db/insert! Category, :name "Wine-Bar"))))
+             (db/insert! Category :name "Wine-Bar"))))
     (test/with-discarded-table-changes Category
       (is (= true
              (db/update! Category 1, :name "Bar-Or-Club")))
       (is (= {:id 1, :name "bar-or-club", :parent-category-id nil}
-             (Category 1))))))
+             (db/select-one Category 1))))))
 
 (defn- timestamp-after-jan-first? [^LocalDateTime t]
   (.isAfter t (LocalDateTime/parse "2017-01-01T00:00:00")))

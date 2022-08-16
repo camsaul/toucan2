@@ -37,7 +37,7 @@
 (m/defmethod build :around :default
   [query-type model args]
   (try
-    (u/with-debug-result (pr-str (list `build query-type model args))
+    (u/with-debug-result (u/pretty-print (list `build query-type model args))
       (next-method query-type model args))
     (catch Throwable e
       (throw (ex-info (format "Error building %s query for model %s: %s"
@@ -162,7 +162,7 @@
 
 (m/defmethod parse-args :around :default
   [query-type model unparsed-args]
-  (u/with-debug-result (pr-str (list 'parse-args query-type model unparsed-args))
+  (u/with-debug-result (u/pretty-print (list `parse-args query-type model unparsed-args))
     (next-method query-type model unparsed-args)))
 
 (m/defmethod parse-args :default

@@ -244,17 +244,13 @@
    (simple-insert! modelable (apply array-map k v more))))
 
 (defn ^{:deprecated "2.0.0"} insert!
-  "DEPRECATED: There is currently no direct equivalent in Toucan 2; use [[toucan2.insert/insert!]] (if you don't need the
-  newly created object) or [[toucan2.insert/insert-returning-keys!]] combined with [[toucan2.select/select]] if you do
-  need the newly created object."
+  "DEPRECATED: use [[toucan2.insert/insert-returning-instances!]] instead."
   {:style/indent 1}
   ([modelable row-map]
-   (model/with-model [model modelable]
-     (let [[pk] (insert/insert-returning-keys! model row-map)]
-       (select/select model :toucan/pk pk))))
+   (insert/insert-returning-instances! modelable row-map))
 
-  ([modelable k v & more]
-   (insert! modelable (apply array-map k v more))))
+  ([modelable k v & {:as more}]
+   (insert! modelable (merge {k v} more))))
 
 (defn ^{:deprecated "2.0.0"} select-one-field
   "DEPRECATED: Use [[toucan2.select/select-one-fn]] instead."

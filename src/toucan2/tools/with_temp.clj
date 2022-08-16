@@ -30,7 +30,7 @@
 ;;                               [pk (select/select-one tableable pk)]))]
 
 ;;     (try
-;;       (testing (format "with temporary %s with attributes %s" (pr-str tableable) (pr-str merged-attributes))
+;;       (testing (format "with temporary %s with attributes %s" (u/pretty-print tableable) (u/pretty-print merged-attributes))
 ;;         (f temp-object))
 ;;       (finally
 ;;         (mutative/delete! tableable pk)))))

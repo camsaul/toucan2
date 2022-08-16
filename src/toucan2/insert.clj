@@ -11,6 +11,7 @@
    [toucan2.select :as select]
    [toucan2.util :as u]))
 
+
 (s/def ::default-args
   (s/alt :single-row-map    map?
          :multiple-row-maps (s/coll-of map?)
@@ -32,8 +33,8 @@
       :multiple-row-maps x
       :kv-pairs          [(into {} (map (juxt :k :v)) x)]
       :columns-rows      (let [{:keys [columns rows]} x]
-                           (for [row rows]
-                             (zipmap columns row))))))
+                           (mapv (partial zipmap columns)
+                                 rows)))))
 
 (m/defmethod query/build [::insert :default :default]
   [_query-type model rows]
@@ -47,7 +48,7 @@
 
 (m/defmethod insert!* :around :default
   [model args]
-  (u/with-debug-result (pr-str (list 'insert!* model args))
+  (u/with-debug-result [(list `insert!* model args)]
     (next-method model args)))
 
 (def ^:dynamic *result-type*
@@ -72,9 +73,9 @@
       (u/println-debug "No rows to insert.")
       0)
     ;; TODO -- should this stuff be in an `:around` method?
-    (u/with-debug-result (format "Inserting %d rows into %s" (count rows) (pr-str model))
-      (let [query (query/build ::insert model (map (partial instance/instance model)
-                                                   rows))]
+    (u/with-debug-result ["Inserting %s rows into %s" (count rows) model]
+      (let [query (query/build ::insert model (mapv (partial instance/instance model)
+                                                    rows))]
         (try
           (execute! model query)
           (catch Throwable e
@@ -88,7 +89,7 @@
                [modelable k v & more]
                [modelable columns row-vectors])}
   [modelable & args]
-  (u/with-debug-result (pr-str (list* 'insert! modelable args))
+  (u/with-debug-result [(list* `insert! modelable args)]
     (model/with-model [model modelable]
       (insert!* model (query/parse-args ::insert model args)))))
 
@@ -115,9 +116,14 @@
                [modelable k v & more]
                [modelable columns row-vectors])}
   [modelable & args]
-  (u/with-debug-result (pr-str (list* `insert-returning-keys! modelable args))
+  (u/with-debug-result [(list* `insert-returning-keys! modelable args)]
     (model/with-model [model modelable]
-      (apply insert-returning-keys!* model args))))
+      (try
+        (apply insert-returning-keys!* model args)
+        (catch Throwable e
+          (throw (ex-info (format "Error in %s for %s: %s" `insert-returning-keys! (pr-str model) (ex-message e))
+                          {:model model, :args args}
+                          e)))))))
 
 (defn insert-returning-instances!
   {:arglists '([modelable & row-or-rows]
@@ -127,12 +133,13 @@
                [[modelable & fields] k v & more]
                [[modelable & fields] columns row-vectors])}
   [modelable-fields & args]
-  (u/with-debug-result (pr-str (list* `insert-returning-instances! modelable-fields args))
+  (u/with-debug-result [(list* `insert-returning-instances! modelable-fields args)]
     (let [[modelable & fields] (if (sequential? modelable-fields)
                                  modelable-fields
                                  [modelable-fields])]
       (model/with-model [model modelable]
         (when-let [row-pks (not-empty (apply insert-returning-keys! modelable args))]
+          (u/println-debug ["%s returned %s" `insert-returning-keys! row-pks])
           (let [pk-vecs      (for [pk row-pks]
                                (if (sequential? pk)
                                  pk

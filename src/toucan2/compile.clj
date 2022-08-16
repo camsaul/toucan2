@@ -10,14 +10,12 @@
 
 (m/defmethod do-with-compiled-query :around :default
   [model query f]
-  (u/println-debug (format "Compile %s query ^%s %s"
-                           (pr-str model)
-                           (some-> query class .getCanonicalName)
-                           (pr-str query)))
-  (binding [u/*debug-indent-level* (inc u/*debug-indent-level*)]
+  (u/println-debug ["Compile %s query ^%s %s" model (some-> query class .getCanonicalName symbol) query])
+  (next-method model query f)
+  #_(binding [u/*debug-indent-level* (inc u/*debug-indent-level*)]
     (next-method model query (fn [compiled-query]
                                (binding [u/*debug-indent-level* (dec u/*debug-indent-level*)]
-                                 (u/print-debug-result (pr-str compiled-query))
+                                 (u/print-debug-result compiled-query)
                                  (f compiled-query))))))
 
 (defmacro with-compiled-query [[query-binding [model query]] & body]

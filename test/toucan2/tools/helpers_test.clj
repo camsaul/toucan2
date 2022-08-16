@@ -295,6 +295,26 @@
                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
              @*venues-awaiting-moderation*)))))
 
+;;; TODO - FIXME
+#_(deftest after-insert-insert-returning-instances-test
+    (testing `insert/insert-returning-instances!
+      (test/with-discarded-table-changes :venues
+        (binding [*venues-awaiting-moderation* (atom [])]
+          (is (= {:id         4
+                  :name       "Lombard Heights Market"
+                  :category   "liquor-store"
+                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                 (insert/insert-returning-instances! ::venues.after-insert {:name "Lombard Heights Market", :category "liquor-store"})))
+          (is (= [(instance/instance
+                   ::venues.after-insert
+                   {:id         4
+                    :name       "Lombard Heights Market"
+                    :category   "liquor-store"
+                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                 @*venues-awaiting-moderation*))))))
+
 (derive ::transformed-venues ::test/venues)
 
 (helpers/deftransforms ::transformed-venues
