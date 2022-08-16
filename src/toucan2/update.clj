@@ -13,6 +13,7 @@
 (s/def ::default-args
   (s/cat
    :pk        (s/? (complement (some-fn keyword? map?)))
+   ;; these are treated as CONDITIONS
    :kv-args   (s/* (s/cat
                     :k keyword?
                     :v any?))
