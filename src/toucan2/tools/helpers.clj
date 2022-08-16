@@ -8,7 +8,8 @@
    [toucan2.select :as select]
    [toucan2.tools.transformed :as transformed]
    [toucan2.update :as update]
-   [toucan2.util :as u]))
+   [toucan2.util :as u]
+   [toucan2.realize :as realize]))
 
 (defn maybe-derive
   [child parent]
@@ -148,35 +149,71 @@
        [~'&model ~row-binding]
        ~@body)))
 
-;; (m/defmulti after-update*
-;;   {:arglists '([model instance])}
-;;   u/dispatch-on-first-arg)
+(m/defmulti after-update
+  {:arglists '([model instance])}
+  u/dispatch-on-first-arg)
 
-;; (m/defmethod update/update!* :around [::after-update :default]
-;;   [model args]
-;;   (let [result (next-method model args)]
-;;     (u/with-debug-result (format "Doing after-update for %s" (u/dispatch-value model))
-;;       (when (pos? result)
-;;         (try
-;;           (let [rows (reducible-instances-matching-update-query model args)]
-;;             (reduce
-;;              (fn [_ instance]
-;;                (after-update* model instance))
-;;              nil
-;;              rows))
-;;           (catch Throwable e
-;;             (throw (ex-info (format "Error in after-update for %s: %s" (u/dispatch-value model) (ex-message e))
-;;                             {:model model, :args args}
-;;                             e))))))
-;;     result))
+(m/defmethod after-update :around :default
+  [model instance]
+  (u/with-debug-result [(list `after-update model instance)]
+    (next-method model instance)))
 
-;; (defmacro define-after-update {:style/indent :defn} [dispatch-value [result-binding] & body]
-;;   (let [[model] (dispatch-value-2 dispatch-value)]
-;;     `(do
-;;        (maybe-derive ~model ::after-update)
-;;        (m/defmethod after-update* [~~model]
-;;          [~'&~'&model ~result-binding ~'&options]
-;;          ~@body))))
+(defn do-after-update [model parsed-args]
+  (println "parsed-args:" parsed-args) ; NOCOMMIT
+  (println "ROWS" (realize/realize (select/select-reducible* model parsed-args)))
+  (try
+    (reduce
+     (fn [_ instance]
+       (println "instance:" instance)   ; NOCOMMIT
+       (after-update model instance)
+       nil)
+     nil
+     (select/select-reducible* model parsed-args))
+    (catch Throwable e
+      (throw (ex-info (format "Error in after-update for %s: %s" (pr-str model) (ex-message e))
+                      {:model model, :args parsed-args}
+                      e)))))
+
+(def ^:dynamic *doing-after-update?* false)
+
+(defn reducible-after-update [model affected-pks]
+  (eduction
+   (map (fn [row]
+          (after-update model row)))
+   (select/select-reducible-with-pks model affected-pks)))
+
+(m/defmethod update/update!* ::after-update
+  [model parsed-args]
+  (if *doing-after-update?*
+    (next-method model parsed-args)
+    (binding [*doing-after-update?* true]
+      (let [affected-pks (update/update-returning-pks!* model parsed-args)]
+        (transduce
+         (map (constantly 1))
+         (completing +)
+         0
+         (reducible-after-update model affected-pks))))))
+
+(m/defmethod update/update-returning-pks!* ::after-update
+  [model parsed-args]
+  (if *doing-after-update?*
+    (next-method model parsed-args)
+    (binding [*doing-after-update?* true]
+      (let [affected-pks (next-method model parsed-args)]
+        (reduce
+         (constantly nil)
+         nil
+         (reducible-after-update model affected-pks))
+        affected-pks))))
+
+(defmacro define-after-update
+  {:style/indent :defn}
+  [model [result-binding] & body]
+  `(let [model# ~model]
+     (maybe-derive model# ::after-update)
+     (m/defmethod after-update model#
+       [~'&model ~result-binding]
+       ~@body)))
 
 ;;;; [[define-before-insert]], [[define-after-insert]]
 
@@ -223,13 +260,13 @@
                         {:model model, :row row}
                         e))))))
 
-(def ^:dynamic *after-insert-handled?* false)
+(def ^:dynamic *doing-after-insert?* false)
 
 (m/defmethod insert/insert!* ::after-insert
   [model parsed-args]
-  (if *after-insert-handled?*
+  (if *doing-after-insert?*
     (next-method model parsed-args)
-    (binding [*after-insert-handled?* true]
+    (binding [*doing-after-insert?* true]
       (let [rows (insert/insert-returning-instances!* model parsed-args)]
         (doseq [row rows]
           (after-insert model row))
@@ -237,9 +274,9 @@
 
 (m/defmethod insert/insert-returning-keys!* ::after-insert
   [model parsed-args]
-  (if *after-insert-handled?*
+  (if *doing-after-insert?*
     (next-method model parsed-args)
-    (binding [*after-insert-handled?* true]
+    (binding [*doing-after-insert?* true]
       (let [row-pks (next-method model parsed-args)
             rows    (insert/select-rows-with-pks model parsed-args row-pks)]
         (doseq [row rows]
@@ -248,9 +285,9 @@
 
 (m/defmethod insert/insert-returning-instances!* ::after-insert
   [model parsed-args]
-  (if *after-insert-handled?*
+  (if *doing-after-insert?*
     (next-method model parsed-args)
-    (binding [*after-insert-handled?* true]
+    (binding [*doing-after-insert?* true]
       (mapv (partial after-insert model)
             (next-method model parsed-args)))))
 

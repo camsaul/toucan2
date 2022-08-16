@@ -97,9 +97,6 @@
     (model/with-model [model modelable]
       (insert!* model (query/parse-args ::insert model args)))))
 
-;;; TODO -- I'm 90% sure that [[insert-returning-keys!*]] and [[insert-returning-instances!*]] should get already-parsed
-;;; args and call [[insert!*]] directly with them (to avoid duplicate parsing)
-
 (m/defmulti insert-returning-keys!*
   {:arglists '([model parsed-args])}
   u/dispatch-on-first-arg)
@@ -147,7 +144,10 @@
   (u/with-debug-result [(list `insert-returning-instances!* model parsed-args)]
     (next-method model parsed-args)))
 
-(defn select-rows-with-pks [model {:keys [fields], :as _parsed-args} row-pks]
+(defn ^:deprecated select-rows-with-pks
+  ;; TODO
+  "DEPRECATED: Use [[toucan2.select/select-reducible-with-pks]] instead."
+  [model {:keys [fields], :as _parsed-args} row-pks]
   (let [pk-vecs      (for [pk row-pks]
                        (if (sequential? pk)
                          pk

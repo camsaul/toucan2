@@ -10,6 +10,16 @@
 
 (humane-test-output/activate!)
 
+(defmethod print-dup java.time.LocalDateTime
+  [t writer]
+  (print-dup (list 'java.time.LocalDateTime/parse (str t))
+             writer))
+
+(defmethod print-method java.time.LocalDateTime
+  [t writer]
+  (print-method (list 'java.time.LocalDateTime/parse (str t))
+                writer))
+
 (defn- test-db-url []
   (or (System/getenv "JDBC_URL_POSTGRES")
       "jdbc:postgresql://localhost:5432/toucan2?user=cam&password=cam"))
