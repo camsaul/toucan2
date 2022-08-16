@@ -275,14 +275,17 @@
         (count rows)))))
 
 (m/defmethod insert/insert-returning-keys!* ::after-insert
-  [model parsed-args]
+  [model {:keys [fields], :as parsed-args}]
   (if *doing-after-insert?*
     (next-method model parsed-args)
     (binding [*doing-after-insert?* true]
-      (let [row-pks (next-method model parsed-args)
-            rows    (insert/select-rows-with-pks model parsed-args row-pks)]
-        (doseq [row rows]
-          (after-insert model row))
+      (let [row-pks (next-method model parsed-args)]
+        (transduce
+         (map (fn [row]
+                (after-insert model row)))
+         (constantly nil)
+         nil
+         (select/select-reducible-with-pks (into [model] fields) row-pks))
         row-pks))))
 
 (m/defmethod insert/insert-returning-instances!* ::after-insert

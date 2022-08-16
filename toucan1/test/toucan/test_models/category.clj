@@ -34,7 +34,7 @@
             (format "A category with ID %d does not exist." parent-category-id)))
   category)
 
-(defn- delete-child-categories [{:keys [id]}]
+(defn- delete-child-categories! [{:keys [id]}]
   (db/delete! Category :parent-category-id id))
 
 (def categories-awaiting-moderation
@@ -70,12 +70,9 @@
   [category]
   (add-category-to-updated-queue! category))
 
-;; (pre-update [this]
-;;   (assert-parent-category-exists this))
-;; (post-update [this]
-;;   (add-category-to-updated-queue! this))
-;; (pre-delete [this]
-;;   (delete-child-categories this))
+(helpers/define-before-delete Category
+  [category]
+  (delete-child-categories! category))
 
 
 (m/defmethod test/create-table-sql-file Category
