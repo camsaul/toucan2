@@ -28,28 +28,31 @@
 (m/defmethod query/parse-args [::insert :default]
   [query-type model unparsed-args]
   (let [[rows-type x] (next-method query-type model unparsed-args)]
-    (condp = rows-type
-      :single-row-map    [x]
-      :multiple-row-maps x
-      :kv-pairs          [(into {} (map (juxt :k :v)) x)]
-      :columns-rows      (let [{:keys [columns rows]} x]
-                           (mapv (partial zipmap columns)
-                                 rows)))))
+    {:rows (condp = rows-type
+             :single-row-map    [x]
+             :multiple-row-maps x
+             :kv-pairs          [(into {} (map (juxt :k :v)) x)]
+             :columns-rows      (let [{:keys [columns rows]} x]
+                                  (mapv (partial zipmap columns)
+                                        rows)))}))
 
 (m/defmethod query/build [::insert :default :default]
-  [_query-type model rows]
+  [query-type model {:keys [rows], :as parsed-args}]
+  (when (empty? rows)
+    (throw (ex-info "Cannot build insert query with empty :values"
+                    {:query-type query-type, :model model, :args parsed-args})))
   {:insert-into [(keyword (model/table-name model))]
    :values      rows})
 
 (m/defmulti insert!*
   "Returns the number of rows inserted."
-  {:arglists '([model args])}
+  {:arglists '([model parsed-args])}
   u/dispatch-on-first-arg)
 
 (m/defmethod insert!* :around :default
-  [model args]
-  (u/with-debug-result [(list `insert!* model args)]
-    (next-method model args)))
+  [model parsed-args]
+  (u/with-debug-result [(list `insert!* model parsed-args)]
+    (next-method model parsed-args)))
 
 (def ^:dynamic *result-type*
   "Type of results we want when inserting something. Either `:reducible` for reducible results, or `:row-count` for the
@@ -58,29 +61,30 @@
   :row-count)
 
 (defn- execute! [model query]
-  (let [connectable (model/deferred-current-connectable model)]
-    (case *result-type*
-      :reducible
-      (execute/reducible-query connectable query)
-
-      :row-count
-      (execute/query-one connectable query))))
+  (let [connectable (model/deferred-current-connectable model)
+        execute-fn  (case *result-type*
+                      :reducible execute/reducible-query
+                      :row-count execute/query-one)]
+    (execute-fn connectable query)))
 
 (m/defmethod insert!* :default
-  [model rows]
+  [model {:keys [rows], :as parsed-args}]
   (if (empty? rows)
     (do
       (u/println-debug "No rows to insert.")
-      0)
+      (case *result-type*
+        :row-count 0
+        :reducible []))
     ;; TODO -- should this stuff be in an `:around` method?
     (u/with-debug-result ["Inserting %s rows into %s" (count rows) model]
-      (let [query (query/build ::insert model (mapv (partial instance/instance model)
-                                                    rows))]
+      (let [query (query/build ::insert model (update parsed-args :rows (fn [rows]
+                                                                          (mapv (partial instance/instance model)
+                                                                                rows))))]
         (try
           (execute! model query)
           (catch Throwable e
             (throw (ex-info (format "Error inserting rows: %s" (ex-message e))
-                            {:model model, :query query}
+                            {:model model, :args parsed-args, :query query}
                             e))))))))
 
 (defn insert!
@@ -93,19 +97,28 @@
     (model/with-model [model modelable]
       (insert!* model (query/parse-args ::insert model args)))))
 
+;;; TODO -- I'm 90% sure that [[insert-returning-keys!*]] and [[insert-returning-instances!*]] should get already-parsed
+;;; args and call [[insert!*]] directly with them (to avoid duplicate parsing)
+
 (m/defmulti insert-returning-keys!*
-  {:arglists '([model & args])}
+  {:arglists '([model parsed-args])}
   u/dispatch-on-first-arg)
 
 (m/defmethod insert-returning-keys!* :default
-  [model & args]
+  [model parsed-args]
   (binding [*result-type*           :reducible
             t2.jdbc.query/*options* (assoc t2.jdbc.query/*options* :return-keys true)]
     (into
      []
      (map (select/select-pks-fn model))
-     (apply insert! model args))))
+     (insert!* model parsed-args))))
 
+(m/defmethod insert-returning-keys!* :around :default
+  [model parsed-args]
+  (u/with-debug-result [(list `insert-returning-keys!* model parsed-args)]
+    (next-method model parsed-args)))
+
+;;; TODO -- rename to `insert-returning-pks!`
 (defn insert-returning-keys!
   "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
   inserted. The primary keys are determined by [[model/primary-keys]]. For models with a single primary key, this
@@ -119,11 +132,43 @@
   (u/with-debug-result [(list* `insert-returning-keys! modelable args)]
     (model/with-model [model modelable]
       (try
-        (apply insert-returning-keys!* model args)
+        (insert-returning-keys!* model (query/parse-args ::insert model args))
         (catch Throwable e
           (throw (ex-info (format "Error in %s for %s: %s" `insert-returning-keys! (pr-str model) (ex-message e))
                           {:model model, :args args}
                           e)))))))
+
+(m/defmulti insert-returning-instances!*
+  {:arglists '([model parsed-args])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod insert-returning-instances!* :around :default
+  [model parsed-args]
+  (u/with-debug-result [(list `insert-returning-instances!* model parsed-args)]
+    (next-method model parsed-args)))
+
+(defn select-rows-with-pks [model {:keys [fields], :as _parsed-args} row-pks]
+  (let [pk-vecs      (for [pk row-pks]
+                       (if (sequential? pk)
+                         pk
+                         [pk]))
+        pk-keys      (model/primary-keys-vec model)
+        pk-maps      (for [pk-vec pk-vecs]
+                       (zipmap pk-keys pk-vec))
+        conditions   (mapcat
+                      (juxt identity (fn [k]
+                                       [:in (mapv k pk-maps)]))
+                      pk-keys)
+        model-fields (if (seq fields)
+                       (cons model fields)
+                       model)]
+    (apply select/select model-fields conditions)))
+
+(m/defmethod insert-returning-instances!* :default
+  [model parsed-args]
+  (when-let [row-pks (not-empty (insert-returning-keys!* model parsed-args))]
+    (u/println-debug ["%s returned %s" `insert-returning-keys!* row-pks])
+    (select-rows-with-pks model parsed-args row-pks)))
 
 (defn insert-returning-instances!
   {:arglists '([modelable & row-or-rows]
@@ -134,24 +179,14 @@
                [[modelable & fields] columns row-vectors])}
   [modelable-fields & args]
   (u/with-debug-result [(list* `insert-returning-instances! modelable-fields args)]
-    (let [[modelable & fields] (if (sequential? modelable-fields)
-                                 modelable-fields
-                                 [modelable-fields])]
-      (model/with-model [model modelable]
-        (when-let [row-pks (not-empty (apply insert-returning-keys! modelable args))]
-          (u/println-debug ["%s returned %s" `insert-returning-keys! row-pks])
-          (let [pk-vecs      (for [pk row-pks]
-                               (if (sequential? pk)
-                                 pk
-                                 [pk]))
-                pk-keys      (model/primary-keys-vec model)
-                pk-maps      (for [pk-vec pk-vecs]
-                               (zipmap pk-keys pk-vec))
-                conditions   (mapcat
-                              (juxt identity (fn [k]
-                                               [:in (mapv k pk-maps)]))
-                              pk-keys)
-                model-fields (if (seq fields)
-                               (cons model fields)
-                               model)]
-            (apply select/select model-fields conditions)))))))
+    (try
+      (let [[modelable & fields] (if (sequential? modelable-fields)
+                                   modelable-fields
+                                   [modelable-fields])]
+        (model/with-model [model modelable]
+          (let [parsed-args (query/parse-args ::insert model args)]
+            (insert-returning-instances!* model (assoc parsed-args :fields fields)))))
+      (catch Throwable e
+        (throw (ex-info (format "Error in %s: %s" `insert-returning-instances! (ex-message e))
+                        {:modelable modelable-fields, :args args}
+                        e))))))

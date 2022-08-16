@@ -255,8 +255,7 @@
   {:arglists '([model row])}
   u/dispatch-on-first-arg)
 
-(m/defmethod insert/insert!* :before ::before-insert
-  [model rows]
+(defn- do-before-insert-to-rows [rows model]
   (mapv
    (fn [row]
      (try
@@ -267,6 +266,10 @@
                          {:model model, :row row}
                          e)))))
    rows))
+
+(m/defmethod insert/insert!* :before ::before-insert
+  [model parsed-args]
+  (update parsed-args :rows do-before-insert-to-rows model))
 
 (defmacro define-before-insert
   {:style/indent :defn}
@@ -291,20 +294,36 @@
                         {:model model, :row row}
                         e))))))
 
-(def ^:dynamic *return-instances?* true)
+(def ^:dynamic *after-insert-handled?* false)
 
 (m/defmethod insert/insert!* ::after-insert
-  [model rows]
-  (if-not *return-instances?*
-    (next-method model rows)
-    (binding [*return-instances?* false]
-      (let [rows  (insert/insert-returning-instances! model rows)
-            rows' (mapv
-                   (partial after-insert model)
-                   rows)]
-        (cond-> rows'
-          (= insert/*result-type* :row-count)
-          count)))))
+  [model parsed-args]
+  (if *after-insert-handled?*
+    (next-method model parsed-args)
+    (binding [*after-insert-handled?* true]
+      (let [rows (insert/insert-returning-instances!* model parsed-args)]
+        (doseq [row rows]
+          (after-insert model row))
+        (count rows)))))
+
+(m/defmethod insert/insert-returning-keys!* ::after-insert
+  [model parsed-args]
+  (if *after-insert-handled?*
+    (next-method model parsed-args)
+    (binding [*after-insert-handled?* true]
+      (let [row-pks (next-method model parsed-args)
+            rows    (insert/select-rows-with-pks model parsed-args row-pks)]
+        (doseq [row rows]
+          (after-insert model row))
+        row-pks))))
+
+(m/defmethod insert/insert-returning-instances!* ::after-insert
+  [model parsed-args]
+  (if *after-insert-handled?*
+    (next-method model parsed-args)
+    (binding [*after-insert-handled?* true]
+      (mapv (partial after-insert model)
+            (next-method model parsed-args)))))
 
 (defmacro define-after-insert {:style/indent :defn}
   [model [instance-binding] & body]
