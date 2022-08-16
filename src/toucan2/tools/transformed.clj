@@ -11,6 +11,9 @@
    [toucan2.util :as u]))
 
 (m/defmulti transforms*
+  "Return a map of
+
+    {column-name {:in <fn>, :out <fn>}}"
   {:arglists '([model])}
   u/dispatch-on-first-arg)
 
@@ -84,7 +87,7 @@
      (into {} (for [[k direction->xform] transforms
                     :let                 [xform (get direction->xform direction)]
                     :when                xform]
-                [k (fn [v]
+                [k (fn xform-fn [v]
                      (try
                        (xform v)
                        (catch Throwable e
@@ -138,24 +141,36 @@
          (result-row/with-thunks row (update thunks k (fn [thunk]
                                                         (comp xform thunk))))
          (update row k xform))
-     (update row k xform))))
+     (u/with-debug-result (format "Transform %s %s" (pr-str k) (pr-str (get row k)))
+       (try
+         (update row k xform)
+         (catch Throwable e
+           (throw (ex-info (format "Error transforming %s %s: %s" (pr-str k) (pr-str (get row k)) (ex-message e))
+                           {:k k, :v (get row k), :row row, :xform xform}
+                           e))))))))
 
 (defn out-transforms [model]
   (wrapped-transforms model :out))
 
+(defn- apply-row-transform-fn [k xform]
+  (fn [instance]
+    (cond-> instance
+      (contains? instance k) (apply-row-transform k xform))))
+
 (defn row-transform-fn [transforms]
   {:pre [(seq transforms)]}
-  (let [transform-fns (for [[k xform] transforms]
-                        (fn [instance]
-                          (if (contains? instance k)
-                            (apply-row-transform instance k xform)
-                            instance)))]
-    (apply comp transform-fns)))
+  (reduce
+   (fn [f [k xform]]
+     (comp (apply-row-transform-fn k xform)
+      f))
+   identity
+   transforms))
 
 (defn transform-results [model reducible-query]
   (if-let [transforms (not-empty (out-transforms model))]
-    (u/with-debug-result (format "Apply transforms %s to results" model)
+    (u/with-debug-result (format "Apply %s transforms to results" model)
       (u/println-debug (pr-str transforms))
+      reducible-query
       (eduction
        (map (row-transform-fn transforms))
        reducible-query))

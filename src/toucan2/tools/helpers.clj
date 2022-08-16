@@ -11,6 +11,8 @@
   (when-not (isa? child parent)
     (derive child parent)))
 
+;;;; [[define-before-select]], [[define-after-select-reducible]], [[define-after-select-each]]
+
 (defn do-before-select [model thunk]
   (u/with-debug-result (format "%s %s" `define-before-select (pr-str model))
     (try
@@ -55,6 +57,23 @@
   [model [instance-binding] & body]
   `(define-after-select-reducible ~model [reducible-query#]
      (do-after-select-each ~'&model reducible-query# (fn [~instance-binding] ~@body))))
+
+;;;; [[define-default-fields]]
+
+(m/defmulti default-fields
+  {:arglists '([model])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod query/build :before [::select/select ::default-fields clojure.lang.IPersistentMap]
+  [_query-type model args]
+  (update args :query (fn [query]
+                        (merge {:select (default-fields model)}
+                               query))))
+
+(defmacro define-default-fields [model & body]
+  `(let [model# ~model]
+     (maybe-derive model# ::default-fields)
+     (m/defmethod default-fields model# [~'&model] ~@body)))
 
 ;; (m/defmulti before-update-transform-changes*
 ;;   {:arglists '([connectableᵈ instanceᵈᵗ options])}
@@ -322,7 +341,12 @@
 ;;               [~'_ ~'_ ~'_]
 ;;               ~model)))))
 
+;;;; [[deftransforms]]
+
 (defmacro deftransforms
+  "`transforms` should be a map of
+
+    {column-name {:in <fn>, :out <fn>}}"
   {:style/indent 1}
   [model transforms]
   `(let [model# ~model]

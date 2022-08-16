@@ -28,6 +28,9 @@
                           (u/dispatch-value connectable))
                   {:connectable connectable})))
 
+;; the difference between this and using [[current/*connection*]] directly is that this waits until it gets resolved by
+;; [[do-with-connection]] to get the value for [[current/*connection*]]. For a reducible query this means you'll get the
+;; value at the time you reduce the query rather than at the time you build the reducible query.
 (m/defmethod do-with-connection ::current
   [_connectable f]
   (do-with-connection current/*connection* f))

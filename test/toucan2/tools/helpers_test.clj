@@ -21,6 +21,20 @@
                                       ::after-select? true})
          (select/select-one ::people 1))))
 
+(derive ::venues.default-fields ::test/venues)
+
+(helpers/define-default-fields ::venues.default-fields
+  [:id :name :category])
+
+(deftest define-default-fields-test
+  (is (= [(instance/instance ::venues.default-fields
+                             {:id 1, :name "Tempest", :category "bar"})
+          (instance/instance ::venues.default-fields
+                             {:id 2, :name "Ho's Tavern", :category "bar"})
+          (instance/instance ::venues.default-fields
+                             {:id 3, :name "BevMo", :category "store"})]
+         (select/select ::venues.default-fields))))
+
 ;; (deftest group-by-xform-test
 ;;   (is (= {false [2 4], true [3 5]}
 ;;          (into {} (toucan2.helpers/group-by-xform even? inc) [1 2 3 4])))
