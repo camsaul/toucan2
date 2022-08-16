@@ -19,7 +19,7 @@
 ;;;; [[define-before-select]], [[define-after-select-reducible]], [[define-after-select-each]]
 
 (defn do-before-select [model thunk]
-  (u/with-debug-result (format "%s %s" `define-before-select (pr-str model))
+  (u/with-debug-result (format "%s %s" `define-before-select (u/pretty-print model))
     (try
       (thunk)
       (catch Throwable e
@@ -47,7 +47,7 @@
 
 (defn do-after-select-each [model reducible-query f]
   (eduction (map (fn [instance]
-                   (u/with-debug-result (format "%s %s %s" `define-after-select-each (pr-str model) (pr-str instance))
+                   (u/with-debug-result (format "%s %s %s" `define-after-select-each (u/pretty-print model) (u/pretty-print instance))
                      (try
                        (f instance)
                        (catch Throwable e
@@ -92,7 +92,7 @@
 ;;   instance)
 
 ;; (defn update-query->select-query [model update-query-args]
-;;   (u/with-debug-result (format "Concert update query args to select query args for %s" (pr-str update-query-args))
+;;   (u/with-debug-result (format "Concert update query args to select query args for %s" (u/pretty-print update-query-args))
 ;;     (query/build ::select/select model update-query-args)))
 
 ;; (defn reducible-instances-matching-update-query
@@ -257,14 +257,16 @@
 
 (m/defmethod insert/insert!* :before ::before-insert
   [model rows]
-  (for [row rows]
-    (try
-      (u/with-debug-result (format "Do before-insert for %s" (pr-str model))
-        (before-insert model row))
-      (catch Throwable e
-        (throw (ex-info (format "Error in before-insert for %s: %s" (pr-str model) (ex-message e))
-                        {:model model, :row row}
-                        e))))))
+  (mapv
+   (fn [row]
+     (try
+       (u/with-debug-result ["Do before-insert for %s" model]
+         (before-insert model row))
+       (catch Throwable e
+         (throw (ex-info (format "Error in before-insert for %s: %s" (pr-str model) (ex-message e))
+                         {:model model, :row row}
+                         e)))))
+   rows))
 
 (defmacro define-before-insert
   {:style/indent :defn}
@@ -281,7 +283,7 @@
 
 (m/defmethod after-insert :around :default
   [model row]
-  (u/with-debug-result (pr-str (list `after-insert model row))
+  (u/with-debug-result [(list `after-insert model row)]
     (try
       (next-method model row)
       (catch Throwable e
@@ -296,9 +298,13 @@
   (if-not *return-instances?*
     (next-method model rows)
     (binding [*return-instances?* false]
-      (let [rows (insert/insert-returning-instances! model rows)]
-        (count (for [row rows]
-                 (after-insert model row)))))))
+      (let [rows  (insert/insert-returning-instances! model rows)
+            rows' (mapv
+                   (partial after-insert model)
+                   rows)]
+        (cond-> rows'
+          (= insert/*result-type* :row-count)
+          count)))))
 
 (defmacro define-after-insert {:style/indent :defn}
   [model [instance-binding] & body]

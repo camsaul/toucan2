@@ -20,7 +20,7 @@
 
 (m/defmethod delete!* :around :default
   [model parsed-args]
-  (u/with-debug-result (pr-str (list 'delete!* model parsed-args))
+  (u/with-debug-result (u/pretty-print (list 'delete!* model parsed-args))
     (next-method model parsed-args)))
 
 (m/defmethod delete!* :default
@@ -39,7 +39,7 @@
   "Returns number of rows deleted."
   {:arglists '([modelable & conditions? query?])}
   [modelable & unparsed-args]
-  (u/with-debug-result (pr-str (list* 'delete! modelable unparsed-args))
+  (u/with-debug-result (u/pretty-print (list* 'delete! modelable unparsed-args))
     (model/with-model [model modelable]
       (query/with-parsed-args-with-query [parsed-args [::delete model unparsed-args]]
         (delete!* model parsed-args)))))

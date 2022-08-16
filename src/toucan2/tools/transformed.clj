@@ -106,8 +106,8 @@
   [model {:keys [kv-args], :as args}]
   (if-let [transforms (not-empty (when (seq kv-args)
                                    (in-transforms model)))]
-    (u/with-debug-result (format "Apply transforms to kv-args %s" (pr-str kv-args))
-      (u/println-debug (pr-str transforms))
+    (u/with-debug-result (format "Apply transforms to kv-args %s" (u/pretty-print kv-args))
+      (u/println-debug (u/pretty-print transforms))
       (cond-> args
         (seq kv-args)                (update :kv-args transform-kv-args transforms)
         (some? (:toucan/pk kv-args)) (update-in [:kv-args :toucan/pk] transform-pk model transforms)))
@@ -141,7 +141,7 @@
          (result-row/with-thunks row (update thunks k (fn [thunk]
                                                         (comp xform thunk))))
          (update row k xform))
-     (u/with-debug-result (format "Transform %s %s" (pr-str k) (pr-str (get row k)))
+     (u/with-debug-result (format "Transform %s %s" (u/pretty-print k) (u/pretty-print (get row k)))
        (try
          (update row k xform)
          (catch Throwable e
@@ -169,7 +169,7 @@
 (defn transform-results [model reducible-query]
   (if-let [transforms (not-empty (out-transforms model))]
     (u/with-debug-result (format "Apply %s transforms to results" model)
-      (u/println-debug (pr-str transforms))
+      (u/println-debug (u/pretty-print transforms))
       reducible-query
       (eduction
        (map (row-transform-fn transforms))

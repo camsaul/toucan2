@@ -49,7 +49,7 @@
 
 (m/defmethod update!* :around :default
   [model parsed-args]
-  (u/with-debug-result (pr-str (list 'update!* model parsed-args))
+  (u/with-debug-result (u/pretty-print (list 'update!* model parsed-args))
     (next-method model parsed-args)))
 
 (m/defmethod update!* :default
@@ -70,7 +70,7 @@
   "Returns number of rows updated."
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [modelable & unparsed-args]
-  (u/with-debug-result (pr-str (list* 'update! modelable unparsed-args))
+  (u/with-debug-result (u/pretty-print (list* 'update! modelable unparsed-args))
     (model/with-model [model modelable]
       (query/with-parsed-args-with-query [parsed-args [::update model unparsed-args]]
         (update!* model parsed-args)))))

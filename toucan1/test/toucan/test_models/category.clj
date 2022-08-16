@@ -52,11 +52,16 @@
 (defn add-category-to-updated-queue! [{:keys [id]}]
   (swap! categories-recently-updated conj id))
 
+(helpers/define-before-insert Category
+  [category]
+  (assert-parent-category-exists category)
+  category)
 
-;; (pre-insert [this]
-;;   (assert-parent-category-exists this))
-;; (post-insert [this]
-;;   (add-category-to-moderation-queue! this))
+(helpers/define-after-insert Category
+  [category]
+  (add-category-to-moderation-queue! category)
+  category)
+
 ;; (pre-update [this]
 ;;   (assert-parent-category-exists this))
 ;; (post-update [this]

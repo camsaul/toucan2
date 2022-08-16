@@ -103,9 +103,9 @@
                                  fk-vals)
               fetched-instance (get pk->fetched-instance fk-vals)]
           (u/with-debug-result (format "Hydrate %s" dest-key)
-            (u/println-debug (pr-str row))
+            (u/println-debug (u/pretty-print row))
             (u/println-debug "with")
-            (u/println-debug (or (some-> fetched-instance pr-str) "nil (no matching fetched row)"))
+            (u/println-debug (or (some-> fetched-instance u/pretty-print) "nil (no matching fetched row)"))
             (cond-> (dissoc row ::fk)
               fetched-instance (assoc dest-key fetched-instance))))))))
 

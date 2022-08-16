@@ -24,16 +24,16 @@
   clojure.lang.IReduceInit
   (realize [this]
     (try
-      (u/with-debug-result (format "(%s ^%s %s)" `realize (.getCanonicalName (class this)) (pr-str this))
+      (u/with-debug-result ["%s %s" `realize (symbol (.getCanonicalName (class this))) #_this]
         (into []
               (map (fn [row]
-                     (u/with-debug-result (format "(%s ^%s %s)" `realize (some-> row class .getCanonicalName) (pr-str row))
+                     (u/with-debug-result [(list `realize (some-> row class .getCanonicalName symbol) row)]
                        (realize row))))
               this))
       (catch Throwable e
         (throw (ex-info (format "Error reducing ^%s %s: %s"
                                 (.getCanonicalName (class this))
-                                (binding [*print-meta* true] (pr-str this))
+                                (binding [*print-meta* true] (u/pretty-print this))
                                 (ex-message e))
                         {:this this}
                         e)))))

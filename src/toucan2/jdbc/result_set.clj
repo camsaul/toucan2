@@ -23,21 +23,23 @@
   {:arglists '([^Connection conn model ^ResultSet rset ^ResultSetMetaData rsmeta ^Long i])}
   (fn [^Connection conn model _rset ^ResultSetMetaData rsmeta ^Long i]
     (let [col-type (.getColumnType rsmeta i)]
-      (u/println-debug (format "Column %d %s is of JDBC type %s, native type %s"
-                               i
-                               (pr-str (.getColumnLabel rsmeta i))
-                               (type-name col-type)
-                               (.getColumnTypeName rsmeta i)))
+      (u/println-debug ["Column %s %s is of JDBC type %s, native type %s"
+                        i
+                        (.getColumnLabel rsmeta i)
+                        (type-name col-type)
+                        (.getColumnTypeName rsmeta i)])
       [(u/dispatch-value conn) (u/dispatch-value model) col-type])))
 
 (m/defmethod read-column-thunk :default
   [_conn _model ^ResultSet rset _rsmeta ^Long i]
-  (u/println-debug (format "Fetching values in column %d with %s" i (list '.getObject 'rs i)))
+  (u/println-debug ["Fetching values in column %s with %s" i (list '.getObject 'rs i)])
   (fn default-read-column-thunk []
     (.getObject rset i)))
 
 (defn get-object-of-class-thunk [^ResultSet rset ^Long i ^Class klass]
-  (u/println-debug (format "Fetching values in column %d with %s" i (list '.getObject 'rs i (symbol (.getCanonicalName klass)))))
+  (u/println-debug ["Fetching values in column %s with %s"
+                    i
+                    (list '.getObject 'rs i (symbol (.getCanonicalName klass)))])
   (fn get-object-of-class-thunk []
     (.getObject rset i klass)))
 
@@ -64,7 +66,7 @@
                                                 ;; once even with multiple rows.
                                                 read-thunk   (delay (read-column-thunk conn model rset rsmeta i))
                                                 result-thunk (fn []
-                                                               (u/with-debug-result (format "Realize column %d %s" i col-name)
+                                                               (u/with-debug-result ["Realize column %s %s" i col-name]
                                                                  (jdbc.rs/read-column-by-index (@read-thunk) rsmeta i)))]]
                                    [col-name result-thunk]))]
     (fn row-instance-thunk []

@@ -1,7 +1,8 @@
 (ns toucan2.util-test
   (:require [toucan2.util :as u]
             [clojure.test :refer :all]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [methodical.util.trace :as m.trace]))
 
 (defmacro ^:private out-str-lines [& body]
   `(some-> (with-out-str ~@body)
@@ -27,41 +28,42 @@
                @evaled?))))))
 
 (deftest with-debug-result-test
-  (testing "debugging disabled"
-    (let [message-form-evaled? (atom false)]
-      (testing "don't print anything"
-        (is (= nil
-               (out-str-lines
-                (u/with-debug-result (do
-                                       (reset! message-form-evaled? true)
-                                       "DEBUG")
-                  {:cans (+ 1 1)})))))
-      (testing "don't eval message form"
-        (is (= false
-               @message-form-evaled?)))))
-  (testing "debugging enabled"
-    (binding [u/*debug* true]
+  (binding [m.trace/*color* false]
+    (testing "debugging disabled"
       (let [message-form-evaled? (atom false)]
-        (is (= ["DEBUG"
-                "+-> {:cans 2}"]
+        (testing "don't print anything"
+          (is (= nil
+                 (out-str-lines
+                  (u/with-debug-result (do
+                                         (reset! message-form-evaled? true)
+                                         "DEBUG")
+                    {:cans (+ 1 1)})))))
+        (testing "don't eval message form"
+          (is (= false
+                 @message-form-evaled?)))))
+    (testing "debugging enabled"
+      (binding [u/*debug* true]
+        (let [message-form-evaled? (atom false)]
+          (is (= ["DEBUG"
+                  "↳ {:cans 2}"]
+                 (out-str-lines
+                  (u/with-debug-result (do
+                                         (reset! message-form-evaled? true)
+                                         "DEBUG")
+                    {:cans (+ 1 1)}))))
+          (is (= true
+                 @message-form-evaled?)))))
+    (testing "Nested debug results"
+      (binding [u/*debug* true]
+        (is (= ["A"
+                "|  B"
+                "|  ↳ 2"
+                "|  C"
+                "|  ↳ :cans"
+                "↳ [2 :cans]"]
                (out-str-lines
-                (u/with-debug-result (do
-                                       (reset! message-form-evaled? true)
-                                       "DEBUG")
-                  {:cans (+ 1 1)}))))
-        (is (= true
-               @message-form-evaled?)))))
-  (testing "Nested debug results"
-    (binding [u/*debug* true]
-      (is (= ["A"
-              "|  B"
-              "|  +-> 2"
-              "|  C"
-              "|  +-> :cans"
-              "+-> [2 :cans]"]
-             (out-str-lines
-              (u/with-debug-result "A"
-                [(u/with-debug-result "B"
-                   2)
-                 (u/with-debug-result "C"
-                   :cans)])))))))
+                (u/with-debug-result "A"
+                  [(u/with-debug-result "B"
+                     2)
+                   (u/with-debug-result "C"
+                     :cans)]))))))))
