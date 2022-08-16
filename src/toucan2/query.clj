@@ -26,19 +26,18 @@
 ;;;; [[build]]
 
 (m/defmulti build
-  "Dispatches on `query-type`, `model`, and the `:query` in `args`."
-  {:arglists '([query-type model args])}
-  (fn [query-type model args]
+  "Dispatches on `query-type`, `model`, and the `:query` in `parsed-args`."
+  {:arglists '([query-type model parsed-args])}
+  (fn [query-type model parsed-args]
     (mapv u/dispatch-value [query-type
                             model
-                            (when (map? args)
-                              (:query args))])))
+                            (:query parsed-args)])))
 
 (m/defmethod build :around :default
-  [query-type model args]
+  [query-type model parsed-args]
   (try
-    (u/with-debug-result (u/pretty-print (list `build query-type model args))
-      (next-method query-type model args))
+    (u/with-debug-result [(list `build query-type model parsed-args)]
+      (next-method query-type model parsed-args))
     (catch Throwable e
       (throw (ex-info (format "Error building %s query for model %s: %s"
                               (pr-str query-type)
@@ -46,52 +45,49 @@
                               (ex-message e))
                       {:query-type     query-type
                        :model          model
-                       :args           args
-                       :method #'build
-                       :dispatch-value (m/dispatch-value build query-type model args)}
+                       :parsed-args    parsed-args
+                       :method         #'build
+                       :dispatch-value (m/dispatch-value build query-type model parsed-args)}
                       e)))))
 
 (m/defmethod build :default
-  [query-type model args]
-  (throw (ex-info (format "Don't know how to build a query from args %s. Do you need to implement %s for %s?"
-                          (pr-str args)
+  [query-type model parsed-args]
+  (throw (ex-info (format "Don't know how to build a query from parsed args %s. Do you need to implement %s for %s?"
+                          (pr-str parsed-args)
                           `build
-                          (pr-str (m/dispatch-value build query-type model args)))
+                          (pr-str (m/dispatch-value build query-type model parsed-args)))
                   {:query-type     query-type
                    :model          model
-                   :args           args
+                   :parsed-args    parsed-args
                    :method         #'build
-                   :dispatch-value (m/dispatch-value build query-type model args)})))
+                   :dispatch-value (m/dispatch-value build query-type model parsed-args)})))
 
 (m/defmethod build [:default :default nil]
-  [query-type model args]
-  (assert (map? args)
-          (format "Default %s method expects map args, got %s. If you want to use non-map args, implement a method for %s"
-                  `build
-                  (pr-str args)
-                  (pr-str (m/dispatch-value build query-type model args))))
-  (build query-type model (assoc args :query {})))
+  [query-type model parsed-args]
+  (assert (map? parsed-args)
+          (format "%s expects map parsed-args, got %s." `build (pr-str parsed-args)))
+  (build query-type model (assoc parsed-args :query {})))
 
 (m/defmethod build [:default :default Long]
-  [query-type model {pk :query, :as args}]
-  (build query-type model (-> args
+  [query-type model {pk :query, :as parsed-args}]
+  (build query-type model (-> parsed-args
                               (assoc :query {})
                               (update :kv-args assoc :toucan/pk pk))))
 
 (m/defmethod build [:default :default String]
-  [query-type model args]
-  (build query-type model (update args :query (fn [sql]
-                                                [sql]))))
+  [query-type model parsed-args]
+  (build query-type model (update parsed-args :query (fn [sql]
+                                                       [sql]))))
 
 (m/defmethod build [:default :default clojure.lang.Sequential]
-  [query-type model {sql-args :query, :keys [kv-args], :as args}]
+  [query-type model {sql-args :query, :keys [kv-args], :as parsed-args}]
   (when (seq kv-args)
     (throw (ex-info "key-value args are not supported for plain SQL queries."
                     {:query-type     query-type
                      :model          model
-                     :args           args
+                     :parsed-args    parsed-args
                      :method         #'build
-                     :dispatch-value (m/dispatch-value build query-type model args)})))
+                     :dispatch-value (m/dispatch-value build query-type model parsed-args)})))
   sql-args)
 
 ;;;; Default [[build]] impl for maps; applying key-value args.
@@ -162,7 +158,7 @@
 
 (m/defmethod parse-args :around :default
   [query-type model unparsed-args]
-  (u/with-debug-result (u/pretty-print (list `parse-args query-type model unparsed-args))
+  (u/with-debug-result [(list `parse-args query-type model unparsed-args)]
     (next-method query-type model unparsed-args)))
 
 (m/defmethod parse-args :default
@@ -190,6 +186,8 @@
              (dissoc :queryable)
              (assoc :query query))))))
 
+;;; TODO -- not 100% sure this is really worth it, we only use it in two places and I think it hides more stuff than
+;;; it's worth
 (defmacro with-parsed-args-with-query
   {:style/indent 1}
   [[parsed-args-binding [query-type model unparsed-args]] & body]
