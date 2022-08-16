@@ -4,6 +4,7 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.execute :as execute]
+   [toucan2.instance :as instance]
    [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.model :as model]
    [toucan2.query :as query]
@@ -72,7 +73,8 @@
       0)
     ;; TODO -- should this stuff be in an `:around` method?
     (u/with-debug-result (format "Inserting %d rows into %s" (count rows) (pr-str model))
-      (let [query (query/build ::insert model rows)]
+      (let [query (query/build ::insert model (map (partial instance/instance model)
+                                                   rows))]
         (try
           (execute! model query)
           (catch Throwable e

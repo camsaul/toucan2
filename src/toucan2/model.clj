@@ -76,3 +76,16 @@
 (m/defmethod primary-keys :default
   [_model]
   [:id])
+
+(defn primary-keys-vec
+  "Get the primary keys for a `model` as a vector."
+  [model]
+  (let [pk-keys (primary-keys model)]
+    (if (sequential? pk-keys)
+      pk-keys
+      [pk-keys])))
+
+(defn primary-key-values
+  "Return a map of primary key values for a Toucan 2 `instance`."
+  [instance]
+  (select-keys instance (primary-keys-vec instance)))

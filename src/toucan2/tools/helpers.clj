@@ -4,7 +4,12 @@
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.util :as u]))
+   [toucan2.util :as u]
+   [clojure.walk :as walk]
+   [toucan2.instance :as instance]
+   [toucan2.update :as update]
+   [toucan2.model :as model]
+   [toucan2.insert :as insert]))
 
 (defn maybe-derive
   [child parent]
@@ -75,31 +80,27 @@
      (maybe-derive model# ::default-fields)
      (m/defmethod default-fields model# [~'&model] ~@body)))
 
+;;;; [[define-before-update]], [[define-after-update]]
+
 ;; (m/defmulti before-update-transform-changes*
-;;   {:arglists '([connectableᵈ instanceᵈᵗ options])}
-;;   u/dispatch-on-first-two-args
-;;   :combo (m.combo.threaded/threading-method-combination :second))
+;;   {:arglists '([instance options])}
+;;   u/dispatch-on-first-arg)
 
 ;; ;; default method is a no-op
 ;; (m/defmethod before-update-transform-changes* :default
 ;;   [_ instance _]
 ;;   instance)
 
-;; (defn update-query->select-query [connectable model update-query options]
-;;   (let [[connectable options] (conn.current/ensure-connectable connectable model options)
-;;         table                 (build-query/table* update-query)
-;;         conditions            (build-query/conditions* update-query)]
-;;     (-> (build-query/buildable-query* connectable model {} :select options)
-;;         (build-query/with-table* table options)
-;;         (build-query/with-conditions* conditions options))))
+;; (defn update-query->select-query [model update-query-args]
+;;   (u/with-debug-result (format "Concert update query args to select query args for %s" (pr-str update-query-args))
+;;     (query/build ::select/select model update-query-args)))
 
 ;; (defn reducible-instances-matching-update-query
 ;;   "Return instances of `model` that match conditions from a compiled `update-query` as passed to `update!*`."
-;;   [connectable model update-query options]
-;;   (let [[connectable options] (conn.current/ensure-connectable connectable model options)
-;;         select-query          (update-query->select-query connectable model update-query options)]
-;;     (log/with-trace-no-result ["Finding matching instances with query %s" select-query]
-;;       (select/select-reducible [connectable model] select-query (or options {})))))
+;;   [model update-query-args]
+;;   (let [select-query-args (update-query->select-query model update-query-args)]
+;;     (u/with-debug-result (format "Finding matching instances with query %s" select-query-args)
+;;       (select/select-reducible* model select-query-args))))
 
 ;; (defn group-by-xform
 ;;   "Transducer that groups together values into a map of `(key-fn x)` -> `[(val-fn x) ...]`, then reduces that map.
@@ -133,32 +134,32 @@
 ;;   `::before-update-transform-matching-rows`."
 ;;     100)
 
-;; (m/defmethod mutative/update!* :around [:default ::before-update-transform-matching-rows :toucan2/buildable-query]
-;;   [connectable model {updates :set, :as query} options]
-;;   (log/with-debug-no-result ["Doing before update for %s" (u/dispatch-value model)]
+;; (m/defmethod update/update!* :around [::before-update-transform-matching-rows clojure.lang.IPersistentMap]
+;;   [model {updates :set, :as query}]
+;;   (u/with-debug-result (format "Doing before update for %s" (u/dispatch-value model))
 ;;     (if (empty? updates)
-;;       (do (log/tracef "Query %s has no changes; skipping rest of update" query)
+;;       (do (u/println-debug (format "Query %s has no changes; skipping rest of update" query))
 ;;           0)
 ;;       (letfn [(f [instance]
-;;                 (before-update-transform-changes* connectable instance options))]
+;;                 (before-update-transform-changes* instance options))]
 ;;         (try
 ;;           ;; TODO -- this whole thing should be done in a transaction.
 ;;           (transduce
 ;;            (comp
 ;;             ;; merge in changes for each instance
 ;;             (map (fn [instance]
-;;                    (log/tracef "Found matching instance %s" instance)
+;;                    (u/println-debug (format "Found matching instance %s" instance))
 ;;                    (merge instance updates)))
 ;;             ;; filter out instances that don't have any changes before calling `f`
 ;;             (filter (fn [instance]
 ;;                       (if (seq (instance/changes instance))
 ;;                         instance
-;;                         (log/tracef "Skipping row with PK %s, it has no changes" (model/primary-key-values instance)))))
+;;                         (u/println-debug (format "Skipping row with PK %s, it has no changes" (model/primary-key-values instance))))))
 ;;             ;; apply the changes-xform to each instance
 ;;             (map (fn [instance]
-;;                    (log/with-trace ["Apply f to %s" instance]
+;;                    (u/with-debug-result (format "Apply f to %s" instance)
 ;;                      (let [result (f instance)]
-;;                        (assert (instance/toucan2-instance? result)
+;;                        (assert (instance/instance? result)
 ;;                                (format "before-update method for %s should return an instance, got ^%s %s"
 ;;                                        (u/dispatch-value model)
 ;;                                        (some-> result class .getCanonicalName)
@@ -168,8 +169,8 @@
 ;;             (filter (fn [instance]
 ;;                       (if (seq (instance/changes instance))
 ;;                         instance
-;;                         (log/tracef "Skipping row with PK %s, it has no changes after applying f"
-;;                                     (model/primary-key-keys connectable instance)))))
+;;                         (u/println-debug (format "Skipping row with PK %s, it has no changes after applying f"
+;;                                                  (model/primary-keys instance))))))
 ;;             ;; TODO -- consider whether we should batch the stuff below. e.g. if we end up matching 1 million objects,
 ;;             ;; it might not be ideal to keep a million PK value vectors in memory at once. Also, a query with `UPDATE
 ;;             ;; table WHERE id IN (...)` with a million ids probably isn't going to work so well.
@@ -177,25 +178,27 @@
 ;;             ;; Group all the PKs by their changes.
 ;;             ;;
 ;;             ;; TODO -- if we had a batched-update method, we wouldn't need this complicated transducer.
-;;             (group-by-xform instance/changes (let [pk-keys (vec (model/primary-key-keys connectable model))]
+;;             (group-by-xform instance/changes (let [pk-keys (model/primary-keys-vec model)]
 ;;                                                #(mapv % pk-keys)))
 ;;             ;; do an update call for each distinct set of changes
 ;;             (map (fn [[changes matching-primary-keys]]
 ;;                    (let [new-query (-> query
+;;                                        (assoc )
 ;;                                        (build-query/with-changes* changes options)
 ;;                                        ;; TODO -- :toucan2/with-pks is currently only implemented for HoneySQL, don't
 ;;                                        ;; assume it works because it might not.
 ;;                                        (build-query/merge-kv-conditions* {:toucan2/with-pks matching-primary-keys} options))]
-;;                      (log/with-trace ["Performing updates with query %s" new-query]
-;;                        (next-method connectable model new-query options))))))
+;;                      (u/with-debug-result (format "Performing updates with query %s" new-query)
+;;                        (next-method model new-query options))))))
 ;;            (completing (fnil + 0 0))
 ;;            0
-;;            (reducible-instances-matching-update-query connectable model query options))
+;;            (reducible-instances-matching-update-query model query options))
 ;;           (catch Throwable e
 ;;             (throw (ex-info (format "Error in after-update for %s: %s" (u/dispatch-value model) (ex-message e))
 ;;                             {:model model, :query query}
 ;;                             e))))))))
 
+;; ;;; TODO -- is this *REALLY* necessary?
 ;; (defn disallow-next-method-calls [body]
 ;;   (walk/postwalk
 ;;    (fn [form]
@@ -206,140 +209,156 @@
 ;;        form))
 ;;    body))
 
-;; (defmacro define-before-update {:style/indent :defn} [dispatch-value [instance-binding] & body]
-;;   (let [[connectable-dv model-dv] (dispatch-value-2 dispatch-value)]
-;;     `(do
-;;        (u/maybe-derive ~model-dv ::before-update-transform-matching-rows)
-;;        (m/defmethod before-update-transform-changes* [~connectable-dv ~model-dv]
-;;          [~'&connectable ~instance-binding ~'&options]
-;;          (let [result# ~(disallow-next-method-calls `(do ~@body))]
-;;            (~'next-method ~'&connectable result# ~'&options))))))
+;; (defmacro define-before-update
+;;   {:style/indent :defn}
+;;   [model [instance-binding] & body]
+;;   `(let [model# ~model]
+;;      (u/maybe-derive model# ::before-update-transform-matching-rows)
+;;      (m/defmethod before-update-transform-changes* model#
+;;        [~'&~instance-binding ~'&options]
+;;        (let [result# ~(disallow-next-method-calls `(do ~@body))]
+;;          (~'next-method ~'&result# ~'&options)))))
 
 ;; (m/defmulti after-update*
-;;   {:arglists '([connectableᵈ modelᵈ instanceᵗ options])}
-;;   u/dispatch-on-first-two-args
-;;   :combo (m.combo.threaded/threading-method-combination :third))
+;;   {:arglists '([model instance])}
+;;   u/dispatch-on-first-arg)
 
-;; (m/defmethod mutative/update!* :around [:default ::after-update :default]
-;;   [connectable model update-query options]
-;;   (let [result (next-method connectable model update-query options)]
-;;     (log/with-debug-no-result ["Doing after-update for %s" (u/dispatch-value model)]
+;; (m/defmethod update/update!* :around [::after-update :default]
+;;   [model args]
+;;   (let [result (next-method model args)]
+;;     (u/with-debug-result (format "Doing after-update for %s" (u/dispatch-value model))
 ;;       (when (pos? result)
 ;;         (try
-;;           (let [rows (reducible-instances-matching-update-query connectable model update-query options)]
+;;           (let [rows (reducible-instances-matching-update-query model args)]
 ;;             (reduce
 ;;              (fn [_ instance]
-;;                (after-update* connectable model instance options))
+;;                (after-update* model instance))
 ;;              nil
 ;;              rows))
 ;;           (catch Throwable e
 ;;             (throw (ex-info (format "Error in after-update for %s: %s" (u/dispatch-value model) (ex-message e))
-;;                             {:model model, :update-query update-query, :options options}
+;;                             {:model model, :args args}
 ;;                             e))))))
 ;;     result))
 
 ;; (defmacro define-after-update {:style/indent :defn} [dispatch-value [result-binding] & body]
-;;   (let [[connectable model] (dispatch-value-2 dispatch-value)]
+;;   (let [[model] (dispatch-value-2 dispatch-value)]
 ;;     `(do
 ;;        (u/maybe-derive ~model ::after-update)
-;;        (m/defmethod after-update* [~connectable ~model]
-;;          [~'&connectable ~'&model ~result-binding ~'&options]
+;;        (m/defmethod after-update* [~~model]
+;;          [~'&~'&model ~result-binding ~'&options]
 ;;          ~@body))))
 
-;; (defn do-before-insert [connectable model query options f]
-;;   (helper "before-insert" model
-;;     (update query :values (fn [rows]
-;;                             (mapv
-;;                              (fn [row]
-;;                                (f (instance/instance connectable model row)))
-;;                              rows)))))
+;;;; [[define-before-insert]], [[define-after-insert]]
 
-;; (defmacro define-before-insert {:style/indent :defn} [dispatch-value [instance-binding] & body]
-;;   `(m/defmethod mutative/insert!* :before ~(dispatch-value-3 dispatch-value)
-;;      [~'&connectable ~'&model ~'&query ~'&options]
-;;      (do-before-insert ~'&connectable ~'&model ~'&query ~'&options
-;;                        (fn [~instance-binding]
-;;                          ~@body))))
+(m/defmulti before-insert
+  {:arglists '([model row])}
+  u/dispatch-on-first-arg)
 
-;; (m/defmulti after-insert*
-;;   {:arglists '([connectableᵈ instanceᵈᵗ options])}
-;;   u/dispatch-on-first-two-args
-;;   :combo (m.combo.threaded/threading-method-combination :second))
+(m/defmethod insert/insert!* :before ::before-insert
+  [model rows]
+  (for [row rows]
+    (try
+      (u/with-debug-result (format "Do before-insert for %s" (pr-str model))
+        (before-insert model row))
+      (catch Throwable e
+        (throw (ex-info (format "Error in before-insert for %s: %s" (pr-str model) (ex-message e))
+                        {:model model, :row row}
+                        e))))))
 
-;; (m/defmethod mutative/insert!* [:default ::after-insert :default]
-;;   [connectable model query options]
-;;   (try
-;;     (let [return-keys?        (get-in options [:next.jdbc :return-keys])
-;;           options             (-> options
-;;                                   ;; TODO -- this is `next.jdbc`-specific -- need a general way to specify
-;;                                   ;; `:return-keys` behavior.
-;;                                   (assoc :reducible? true)
-;;                                   (assoc-in [:next.jdbc :return-keys] true))
-;;           reducible-query     (next-method connectable model query options)
-;;           pks                 (into [] (map (select/select-pks-fn connectable model)) reducible-query)
-;;           reducible-instances (select/select-reducible
-;;                                [connectable model]
-;;                                :toucan2/with-pks pks
-;;                                {}
-;;                                (update options :next.jdbc dissoc :return-keys))]
-;;       (transduce
-;;        (map realize/realize)
-;;        (completing
-;;         (fn [acc instance]
-;;           (after-insert* connectable instance options)
-;;           (if return-keys?
-;;             (conj acc (model/primary-key-values instance))
-;;             (inc acc))))
-;;        (if return-keys? [] 0)
-;;        reducible-instances))
-;;     (catch Throwable e
-;;       (throw (ex-info (format "Error in after insert for %s: %s" (u/dispatch-value model) (ex-message e))
-;;                       {:model model, :query query, :options options}
-;;                       e)))))
+(defmacro define-before-insert
+  {:style/indent :defn}
+  [model [instance-binding] & body]
+  `(let [model# ~model]
+     (derive model# ::before-insert)
+     (m/defmethod before-insert model#
+       [~'&model ~instance-binding]
+       ~@body)))
 
-;; (defmacro define-after-insert {:style/indent :defn} [dispatch-value [instance-binding] & body]
-;;   (let [[connectable model] (dispatch-value-2 dispatch-value)]
-;;     `(do
-;;        (u/maybe-derive ~model ::after-insert)
-;;        (m/defmethod after-insert* [~connectable ~model]
-;;          [~'&connectable ~instance-binding ~'&options]
-;;          ~@body))))
 
-;; (defn do-before-delete [connectable model delete-query options f]
+#_(m/defmulti after-insert*
+  {:arglists '([instance options])}
+  u/dispatch-on-first-two-args
+  :combo (m.combo.threaded/threading-method-combination :second))
+
+#_(m/defmethod mutative/insert!* [:default ::after-insert :default]
+  [model query options]
+  (try
+    (let [return-keys?        (get-in options [:next.jdbc :return-keys])
+          options             (-> options
+                                  ;; TODO -- this is `next.jdbc`-specific -- need a general way to specify
+                                  ;; `:return-keys` behavior.
+                                  (assoc :reducible? true)
+                                  (assoc-in [:next.jdbc :return-keys] true))
+          reducible-query     (next-method model query options)
+          pks                 (into [] (map (select/select-pks-fn model)) reducible-query)
+          reducible-instances (select/select-reducible
+                               [model]
+                               :toucan2/with-pks pks
+                               {}
+                               (update options :next.jdbc dissoc :return-keys))]
+      (transduce
+       (map realize/realize)
+       (completing
+        (fn [acc instance]
+          (after-insert* instance options)
+          (if return-keys?
+            (conj acc (model/primary-key-values instance))
+            (inc acc))))
+       (if return-keys? [] 0)
+       reducible-instances))
+    (catch Throwable e
+      (throw (ex-info (format "Error in after insert for %s: %s" (u/dispatch-value model) (ex-message e))
+                      {:model model, :query query, :options options}
+                      e)))))
+
+#_(defmacro define-after-insert {:style/indent :defn} [dispatch-value [instance-binding] & body]
+  (let [[model] (dispatch-value-2 dispatch-value)]
+    `(do
+       (u/maybe-derive ~model ::after-insert)
+       (m/defmethod after-insert* [~~model]
+         [~'&~instance-binding ~'&options]
+         ~@body))))
+
+;;;; [[define-before-delete]], [[define-after-delete]]
+
+;; (defn do-before-delete [model delete-query options f]
 ;;   (helper "before-delete" model
-;;     (let [query (-> (build-query/buildable-query* connectable model {} :select options)
-;;                     (build-query/with-table* model options)
-;;                     (build-query/with-conditions* (build-query/conditions* delete-query) options))]
-;;       (log/with-trace ["Fetching matching rows with query %s" query]
-;;         (reduce
-;;          (fn [_ instance]
-;;            (f instance))
-;;          nil
-;;          (select/select-reducible [connectable model] query)))))
+;;           (let [query (-> (build-query/buildable-query* model {} :select options)
+;;                           (build-query/with-table* model options)
+;;                           (build-query/with-conditions* (build-query/conditions* delete-query) options))]
+;;             (u/with-debug-result (format "Fetching matching rows with query %s" query)
+;;               (reduce
+;;                (fn [_ instance]
+;;                  (f instance))
+;;                nil
+;;                (select/select-reducible [model] query)))))
 ;;   delete-query)
 
 ;; (defmacro define-before-delete {:style/indent :defn} [dispatch-value [instance-binding] & body]
 ;;   `(m/defmethod mutative/delete!* :before ~(dispatch-value-3 dispatch-value)
-;;      [~'&connectable ~'&model ~'&query ~'&options]
-;;      (do-before-delete ~'&connectable ~'&model ~'&query ~'&options
+;;      [~'&~'&model ~'&query ~'&options]
+;;      (do-before-delete ~'&~'&model ~'&query ~'&options
 ;;                        (fn [~instance-binding]
 ;;                          ~@body))))
 
-;; ;; TODO
-;; #_(defmacro define-after-delete {:style/indent :defn} [dispatch-value [a-binding] & body]
-;;     (m/defmethod mutative/delete!* :after ~(dispatch-value-3 dispatch-value)
-;;       [~'&connectable ~'&model _ ~'&options]
-;;       ~@body))
+;; TODO
+#_(defmacro define-after-delete {:style/indent :defn} [dispatch-value [a-binding] & body]
+    (m/defmethod mutative/delete!* :after ~(dispatch-value-3 dispatch-value)
+      [~'&~'&model _ ~'&options]
+      ~@body))
 
-;; (defmacro define-keys-for-automagic-hydration
-;;   {:style/indent 1}
-;;   [dispatch-value & ks]
-;;   (let [[connectable model] (dispatch-value-2 dispatch-value)]
-;;     `(do
-;;        ~@(for [k ks]
-;;            `(m/defmethod hydrate/table-for-automagic-hydration* [~connectable ~model ~k]
-;;               [~'_ ~'_ ~'_]
-;;               ~model)))))
+;;;; [[define-keys-for-automagic-hydration]]
+
+#_(defmacro define-keys-for-automagic-hydration
+  {:style/indent 1}
+  [dispatch-value & ks]
+  (let [[model] (dispatch-value-2 dispatch-value)]
+    `(do
+       ~@(for [k ks]
+           `(m/defmethod hydrate/table-for-automagic-hydration* [~~model ~k]
+              [~'_ ~'_ ~'_]
+              ~model)))))
 
 ;;;; [[deftransforms]]
 

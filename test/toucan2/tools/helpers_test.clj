@@ -4,7 +4,11 @@
    [toucan2.instance :as instance]
    [toucan2.select :as select]
    [toucan2.test :as test]
-   [toucan2.tools.helpers :as helpers]))
+   [toucan2.tools.helpers :as helpers]
+   [methodical.core :as m]
+   [clojure.string :as str]
+   [toucan2.insert :as insert])
+  (:import java.time.LocalDateTime))
 
 (derive ::people ::test/people)
 
@@ -253,21 +257,19 @@
 ;;     ;; TODO
 ;;     ))
 
-;; (helpers/deftransforms ::transformed-venues
-;;   {:id {:in  #(some-> % Integer/parseInt)
-;;         :out str}})
+(derive ::venues.before-insert ::test/venues)
 
-;; (helpers/define-table-name ::transformed-venues "venues")
+(helpers/define-before-insert ::venues.before-insert
+  [venue]
+  (cond-> venue
+    (:name venue) (update :name str/upper-case)))
 
-;; (deftest deftransforms-test
-;;   (is (= (instance/instance
-;;           ::transformed-venues
-;;           {:id         "1"
-;;            :name       "Tempest"
-;;            :category   "bar"
-;;            :created-at (t/local-date-time "2017-01-01T00:00")
-;;            :updated-at (t/local-date-time "2017-01-01T00:00")})
-;;          (select/select-one [:test/postgres ::transformed-venues] "1"))))
+(deftest before-insert-test
+  (test/with-discarded-table-changes :venues
+    (is (= 1
+           (insert/insert! ::venues.before-insert {:name "Tin Vietnamese", :category "resturaunt"})))
+    (is (= (instance/instance ::venues.before-insert {:id 4, :name "TIN VIETNAMESE"})
+           (select/select-one [::venues.before-insert :id :name] :id 4)))))
 
 ;; (derive ::venues-after-insert ::venues)
 
@@ -292,3 +294,19 @@
 ;;                 :created-at (t/local-date-time "2017-01-01T00:00")
 ;;                 :updated-at (t/local-date-time "2017-01-01T00:00")})]
 ;;              @*venues-awaiting-moderation*)))))
+
+(derive ::transformed-venues ::test/venues)
+
+(helpers/deftransforms ::transformed-venues
+  {:id {:in  #(some-> % Integer/parseInt)
+        :out str}})
+
+(deftest deftransforms-test
+  (is (= (instance/instance
+          ::transformed-venues
+          {:id         "1"
+           :name       "Tempest"
+           :category   "bar"
+           :created-at (LocalDateTime/parse "2017-01-01T00:00")
+           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+         (select/select-one ::transformed-venues :toucan/pk "1"))))
