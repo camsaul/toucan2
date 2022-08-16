@@ -132,6 +132,8 @@
     (is (= [[4 "Grant & Green"]]
            (insert/insert-returning-keys! ::venues.composite-pk {:name "Grant & Green", :category "bar"})))))
 
+;;; TODO
+
 ;; (deftest insert!-custom-honeysql-test
 ;;   (test/with-default-connection
 ;;     (testing "single map row"
@@ -164,7 +166,42 @@
 ;;                (insert/insert-returning-keys! ::venues.custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))))))
 
 (deftest insert!-no-changes-no-op-test
-  (testing "If there are no rows, insert! should no-op and return zero"
-    (is (= 0
-           (test/with-discarded-table-changes :venues
+  (test/with-discarded-table-changes :venues
+    (testing "If there are no rows, insert! should no-op and return zero"
+      (is (= 0
              (insert/insert! ::test/venues []))))))
+
+(deftest insert-returning-instances-test
+  (test/with-discarded-table-changes :venues
+    (is (= [(instance/instance
+             ::test/venues
+             {:id         4
+              :name       "Grant & Green"
+              :category   "bar"
+              :created-at (LocalDateTime/parse "2017-01-01T00:00")
+              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+            (instance/instance
+             ::test/venues
+             {:id         5
+              :name       "North Beach Cantina"
+              :category   "resturaunt"
+              :created-at (LocalDateTime/parse "2017-01-01T00:00")
+              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+           (insert/insert-returning-instances!
+            ::test/venues
+            [{:name "Grant & Green", :category "bar"}
+             {:name "North Beach Cantina", :category "resturaunt"}]))))
+  (testing "Support wrapping the model in a vector, because why not?"
+    (test/with-discarded-table-changes :venues
+      (is (= [(instance/instance
+               ::test/venues
+               {:id   4
+                :name "Grant & Green"})
+              (instance/instance
+               ::test/venues
+               {:id   5
+                :name "North Beach Cantina"})]
+             (insert/insert-returning-instances!
+              [::test/venues :id :name]
+              [{:name "Grant & Green", :category "bar"}
+               {:name "North Beach Cantina", :category "resturaunt"}]))))))

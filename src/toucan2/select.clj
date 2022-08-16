@@ -33,12 +33,13 @@
 (defn select-reducible [modelable & unparsed-args]
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
-  (let [[modelable & columns] (if (sequential? modelable)
-                                modelable
-                                [modelable])]
-    (model/with-model [model modelable]
-      (query/with-parsed-args-with-query [parsed-args [::select model unparsed-args]]
-        (select-reducible* model (assoc parsed-args :columns columns))))))
+  (u/with-debug-result (pr-str (list* `select-reducible modelable unparsed-args))
+    (let [[modelable & columns] (if (sequential? modelable)
+                                  modelable
+                                  [modelable])]
+      (model/with-model [model modelable]
+        (query/with-parsed-args-with-query [parsed-args [::select model unparsed-args]]
+          (select-reducible* model (assoc parsed-args :columns columns)))))))
 
 (defn select
   {:arglists '([modelable & kv-args? query?]

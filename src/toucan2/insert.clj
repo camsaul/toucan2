@@ -105,8 +105,6 @@
      (map (select/select-pks-fn model))
      (apply insert! model args))))
 
-;; TODO -- I don't 100% remember why this returns the PK values as opposed to the entire row or whatever the database
-;; decides to gives us. Seems not that useful TBH
 (defn insert-returning-keys!
   "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
   inserted. The primary keys are determined by [[model/primary-keys]]. For models with a single primary key, this
@@ -117,6 +115,31 @@
                [modelable k v & more]
                [modelable columns row-vectors])}
   [modelable & args]
-  (u/with-debug-result (pr-str (list* 'insert-returning-keys! modelable args))
+  (u/with-debug-result (pr-str (list* `insert-returning-keys! modelable args))
     (model/with-model [model modelable]
       (apply insert-returning-keys!* model args))))
+
+(defn insert-returning-instances!
+  {:arglists '([modelable & args] [[modelable & fields] & args])}
+  [modelable-fields & args]
+  (u/with-debug-result (pr-str (list* `insert-returning-instances! modelable-fields args))
+    (let [[modelable & fields] (if (sequential? modelable-fields)
+                                 modelable-fields
+                                 [modelable-fields])]
+      (model/with-model [model modelable]
+        (when-let [row-pks (not-empty (apply insert-returning-keys! modelable args))]
+          (let [pk-vecs      (for [pk row-pks]
+                               (if (sequential? pk)
+                                 pk
+                                 [pk]))
+                pk-keys      (model/primary-keys-vec model)
+                pk-maps      (for [pk-vec pk-vecs]
+                               (zipmap pk-keys pk-vec))
+                conditions   (mapcat
+                              (juxt identity (fn [k]
+                                               [:in (mapv k pk-maps)]))
+                              pk-keys)
+                model-fields (if (seq fields)
+                               (cons model fields)
+                               model)]
+            (apply select/select model-fields conditions)))))))
