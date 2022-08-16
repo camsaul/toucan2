@@ -62,6 +62,14 @@
   (add-category-to-moderation-queue! category)
   category)
 
+(helpers/define-before-update Category
+  [category]
+  (assert-parent-category-exists category))
+
+(helpers/define-after-update Category
+  [category]
+  (add-category-to-updated-queue! category))
+
 ;; (pre-update [this]
 ;;   (assert-parent-category-exists this))
 ;; (post-update [this]

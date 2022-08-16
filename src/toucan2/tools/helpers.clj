@@ -9,7 +9,9 @@
    [toucan2.tools.transformed :as transformed]
    [toucan2.update :as update]
    [toucan2.util :as u]
-   [toucan2.realize :as realize]))
+   [toucan2.realize :as realize]
+   [toucan2.delete :as delete]
+   [toucan2.connection :as conn]))
 
 (defn maybe-derive
   [child parent]
@@ -301,25 +303,34 @@
 
 ;;;; [[define-before-delete]], [[define-after-delete]]
 
-;; (defn do-before-delete [model delete-query options f]
-;;   (helper "before-delete" model
-;;           (let [query (-> (build-query/buildable-query* model {} :select options)
-;;                           (build-query/with-table* model options)
-;;                           (build-query/with-conditions* (build-query/conditions* delete-query) options))]
-;;             (u/with-debug-result (format "Fetching matching rows with query %s" query)
-;;               (reduce
-;;                (fn [_ instance]
-;;                  (f instance))
-;;                nil
-;;                (select/select-reducible [model] query)))))
-;;   delete-query)
+(m/defmulti before-delete
+  {:arglists '([model instance])}
+  u/dispatch-on-first-arg)
 
-;; (defmacro define-before-delete {:style/indent :defn} [dispatch-value [instance-binding] & body]
-;;   `(m/defmethod mutative/delete!* :before ~(dispatch-value-3 dispatch-value)
-;;      [~'&~'&model ~'&query ~'&options]
-;;      (do-before-delete ~'&~'&model ~'&query ~'&options
-;;                        (fn [~instance-binding]
-;;                          ~@body))))
+(m/defmethod before-delete :around :default
+  [model instance]
+  (u/with-debug-result [(list `before-delete model instance)]
+    (next-method model instance)))
+
+(m/defmethod delete/delete!* :around ::before-delete
+  [model parsed-args]
+  (conn/with-transaction [_conn (model/deferred-current-connectable model)]
+    (transduce
+     (map (fn [row]
+            (before-delete model row)))
+     (constantly nil)
+     nil
+     (select/select-reducible* model parsed-args))
+    (next-method model parsed-args)))
+
+(defmacro define-before-delete
+  {:style/indent :defn}
+  [model [instance-binding] & body]
+  `(let [model# ~model]
+     (maybe-derive model# ::before-delete)
+     (m/defmethod before-delete model#
+       [~'&model ~instance-binding]
+       ~@body)))
 
 ;; TODO
 #_(defmacro define-after-delete {:style/indent :defn} [dispatch-value [a-binding] & body]
