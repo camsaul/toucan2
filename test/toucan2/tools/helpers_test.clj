@@ -275,12 +275,53 @@
     ;; TODO
     ))
 
+(def ^:private ^:dynamic *venues-awaiting-moderation* nil)
+
+(derive ::venues.after-update ::test/venues)
+
+(helpers/define-after-update ::venues.after-update
+  [venue]
+  (when *venues-awaiting-moderation*
+    (swap! *venues-awaiting-moderation* conj venue))
+  nil)
+
+(deftest after-update-test
+  (doseq [f [#'update/update!
+             #'update/update-returning-pks!]]
+    (testing f
+      (test/with-discarded-table-changes :venues
+        (binding [*venues-awaiting-moderation* (atom [])]
+          (is (= (condp = f
+                   #'update/update!               2
+                   #'update/update-returning-pks! [1 2])
+                 (f ::venues.after-update :category "bar" {:category "BARRR"})))
+          (testing "rows should be updated in DB"
+            (is (= [(instance/instance ::venues.after-update {:id 1, :name "Tempest", :category "BARRR"})
+                    (instance/instance ::venues.after-update {:id 2, :name "Ho's Tavern", :category "BARRR"})]
+                   (select/select [::venues.after-update :id :name :category] :category "BARRR" {:order-by [[:id :asc]]}))))
+          (testing (str "rows should have been added to " `*venues-awaiting-moderation*)
+            (is (= [(instance/instance ::venues.after-update {:id         1
+                                                              :name       "Tempest"
+                                                              :category   "BARRR"
+                                                              :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                    (instance/instance ::venues.after-update {:id         2
+                                                              :name       "Ho's Tavern"
+                                                              :category   "BARRR"
+                                                              :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                   @*venues-awaiting-moderation*))))))))
+
+;;; TODO -- should `after-update` automatically do things in a transaction? So if `after-update` fails, the original
+;;; updates were canceled?
+
 (derive ::venues.before-insert ::test/venues)
 
 (helpers/define-before-insert ::venues.before-insert
   [venue]
   (cond-> venue
     (:name venue) (update :name str/upper-case)))
+
 
 (deftest before-insert-test
   (test/with-discarded-table-changes :venues
@@ -291,8 +332,6 @@
 
 (derive ::venues.after-insert ::test/venues)
 
-(def ^:private ^:dynamic *venues-awaiting-moderation* nil)
-
 (helpers/define-after-insert ::venues.after-insert
   [venue]
   (when *venues-awaiting-moderation*
@@ -300,62 +339,31 @@
   (assoc venue :awaiting-moderation? true))
 
 (deftest after-insert-test
-  (test/with-discarded-table-changes :venues
-    (binding [*venues-awaiting-moderation* (atom [])]
-      (is (= 1
-             (insert/insert! ::venues.after-insert {:name "Lombard Heights Market", :category "liquor-store"})))
-      (testing "should be added to *venues-awaiting-moderation*"
-        (is (= [(instance/instance
-                 ::venues.after-insert
-                 {:id         4
-                  :name       "Lombard Heights Market"
-                  :category   "liquor-store"
-                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
-               @*venues-awaiting-moderation*))))))
-
-(deftest after-insert-returning-keys-test
-  (testing `insert/insert-returning-keys!
-    (test/with-discarded-table-changes :venues
-      (binding [*venues-awaiting-moderation* (atom [])]
-        (testing "should return instance"
-          (is (= [4]
-                 (insert/insert-returning-keys!
-                  ::venues.after-insert
-                  {:name "Lombard Heights Market", :category "liquor-store"}))))
-        (testing "should be added to *venues-awaiting-moderation*"
-          (is (= [(instance/instance
-                   ::venues.after-insert
-                   {:id         4
-                    :name       "Lombard Heights Market"
-                    :category   "liquor-store"
-                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
-                 @*venues-awaiting-moderation*)))))))
-
-(deftest after-insert-returning-instances-test
-  (testing `insert/insert-returning-instances!
-    (test/with-discarded-table-changes :venues
-      (binding [*venues-awaiting-moderation* (atom [])]
-        (testing "should return instance"
-          (is (= [{:id                   4
-                   :name                 "Lombard Heights Market"
-                   :category             "liquor-store"
-                   :created-at           (LocalDateTime/parse "2017-01-01T00:00")
-                   :updated-at           (LocalDateTime/parse "2017-01-01T00:00")
-                   :awaiting-moderation? true}]
-                 (insert/insert-returning-instances!
-                  ::venues.after-insert
-                  {:name "Lombard Heights Market", :category "liquor-store"}))))
-        (testing "should be added to *venues-awaiting-moderation*"
-          (is (= [(instance/instance
-                   ::venues.after-insert
-                   {:id         4
-                    :name       "Lombard Heights Market"
-                    :category   "liquor-store"
-                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
-                 @*venues-awaiting-moderation*)))))))
+  (doseq [f [#'insert/insert!
+             #'insert/insert-returning-keys!
+             #'insert/insert-returning-instances!]]
+    (testing f
+      (test/with-discarded-table-changes :venues
+        (binding [*venues-awaiting-moderation* (atom [])]
+          (is (= (condp = f
+                   #'insert/insert! 1
+                   #'insert/insert-returning-keys! [4]
+                   #'insert/insert-returning-instances! [{:id                   4
+                                                          :name                 "Lombard Heights Market"
+                                                          :category             "liquor-store"
+                                                          :created-at           (LocalDateTime/parse "2017-01-01T00:00")
+                                                          :updated-at           (LocalDateTime/parse "2017-01-01T00:00")
+                                                          :awaiting-moderation? true}])
+                 (f ::venues.after-insert {:name "Lombard Heights Market", :category "liquor-store"})))
+          (testing "should be added to *venues-awaiting-moderation*"
+            (is (= [(instance/instance
+                     ::venues.after-insert
+                     {:id         4
+                      :name       "Lombard Heights Market"
+                      :category   "liquor-store"
+                      :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                   @*venues-awaiting-moderation*))))))))
 
 (derive ::transformed-venues ::test/venues)
 

@@ -109,3 +109,11 @@
            (update/update! ::test/venues ::named-conditions {:name "Grant & Green"})))
     (is (= "Grant & Green"
            (select/select-one-fn :name ::test/venues 1)))))
+
+(deftest update-returning-pks-test
+  (test/with-discarded-table-changes :venues
+    (is (= [1 2]
+           (update/update-returning-pks! ::test/venues :category "bar" {:category "BARRR"})))
+    (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
+            (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
+           (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]})))))
