@@ -120,7 +120,12 @@
       (apply insert-returning-keys!* model args))))
 
 (defn insert-returning-instances!
-  {:arglists '([modelable & args] [[modelable & fields] & args])}
+  {:arglists '([modelable & row-or-rows]
+               [modelable k v & more]
+               [modelable columns row-vectors]
+               [[modelable & fields] & row-or-rows]
+               [[modelable & fields] k v & more]
+               [[modelable & fields] columns row-vectors])}
   [modelable-fields & args]
   (u/with-debug-result (pr-str (list* `insert-returning-instances! modelable-fields args))
     (let [[modelable & fields] (if (sequential? modelable-fields)
