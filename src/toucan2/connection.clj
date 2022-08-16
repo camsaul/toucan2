@@ -5,9 +5,19 @@
    [next.jdbc :as jdbc]
    [toucan2.current :as current]))
 
+(set! *warn-on-reflection* true)
+
+;;; TODO -- shouldn't
+
 (m/defmulti do-with-connection
   {:arglists '([connectable f])}
   u/dispatch-on-first-arg)
+
+(m/defmethod do-with-connection :around :default
+  [connectable f]
+  (next-method connectable (^:once fn* [conn]
+                            (binding [current/*connection* conn]
+                              (f conn)))))
 
 ;; TODO -- don't love this syntax.
 (defmacro with-connection
@@ -27,6 +37,10 @@
                           `do-with-connection
                           (u/dispatch-value connectable))
                   {:connectable connectable})))
+
+(m/defmethod do-with-connection nil
+  [_connectable f]
+  (do-with-connection ::current f))
 
 ;; the difference between this and using [[current/*connection*]] directly is that this waits until it gets resolved by
 ;; [[do-with-connection]] to get the value for [[current/*connection*]]. For a reducible query this means you'll get the
@@ -56,10 +70,7 @@
 
 (m/defmethod do-with-connection clojure.lang.IPersistentMap
   [m f]
-  (do-with-connection (jdbc/get-datasource m)
-                      (^:once fn* [conn]
-                       (binding [current/*connection* conn]
-                         (f conn)))))
+  (do-with-connection (jdbc/get-datasource m) f))
 
 ;;;; connection string support
 
@@ -80,3 +91,26 @@
   [^String connection-string f]
   (with-open [conn (java.sql.DriverManager/getConnection connection-string)]
     (f conn)))
+
+(m/defmulti do-with-transaction
+  {:arglists '([connection f])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod do-with-transaction :around :default
+  [connection f]
+  (u/with-debug-result [(list `do-with-transaction (some-> connection class .getCanonicalName symbol))]
+    (next-method connection (^:once fn* [conn]
+                             (binding [current/*connection* conn]
+                               (f conn))))))
+
+(m/defmethod do-with-transaction java.sql.Connection
+  [^java.sql.Connection conn f]
+  (jdbc/with-transaction [t-conn conn]
+    (f t-conn)))
+
+(defmacro with-transaction
+  {:style/indent 1}
+  [[conn-binding connectable] & body]
+  `(with-connection [conn# ~connectable]
+     (do-with-transaction conn#
+                          (^:once fn* [~conn-binding] ~@body))))
