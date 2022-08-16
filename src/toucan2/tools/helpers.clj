@@ -213,7 +213,7 @@
 ;;   {:style/indent :defn}
 ;;   [model [instance-binding] & body]
 ;;   `(let [model# ~model]
-;;      (u/maybe-derive model# ::before-update-transform-matching-rows)
+;;      (maybe-derive model# ::before-update-transform-matching-rows)
 ;;      (m/defmethod before-update-transform-changes* model#
 ;;        [~'&~instance-binding ~'&options]
 ;;        (let [result# ~(disallow-next-method-calls `(do ~@body))]
@@ -244,7 +244,7 @@
 ;; (defmacro define-after-update {:style/indent :defn} [dispatch-value [result-binding] & body]
 ;;   (let [[model] (dispatch-value-2 dispatch-value)]
 ;;     `(do
-;;        (u/maybe-derive ~model ::after-update)
+;;        (maybe-derive ~model ::after-update)
 ;;        (m/defmethod after-update* [~~model]
 ;;          [~'&~'&model ~result-binding ~'&options]
 ;;          ~@body))))
@@ -275,50 +275,38 @@
        [~'&model ~instance-binding]
        ~@body)))
 
+(m/defmulti after-insert
+  {:arglists '([model row])}
+  u/dispatch-on-first-arg)
 
-#_(m/defmulti after-insert*
-  {:arglists '([instance options])}
-  u/dispatch-on-first-two-args
-  :combo (m.combo.threaded/threading-method-combination :second))
+(m/defmethod after-insert :around :default
+  [model row]
+  (u/with-debug-result (pr-str (list `after-insert model row))
+    (try
+      (next-method model row)
+      (catch Throwable e
+        (throw (ex-info (format "Error in %s for %s: %s" `after-insert (pr-str model) (ex-message e))
+                        {:model model, :row row}
+                        e))))))
 
-#_(m/defmethod mutative/insert!* [:default ::after-insert :default]
-  [model query options]
-  (try
-    (let [return-keys?        (get-in options [:next.jdbc :return-keys])
-          options             (-> options
-                                  ;; TODO -- this is `next.jdbc`-specific -- need a general way to specify
-                                  ;; `:return-keys` behavior.
-                                  (assoc :reducible? true)
-                                  (assoc-in [:next.jdbc :return-keys] true))
-          reducible-query     (next-method model query options)
-          pks                 (into [] (map (select/select-pks-fn model)) reducible-query)
-          reducible-instances (select/select-reducible
-                               [model]
-                               :toucan2/with-pks pks
-                               {}
-                               (update options :next.jdbc dissoc :return-keys))]
-      (transduce
-       (map realize/realize)
-       (completing
-        (fn [acc instance]
-          (after-insert* instance options)
-          (if return-keys?
-            (conj acc (model/primary-key-values instance))
-            (inc acc))))
-       (if return-keys? [] 0)
-       reducible-instances))
-    (catch Throwable e
-      (throw (ex-info (format "Error in after insert for %s: %s" (u/dispatch-value model) (ex-message e))
-                      {:model model, :query query, :options options}
-                      e)))))
+(def ^:dynamic *return-instances?* true)
 
-#_(defmacro define-after-insert {:style/indent :defn} [dispatch-value [instance-binding] & body]
-  (let [[model] (dispatch-value-2 dispatch-value)]
-    `(do
-       (u/maybe-derive ~model ::after-insert)
-       (m/defmethod after-insert* [~~model]
-         [~'&~instance-binding ~'&options]
-         ~@body))))
+(m/defmethod insert/insert!* ::after-insert
+  [model rows]
+  (if-not *return-instances?*
+    (next-method model rows)
+    (binding [*return-instances?* false]
+      (let [rows (insert/insert-returning-instances! model rows)]
+        (count (for [row rows]
+                 (after-insert model row)))))))
+
+(defmacro define-after-insert {:style/indent :defn}
+  [model [instance-binding] & body]
+  `(let [model# ~model]
+     (maybe-derive model# ::after-insert)
+     (m/defmethod after-insert model#
+       [~'&model ~instance-binding]
+       ~@body)))
 
 ;;;; [[define-before-delete]], [[define-after-delete]]
 
