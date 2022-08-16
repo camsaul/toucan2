@@ -206,11 +206,11 @@
     (map row-xform rows)))
 
 (m/defmethod query/parse-args :after [::insert/insert ::transformed]
-  [_query-type model rows]
+  [_query-type model parsed-args]
   (if-let [transforms (in-transforms model)]
-    (u/with-debug-result (format "Apply %s transforms to %s" transforms rows)
-      (transform-insert-rows rows transforms))
-    rows))
+    (u/with-debug-result (format "Apply %s transforms to %s" transforms parsed-args)
+      (update parsed-args :rows transform-insert-rows transforms))
+    parsed-args))
 
 (m/defmethod insert/insert!* :after ::transformed :default
   [model results]
