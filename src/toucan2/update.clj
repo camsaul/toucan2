@@ -67,7 +67,7 @@
 
 (defn update!
   "Returns number of rows updated."
-  {:arglists '([modelable pk? conditions-map? & kv-args changes-map])}
+  {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [modelable & unparsed-args]
   (u/with-debug-result (pr-str (list* 'update! modelable unparsed-args))
     (model/with-model [model modelable]

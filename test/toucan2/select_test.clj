@@ -239,6 +239,9 @@
   (is (= nil
          (select/select-one ::test/people :id 1000))))
 
+;;; TODO -- a test to make sure this doesn't fetch a second row even if query would return multiple rows. A test with a
+;;; SQL query.
+
 (deftest select-fn-test
   (testing "Equivalent of Toucan select-field"
     (is (= #{1 2 3 4}
