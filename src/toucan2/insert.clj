@@ -8,9 +8,9 @@
    [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.model :as model]
    [toucan2.query :as query]
+   [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.util :as u]))
-
 
 (s/def ::default-args
   (s/alt :single-row-map    map?
@@ -144,31 +144,13 @@
   (u/with-debug-result [(list `insert-returning-instances!* model parsed-args)]
     (next-method model parsed-args)))
 
-(defn ^:deprecated select-rows-with-pks
-  ;; TODO
-  "DEPRECATED: Use [[toucan2.select/select-reducible-with-pks]] instead."
-  [model {:keys [fields], :as _parsed-args} row-pks]
-  (let [pk-vecs      (for [pk row-pks]
-                       (if (sequential? pk)
-                         pk
-                         [pk]))
-        pk-keys      (model/primary-keys-vec model)
-        pk-maps      (for [pk-vec pk-vecs]
-                       (zipmap pk-keys pk-vec))
-        conditions   (mapcat
-                      (juxt identity (fn [k]
-                                       [:in (mapv k pk-maps)]))
-                      pk-keys)
-        model-fields (if (seq fields)
-                       (cons model fields)
-                       model)]
-    (apply select/select model-fields conditions)))
+;;; TODO -- should this actually be `reducible-insert-returning-instances!*`? Seems like it should.
 
 (m/defmethod insert-returning-instances!* :default
-  [model parsed-args]
+  [model {:keys [fields], :as  parsed-args}]
   (when-let [row-pks (not-empty (insert-returning-keys!* model parsed-args))]
     (u/println-debug ["%s returned %s" `insert-returning-keys!* row-pks])
-    (select-rows-with-pks model parsed-args row-pks)))
+    (realize/realize (select/select-reducible-with-pks (into [model] fields) row-pks))))
 
 (defn insert-returning-instances!
   {:arglists '([modelable & row-or-rows]
