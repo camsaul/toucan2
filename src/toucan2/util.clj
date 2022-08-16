@@ -20,9 +20,9 @@
 (defn println-debug* [& args]
   (println-debug-lines (with-out-str (apply println args))))
 
-(defn pretty-print [x]
+(defn pprint-to-str [x]
   (if (instance? pretty.core.PrettyPrintable x)
-    (pretty-print (pretty/pretty x))
+    (pprint-to-str (pretty/pretty x))
     (str/trim (with-out-str (#'m.trace/pprint x)))))
 
 (defmacro println-debug
@@ -30,7 +30,7 @@
   `(when *debug*
      ~(if (vector? arg)
         `(println-debug-lines (format ~(first arg) ~@(for [arg (rest arg)]
-                                                       `(pretty-print ~arg)))
+                                                       `(pprint-to-str ~arg)))
                               ~@more)
         `(println-debug* ~arg ~@more))))
 
@@ -38,7 +38,7 @@
   (print (indentation))
   (print "↳ ")
 
-  (let [s     (pretty-print result)
+  (let [s     (pprint-to-str result)
         lines (str/split-lines (str/trim s))]
     (print (first lines))
     (doseq [line (rest lines)]
@@ -60,8 +60,8 @@
     `(with-debug-result ~(if (> (count message) 1)
                            `(format ~(first message)
                                    ~@(for [arg (rest message)]
-                                       `(pretty-print ~arg)))
-                           `(pretty-print ~(first message)))
+                                       `(pprint-to-str ~arg)))
+                           `(pprint-to-str ~(first message)))
        ~@body)
     `(let [thunk# (^:once fn* [] ~@body)]
        (if-not *debug*

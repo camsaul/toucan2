@@ -33,7 +33,8 @@
       (catch Throwable e
         (throw (ex-info (format "Error reducing ^%s %s: %s"
                                 (.getCanonicalName (class this))
-                                (binding [*print-meta* true] (u/pretty-print this))
+                                (binding [*print-meta* true]
+                                  (pr-str this))
                                 (ex-message e))
                         {:this this}
                         e)))))

@@ -1,15 +1,14 @@
 (ns toucan2.tools.helpers
   (:require
    [methodical.core :as m]
+   [toucan2.insert :as insert]
+   [toucan2.instance :as instance]
+   [toucan2.model :as model]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.util :as u]
-   [clojure.walk :as walk]
-   [toucan2.instance :as instance]
    [toucan2.update :as update]
-   [toucan2.model :as model]
-   [toucan2.insert :as insert]))
+   [toucan2.util :as u]))
 
 (defn maybe-derive
   [child parent]
@@ -19,7 +18,7 @@
 ;;;; [[define-before-select]], [[define-after-select-reducible]], [[define-after-select-each]]
 
 (defn do-before-select [model thunk]
-  (u/with-debug-result (format "%s %s" `define-before-select (u/pretty-print model))
+  (u/with-debug-result ["%s %s" `define-before-select model]
     (try
       (thunk)
       (catch Throwable e
@@ -47,7 +46,7 @@
 
 (defn do-after-select-each [model reducible-query f]
   (eduction (map (fn [instance]
-                   (u/with-debug-result (format "%s %s %s" `define-after-select-each (u/pretty-print model) (u/pretty-print instance))
+                   (u/with-debug-result [(list `define-after-select-each model instance)]
                      (try
                        (f instance)
                        (catch Throwable e
@@ -82,142 +81,72 @@
 
 ;;;; [[define-before-update]], [[define-after-update]]
 
-;; (m/defmulti before-update-transform-changes*
-;;   {:arglists '([instance options])}
-;;   u/dispatch-on-first-arg)
+(m/defmulti before-update
+  {:arglists '([model row])}
+  u/dispatch-on-first-arg)
 
-;; ;; default method is a no-op
-;; (m/defmethod before-update-transform-changes* :default
-;;   [_ instance _]
-;;   instance)
+(m/defmethod before-update :around :default
+  [model row]
+  (u/with-debug-result [(list `before-update model row)]
+    (next-method model row)))
 
-;; (defn update-query->select-query [model update-query-args]
-;;   (u/with-debug-result (format "Concert update query args to select query args for %s" (u/pretty-print update-query-args))
-;;     (query/build ::select/select model update-query-args)))
+(defn before-update-changes->affected-pk-maps [model reducible-matching-rows changes]
+  (reduce
+   (fn [changes->pks row]
+     (let [row (merge row changes)
+           row (before-update model row)]
+       (update changes->pks
+               (instance/changes row)
+               (fn [pks]
+                 (conj (set pks) (model/primary-key-values model row))))))
+   {}
+   reducible-matching-rows))
 
-;; (defn reducible-instances-matching-update-query
-;;   "Return instances of `model` that match conditions from a compiled `update-query` as passed to `update!*`."
-;;   [model update-query-args]
-;;   (let [select-query-args (update-query->select-query model update-query-args)]
-;;     (u/with-debug-result (format "Finding matching instances with query %s" select-query-args)
-;;       (select/select-reducible* model select-query-args))))
+(defn do-before-update-with-args [model {:keys [changes], :as parsed-args}]
+  (let [reducible-matching-rows   (select/select-reducible* model parsed-args)
+        changes->affected-pk-maps (before-update-changes->affected-pk-maps model reducible-matching-rows changes)]
+    (if (= (count (keys changes->affected-pk-maps)) 1)
+      ;; every row has the same exact changes: we only need to perform a single update, using the original conditions.
+      (update/update!* model (assoc parsed-args :changes (first (keys changes->affected-pk-maps))))
+      ;; More than one set of changes: update each row individually.
+      ;;
+      ;; TODO -- we should also batch these together as much as possible. If we update 100 rows with two possible change
+      ;; sets then we should perform 2 updates, not 100.
+      (reduce
+       (fn [update-count [changes affected-pk-maps]]
+         (reduce
+          (fn [update-count pk-map]
+            (+ update-count (update/update!* model (assoc parsed-args
+                                                          :changes changes
+                                                          :kv-args pk-map))))
+          update-count
+          affected-pk-maps))
+       0
+       changes->affected-pk-maps))))
 
-;; (defn group-by-xform
-;;   "Transducer that groups together values into a map of `(key-fn x)` -> `[(val-fn x) ...]`, then reduces that map.
+(def ^:dynamic *doing-before-update?* false)
 
-;;     (into {} (group-by-xform even? inc) [1 2 3 4])
-;;     ;; ->
-;;     {false [2 4], true [3 5]}"
-;;   [key-fn val-fn]
-;;   (fn [rf]
-;;     (let [k->v (atom {})]
-;;       (fn
-;;         ([] (rf))
-;;         ([acc]
-;;          ;; optimization: remove the matching-primary-keys if there's just one set of changes to apply.
-;;          (let [k->v @k->v
-;;                k->v (if (= (bounded-count 2 k->v) 1)
-;;                       {(ffirst k->v) nil}
-;;                       k->v)]
-;;            (reduce
-;;             rf
-;;             acc
-;;             k->v)))
-;;         ([acc x]
-;;          (let [k (key-fn x)
-;;                v (val-fn x)]
-;;            (swap! k->v update k #(conj (vec %) v))
-;;            acc))))))
+(m/defmethod update/update!* ::before-update
+  [model {:keys [changes], :as parsed-args}]
+  (cond
+    ;; if there are no changes we don't need to do anything -- just no-op.
+    (zero? (count changes))
+    0
 
-;; #_(def ^:dynamic *update-batch-size*
-;;   "Maximum number of rows to fetch and update at a time when using `define-before-update` and
-;;   `::before-update-transform-matching-rows`."
-;;     100)
+    ;; if we're already doing special before-update stuff then don't do the special stuff on top of that again.
+    *doing-before-update?*
+    (next-method model parsed-args)
 
-;; (m/defmethod update/update!* :around [::before-update-transform-matching-rows clojure.lang.IPersistentMap]
-;;   [model {updates :set, :as query}]
-;;   (u/with-debug-result (format "Doing before update for %s" (u/dispatch-value model))
-;;     (if (empty? updates)
-;;       (do (u/println-debug (format "Query %s has no changes; skipping rest of update" query))
-;;           0)
-;;       (letfn [(f [instance]
-;;                 (before-update-transform-changes* instance options))]
-;;         (try
-;;           ;; TODO -- this whole thing should be done in a transaction.
-;;           (transduce
-;;            (comp
-;;             ;; merge in changes for each instance
-;;             (map (fn [instance]
-;;                    (u/println-debug (format "Found matching instance %s" instance))
-;;                    (merge instance updates)))
-;;             ;; filter out instances that don't have any changes before calling `f`
-;;             (filter (fn [instance]
-;;                       (if (seq (instance/changes instance))
-;;                         instance
-;;                         (u/println-debug (format "Skipping row with PK %s, it has no changes" (model/primary-key-values instance))))))
-;;             ;; apply the changes-xform to each instance
-;;             (map (fn [instance]
-;;                    (u/with-debug-result (format "Apply f to %s" instance)
-;;                      (let [result (f instance)]
-;;                        (assert (instance/instance? result)
-;;                                (format "before-update method for %s should return an instance, got ^%s %s"
-;;                                        (u/dispatch-value model)
-;;                                        (some-> result class .getCanonicalName)
-;;                                        (pr-str result)))
-;;                        result))))
-;;             ;; filter out the ones that don't have any changes AFTER calling `f`.
-;;             (filter (fn [instance]
-;;                       (if (seq (instance/changes instance))
-;;                         instance
-;;                         (u/println-debug (format "Skipping row with PK %s, it has no changes after applying f"
-;;                                                  (model/primary-keys instance))))))
-;;             ;; TODO -- consider whether we should batch the stuff below. e.g. if we end up matching 1 million objects,
-;;             ;; it might not be ideal to keep a million PK value vectors in memory at once. Also, a query with `UPDATE
-;;             ;; table WHERE id IN (...)` with a million ids probably isn't going to work so well.
-;;             #_(partition-all *update-batch-size*)
-;;             ;; Group all the PKs by their changes.
-;;             ;;
-;;             ;; TODO -- if we had a batched-update method, we wouldn't need this complicated transducer.
-;;             (group-by-xform instance/changes (let [pk-keys (model/primary-keys-vec model)]
-;;                                                #(mapv % pk-keys)))
-;;             ;; do an update call for each distinct set of changes
-;;             (map (fn [[changes matching-primary-keys]]
-;;                    (let [new-query (-> query
-;;                                        (assoc )
-;;                                        (build-query/with-changes* changes options)
-;;                                        ;; TODO -- :toucan2/with-pks is currently only implemented for HoneySQL, don't
-;;                                        ;; assume it works because it might not.
-;;                                        (build-query/merge-kv-conditions* {:toucan2/with-pks matching-primary-keys} options))]
-;;                      (u/with-debug-result (format "Performing updates with query %s" new-query)
-;;                        (next-method model new-query options))))))
-;;            (completing (fnil + 0 0))
-;;            0
-;;            (reducible-instances-matching-update-query model query options))
-;;           (catch Throwable e
-;;             (throw (ex-info (format "Error in after-update for %s: %s" (u/dispatch-value model) (ex-message e))
-;;                             {:model model, :query query}
-;;                             e))))))))
+    :else
+    (binding [*doing-before-update?* true]
+      (do-before-update-with-args model parsed-args))))
 
-;; ;;; TODO -- is this *REALLY* necessary?
-;; (defn disallow-next-method-calls [body]
-;;   (walk/postwalk
-;;    (fn [form]
-;;      (if (and (sequential? form)
-;;               (= (first form) 'next-method))
-;;        (throw (ex-info "Don't call next-method here. It's already called automatically!"
-;;                        {:body body, :form form}))
-;;        form))
-;;    body))
-
-;; (defmacro define-before-update
-;;   {:style/indent :defn}
-;;   [model [instance-binding] & body]
-;;   `(let [model# ~model]
-;;      (maybe-derive model# ::before-update-transform-matching-rows)
-;;      (m/defmethod before-update-transform-changes* model#
-;;        [~'&~instance-binding ~'&options]
-;;        (let [result# ~(disallow-next-method-calls `(do ~@body))]
-;;          (~'next-method ~'&result# ~'&options)))))
+(defmacro define-before-update [model [row-binding] & body]
+  `(let [model# ~model]
+     (maybe-derive model# ::before-update)
+     (m/defmethod before-update model#
+       [~'&model ~row-binding]
+       ~@body)))
 
 ;; (m/defmulti after-update*
 ;;   {:arglists '([model instance])}
@@ -255,7 +184,7 @@
   {:arglists '([model row])}
   u/dispatch-on-first-arg)
 
-(defn- do-before-insert-to-rows [rows model]
+(defn do-before-insert-to-rows [rows model]
   (mapv
    (fn [row]
      (try

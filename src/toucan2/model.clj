@@ -5,7 +5,8 @@
    [toucan2.model :as model]
    [toucan2.util :as u]
    [toucan2.connection :as conn]
-   [pretty.core :as pretty]))
+   [pretty.core :as pretty]
+   [toucan2.instance :as instance]))
 
 ;; TODO -- this should probably also support.
 (m/defmulti do-with-model
@@ -85,7 +86,10 @@
       pk-keys
       [pk-keys])))
 
+;;; TODO -- rename to `primary-key-values-map`
 (defn primary-key-values
   "Return a map of primary key values for a Toucan 2 `instance`."
-  [instance]
-  (select-keys instance (primary-keys-vec instance)))
+  ([instance]
+   (primary-key-values (instance/model instance) instance))
+  ([model m]
+   (select-keys m (primary-keys-vec model))))

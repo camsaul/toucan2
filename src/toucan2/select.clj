@@ -33,7 +33,7 @@
 (defn select-reducible [modelable & unparsed-args]
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
-  (u/with-debug-result (u/pretty-print (list* `select-reducible modelable unparsed-args))
+  (u/with-debug-result [(list* `select-reducible modelable unparsed-args)]
     (let [[modelable & columns] (if (sequential? modelable)
                                   modelable
                                   [modelable])]
@@ -140,8 +140,7 @@
 
 (m/defmethod count* :default
   [model unparsed-args]
-  (u/println-debug (format "No efficient implementation of count* for %s, doing select-reducible and counting the rows..."
-                           (u/pretty-print model)))
+  (u/println-debug ["No efficient implementation of count* for %s, doing select-reducible and counting the rows..." model])
   (reduce
    (fn [acc _]
      (inc acc))
@@ -160,8 +159,7 @@
 
 (m/defmethod exists?* :default
   [model unparsed-args]
-  (u/println-debug (format "No efficient implementation of exists?* for %s, doing select-reducible and seeing if it returns a row..."
-                           (u/pretty-print model)))
+  (u/println-debug ["No efficient implementation of exists?* for %s, doing select-reducible and seeing if it returns a row..." model])
   (transduce
    (take 1)
    (fn

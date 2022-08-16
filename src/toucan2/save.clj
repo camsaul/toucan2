@@ -14,10 +14,7 @@
 (m/defmethod save! :around :default
   [object]
   (try
-    (u/with-debug-result (format "Save %s %s changes %s"
-                                 (u/pretty-print (instance/model object))
-                                 (u/pretty-print object)
-                                 (u/pretty-print (instance/changes object)))
+    (u/with-debug-result ["Save %s %s changes %s" (instance/model object) object (instance/changes object)]
       (next-method object))
     (catch Throwable e
       (throw (ex-info (format "Error saving %s: %s"
@@ -33,7 +30,7 @@
   (assert (instance/instance? object)
           (format "Don't know how to save something that's not a Toucan instance. Got: ^%s %s"
                   (some-> object class .getCanonicalName)
-                  (u/pretty-print object)))
+                  (pr-str object)))
   (if-let [changes (not-empty (instance/changes object))]
     (model/with-model [model (instance/model object)]
       (let [pk-values     (select-keys object (model/primary-keys (instance/model object)))
@@ -45,7 +42,7 @@
                           {:object object
                            :pk     pk-values})))
         (when (> rows-affected 1)
-          (u/println-debug "Warning: more than 1 row affected when saving %s with primary key %s"
-                           (u/pretty-print model) (u/pretty-print pk-values)))
+          (u/println-debug ["Warning: more than 1 row affected when saving %s with primary key %s"
+                            model pk-values]))
         (instance/reset-original object)))
     object))
