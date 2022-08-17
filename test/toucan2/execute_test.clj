@@ -13,6 +13,8 @@
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
+(use-fixtures :each (test/do-db-types-fixture))
+
 ;; TODO -- not 100% sure it makes sense for Toucan to be doing the magic key transformations automatically here without
 ;; us even asking!
 

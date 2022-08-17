@@ -15,21 +15,20 @@
 
 (models/set-root-namespace! 'toucan.test-models)
 
-(defn- reset-db! []
+(defn- reset-db! [db-type]
   (doseq [model [Address
                  Category
                  PhoneNumber
                  User
                  Venue]]
-    (conn/with-connection [conn ::test/db]
-      (test/create-table! test/*db-type* conn model))))
+    (test/create-table! db-type model)))
 
-(def initialized? (atom false))
+(def ^:private initialized-db-types (atom #{}))
 
-(defn- init-db! []
-  (when-not @initialized?
-    (reset-db!)
-    (reset! initialized? true)))
+(defn- init-db! [db-type]
+  (when-not (contains? @initialized-db-types db-type)
+    (reset-db! db-type)
+    (swap! initialized-db-types conj db-type)))
 
 (derive ::db ::test/db)
 
@@ -39,5 +38,5 @@
 
 (m/defmethod conn/do-with-connection ::db
   [connectable f]
-  (init-db!)
+  (init-db! (test/current-db-type))
   (next-method connectable f))

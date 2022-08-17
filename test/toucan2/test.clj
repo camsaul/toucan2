@@ -1,25 +1,110 @@
 (ns toucan2.test
   (:require
    [clojure.string :as str]
+   [clojure.test :refer :all]
    [methodical.core :as m]
    [pjstadig.humane-test-output :as humane-test-output]
    [toucan2.connection :as conn]
    [toucan2.model :as model]
-   [camel-snake-kebab.core :as csk]))
+   [toucan2.test :as test]))
 
 (set! *warn-on-reflection* true)
 
 (humane-test-output/activate!)
 
-(defmethod print-dup java.time.LocalDateTime
-  [t writer]
-  (print-dup (list 'java.time.LocalDateTime/parse (str t))
-             writer))
+;;;; test [[db-types]] and tooling
 
-(defmethod print-method java.time.LocalDateTime
-  [t writer]
-  (print-method (list 'java.time.LocalDateTime/parse (str t))
-                writer))
+;;; The DB types stuff below is used to run tests against multiple types of DBs. It's similar to how the `DRIVERS` env
+;;; var works in Metabase tests.
+;;;
+;;; [[db-types]] -- the set of all possible types that we can run tests against. Comes from `TEST_DBS`. In the REPL,
+;;; change this with [[set-db-types!]].
+;;;
+;;; The macro [[do-db-types]] is used to write tests that run once for each enabled test DB type, optionally
+;;; restricted to some subset of the enabled types using a predicate function
+
+(defn- db-types-from-env
+  ([]
+   (db-types-from-env (System/getenv "TEST_DBS")))
+  ([s]
+   (when (string? s)
+     (not-empty (vec (for [s (str/split (str/lower-case (str/trim s)) #"\s*,\s*")
+                           :when (seq s)]
+                       (keyword s)))))))
+
+(deftest db-types-from-env-test
+  (are [s expected] (is (= expected
+                           (db-types-from-env s)))
+    nil           nil
+    ""            nil
+    " "           nil
+    "postgres"    [:postgres]
+    "postgres,h2" [:postgres :h2]))
+
+(def ^:private default-db-types
+  (atom (or (db-types-from-env)
+            [:postgres])))
+
+(defn- db-types
+  "The enabled test DB types that we should run tests against inside of [[for-all-db-types]] forms."
+  []
+  @default-db-types)
+
+(def ^:dynamic ^:private *current-db-type*
+  nil)
+
+(defn current-db-type []
+  (or *current-db-type*
+      (first (db-types))))
+
+(println "Running tests against DB types:" (pr-str (db-types)))
+
+(defn do-db-types* [pred f]
+  (let [pred (or pred identity)]
+    (doseq [db-type (db-types)
+            :when (pred db-type)]
+      (binding [*current-db-type* db-type]
+        (testing (str db-type \newline)
+          (f db-type))))))
+
+(defmacro do-db-types
+  "Execute `body` once for each of the currently enabled test [[db-types]]. Pass an optional predicate function, such as a
+  set of DB types, to only execute body for db types that satisfy that predicate.
+
+    ;; run against all the enabled test [[db-types]]
+    (do-db-types [_db-type]
+      ...)
+
+    ;; run against :h2 if it one of the enabled test [[db-types]]
+    (do-db-types [_db-type #{:h2}]
+      ...)
+
+    ;; run against any enabled test [[db-types]] whose name starts with `m`
+    (do-db-types [_db-type #(str/starts-with? (name %) \"m\")]
+      ...)"
+  {:style/indent :defn
+   :arglists     '([[db-type-binding] & body]
+                   [[db-type-binding pred] & body])}
+  [[db-type-binding pred] & body]
+  `(do-db-types* ~pred (^:once fn* [~db-type-binding] ~@body)))
+
+(defn do-db-types-fixture
+  "[[clojure.test]] fixture for running tests in a namespace against various db types using [[do-db-types]].
+
+    ;; run tests in this namespace against all the enabled test [[db-types]]
+    (use-fixtures :each (do-db-types-fixture))
+
+    ;; run tests in this namespace only against `:h2` iff `:h2` is one of the enabled test [[db-types]]
+    (use-fixtures :each (do-db-types-fixture #{:h2}))"
+  ([]
+   (do-db-types-fixture identity))
+
+  ([pred]
+   (fn [thunk]
+     (do-db-types [_db-type pred]
+       (thunk)))))
+
+;;;; URLs for test DBs.
 
 (defmulti ^:private default-test-db-url
   {:arglists '([db-type])}
@@ -38,6 +123,8 @@
     (or (System/getenv env-var)
         (default-test-db-url db-type))))
 
+;;;; creating test tables, and the default test models.
+
 (m/defmulti create-table-sql-file
   {:arglists '([db-type model-or-table-name])}
   (fn [db-type model-or-table-name]
@@ -51,75 +138,6 @@
   [_db-type _table-name]
   "test/toucan2/test/venues.sql")
 
-(defn- create-table-statements [db-type table-name]
-  (for [stmt (str/split (str/trim (slurp (create-table-sql-file db-type table-name))) #";")]
-    (str/trim stmt)))
-
-(defn create-table! [db-type ^java.sql.Connection conn table-name]
-  (try
-    #_(let [start-time-ms (System/currentTimeMillis)])
-    (doseq [^String sql (create-table-statements db-type table-name)]
-      #_(println sql)
-      (with-open [stmt (.createStatement conn)]
-        (try
-          (.execute stmt sql)
-          (catch Throwable e
-            (throw (ex-info (format "Error executing SQL: %s" (ex-message e))
-                            {:sql sql}
-                            e))))))
-    #_(printf "✔ done in %d ms\n\n" (- (System/currentTimeMillis) start-time-ms))
-    (catch Throwable e
-      (throw (ex-info (format "Error creating table %s: %s" table-name (ex-message e))
-                      {:table table-name}
-                      e)))))
-
-(def ^:private initialized? (atom #{}))
-
-(defn- set-up-test-db! [db-type]
-  (when-not (contains? @initialized? db-type)
-    (println "Set up" db-type "test DB")
-    (with-open [conn (java.sql.DriverManager/getConnection (test-db-url db-type))]
-      (doseq [table-name [:people
-                          :venues]]
-        (create-table! db-type conn table-name)))
-    (swap! initialized? conj db-type)))
-
-(m/defmethod conn/do-with-connection ::h2
-  [_connectable f]
-  (set-up-test-db! :h2)
-  (conn/do-with-connection (test-db-url :h2) f))
-
-(m/defmethod conn/do-with-connection ::postgres
-  [_connectable f]
-  (set-up-test-db! :postgres)
-  (conn/do-with-connection (test-db-url :postgres) f))
-
-(def ^:dynamic *db-type*
-  (or (some-> (System/getenv "DB_TYPE") str/lower-case keyword)
-      :postgres))
-
-(m/defmethod conn/do-with-connection ::db
-  [_connectable f]
-  (let [db-type (keyword "toucan2.test" (name *db-type*))]
-    (assert (not= db-type ::db))
-    (conn/do-with-connection db-type f)))
-
-(defn do-with-discarded-table-changes [db-type table-name thunk]
-  (try
-    (thunk)
-    (finally
-      (with-open [conn (java.sql.DriverManager/getConnection (test-db-url db-type))]
-        (create-table! db-type conn table-name)))))
-
-(defmacro with-discarded-table-changes
-  {:style/indent 1}
-  [table-name & body]
-  `(do-with-discarded-table-changes *db-type* ~table-name (^:once fn* [] ~@body)))
-
-(m/defmethod model/default-connectable ::models
-  [_model]
-  ::db)
-
 (derive ::people ::models)
 
 (m/defmethod model/table-name ::people
@@ -131,3 +149,98 @@
 (m/defmethod model/table-name ::venues
   [_model]
   "venues")
+
+(defn- create-table-statements [db-type table-name]
+  (for [stmt (str/split (str/trim (slurp (create-table-sql-file db-type table-name))) #";")]
+    (str/trim stmt)))
+
+(defn create-table!
+  "Create the table named `table-name` for the [[current-db-type]] using the SQL from [[create-table-sql-file]]."
+  ([table-name]
+   (create-table! (current-db-type) table-name))
+
+  ([db-type table-name]
+   (binding [*current-db-type* db-type]
+     (conn/with-connection [conn ::test/db]
+       (create-table! db-type conn table-name))))
+
+  ([db-type ^java.sql.Connection conn table-name]
+   (try
+     (doseq [^String sql (create-table-statements db-type table-name)]
+       (with-open [stmt (.createStatement conn)]
+         (try
+           (.execute stmt sql)
+           (catch Throwable e
+             (throw (ex-info (format "Error executing SQL: %s" (ex-message e))
+                             {:sql sql}
+                             e))))))
+     (catch Throwable e
+       (throw (ex-info (format "Error creating table %s: %s" table-name (ex-message e))
+                       {:table table-name}
+                       e))))))
+
+
+;;;; test DB init and test connectables.
+
+(def ^:private initialized-test-dbs (atom #{}))
+
+(defn- set-up-test-db! [db-type]
+  (when-not (contains? @initialized-test-dbs db-type)
+    (println "Set up" db-type "test DB")
+    (with-open [conn (java.sql.DriverManager/getConnection (test-db-url db-type))]
+      (doseq [table-name [:people
+                          :venues]]
+        (create-table! db-type conn table-name)))
+    (swap! initialized-test-dbs conj db-type)))
+
+(m/defmethod conn/do-with-connection ::db
+  [_connectable f]
+  (let [db-type (current-db-type)]
+    (set-up-test-db! db-type)
+    (conn/do-with-connection (test-db-url db-type) f)))
+
+(defn do-with-discarded-table-changes [db-type table-name thunk]
+  (try
+    (thunk)
+    (finally
+      (with-open [conn (java.sql.DriverManager/getConnection (test-db-url db-type))]
+        (create-table! db-type conn table-name)))))
+
+(defmacro with-discarded-table-changes
+  {:style/indent 1}
+  [table-name & body]
+  `(do-with-discarded-table-changes (current-db-type) ~table-name (^:once fn* [] ~@body)))
+
+(m/defmethod model/default-connectable ::models
+  [_model]
+  ::db)
+
+;;;; conveniences for REPL-based usage. These are not used in tests.
+
+(defn set-db-types!
+  "Change the DB types to run tests against for the current REPL session."
+  [db-types]
+  {:pre [(sequential? db-types) (every? keyword? db-types) (seq db-types)]}
+  (reset! default-db-types db-types))
+
+(derive ::convenience-connectable ::db)
+(derive :repl/h2                  ::convenience-connectable)
+(derive :repl/postgres            ::convenience-connectable)
+
+(m/defmethod conn/do-with-connection ::convenience-connectable
+  [connectable f]
+  (let [db-type (keyword (name connectable))]
+    (binding [*current-db-type* db-type]
+      (conn/do-with-connection ::db f))))
+
+;;;; misc print methods
+
+(defmethod print-dup java.time.LocalDateTime
+  [t writer]
+  (print-dup (list 'java.time.LocalDateTime/parse (str t))
+             writer))
+
+(defmethod print-method java.time.LocalDateTime
+  [t writer]
+  (print-method (list 'java.time.LocalDateTime/parse (str t))
+                writer))
