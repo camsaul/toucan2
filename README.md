@@ -1,6 +1,6 @@
-![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/camsaul/toucan2/Tests/master?style=for-the-badge)
+[![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/camsaul/toucan2/Tests/master?style=for-the-badge)](https://github.com/camsaul/toucan2/actions/workflows/config.yml)
 [![License](https://img.shields.io/badge/license-Eclipse%20Public%20License-blue.svg?style=for-the-badge)](https://raw.githubusercontent.com/camsaul/toucan2/master/LICENSE)
-![GitHub last commit](https://img.shields.io/github/last-commit/camsaul/toucan2?style=for-the-badge)
+[![GitHub last commit](https://img.shields.io/github/last-commit/camsaul/toucan2?style=for-the-badge)](https://github.com/camsaul/toucan2/commits/)
 <!-- [![cljdoc badge](https://cljdoc.org/badge/com.camsaul/toucan2)](https://cljdoc.org/d/com.camsaul/toucan2/CURRENT) -->
 <!-- [![Downloads](https://versions.deps.co/camsaul/toucan2/downloads.svg)](https://versions.deps.co/camsaul/toucan2) -->
 <!-- [![Dependencies Status](https://versions.deps.co/camsaul/toucan2/status.svg)](https://versions.deps.co/camsaul/toucan2) -->
