@@ -40,17 +40,17 @@ jobs:
       with:
         java-version: 17
         distribution: 'temurin'
-    - name: Install Clojure CLI
-      shell: bash
-      run: |
-        curl -O https://download.clojure.org/install/linux-install-1.11.0.1100.sh &&
-        sudo bash ./linux-install-1.11.0.1100.sh
+    - name: Setup Clojure
+      uses: DeLaGuardo/setup-clojure@9.4
+      with:
+        cli: 1.11.1
     - name: Restore cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
-          ~/.m2
+          ~/.m2/repository
           ~/.gitlibs
+          ~/.deps.clj
         key: tests
     - run: clojure -X:dev:test
       name: Run tests
