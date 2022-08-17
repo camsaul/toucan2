@@ -31,9 +31,17 @@
                                  :sha     "518d5a1cbfcd7c952f548e6dbfcb9a4a5faf9062"}}
    :main-opts  ["-m" "clj-check.check"]}
 
+  ;; clj -T:whitespace-linter
+  :whitespace-linter
+  {:deps       {com.github.camsaul/whitespace-linter {:sha "e35bc252ccf5cc74f7d543ef95ad8a3e5131f25b"}}
+   :ns-default whitespace-linter
+   :exec-fn    whitespace-linter/lint
+   :exec-args  {:paths            ["deps.edn" ".clj-kondo" "src" "test" "toucan1/src" "toucan1/test" ".github"]
+                :include-patterns ["\\.clj[cs]?$" "\\.edn$" "\\.yaml$" "\\.sql$"]}}
+
   ;; clojure -X:dev:test
   :test
   {:extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
    :exec-fn    cognitect.test-runner.api/test
-   :exec-args {:dirs ["test"
-                      "toucan1/test"]}}}}
+   :exec-args  {:dirs ["test"
+                       "toucan1/test"]}}}}
