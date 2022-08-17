@@ -3,8 +3,7 @@
    [clojure.string :as str]
    [potemkin :as p]
    [pretty.core :as pretty]
-   [puget.printer :as puget]
-   [fipp.visit :as f.visit]))
+   [puget.printer :as puget]))
 
 (set! *warn-on-reflection* true)
 
@@ -113,7 +112,7 @@
 
 (defmacro format-doc [s & args]
   `(pprint-to-str (->Doc ~(vec (interleave (map (fn [s]
-                                                  `(->Text ~(str/trimr s)))
+                                                  (list `->Text (str/trimr s)))
                                                 (str/split s #"%s"))
                                            args)))))
 

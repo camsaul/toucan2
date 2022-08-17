@@ -1,9 +1,9 @@
 (ns toucan2.connection
   (:require
    [methodical.core :as m]
-   [toucan2.util :as u]
    [next.jdbc :as jdbc]
-   [toucan2.current :as current]))
+   [toucan2.current :as current]
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 

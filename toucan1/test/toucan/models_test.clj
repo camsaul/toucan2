@@ -5,9 +5,9 @@
    [toucan.test-models.category :as category :refer [Category]]
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
-   [toucan2.test :as test]
+   [toucan2.current :as current]
    [toucan2.model :as model]
-   [toucan2.current :as current])
+   [toucan2.test :as test])
   (:import
    (java.time LocalDateTime)))
 

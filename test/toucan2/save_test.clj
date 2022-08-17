@@ -1,11 +1,13 @@
 (ns toucan2.save-test
-  (:require [clojure.test :refer :all]
-            [toucan2.save :as save]
-            [toucan2.test :as test]
-            [toucan2.select :as select]
-            [toucan2.instance :as instance]
-            [toucan2.execute :as execute])
-  (:import java.time.LocalDateTime))
+  (:require
+   [clojure.test :refer :all]
+   [toucan2.execute :as execute]
+   [toucan2.instance :as instance]
+   [toucan2.save :as save]
+   [toucan2.select :as select]
+   [toucan2.test :as test])
+  (:import
+   (java.time LocalDateTime)))
 
 (deftest save-test
   (test/with-discarded-table-changes :venues

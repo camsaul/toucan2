@@ -6,9 +6,9 @@
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.query :as query]
+   [toucan2.realize :as realize]
    [toucan2.select :as select]
-   [toucan2.test :as test]
-   [toucan2.realize :as realize])
+   [toucan2.test :as test])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 

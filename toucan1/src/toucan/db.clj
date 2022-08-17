@@ -11,12 +11,12 @@
    [toucan2.delete :as delete]
    [toucan2.execute :as execute]
    [toucan2.insert :as insert]
+   [toucan2.instance :as instance]
    [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.model :as model]
    [toucan2.select :as select]
    [toucan2.update :as update]
-   [toucan2.util :as u]
-   [toucan2.instance :as instance]))
+   [toucan2.util :as u]))
 
 (comment models/keep-me)
 
@@ -241,7 +241,7 @@
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead."
   [modelable row-maps]
   (when (seq row-maps)
-    (model/with-model [model modelable]
+    (model/with-model [_model modelable]
       (insert/insert-returning-pks! modelable row-maps))))
 
 (defn ^{:deprecated "2.0.0"} simple-insert!

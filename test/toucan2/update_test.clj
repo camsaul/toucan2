@@ -1,13 +1,15 @@
 (ns toucan2.update-test
-  (:require [toucan2.update :as update]
-            [clojure.test :refer :all]
-            [toucan2.test :as test]
-            [methodical.core :as m]
-            [toucan2.model :as model]
-            [toucan2.select :as select]
-            [toucan2.instance :as instance]
-            [toucan2.query :as query])
-  (:import java.time.LocalDateTime))
+  (:require
+   [clojure.test :refer :all]
+   [methodical.core :as m]
+   [toucan2.instance :as instance]
+   [toucan2.model :as model]
+   [toucan2.query :as query]
+   [toucan2.select :as select]
+   [toucan2.test :as test]
+   [toucan2.update :as update])
+  (:import
+   (java.time LocalDateTime)))
 
 (deftest ^:parallel parse-update-args-test
   (is (= {:changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}

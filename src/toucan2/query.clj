@@ -1,11 +1,11 @@
 (ns toucan2.query
   (:require
-   [methodical.core :as m]
-   [toucan2.util :as u]
-   [honey.sql.helpers :as hsql.helpers]
-   [toucan2.model :as model]
    [clojure.spec.alpha :as s]
-   [toucan2.query :as query]))
+   [honey.sql.helpers :as hsql.helpers]
+   [methodical.core :as m]
+   [toucan2.model :as model]
+   [toucan2.query :as query]
+   [toucan2.util :as u]))
 
 ;;;; [[do-with-query]] and [[with-query]]
 
