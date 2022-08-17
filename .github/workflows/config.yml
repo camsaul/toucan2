@@ -9,20 +9,23 @@ jobs:
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v3
-    - name: Run clj-kondo
-      run: >-
-        docker run
-        --volume $PWD:/work
-        --rm cljkondo/clj-kondo:2022.08.03
-        clj-kondo
-        --config /work/.clj-kondo/config.edn
-        --config-dir /work/.clj-kondo
-        --parallel
-        --lint
-        /work/src
-        /work/test
-        /work/toucan1/src
-        /work/toucan1/test
+    - uses: DeLaGuardo/clojure-lint-action@master
+      with:
+        clj-kondo-args: >-
+          --copy-configs
+          --dependencies
+          --lint
+          "$(clojure -Spath)"
+    - uses: DeLaGuardo/clojure-lint-action@master
+      with:
+        clj-kondo-args: >-
+          --parallel
+          --lint
+          /work/src
+          /work/test
+          /work/toucan1/src
+          /work/toucan1/test
+        github_token: ${{ secrets.GITHUB_TOKEN }}
 
   tests:
     runs-on: ubuntu-20.04
