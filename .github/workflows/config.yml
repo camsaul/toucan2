@@ -75,6 +75,6 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: tests
+        key: whitespace-linter
     - run: clojure -T:whitespace-linter
       name: Run whitespace linter
