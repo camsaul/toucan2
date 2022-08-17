@@ -6,6 +6,7 @@
    [methodical.core :as m]
    [toucan2.model :as model]
    [toucan2.select :as select]
+   [toucan2.tools.before-insert :as before-insert]
    [toucan2.tools.before-update :as before-update]
    [toucan2.tools.helpers :as helpers]
    [toucan2.tools.identity-query :as identity-query]))
@@ -61,7 +62,7 @@
     `(do
        ~(when insert
           `(let [insert-fn# ~insert]
-             (helpers/define-before-insert ~property-keyword
+             (before-insert/define-before-insert ~property-keyword
                [instance#]
                (insert-fn# instance#))))
        ~(when update

@@ -12,7 +12,10 @@
    [toucan.test-models.user :refer [User]]
    [toucan.test-setup :as test-setup]
    [toucan2.instance :as instance]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.connection :as conn]
+   [toucan2.current :as current]
+   [toucan2.compile :as compile])
   (:import
    (java.util Locale)))
 
@@ -33,7 +36,6 @@
 (deftest dashed-field-names-test
   (testing "Test allowing dashed field names"
     (is (not (db/automatically-convert-dashes-and-underscores?)))
-
     (binding [db/*automatically-convert-dashes-and-underscores* true]
       (is (db/automatically-convert-dashes-and-underscores?)))
     (binding [db/*automatically-convert-dashes-and-underscores* false]
@@ -55,7 +57,7 @@
   [_model]
   mangle-a-chars)
 
-(derive ::UserWithMangledIdentifiers :models/User)
+(derive ::UserWithMangledIdentifiers User)
 (derive ::UserWithMangledIdentifiers ::mangled-identifiers)
 
 (deftest custom-identifiers-test
@@ -65,46 +67,17 @@
 
 ;; TODO
 #_(deftest default-to-lower-case-key-xform-test
-  (is (= [str/lower-case #{:first-name :last-name :id}] ; Note the absence of circumflexes over a's
-         (let [original-options @@(var db/default-jdbc-options)]
-           (try
-             (db/set-default-jdbc-options! {:identifiers mangle-a-chars})
-             ;; Setting default options without `:identifiers` should default to str/lower-case. If it doesn't, we can expect
-             ;; either the current value `mangle-a-chars` (:identifiers wasn't updated), or nil (overwritten).
-             (db/set-default-jdbc-options! {})
-             [(:identifiers @@(var db/default-jdbc-options))
-              (-> (db/select-one 'User) keys set)]
-             (finally
-               (db/set-default-jdbc-options! original-options)))))))
-
-;;; TODO
-#_(deftest replace-underscores-test
-  (is (= :2-cans
-         (#'db/replace-underscores :2_cans)))
-  (testing "shouldn't do anything to keywords with no underscores"
-    (is (= :2-cans
-           (#'db/replace-underscores :2-cans))))
-  (testing "should work with strings as well"
-    (is (= :2-cans
-           (#'db/replace-underscores "2_cans"))))
-  (testing "make sure it respects namespaced keywords or keywords with slashes in them"
-    (is (= :bird-types/two-cans
-           (#'db/replace-underscores :bird-types/two_cans))))
-  (testing "don't barf if there's a nil input"
-    (is (= nil
-           (#'db/replace-underscores nil))))
-  (testing "shouldn't do anything for numbers!"
-    (is (= 2
-           (#'db/replace-underscores 2)))))
-
-;;; TODO
-#_(deftest transform-keys-test
-    (testing "Test transform-keys"
-      (is (= {:2-cans true}
-             (#'db/transform-keys #'db/replace-underscores {:2_cans true}))))
-    (testing "make sure it works recursively and inside arrays"
-      (is (= [{:2-cans {:2-cans true}}]
-             (#'db/transform-keys #'db/replace-underscores [{:2_cans {:2_cans true}}])))))
+    (is (= [str/lower-case #{:first-name :last-name :id}] ; Note the absence of circumflexes over a's
+           (let [original-options @@(var db/default-jdbc-options)]
+             (try
+               (db/set-default-jdbc-options! {:identifiers mangle-a-chars})
+               ;; Setting default options without `:identifiers` should default to str/lower-case. If it doesn't, we can expect
+               ;; either the current value `mangle-a-chars` (:identifiers wasn't updated), or nil (overwritten).
+               (db/set-default-jdbc-options! {})
+               [(:identifiers @@(var db/default-jdbc-options))
+                (-> (db/select-one 'User) keys set)]
+               (finally
+                 (db/set-default-jdbc-options! original-options)))))))
 
 ;;; TODO
 #_(deftest transaction-test
@@ -129,22 +102,25 @@
 
 (deftest query-test
   (testing "Test query"
-    (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
-           (db/query {:select   [:*]
-                      :from     [:t1_users]
-                      :order-by [:id]
-                      :limit    1})))))
+    (binding [current/*connection* ::test/db]
+      (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
+             (db/query {:select   [:*]
+                        :from     [:t1_users]
+                        :order-by [:id]
+                        :limit    1}))))))
 
 (deftest lower-case-identifiers-test
   (testing "Test that identifiers are correctly lower cased in Turkish locale (toucan#59)"
     (let [original-locale (Locale/getDefault)]
       (try
         (Locale/setDefault (Locale/forLanguageTag "tr"))
-        (test/create-table! ::heroes/heroes)
-        (let [first-row (first (db/query {:select [:ID] :from [:heroes]}))]
-          ;; If `db/query` (jdbc) uses [[clojure.string/lower-case]], `:ID` will be converted to `:ıd` in Turkish locale
-          (is (= :id
-                 (first (keys first-row)))))
+        (conn/with-connection [conn ::test/db]
+          (test/create-table! conn ::heroes/heroes)
+          (binding [compile/*honeysql-options* (assoc compile/*honeysql-options* :quoted true)]
+            (let [first-row (first (db/query {:select [:ID] :from [:t1_heroes]}))]
+              ;; If `db/query` (jdbc) uses [[clojure.string/lower-case]], `:ID` will be converted to `:ıd` in Turkish locale
+              (is (= :id
+                     (first (keys first-row)))))))
         (finally
           (Locale/setDefault original-locale))))))
 
@@ -154,12 +130,13 @@
   (transduce (map identity) conj #{} reducible-query-result))
 
 (deftest query-reducible-test
-  (testing "Test query-reducible"
-    (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
-           (transduce-to-set (db/reducible-query {:select   [:*]
-                                                  :from     [:t1_users]
-                                                  :order-by [:id]
-                                                  :limit    1}))))))
+  (conn/with-connection [_conn ::test/db]
+    (testing "Test query-reducible"
+      (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
+             (transduce-to-set (db/reducible-query {:select   [:*]
+                                                    :from     [:t1_users]
+                                                    :order-by [:id]
+                                                    :limit    1})))))))
 
 (deftest qualify-test
   (is (= :t1_users.first-name
@@ -199,6 +176,18 @@
   (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
          (db/simple-select-one User {:where [:= :first-name "Cam"]}))))
 
+;; (defn do-with-default-connection [thunk]
+;;   (try
+;;     (m/defmethod conn/do-with-connection :toucan/default
+;;       [connectable f]
+;;       (next-method ::test/db f))
+;;     (thunk)
+;;     (finally
+;;       (m/remove-primary-method! #'conn/do-with-connection :toucan/default))))
+
+;; (defmacro with-default-connection [& body]
+;;   `(do-with-default-connection (^:once fn* [] ~@body)))
+
 (deftest update!-test
   (test/with-discarded-table-changes User
     (db/update! User 1 :last-name "Era")
@@ -208,7 +197,7 @@
     (let [id "012345678"]
       (db/simple-insert! PhoneNumber {:number id, :country_code "US"})
       (db/update! PhoneNumber id :country_code "AU")
-      (is (= {:number "012345678", :country_code "AU"}
+      (is (= {:number id, :country_code "AU"}
              (db/select-one PhoneNumber :number id))))))
 
 (deftest update-where!-test
@@ -233,13 +222,13 @@
       :first-name nil
       :last-name "Can")
     (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
-           (User 2))))
+           (db/select-one User 2))))
   (test/with-discarded-table-changes User
     (db/update-non-nil-keys! User 2
       {:first-name nil
        :last-name  "Can"})
     (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
-           (User 2)))))
+           (db/select-one User 2)))))
 
 (deftest simple-insert-many!-test
   (testing "It must return the inserted ids"

@@ -47,7 +47,10 @@
 
 (m/defmethod conn/do-with-connection DeferredCurrentConnectable
   [{:keys [model]} f]
-  (conn/do-with-connection (current-connectable model) f))
+  (let [connectable (current-connectable model)]
+    (assert (not (instance? DeferredCurrentConnectable connectable))
+            (format "%s returned another %s" `current-connectable `DeferredCurrentConnectable))
+    (conn/do-with-connection connectable f)))
 
 (defn deferred-current-connectable [model]
   (->DeferredCurrentConnectable model))
