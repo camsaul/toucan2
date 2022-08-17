@@ -203,3 +203,11 @@
                               (cons model columns)
                               model)]
           (apply select-reducible model-columns conditions))))))
+
+(defn return-pks-eduction
+  "Given a `reducible-update` returning whatever (presumably returning update counts) wrap it in an eduction and
+  in [[->WithReturnKeys]] so it returns a sequence of primary key vectors."
+  [model reducible-update]
+  (eduction
+   (map (select-pks-fn model))
+   (execute/->WithReturnKeys reducible-update)))

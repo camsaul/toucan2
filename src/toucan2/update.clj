@@ -3,14 +3,13 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [pretty.core :as pretty]
    [toucan2.execute :as execute]
    [toucan2.model :as model]
    [toucan2.query :as query]
-   [toucan2.util :as u]
-   [toucan2.jdbc.query :as t2.jdbc.query]
-   [toucan2.select :as select]
    [toucan2.realize :as realize]
-   [pretty.core :as pretty]))
+   [toucan2.select :as select]
+   [toucan2.util :as u]))
 
 ;;; this is basically the same as the args for `select` and `delete` but the difference is that it has an additional
 ;;; optional arg, `:pk`, as the first arg, and one additional optional arg, the `changes` map at the end
@@ -68,7 +67,7 @@
         (reduce rf init []))
       (let [query (query/build ::update model parsed-args)]
         (try
-          (reduce rf init (execute/reducible-query (model/deferred-current-connectable model) query))
+          (reduce rf init (execute/reducible-query (model/deferred-current-connectable model) model query))
           (catch Throwable e
             (throw (ex-info (format "Error updating rows: %s" (ex-message e))
                             {:model model, :query query}
@@ -108,31 +107,13 @@
 
 ;;;; [[reducible-update-returning-pks]] and [[update-returning-pks!]]
 
-(defrecord WithReturnKeys [reducible]
-  clojure.lang.IReduceInit
-  (reduce [_this rf init]
-    (binding [t2.jdbc.query/*options* (assoc t2.jdbc.query/*options* :return-keys true)]
-      (reduce rf init reducible)))
-
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `->WithReturnKeys reducible)))
-
-(defn return-pks-eduction
-  "Given a `reducible-update` returning whatever (presumably returning update counts) wrap it in an eduction and
-  in [[->WithReturnKeys]] so it returns a sequence of primary key vectors."
-  [model reducible-update]
-  (eduction
-   (map (select/select-pks-fn model))
-   (->WithReturnKeys reducible-update)))
-
 (m/defmulti reducible-update-returning-pks*
   {:arglists '([model parsed-args])}
   u/dispatch-on-first-arg)
 
 (m/defmethod reducible-update-returning-pks* :default
   [model parsed-args]
-  (return-pks-eduction model (reducible-update* model parsed-args)))
+  (select/return-pks-eduction model (reducible-update* model parsed-args)))
 
 (defn reducible-update-returning-pks
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}

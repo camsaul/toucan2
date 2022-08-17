@@ -3,7 +3,8 @@
    [clojure.string :as str]
    [potemkin :as p]
    [pretty.core :as pretty]
-   [puget.printer :as puget]))
+   [puget.printer :as puget]
+   [fipp.visit :as f.visit]))
 
 (set! *warn-on-reflection* true)
 
@@ -11,14 +12,25 @@
 
 (def ^:dynamic *debug-indent-level* 0)
 
+(def ^:private ^:dynamic *last-indentation-separator* "| ")
+
 (defn indentation []
-  (str/join (repeat *debug-indent-level* "|  ")))
+  (str/join (concat (repeat (dec *debug-indent-level*) "|  ")
+                    (when (pos? *debug-indent-level*)
+                      (str *last-indentation-separator* \space)))))
 
 (defn println-debug-lines [s]
-  (let [lines       (str/split-lines (str/trim s))]
-    (doseq [line lines]
+  (let [[first-line & more] (str/split-lines (str/trim s))]
+    (when first-line
+      (binding [*last-indentation-separator* "+-"]
+        (print (indentation)))
+      (println first-line))
+    (doseq [line more]
       (print (indentation))
-      (println line))))
+      (if (= (first line) \space)
+        (do (print "⋮")
+            (println (str/join (rest line))))
+        (println line)))))
 
 (defn println-debug* [& args]
   (println-debug-lines (with-out-str (apply println args))))
@@ -54,6 +66,23 @@
     (fn [_printer x]
       [:text (str x)])))
 
+(defrecord Doc [forms])
+
+(defmethod print-handler Doc
+  [_klass]
+  (fn [printer {:keys [forms]}]
+    (into [:group] (for [form forms]
+                     (puget/format-doc printer form)))))
+
+(defrecord Text [s])
+
+(defmethod print-handler Text
+  [_klass]
+  (fn [_printer {:keys [s]}]
+    [:span
+     [:text s]
+     [:line]]))
+
 (prefer-method print-handler pretty.core.PrettyPrintable clojure.lang.IRecord)
 
 (defn- default-color-printer [x]
@@ -82,14 +111,19 @@
 (defn pprint-to-str [x]
   (str/trim (with-out-str (pprint x))))
 
+(defmacro format-doc [s & args]
+  `(pprint-to-str (->Doc ~(vec (interleave (map (fn [s]
+                                                  `(->Text ~(str/trimr s)))
+                                                (str/split s #"%s"))
+                                           args)))))
+
 (defmacro println-debug
   [arg & more]
   `(when *debug*
      ~(if (vector? arg)
         `(println-debug-lines ~(if (= (count arg) 1)
                                  `(pprint-to-str ~(first arg))
-                                 `(format ~(first arg) ~@(for [arg (rest arg)]
-                                                           `(pprint-to-str ~arg))))
+                                 `(format-doc ~(first arg) ~@(rest arg)))
                               ~@more)
         `(println-debug* ~arg ~@more))))
 
@@ -103,7 +137,7 @@
     (doseq [line (rest lines)]
       (print \newline)
       (print (indentation))
-      (print "   ")
+      (print "  ")
       (print line))
     (println)))
 
@@ -117,9 +151,7 @@
 (defmacro with-debug-result [message & body]
   (if (vector? message)
     `(with-debug-result ~(if (> (count message) 1)
-                           `(format ~(first message)
-                                   ~@(for [arg (rest message)]
-                                       `(pprint-to-str ~arg)))
+                           `(format-doc ~(first message) ~@(rest message))
                            `(pprint-to-str ~(first message)))
        ~@body)
     `(let [thunk# (^:once fn* [] ~@body)]

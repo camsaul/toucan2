@@ -48,7 +48,7 @@
     (is (= nil
            (select/select-one ::test/venues 4))))
   (doseq [[returning-keys? insert!] {false #'insert/insert!
-                                     true  #'insert/insert-returning-keys!}]
+                                     true  #'insert/insert-returning-pks!}]
     (testing (str insert!)
       (test/with-discarded-table-changes :venues
         (f returning-keys? insert!)))))
@@ -128,10 +128,10 @@
   [_model]
   [:id :name])
 
-(deftest insert-returning-keys!-composite-pk-test
+(deftest insert-returning-pks!-composite-pk-test
   (test/with-discarded-table-changes :venues
     (is (= [[4 "Grant & Green"]]
-           (insert/insert-returning-keys! ::venues.composite-pk {:name "Grant & Green", :category "bar"})))))
+           (insert/insert-returning-pks! ::venues.composite-pk {:name "Grant & Green", :category "bar"})))))
 
 ;;; TODO
 
@@ -164,7 +164,7 @@
 ;;     (testing "returning-keys"
 ;;       (test/with-discarded-table-changes :venues
 ;;         (is (= [4]
-;;                (insert/insert-returning-keys! ::venues.custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))))))
+;;                (insert/insert-returning-pks! ::venues.custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))))))
 
 (deftest insert!-no-changes-no-op-test
   (test/with-discarded-table-changes :venues

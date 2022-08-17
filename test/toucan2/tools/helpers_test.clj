@@ -1,10 +1,9 @@
 (ns toucan2.tools.helpers-test
   (:require
-   [clojure.string :as str]
    [clojure.test :refer :all]
    [toucan2.delete :as delete]
-   [toucan2.insert :as insert]
    [toucan2.instance :as instance]
+   [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.helpers :as helpers]
@@ -33,70 +32,30 @@
   [:id :name :category])
 
 (deftest define-default-fields-test
+  (is (= {:select [:id :name :category], :from [[:venues]]}
+         (query/build ::select/select ::venues.default-fields {:query {}})))
   (is (= [(instance/instance ::venues.default-fields
                              {:id 1, :name "Tempest", :category "bar"})
           (instance/instance ::venues.default-fields
                              {:id 2, :name "Ho's Tavern", :category "bar"})
           (instance/instance ::venues.default-fields
                              {:id 3, :name "BevMo", :category "store"})]
-         (select/select ::venues.default-fields))))
+         (select/select ::venues.default-fields)))
+  (testing "should still be able to override default fields"
+    (is (= {:select [:id :name], :from [[:venues]]}
+           (query/build ::select/select ::venues.default-fields {:query {}, :columns [:id :name]})))
+    (is (= (instance/instance ::venues.default-fields
+                              {:id 1, :name "Tempest"})
+           (select/select-one [::venues.default-fields :id :name])))))
 
 
 
 ;;; TODO -- should `after-update` automatically do things in a transaction? So if `after-update` fails, the original
 ;;; updates were canceled?
 
-(derive ::venues.before-insert ::test/venues)
-
-(helpers/define-before-insert ::venues.before-insert
-  [venue]
-  (cond-> venue
-    (:name venue) (update :name str/upper-case)))
 
 
-(deftest before-insert-test
-  (test/with-discarded-table-changes :venues
-    (is (= 1
-           (insert/insert! ::venues.before-insert {:name "Tin Vietnamese", :category "resturaunt"})))
-    (is (= (instance/instance ::venues.before-insert {:id 4, :name "TIN VIETNAMESE"})
-           (select/select-one [::venues.before-insert :id :name] :id 4)))))
 
-(derive ::venues.after-insert ::test/venues)
-
-(def ^:private ^:dynamic *venues-awaiting-moderation* nil)
-
-(helpers/define-after-insert ::venues.after-insert
-  [venue]
-  (when *venues-awaiting-moderation*
-    (swap! *venues-awaiting-moderation* conj venue))
-  (assoc venue :awaiting-moderation? true))
-
-(deftest after-insert-test
-  (doseq [f [#'insert/insert!
-             #'insert/insert-returning-keys!
-             #'insert/insert-returning-instances!]]
-    (testing f
-      (test/with-discarded-table-changes :venues
-        (binding [*venues-awaiting-moderation* (atom [])]
-          (is (= (condp = f
-                   #'insert/insert! 1
-                   #'insert/insert-returning-keys! [4]
-                   #'insert/insert-returning-instances! [{:id                   4
-                                                          :name                 "Lombard Heights Market"
-                                                          :category             "liquor-store"
-                                                          :created-at           (LocalDateTime/parse "2017-01-01T00:00")
-                                                          :updated-at           (LocalDateTime/parse "2017-01-01T00:00")
-                                                          :awaiting-moderation? true}])
-                 (f ::venues.after-insert {:name "Lombard Heights Market", :category "liquor-store"})))
-          (testing "should be added to *venues-awaiting-moderation*"
-            (is (= [(instance/instance
-                     ::venues.after-insert
-                     {:id         4
-                      :name       "Lombard Heights Market"
-                      :category   "liquor-store"
-                      :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
-                   @*venues-awaiting-moderation*))))))))
 
 (derive ::venues.before-delete ::test/venues)
 

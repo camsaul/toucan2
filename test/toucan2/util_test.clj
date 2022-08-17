@@ -57,9 +57,9 @@
     (testing "Nested debug results"
       (binding [u/*debug* true]
         (is (= ["A"
-                "|  B"
+                "+- B"
                 "|  ↳ 2"
-                "|  C"
+                "+- C"
                 "|  ↳ :cans"
                 "↳ [2 :cans]"]
                (out-str-lines
