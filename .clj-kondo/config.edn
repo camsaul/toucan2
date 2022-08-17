@@ -22,8 +22,7 @@
   }
 
  :lint-as
- {methodical.core/defmulti                  clojure.core/defmulti
-  potemkin/def-map-type                     clojure.core/defrecord
+ {potemkin/def-map-type                     clojure.core/defrecord
   potemkin/defprotocol+                     clojure.core/defprotocol
   potemkin/defrecord+                       clojure.core/defrecord
   potemkin/deftype+                         clojure.core/deftype
@@ -36,7 +35,7 @@
 
  :hooks
  {:analyze-call
-  {methodical.core/defmethod hooks.methodical.core/defmethod}
+  {}
 
   :macroexpand
   {toucan.db/with-call-counting                        macros.toucan2.execute/with-call-count
