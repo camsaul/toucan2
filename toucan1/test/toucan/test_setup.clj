@@ -10,8 +10,8 @@
    [toucan.test-models.user :refer [User]]
    [toucan.test-models.venue :refer [Venue]]
    [toucan2.connection :as conn]
-   [toucan2.test :as test]
-   [toucan2.model :as model]))
+   [toucan2.model :as model]
+   [toucan2.test :as test]))
 
 (models/set-root-namespace! 'toucan.test-models)
 

@@ -79,7 +79,8 @@
     (let [parsed-args (assoc parsed-args ::after-insert? true)]
       (after-reducible-instances model (next-method model parsed-args)))))
 
-(defmacro define-after-insert {:style/indent :defn}
+(defmacro define-after-insert
+  {:style/indent :defn}
   [model [instance-binding] & body]
   `(let [model# ~model]
      (u/maybe-derive model# ::after-insert)

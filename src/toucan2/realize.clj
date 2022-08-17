@@ -1,8 +1,10 @@
 (ns toucan2.realize
-  (:require [potemkin :as p]
-            [toucan2.util :as u]
-            [next.jdbc.result-set :as jdbc.rset])
-  (:import next.jdbc.result_set.DatafiableRow))
+  (:require
+   [next.jdbc.result-set :as jdbc.rset]
+   [potemkin :as p]
+   [toucan2.util :as u])
+  (:import
+   (next.jdbc.result_set DatafiableRow)))
 
 (comment jdbc.rset/keep-me)
 

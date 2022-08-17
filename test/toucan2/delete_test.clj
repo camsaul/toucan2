@@ -4,9 +4,9 @@
    [methodical.core :as m]
    [toucan2.delete :as delete]
    [toucan2.model :as model]
+   [toucan2.query :as query]
    [toucan2.select :as select]
-   [toucan2.test :as test]
-   [toucan2.query :as query]))
+   [toucan2.test :as test]))
 
 (deftest parse-args-test
   (is (= {:queryable 1}
