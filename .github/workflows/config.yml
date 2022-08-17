@@ -13,12 +13,11 @@ jobs:
       with:
         check-name: Run clj-kondo
         clj-kondo-args: >-
-          --parallel
           --lint
-          /work/src
-          /work/test
-          /work/toucan1/src
-          /work/toucan1/test
+          src
+          test
+          toucan1/src
+          toucan1/test
         github_token: ${{ secrets.GITHUB_TOKEN }}
 
   tests:
