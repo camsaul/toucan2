@@ -79,6 +79,6 @@
   (delete-child-categories! category))
 
 
-(m/defmethod test/create-table-sql-file Category
-  [_table-name]
+(m/defmethod test/create-table-sql-file [:default Category]
+  [_db-type _table-name]
   "toucan1/test/toucan/test_models/category.sql")

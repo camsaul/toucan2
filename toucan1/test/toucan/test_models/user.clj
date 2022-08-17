@@ -7,6 +7,6 @@
 
 (models/defmodel User :t1_users)
 
-(m/defmethod test/create-table-sql-file User
-  [_table-name]
+(m/defmethod test/create-table-sql-file [:default User]
+  [_db-type _table-name]
   "toucan1/test/toucan/test_models/user.sql")

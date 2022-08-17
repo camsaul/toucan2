@@ -17,6 +17,6 @@
   [_model]
   identity)
 
-(m/defmethod test/create-table-sql-file PhoneNumber
-  [_table-name]
+(m/defmethod test/create-table-sql-file [:default PhoneNumber]
+  [_db-type _table-name]
   "toucan1/test/toucan/test_models/phone_number.sql")

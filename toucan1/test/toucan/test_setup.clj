@@ -22,7 +22,7 @@
                  User
                  Venue]]
     (conn/with-connection [conn ::test/db]
-      (test/create-table! conn model))))
+      (test/create-table! test/*db-type* conn model))))
 
 (def initialized? (atom false))
 

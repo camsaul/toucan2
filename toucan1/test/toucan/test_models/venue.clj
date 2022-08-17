@@ -32,6 +32,6 @@
 (helpers/deftransforms Venue
   {:category keyword-transform})
 
-(m/defmethod test/create-table-sql-file Venue
-  [_table-name]
+(m/defmethod test/create-table-sql-file [:default Venue]
+  [_db-type _table-name]
   "toucan1/test/toucan/test_models/venue.sql")

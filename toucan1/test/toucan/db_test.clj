@@ -115,7 +115,7 @@
       (try
         (Locale/setDefault (Locale/forLanguageTag "tr"))
         (conn/with-connection [conn ::test/db]
-          (test/create-table! conn ::heroes/heroes)
+          (test/create-table! test/*db-type* conn ::heroes/heroes)
           (binding [compile/*honeysql-options* (assoc compile/*honeysql-options* :quoted true)]
             (let [first-row (first (db/query {:select [:ID] :from [:t1_heroes]}))]
               ;; If `db/query` (jdbc) uses [[clojure.string/lower-case]], `:ID` will be converted to `:ıd` in Turkish locale
