@@ -182,22 +182,24 @@
   {:arglists '([model row-pks]
                [[model & columns] row-pks])}
   [modelable-columns row-pks]
-  (let [[modelable & columns] (if (sequential? modelable-columns)
-                                modelable-columns
-                                [modelable-columns])]
-    (model/with-model [model modelable]
-      (let [pk-vecs           (for [pk row-pks]
-                                (if (sequential? pk)
-                                  pk
-                                  [pk]))
-            pk-keys           (model/primary-keys-vec model)
-            pk-maps           (for [pk-vec pk-vecs]
-                                (zipmap pk-keys pk-vec))
-            conditions        (mapcat
-                               (juxt identity (fn [k]
-                                                [:in (mapv k pk-maps)]))
-                               pk-keys)
-            model-columns (if (seq columns)
-                            (cons model columns)
-                            model)]
-        (apply select-reducible model-columns conditions)))))
+  (if (empty? row-pks)
+    []
+    (let [[modelable & columns] (if (sequential? modelable-columns)
+                                  modelable-columns
+                                  [modelable-columns])]
+      (model/with-model [model modelable]
+        (let [pk-vecs       (for [pk row-pks]
+                              (if (sequential? pk)
+                                pk
+                                [pk]))
+              pk-keys       (model/primary-keys-vec model)
+              pk-maps       (for [pk-vec pk-vecs]
+                              (zipmap pk-keys pk-vec))
+              conditions    (mapcat
+                             (juxt identity (fn [k]
+                                              [:in (mapv k pk-maps)]))
+                             pk-keys)
+              model-columns (if (seq columns)
+                              (cons model columns)
+                              model)]
+          (apply select-reducible model-columns conditions))))))

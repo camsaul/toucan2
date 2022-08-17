@@ -32,15 +32,13 @@
   :toucan/default)
 
 (defn- current-connectable [model]
-  (u/with-debug-result ["Realizing deferred current connectable for model %s. %s is bound to %s"
-                        model
-                        `current/*connection*
-                        current/*connection*]
+  (u/with-debug-result ["Realizing deferred current connectable for model %s." model]
+    (u/println-debug ["%s is %s" `current/*connection* current/*connection*])
     (if (= current/*connection* :toucan/default)
-      (u/with-debug-result ["Current connection is default; using %s for model %s" `default-connectable model]
+      (do
+        (u/println-debug ["Using %s for model %s" `default-connectable model])
         (default-connectable model))
-      (u/with-debug-result "Current connection is *NOT* default. Using that"
-        current/*connection*))))
+      current/*connection*)))
 
 (defrecord DeferredCurrentConnectable [model]
   pretty/PrettyPrintable
@@ -60,7 +58,18 @@
 
 (m/defmethod table-name :default
   [model]
+  (if (instance? clojure.lang.Named model)
+    ((m/effective-method table-name clojure.lang.Named) model)
+    (throw (ex-info (format "Invalid model %s: don't know how to get its table name." (pr-str model))
+                    {:model model}))))
+
+(m/defmethod table-name clojure.lang.Named
+  [model]
   (name model))
+
+(m/defmethod table-name String
+  [table]
+  table)
 
 (m/defmulti primary-keys
   {:arglists '([model])}

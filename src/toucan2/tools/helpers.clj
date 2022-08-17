@@ -1,17 +1,16 @@
 (ns toucan2.tools.helpers
   (:require
    [methodical.core :as m]
+   [toucan2.connection :as conn]
+   [toucan2.delete :as delete]
    [toucan2.insert :as insert]
-   [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.query :as query]
+   [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.tools.transformed :as transformed]
    [toucan2.update :as update]
-   [toucan2.util :as u]
-   [toucan2.realize :as realize]
-   [toucan2.delete :as delete]
-   [toucan2.connection :as conn]))
+   [toucan2.util :as u]))
 
 (defn maybe-derive
   [child parent]
@@ -81,141 +80,6 @@
   `(let [model# ~model]
      (maybe-derive model# ::default-fields)
      (m/defmethod default-fields model# [~'&model] ~@body)))
-
-;;;; [[define-before-update]], [[define-after-update]]
-
-(m/defmulti before-update
-  {:arglists '([model row])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod before-update :around :default
-  [model row]
-  (u/with-debug-result [(list `before-update model row)]
-    (next-method model row)))
-
-(defn before-update-changes->affected-pk-maps [model reducible-matching-rows changes]
-  (reduce
-   (fn [changes->pks row]
-     (let [row (merge row changes)
-           row (before-update model row)]
-       (update changes->pks
-               (instance/changes row)
-               (fn [pks]
-                 (conj (set pks) (model/primary-key-values model row))))))
-   {}
-   reducible-matching-rows))
-
-(defn do-before-update-with-args [model {:keys [changes], :as parsed-args}]
-  (let [reducible-matching-rows   (select/select-reducible* model parsed-args)
-        changes->affected-pk-maps (before-update-changes->affected-pk-maps model reducible-matching-rows changes)]
-    (if (= (count (keys changes->affected-pk-maps)) 1)
-      ;; every row has the same exact changes: we only need to perform a single update, using the original conditions.
-      (update/update!* model (assoc parsed-args :changes (first (keys changes->affected-pk-maps))))
-      ;; More than one set of changes: update each row individually.
-      ;;
-      ;; TODO -- we should also batch these together as much as possible. If we update 100 rows with two possible change
-      ;; sets then we should perform 2 updates, not 100.
-      (reduce
-       (fn [update-count [changes affected-pk-maps]]
-         (reduce
-          (fn [update-count pk-map]
-            (+ update-count (update/update!* model (assoc parsed-args
-                                                          :changes changes
-                                                          :kv-args pk-map))))
-          update-count
-          affected-pk-maps))
-       0
-       changes->affected-pk-maps))))
-
-(def ^:dynamic *doing-before-update?* false)
-
-(m/defmethod update/update!* ::before-update
-  [model {:keys [changes], :as parsed-args}]
-  (cond
-    ;; if there are no changes we don't need to do anything -- just no-op.
-    (zero? (count changes))
-    0
-
-    ;; if we're already doing special before-update stuff then don't do the special stuff on top of that again.
-    *doing-before-update?*
-    (next-method model parsed-args)
-
-    :else
-    (binding [*doing-before-update?* true]
-      (do-before-update-with-args model parsed-args))))
-
-(defmacro define-before-update [model [row-binding] & body]
-  `(let [model# ~model]
-     (maybe-derive model# ::before-update)
-     (m/defmethod before-update model#
-       [~'&model ~row-binding]
-       ~@body)))
-
-(m/defmulti after-update
-  {:arglists '([model instance])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod after-update :around :default
-  [model instance]
-  (u/with-debug-result [(list `after-update model instance)]
-    (next-method model instance)))
-
-(defn do-after-update [model parsed-args]
-  (println "parsed-args:" parsed-args) ; NOCOMMIT
-  (println "ROWS" (realize/realize (select/select-reducible* model parsed-args)))
-  (try
-    (reduce
-     (fn [_ instance]
-       (println "instance:" instance)   ; NOCOMMIT
-       (after-update model instance)
-       nil)
-     nil
-     (select/select-reducible* model parsed-args))
-    (catch Throwable e
-      (throw (ex-info (format "Error in after-update for %s: %s" (pr-str model) (ex-message e))
-                      {:model model, :args parsed-args}
-                      e)))))
-
-(def ^:dynamic *doing-after-update?* false)
-
-(defn reducible-after-update [model affected-pks]
-  (eduction
-   (map (fn [row]
-          (after-update model row)))
-   (select/select-reducible-with-pks model affected-pks)))
-
-(m/defmethod update/update!* ::after-update
-  [model parsed-args]
-  (if *doing-after-update?*
-    (next-method model parsed-args)
-    (binding [*doing-after-update?* true]
-      (let [affected-pks (update/update-returning-pks!* model parsed-args)]
-        (transduce
-         (map (constantly 1))
-         (completing +)
-         0
-         (reducible-after-update model affected-pks))))))
-
-(m/defmethod update/update-returning-pks!* ::after-update
-  [model parsed-args]
-  (if *doing-after-update?*
-    (next-method model parsed-args)
-    (binding [*doing-after-update?* true]
-      (let [affected-pks (next-method model parsed-args)]
-        (reduce
-         (constantly nil)
-         nil
-         (reducible-after-update model affected-pks))
-        affected-pks))))
-
-(defmacro define-after-update
-  {:style/indent :defn}
-  [model [result-binding] & body]
-  `(let [model# ~model]
-     (maybe-derive model# ::after-update)
-     (m/defmethod after-update model#
-       [~'&model ~result-binding]
-       ~@body)))
 
 ;;;; [[define-before-insert]], [[define-after-insert]]
 

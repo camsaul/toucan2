@@ -1,8 +1,11 @@
 (ns toucan2.util
-  (:require [clojure.string :as str]
-            [potemkin :as p]
-            [pretty.core :as pretty]
-            [methodical.util.trace :as m.trace]))
+  (:require
+   [clojure.string :as str]
+   [potemkin :as p]
+   [pretty.core :as pretty]
+   [puget.printer :as puget]))
+
+(set! *warn-on-reflection* true)
 
 (def ^:dynamic *debug* false)
 
@@ -20,17 +23,73 @@
 (defn println-debug* [& args]
   (println-debug-lines (with-out-str (apply println args))))
 
+(def ^:dynamic *color*
+  "Whether or not to print the trace in color. True by default, unless the env var `NO_COLOR` is true."
+  (if-let [env-var-value (System/getenv "NO_COLOR")]
+    (Boolean/parseBoolean env-var-value)
+    true))
+
+(defmulti ^:private print-handler
+  {:arglists '([klass])}
+  (fn [klass]
+    klass))
+
+(defmethod print-handler :default
+  [_klass]
+  nil)
+
+(defmethod print-handler pretty.core.PrettyPrintable
+  [_klass]
+  (fn [printer x]
+    (puget/format-doc printer (pretty/pretty x))))
+
+(defmethod print-handler clojure.core.Eduction
+  [_klass]
+  (fn [printer ^clojure.core.Eduction ed]
+    (puget/format-doc printer (list 'eduction (.xform ed) (.coll ed)))))
+
+(defmethod print-handler clojure.lang.IRecord
+  [klass]
+  (when (isa? klass clojure.lang.IReduceInit)
+    (fn [_printer x]
+      [:text (str x)])))
+
+(prefer-method print-handler pretty.core.PrettyPrintable clojure.lang.IRecord)
+
+(defn- default-color-printer [x]
+  ;; don't print in black. I can't see it
+  (puget/cprint x {:color-scheme   {:nil nil}
+                   :print-handlers print-handler}))
+
+(defn- default-boring-printer [x]
+  (puget/pprint x {:print-handlers print-handler}))
+
+(defn pretty-printer []
+  (if *color*
+    default-color-printer
+    default-boring-printer))
+
+(defn- pprint
+  "Pretty print a form `x`."
+  [x]
+  (try
+    ((pretty-printer) x)
+    (catch Throwable e
+      (throw (ex-info (format "Error pretty printing %s: %s" (some-> x class .getCanonicalName) (ex-message e))
+                      {:object x}
+                      e)))))
+
 (defn pprint-to-str [x]
-  (if (instance? pretty.core.PrettyPrintable x)
-    (pprint-to-str (pretty/pretty x))
-    (str/trim (with-out-str (#'m.trace/pprint x)))))
+  (str/trim (with-out-str (pprint x))))
 
 (defmacro println-debug
   [arg & more]
   `(when *debug*
      ~(if (vector? arg)
-        `(println-debug-lines (format ~(first arg) ~@(for [arg (rest arg)]
-                                                       `(pprint-to-str ~arg)))
+        `(println-debug-lines ~(if (= (count arg) 1)
+                                 `(pprint-to-str ~(first arg))
+                                 `(format ~(first arg) ~@(for [arg (rest arg)]
+                                                           `(pprint-to-str ~arg))))
                               ~@more)
         `(println-debug* ~arg ~@more))))
 
@@ -111,3 +170,8 @@
   This function always uses the `Locale/US` locale."
   [^CharSequence s]
   (.. s toString (toLowerCase (java.util.Locale/US))))
+
+(defn maybe-derive
+  [child parent]
+  (when-not (isa? child parent)
+    (derive child parent)))

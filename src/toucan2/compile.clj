@@ -10,13 +10,8 @@
 
 (m/defmethod do-with-compiled-query :around :default
   [model query f]
-  (u/println-debug ["Compile %s query ^%s %s" model (some-> query class .getCanonicalName symbol) query])
-  (next-method model query f)
-  #_(binding [u/*debug-indent-level* (inc u/*debug-indent-level*)]
-    (next-method model query (fn [compiled-query]
-                               (binding [u/*debug-indent-level* (dec u/*debug-indent-level*)]
-                                 (u/print-debug-result compiled-query)
-                                 (f compiled-query))))))
+  (u/println-debug [(list 'compile model query)])
+  (next-method model query f))
 
 (defmacro with-compiled-query [[query-binding [model query]] & body]
   `(do-with-compiled-query
@@ -45,6 +40,15 @@
 
 (m/defmethod do-with-compiled-query [:default clojure.lang.IPersistentMap]
   [model honeysql f]
-  (let [sql-args (hsql/format honeysql (merge @global-honeysql-options
-                                              *honeysql-options*))]
-    (do-with-compiled-query model sql-args f)))
+  (let [options (merge @global-honeysql-options
+                       *honeysql-options*)]
+    (u/println-debug ["Compiling Honey SQL with options %s" options])
+    (let [sql-args (try
+                     (hsql/format honeysql options)
+                     (catch Throwable e
+                       (throw (ex-info (format "Error building Honey SQL query: %s" (ex-message e))
+                                       {:model    model
+                                        :honeysql honeysql
+                                        :options  options}
+                                       e))))]
+      (do-with-compiled-query model sql-args f))))

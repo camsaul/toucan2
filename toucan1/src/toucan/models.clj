@@ -56,7 +56,7 @@
 
 (defmacro add-property!
   {:style/indent 1}
-  [k & {:keys [#_insert #_update select]}]
+  [k & {:keys [#_insert update select]}]
   (let [property-keyword (qualify-property-keyword k)]
     `(do
        ;; ~(when insert
@@ -64,11 +64,11 @@
        ;;       (helpers/define-before-insert ~property-keyword
        ;;         [instance#]
        ;;         (insert-fn# instance# nil))))
-       ;; ~(when update
-       ;;    `(let [update-fn# ~update]
-       ;;       (helpers/define-before-update ~property-keyword
-       ;;         [instance#]
-       ;;         (update-fn# instance# nil))))
+       ~(when update
+          `(let [update-fn# ~update]
+             (helpers/define-before-update ~property-keyword
+               [instance#]
+               (update-fn# instance# nil))))
        ~(when select
           `(let [select-fn# ~select]
              (helpers/define-before-select ~property-keyword
@@ -82,13 +82,13 @@
     (model/with-model [model modelable]
       (first (model/primary-keys model)))))
 
-(defn do-pre-insert
+#_(defn do-pre-insert
   [model obj]
   ;; TODO
   obj
   )
 
-(defn do-pre-update
+#_(defn do-pre-update
   [model obj]
   ;; TODO
   obj
