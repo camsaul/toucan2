@@ -8,7 +8,7 @@ CREATE TABLE t1_categories (
 
 INSERT INTO t1_categories (name, "parent-category-id")
 VALUES
-('bar', NULL),            -- 1
-('dive-bar', 1),          -- 2
-('resturaunt', NULL),     -- 3
-('mxican-resturaunt', 3); -- 4
+('bar', NULL),             -- 1
+('dive-bar', 1),           -- 2
+('resturaunt', NULL),      -- 3
+('mexican-resturaunt', 3); -- 4

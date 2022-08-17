@@ -165,3 +165,14 @@
     ;; -> CALLS: 2"
   [[call-count-fn-binding] & body]
   `(do-with-call-counts (^:once fn* [~call-count-fn-binding] ~@body)))
+
+;;; TODO -- this is kind of JDBC specific
+(defrecord WithReturnKeys [reducible]
+  clojure.lang.IReduceInit
+  (reduce [_this rf init]
+    (binding [t2.jdbc.query/*options* (assoc t2.jdbc.query/*options* :return-keys true)]
+      (reduce rf init reducible)))
+
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `->WithReturnKeys reducible)))

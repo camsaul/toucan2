@@ -168,7 +168,7 @@
 
 (defn transform-results [model reducible-query]
   (if-let [transforms (not-empty (out-transforms model))]
-    (u/with-debug-result ["Apply %s transforms to results" model]
+    (u/with-debug-result [(list `transform-results model)]
       (u/println-debug [transforms])
       reducible-query
       (eduction
@@ -212,8 +212,29 @@
       (update parsed-args :rows transform-insert-rows transforms))
     parsed-args))
 
-(m/defmethod insert/insert!* :after ::transformed :default
-  [model results]
-  (if (integer? results)
-    results
-    (transform-results model results)))
+;; (m/remove-all-aux-methods! #'insert/reducible-insert-returning-pks* :after ::transformed)
+;; (m/defmethod insert/reducible-insert-returning-pks* :after ::transformed
+;;   [model reducible-results]
+;;   (transform-results model reducible-results))
+
+(m/defmethod insert/reducible-insert-returning-pks* :after ::transformed
+  [model reducible-results]
+  (let [pk-keys (model/primary-keys model)]
+    (eduction
+     (map (if (= (count pk-keys) 1)
+            (first pk-keys)
+            (juxt pk-keys)))
+     (transform-results model (eduction
+                               (map (fn [pk-vec]
+                                      (zipmap pk-keys (if (sequential? pk-vec)
+                                                        pk-vec
+                                                        [pk-vec]))))
+                               reducible-results)))))
+
+(m/defmethod insert/reducible-insert-returning-instances* :after ::transformed
+  [model reducible-results]
+  (transform-results model reducible-results))
+
+;; (m/defmethod insert/reducible-insert-returning-instances* :after ::transformed
+;;   [model reducible-results]
+;;   (transform-results model reducible-results))

@@ -3,13 +3,10 @@
    [methodical.core :as m]
    [toucan2.connection :as conn]
    [toucan2.delete :as delete]
-   [toucan2.insert :as insert]
    [toucan2.model :as model]
    [toucan2.query :as query]
-   [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update]
    [toucan2.util :as u]))
 
 (defn maybe-derive
@@ -72,101 +69,16 @@
 
 (m/defmethod query/build :before [::select/select ::default-fields clojure.lang.IPersistentMap]
   [_query-type model args]
-  (update args :query (fn [query]
-                        (merge {:select (default-fields model)}
-                               query))))
+  (u/with-debug-result ["add default fields for %s" model]
+    (update args :columns (fn [columns]
+                            (or (not-empty columns)
+                                (default-fields model))))))
 
 (defmacro define-default-fields [model & body]
   `(let [model# ~model]
      (maybe-derive model# ::default-fields)
      (m/defmethod default-fields model# [~'&model] ~@body)))
 
-;;;; [[define-before-insert]], [[define-after-insert]]
-
-(m/defmulti before-insert
-  {:arglists '([model row])}
-  u/dispatch-on-first-arg)
-
-(defn do-before-insert-to-rows [rows model]
-  (mapv
-   (fn [row]
-     (try
-       (u/with-debug-result ["Do before-insert for %s" model]
-         (before-insert model row))
-       (catch Throwable e
-         (throw (ex-info (format "Error in before-insert for %s: %s" (pr-str model) (ex-message e))
-                         {:model model, :row row}
-                         e)))))
-   rows))
-
-(m/defmethod insert/insert!* :before ::before-insert
-  [model parsed-args]
-  (update parsed-args :rows do-before-insert-to-rows model))
-
-(defmacro define-before-insert
-  {:style/indent :defn}
-  [model [instance-binding] & body]
-  `(let [model# ~model]
-     (derive model# ::before-insert)
-     (m/defmethod before-insert model#
-       [~'&model ~instance-binding]
-       ~@body)))
-
-(m/defmulti after-insert
-  {:arglists '([model row])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod after-insert :around :default
-  [model row]
-  (u/with-debug-result [(list `after-insert model row)]
-    (try
-      (next-method model row)
-      (catch Throwable e
-        (throw (ex-info (format "Error in %s for %s: %s" `after-insert (pr-str model) (ex-message e))
-                        {:model model, :row row}
-                        e))))))
-
-(def ^:dynamic *doing-after-insert?* false)
-
-(m/defmethod insert/insert!* ::after-insert
-  [model parsed-args]
-  (if *doing-after-insert?*
-    (next-method model parsed-args)
-    (binding [*doing-after-insert?* true]
-      (let [rows (insert/insert-returning-instances!* model parsed-args)]
-        (doseq [row rows]
-          (after-insert model row))
-        (count rows)))))
-
-(m/defmethod insert/insert-returning-keys!* ::after-insert
-  [model {:keys [fields], :as parsed-args}]
-  (if *doing-after-insert?*
-    (next-method model parsed-args)
-    (binding [*doing-after-insert?* true]
-      (let [row-pks (next-method model parsed-args)]
-        (transduce
-         (map (fn [row]
-                (after-insert model row)))
-         (constantly nil)
-         nil
-         (select/select-reducible-with-pks (into [model] fields) row-pks))
-        row-pks))))
-
-(m/defmethod insert/insert-returning-instances!* ::after-insert
-  [model parsed-args]
-  (if *doing-after-insert?*
-    (next-method model parsed-args)
-    (binding [*doing-after-insert?* true]
-      (mapv (partial after-insert model)
-            (next-method model parsed-args)))))
-
-(defmacro define-after-insert {:style/indent :defn}
-  [model [instance-binding] & body]
-  `(let [model# ~model]
-     (maybe-derive model# ::after-insert)
-     (m/defmethod after-insert model#
-       [~'&model ~instance-binding]
-       ~@body)))
 
 ;;;; [[define-before-delete]], [[define-after-delete]]
 

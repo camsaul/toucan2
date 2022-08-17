@@ -14,9 +14,9 @@
 (defn- now [] (java.time.LocalDateTime/now))
 
 (models/add-property! ::timestamped?
-  :insert (fn [obj _]
+  :insert (fn [obj]
             (assoc obj :created-at (now), :updated-at (now)))
-  :update (fn [obj _]
+  :update (fn [obj]
             (assoc obj :updated-at (now))))
 
 (derive Venue ::timestamped?)

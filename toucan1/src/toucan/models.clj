@@ -6,9 +6,9 @@
    [methodical.core :as m]
    [toucan2.model :as model]
    [toucan2.select :as select]
+   [toucan2.tools.before-update :as before-update]
    [toucan2.tools.helpers :as helpers]
-   [toucan2.tools.identity-query :as identity-query]
-   [toucan2.util :as u]))
+   [toucan2.tools.identity-query :as identity-query]))
 
 (defonce ^:private -root-namespace (atom 'models))
 
@@ -56,24 +56,24 @@
 
 (defmacro add-property!
   {:style/indent 1}
-  [k & {:keys [#_insert update select]}]
+  [k & {:keys [insert update select]}]
   (let [property-keyword (qualify-property-keyword k)]
     `(do
-       ;; ~(when insert
-       ;;    `(let [insert-fn# ~insert]
-       ;;       (helpers/define-before-insert ~property-keyword
-       ;;         [instance#]
-       ;;         (insert-fn# instance# nil))))
+       ~(when insert
+          `(let [insert-fn# ~insert]
+             (helpers/define-before-insert ~property-keyword
+               [instance#]
+               (insert-fn# instance#))))
        ~(when update
           `(let [update-fn# ~update]
-             (helpers/define-before-update ~property-keyword
+             (before-update/define-before-update ~property-keyword
                [instance#]
-               (update-fn# instance# nil))))
+               (update-fn# instance#))))
        ~(when select
           `(let [select-fn# ~select]
              (helpers/define-before-select ~property-keyword
                [instance#]
-               (select-fn# instance# nil)))))))
+               (select-fn# instance#)))))))
 
 (defn ^{:deprecated "2.0.0"} primary-key
   "DEPRECATED: use [[toucan2.model/primary-keys]] instead."

@@ -19,7 +19,7 @@
 ;;         merged-attributes (merge {} defaults attributes)
 ;;         [pk temp-object]  (log/with-trace ["Create temporary %s with attributes %s" tableable merged-attributes]
 ;;                             (let [[pk] (try
-;;                                          (mutative/insert-returning-keys! tableable merged-attributes)
+;;                                          (mutative/insert-returning-pks! tableable merged-attributes)
 ;;                                          (catch Throwable e
 ;;                                            (throw (ex-info (format "Error inserting temp %s: %s" (pr-str tableable) (ex-message e))
 ;;                                                            {:tableable  tableable

@@ -2,7 +2,6 @@
   (:require
    [methodical.core :as m]
    [pretty.core :as pretty]
-   [toucan2.model :as model]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.update :as update]
@@ -53,7 +52,7 @@
     (u/with-debug-result ["do after-update for %s in %s" model `update/reducible-update*]
       (let [parsed-args                      (assoc parsed-args ::doing-after-update? true)
             reducible-update-returning-count (next-method model parsed-args)
-            reducible-update-returning-pks   (update/return-pks-eduction model reducible-update-returning-count)]
+            reducible-update-returning-pks   (select/return-pks-eduction model reducible-update-returning-count)]
         (eduction
          (map (constantly 1))
          (->ReducibleAfterUpdate model reducible-update-returning-pks))))))

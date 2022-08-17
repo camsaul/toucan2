@@ -14,7 +14,8 @@
    [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.model :as model]
    [toucan2.select :as select]
-   [toucan2.update :as update]))
+   [toucan2.update :as update]
+   [toucan2.util :as u]))
 
 (comment models/keep-me)
 
@@ -36,32 +37,34 @@
   (or *quoting-style*
       (get @compile/global-honeysql-options :dialect)))
 
-(def ^:dynamic ^{:deprecated "2.0.0"} *automatically-convert-dashes-and-underscores*
-  "DEPRECATED: binding [[toucan2.compile/*honeysql-options*]] instead."
-  nil)
+;; (def ^:dynamic ^{:deprecated "2.0.0"} *automatically-convert-dashes-and-underscores*
+;;   "DEPRECATED: binding [[toucan2.compile/*honeysql-options*]] instead."
+;;   nil)
 
-(defn ^{:deprecated "2.0.0"} set-default-automatically-convert-dashes-and-underscores!
-  "DEPRECATED: set [[toucan2.compile/global-honeysql-options]] directly."
-  [automatically-convert-dashes-and-underscores]
-  (swap! compile/global-honeysql-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores)))
+;; (defn ^{:deprecated "2.0.0"} set-default-automatically-convert-dashes-and-underscores!
+;;   "DEPRECATED: set [[toucan2.compile/global-honeysql-options]] directly."
+;;   [automatically-convert-dashes-and-underscores]
+;;   (swap! compile/global-honeysql-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores)))
 
-(defn ^{:deprecated "2.0.0"} automatically-convert-dashes-and-underscores?
-  []
-  (if (nil? *automatically-convert-dashes-and-underscores*)
-    (get @compile/global-honeysql-options :quoted-snake)
-    *automatically-convert-dashes-and-underscores*))
+;; (defn ^{:deprecated "2.0.0"} automatically-convert-dashes-and-underscores?
+;;   []
+;;   (if (nil? *automatically-convert-dashes-and-underscores*)
+;;     (get @compile/global-honeysql-options :quoted-snake)
+;;     *automatically-convert-dashes-and-underscores*))
 
 (m/defmethod compile/do-with-compiled-query [:toucan1/model clojure.lang.IPersistentMap]
   [model honeysql f]
-  (binding [compile/*honeysql-options* (merge
-                                        ;; defaults
-                                        {:quoted true, :dialect :ansi, :quoted-snake true}
-                                        compile/*honeysql-options*
-                                        (when *quoting-style*
-                                          {:dialect *quoting-style*})
-                                        (when (false? *automatically-convert-dashes-and-underscores*)
-                                          {:quoted-snake false}))]
-    (next-method model honeysql f)))
+  (u/with-debug-result ["Compiling Honey SQL query for legacy Toucan 1 model %s" model]
+    (binding [compile/*honeysql-options* (merge
+                                          ;; defaults
+                                          {:quoted true, :dialect :ansi, #_:quoted-snake #_true}
+                                          compile/*honeysql-options*
+                                          (when *quoting-style*
+                                            {:dialect *quoting-style*})
+                                          ;; (when (false? *automatically-convert-dashes-and-underscores*)
+                                          ;;   {:quoted-snake false})
+                                          )]
+      (next-method model honeysql f))))
 
 ;; replaces `*db-connection*`
 (p/import-vars [current *connection*])
@@ -219,24 +222,24 @@
     (thunk)))
 
 (defn ^{:deprecated "2.0.0"} simple-insert-many!
-  "DEPRECATED: use [[toucan2.insert/insert-returning-keys!]] instead. Returns the ID of the "
+  "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead. Returns the ID of the "
   [modelable row-maps]
   (when (seq row-maps)
     (model/with-model [model modelable]
       (do-with-model-default-connectable
        model
        (^:once fn* []
-        (insert/insert-returning-keys! (model/table-name model) row-maps))))))
+        (insert/insert-returning-pks! (model/table-name model) row-maps))))))
 
 (defn ^{:deprecated "2.0.0"} insert-many!
-  "DEPRECATED: use [[toucan2.insert/insert-returning-keys!]] instead."
+  "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead."
   [modelable row-maps]
   (when (seq row-maps)
     (model/with-model [model modelable]
-      (insert/insert-returning-keys! modelable row-maps))))
+      (insert/insert-returning-pks! modelable row-maps))))
 
 (defn ^{:deprecated "2.0.0"} simple-insert!
-  "DEPRECATED: use [[toucan2.insert/insert-returning-keys!]] instead."
+  "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead."
   ([modelable row-map]
    (first (simple-insert-many! modelable [row-map])))
 

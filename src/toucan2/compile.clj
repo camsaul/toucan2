@@ -10,7 +10,7 @@
 
 (m/defmethod do-with-compiled-query :around :default
   [model query f]
-  (u/println-debug [(list 'compile model query)])
+  (u/println-debug ["compile %s query %s" model query])
   (next-method model query f))
 
 (defmacro with-compiled-query [[query-binding [model query]] & body]
