@@ -11,13 +11,15 @@ jobs:
     - uses: actions/checkout@v3
     - uses: DeLaGuardo/clojure-lint-action@master
       with:
+        check-name: Fetch clj-kondo configs for dependencies
         clj-kondo-args: >-
           --copy-configs
           --dependencies
-          --lint
-          "$(clojure -Spath)"
+          --lint "$(clojure -Spath)"
+        github_token: ${{ secrets.GITHUB_TOKEN }}
     - uses: DeLaGuardo/clojure-lint-action@master
       with:
+        check-name: Run clj-kondo
         clj-kondo-args: >-
           --parallel
           --lint
