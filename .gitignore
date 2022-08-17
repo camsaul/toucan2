@@ -5,8 +5,6 @@
 .cpcache
 .nrepl-port
 /*.iml
-/.clj-kondo/com.github.seancorfield
-/.clj-kondo/methodical
 /.eastwood
 /.env
 /.envrc
