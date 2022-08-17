@@ -1,0 +1,27 @@
+{:config-paths
+ ["macros"]
+
+ :lint-as
+ {toucan2.compile/with-compiled-query       clojure.core/let
+  toucan2.connection/with-connection        clojure.core/let
+  toucan2.connection/with-transaction       clojure.core/let
+  toucan2.model/with-model                  clojure.core/let
+  toucan2.query/with-parsed-args-with-query clojure.core/let
+  toucan2.query/with-query                  clojure.core/let}
+
+ :hooks
+ {:analyze-call
+  {}
+
+  :macroexpand
+  {toucan.db/with-call-counting                        macros.toucan2.execute/with-call-count
+   toucan.models/defmodel                              macros.toucan.models/defmodel
+   toucan2.execute/with-call-count                     macros.toucan2.execute/with-call-count
+   toucan2.tools.after-insert/define-after-insert      macros.toucan2.tools.after-insert/define-after-insert
+   toucan2.tools.after-update/define-after-update      macros.toucan2.tools.after-update/define-after-update
+   toucan2.tools.before-insert/define-before-insert    macros.toucan2.tools.before-insert/define-before-insert
+   toucan2.tools.before-update/define-before-update    macros.toucan2.tools.before-update/define-before-update
+   toucan2.tools.helpers/define-before-delete          macros.toucan2.tools.helpers/define-before-delete
+   toucan2.tools.helpers/define-before-select          macros.toucan2.tools.helpers/define-before-select
+   toucan2.tools.helpers/define-after-select-reducible macros.toucan2.tools.helpers/define-after-select-reducible
+   toucan2.tools.helpers/define-after-select-each      macros.toucan2.tools.helpers/define-after-select-each}}}
