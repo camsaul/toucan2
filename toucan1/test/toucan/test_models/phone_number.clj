@@ -3,9 +3,9 @@
   (:require
    [methodical.core :as m]
    [toucan.models :as models]
+   [toucan2.instance :as instance]
    [toucan2.model :as model]
-   [toucan2.test :as test]
-   [toucan2.instance :as instance]))
+   [toucan2.test :as test]))
 
 (models/defmodel PhoneNumber :t1_phone_numbers)
 

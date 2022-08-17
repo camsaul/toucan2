@@ -11,11 +11,11 @@
    [toucan.test-models.phone-number :refer [PhoneNumber]]
    [toucan.test-models.user :refer [User]]
    [toucan.test-setup :as test-setup]
-   [toucan2.instance :as instance]
-   [toucan2.test :as test]
+   [toucan2.compile :as compile]
    [toucan2.connection :as conn]
    [toucan2.current :as current]
-   [toucan2.compile :as compile])
+   [toucan2.instance :as instance]
+   [toucan2.test :as test])
   (:import
    (java.util Locale)))
 

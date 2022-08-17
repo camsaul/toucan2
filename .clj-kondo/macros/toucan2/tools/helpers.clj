@@ -21,3 +21,11 @@
      (fn [~(vary-meta '&model assoc :clj-kondo/ignore [:unused-binding])
           ~instance-binding]
        ~@body)))
+
+(defmacro define-before-delete
+  [model [instance-binding] & body]
+  `(do
+     ~model
+     (fn [~(vary-meta '&model assoc :clj-kondo/ignore [:unused-binding])
+          ~instance-binding]
+       ~@body)))

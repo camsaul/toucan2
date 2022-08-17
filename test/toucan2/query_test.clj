@@ -1,8 +1,9 @@
 (ns toucan2.query-test
-  (:require [toucan2.query :as query]
-            [clojure.test :refer :all]
-            [methodical.core :as m]
-            [toucan2.model :as model]))
+  (:require
+   [clojure.test :refer :all]
+   [methodical.core :as m]
+   [toucan2.model :as model]
+   [toucan2.query :as query]))
 
 (deftest ^:parallel condition->honeysql-where-clause-test
   (doseq [[[k v] expected] {[:id :id]           [:= :id :id]
