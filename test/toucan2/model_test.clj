@@ -6,10 +6,12 @@
    [toucan2.model :as model]
    [toucan2.test :as test]))
 
-(deftest ^:parallel default-table-name-test
-  (doseq [[model expected] {"ABC"   "ABC"
-                            :abc    "abc"
-                            :ns/abc "abc"}]
+(deftest ^:parallel table-name-test
+  (doseq [[model expected] {"ABC"    "ABC"
+                            :abc     "abc"
+                            :ns/abc  "abc"
+                            :default "default"
+                            'symbol  "symbol"}]
     (testing (pr-str `(model/table-name ~model))
       (is (= expected
              (model/table-name model))))))

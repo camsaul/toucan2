@@ -168,7 +168,7 @@
 
 (defn transform-results [model reducible-query]
   (if-let [transforms (not-empty (out-transforms model))]
-    (u/with-debug-result (format "Apply %s transforms to results" model)
+    (u/with-debug-result ["Apply %s transforms to results" model]
       (u/println-debug [transforms])
       reducible-query
       (eduction
@@ -184,7 +184,7 @@
 (m/defmethod query/build :before [::update/update ::transformed :default]
   [_query-type model {:keys [query], :as args}]
   (if-let [transforms (not-empty (in-transforms model))]
-    (u/with-debug-result (format "Apply %s transforms to %s" transforms args)
+    (u/with-debug-result ["Apply %s transforms to %s" transforms args]
       (let [args (-> args
                      (update :kv-args merge query)
                      (dissoc :query))]
@@ -208,7 +208,7 @@
 (m/defmethod query/parse-args :after [::insert/insert ::transformed]
   [_query-type model parsed-args]
   (if-let [transforms (in-transforms model)]
-    (u/with-debug-result (format "Apply %s transforms to %s" transforms parsed-args)
+    (u/with-debug-result ["Apply %s transforms to %s" transforms parsed-args]
       (update parsed-args :rows transform-insert-rows transforms))
     parsed-args))
 

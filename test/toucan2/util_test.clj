@@ -1,8 +1,9 @@
 (ns toucan2.util-test
-  (:require [toucan2.util :as u]
-            [clojure.test :refer :all]
-            [clojure.string :as str]
-            [methodical.util.trace :as m.trace]))
+  (:require
+   [clojure.string :as str]
+   [clojure.test :refer :all]
+   [pretty.core :as pretty]
+   [toucan2.util :as u]))
 
 (defmacro ^:private out-str-lines [& body]
   `(some-> (with-out-str ~@body)
@@ -28,7 +29,7 @@
                @evaled?))))))
 
 (deftest with-debug-result-test
-  (binding [m.trace/*color* false]
+  (binding [u/*color* false]
     (testing "debugging disabled"
       (let [message-form-evaled? (atom false)]
         (testing "don't print anything"
@@ -67,3 +68,29 @@
                      2)
                    (u/with-debug-result "C"
                      :cans)]))))))))
+
+(defrecord Reducible [realized?]
+  clojure.lang.IReduceInit
+  (reduce [_this rf init]
+    (reset! realized? true)
+    (reduce rf init [])))
+
+(deftest pprint-test
+  (testing "Pretty-printing an clojure.lang.IReduceInit should not realize it. Top-level object:"
+    (binding [u/*color* false]
+      (doseq [f [identity
+                 list
+                 vector
+                 #(eduction identity %)
+                 (fn [x] {:x x})
+                 (fn [x]
+                   (reify
+                     pretty/PrettyPrintable
+                     (pretty [_this]
+                       (list 'reducible x))))]]
+        (let [realized? (atom false)
+              reducible (->Reducible realized?)
+              x         (f reducible)]
+          (testing (.getCanonicalName (class x))
+            (is (string? (u/pprint-to-str x)))
+            (is (false? @realized?))))))))

@@ -189,6 +189,7 @@
 ;;; TODO -- not 100% sure this is really worth it, we only use it in two places and I think it hides more stuff than
 ;;; it's worth
 (defmacro with-parsed-args-with-query
+  "Parse `unparsed-args` according with [[parse-args]]. Build `:query` with [[build]] and include in parsed args."
   {:style/indent 1}
   [[parsed-args-binding [query-type model unparsed-args]] & body]
   `(do-with-parsed-args-with-query ~query-type ~model ~unparsed-args (^:once fn* [~parsed-args-binding] ~@body)))

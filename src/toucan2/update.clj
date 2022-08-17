@@ -8,7 +8,9 @@
    [toucan2.query :as query]
    [toucan2.util :as u]
    [toucan2.jdbc.query :as t2.jdbc.query]
-   [toucan2.select :as select]))
+   [toucan2.select :as select]
+   [toucan2.realize :as realize]
+   [pretty.core :as pretty]))
 
 ;;; this is basically the same as the args for `select` and `delete` but the difference is that it has an additional
 ;;; optional arg, `:pk`, as the first arg, and one additional optional arg, the `changes` map at the end
@@ -37,81 +39,112 @@
              (update :kv-args assoc :toucan/pk pk)))))
 
 (m/defmethod query/build [::update :default clojure.lang.IPersistentMap]
-  [query-type model {:keys [kv-args query changes], :as args}]
-  (let [args (assoc args
-                    :kv-args (merge kv-args query)
-                    :query   {:update [(keyword (model/table-name model))]
-                              :set    changes})]
-    (next-method query-type model args)))
+  [query-type model {:keys [kv-args query changes], :as parsed-args}]
+  (when (empty? changes)
+    (throw (ex-info "Cannot build an update query with no changes."
+                    {:query-type query-type, :model model, :parsed-args parsed-args})))
+  (let [parsed-args (assoc parsed-args
+                           :kv-args (merge kv-args query)
+                           :query   {:update [(keyword (model/table-name model))]
+                                     :set    changes})]
+    (next-method query-type model parsed-args)))
 
-(m/defmulti update!*
-  "The value of `args` depends on what [[parse-args]] returns for the model."
+;;;; [[reducible-update]] and [[update!]]
+
+(m/defmulti reducible-update*
   {:arglists '([model parsed-args])}
   u/dispatch-on-first-arg)
 
-(m/defmethod update!* :around :default
+(m/defmethod reducible-update* :around :default
   [model parsed-args]
-  (u/with-debug-result [(list 'update!* model parsed-args)]
+  (u/with-debug-result [(list `reducible-update* model parsed-args)]
     (next-method model parsed-args)))
 
-(def ^:dynamic *result-type*
-  "Type of results we want when updating something. Either `:reducible` for reducible results, or `:row-count` for the
-  number of rows updated. `:reducible` executes the query with [[execute/reducible-query]] while `:row-count`
-  uses [[query/execute!]]."
-  :row-count)
+(defn reduce-reducible-update! [model {:keys [changes], :as parsed-args} rf init]
+  (u/with-debug-result "reduce reducible update"
+    (if (empty? changes)
+      (do
+        (u/println-debug "Query has no changes, skipping update")
+        (reduce rf init []))
+      (let [query (query/build ::update model parsed-args)]
+        (try
+          (reduce rf init (execute/reducible-query (model/deferred-current-connectable model) query))
+          (catch Throwable e
+            (throw (ex-info (format "Error updating rows: %s" (ex-message e))
+                            {:model model, :query query}
+                            e))))))))
 
-(m/defmethod update!* :default
-  [model {:keys [changes], :as parsed-args}]
-  (if (empty? changes)
-    (do
-      (u/println-debug "Query has no changes, skipping update")
-      (case *result-type*
-        :row-count 0
-        :reducible []))
-    (let [query (query/build ::update model parsed-args)
-          execute-fn (case *result-type*
-                       :reducible execute/reducible-query
-                       :row-count execute/query-one)]
-      (try
-        (execute-fn (model/deferred-current-connectable model) query)
-        (catch Throwable e
-          (throw (ex-info (format "Error updating rows: %s" (ex-message e))
-                          {:model model, :query query}
-                          e)))))))
+(defrecord ReducibleUpdate [model parsed-args]
+  clojure.lang.IReduceInit
+  (reduce [_this rf init]
+    (reduce-reducible-update! model parsed-args rf init))
+
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `->ReducibleUpdate model parsed-args)))
+
+(m/defmethod reducible-update* :default
+  [model parsed-args]
+  (->ReducibleUpdate model parsed-args))
+
+(defn reducible-update
+  {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
+  [modelable & unparsed-args]
+  (model/with-model [model modelable]
+    (query/with-parsed-args-with-query [parsed-args [::update model unparsed-args]]
+      (reducible-update* model parsed-args))))
 
 (defn update!
-  "Returns number of rows updated."
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [modelable & unparsed-args]
   (u/with-debug-result [(list* `update! modelable unparsed-args)]
     (model/with-model [model modelable]
-      (query/with-parsed-args-with-query [parsed-args [::update model unparsed-args]]
-        (update!* model parsed-args)))))
+      (try
+        (reduce + 0 (apply reducible-update model unparsed-args))
+        (catch Throwable e
+          (throw (ex-info (format "Error updating %s: %s" (pr-str model) (ex-message e))
+                          {:model model, :unparsed-args unparsed-args}
+                          e)))))))
 
-(m/defmulti update-returning-pks!*
+;;;; [[reducible-update-returning-pks]] and [[update-returning-pks!]]
+
+(defrecord WithReturnKeys [reducible]
+  clojure.lang.IReduceInit
+  (reduce [_this rf init]
+    (binding [t2.jdbc.query/*options* (assoc t2.jdbc.query/*options* :return-keys true)]
+      (reduce rf init reducible)))
+
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `->WithReturnKeys reducible)))
+
+(defn return-pks-eduction
+  "Given a `reducible-update` returning whatever (presumably returning update counts) wrap it in an eduction and
+  in [[->WithReturnKeys]] so it returns a sequence of primary key vectors."
+  [model reducible-update]
+  (eduction
+   (map (select/select-pks-fn model))
+   (->WithReturnKeys reducible-update)))
+
+(m/defmulti reducible-update-returning-pks*
   {:arglists '([model parsed-args])}
   u/dispatch-on-first-arg)
 
-(m/defmethod update-returning-pks!* :around :default
+(m/defmethod reducible-update-returning-pks* :default
   [model parsed-args]
-  (u/with-debug-result [(list `update-returning-pks!* model parsed-args)]
-    (next-method model parsed-args)))
+  (return-pks-eduction model (reducible-update* model parsed-args)))
 
-(m/defmethod update-returning-pks!* :default
-  [model parsed-args]
-  (binding [*result-type*           :reducible
-            t2.jdbc.query/*options* (assoc t2.jdbc.query/*options* :return-keys true)]
-    (into
-     []
-     (map (select/select-pks-fn model))
-     (update!* model parsed-args))))
+(defn reducible-update-returning-pks
+  {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
+  [modelable & unparsed-args]
+  (model/with-model [model modelable]
+    (query/with-parsed-args-with-query [parsed-args [::update model unparsed-args]]
+      (reducible-update-returning-pks* model parsed-args))))
 
 (defn update-returning-pks!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [modelable & unparsed-args]
-  (u/with-debug-result [(list* `update-returning-pks! unparsed-args)]
-    (model/with-model [model modelable]
-      (let [parsed-args (query/parse-args ::update model unparsed-args)]
-        (update-returning-pks!* model parsed-args)))))
+  (u/with-debug-result [(list* `update-returning-pks! modelable unparsed-args)]
+    (realize/realize (apply reducible-update-returning-pks modelable unparsed-args))))
 
 ;;; TODO -- add `update-returning-instances!`, similar to [[toucan2.insert/insert-returning-instances!]]

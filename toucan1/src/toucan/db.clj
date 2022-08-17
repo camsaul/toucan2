@@ -247,7 +247,7 @@
   "DEPRECATED: use [[toucan2.insert/insert-returning-instances!]] instead."
   {:style/indent 1}
   ([modelable row-map]
-   (insert/insert-returning-instances! modelable row-map))
+   (first (insert/insert-returning-instances! modelable row-map)))
 
   ([modelable k v & {:as more}]
    (insert! modelable (merge {k v} more))))

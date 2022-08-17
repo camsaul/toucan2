@@ -7,9 +7,10 @@
    [toucan2.model :as model]
    [toucan2.query :as query]
    [toucan2.select :as select]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.realize :as realize])
   (:import
-   (java.time OffsetDateTime)))
+   (java.time LocalDateTime OffsetDateTime)))
 
 (derive ::people ::test/people)
 
@@ -395,3 +396,21 @@
     (is (= ["SELECT p.id FROM people p WHERE p.id = ?" 1]
            (query/compiled
              (select/select-one ::people {:select [:p.id], :from [[::people :p]], :where [:= :p.id 1]}))))))
+
+(deftest select-reducible-with-pks-test
+  (is (= [(instance/instance ::test/venues {:id         1
+                                            :name       "Tempest"
+                                            :category   "bar"
+                                            :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                            :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+         (realize/realize (select/select-reducible-with-pks ::test/venues [1]))
+         (realize/realize (select/select-reducible-with-pks ::test/venues [[1]]))))
+  (testing "model-columns; multiple PKs"
+    (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest"})
+            (instance/instance ::test/venues {:id 2, :name "Ho's Tavern"})]
+           (realize/realize (select/select-reducible-with-pks [::test/venues :id :name] [1 2]))
+           (realize/realize (select/select-reducible-with-pks [::test/venues :id :name] [[1] [2]])))))
+  (testing "empty PKs"
+    (is (= []
+           (realize/realize (select/select-reducible-with-pks [::test/venues :id :name] []))
+           (realize/realize (select/select-reducible-with-pks [::test/venues :id :name] nil))))))
