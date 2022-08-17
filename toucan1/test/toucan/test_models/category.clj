@@ -12,7 +12,9 @@
    [toucan.db :as db]
    [toucan.models :as models]
    [toucan2.test :as test]
+   [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-update :as after-update]
+   [toucan2.tools.before-insert :as before-insert]
    [toucan2.tools.before-update :as before-update]
    [toucan2.tools.helpers :as helpers]))
 
@@ -32,8 +34,6 @@
 
 (defn- assert-parent-category-exists [{:keys [parent-category-id], :as category}]
   (when parent-category-id
-    (binding [toucan2.util/*debug* true]
-      (println (list 'db/exists? Category :id parent-category-id) '=> (db/exists? Category :id parent-category-id))) ; NOCOMMIT
     (assert (db/exists? Category :id parent-category-id)
             (format "A category with ID %d does not exist." parent-category-id)))
   category)
@@ -56,12 +56,12 @@
 (defn add-category-to-updated-queue! [{:keys [id]}]
   (swap! categories-recently-updated conj id))
 
-(helpers/define-before-insert Category
+(before-insert/define-before-insert Category
   [category]
   (assert-parent-category-exists category)
   category)
 
-(helpers/define-after-insert Category
+(after-insert/define-after-insert Category
   [category]
   (add-category-to-moderation-queue! category)
   category)

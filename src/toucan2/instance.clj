@@ -17,6 +17,8 @@
       (keyword (->kebab-case (namespace k)) (->kebab-case (name k)))
       (keyword (->kebab-case (name k))))))
 
+(def ^:dynamic *default-key-transform-fn* default-key-transform)
+
 (m/defmulti key-transform-fn
   {:arglists '([model])}
   u/dispatch-on-first-arg)
@@ -25,7 +27,7 @@
   [_model]
   ;; TODO -- should this value come from a dynamic variable? You could always implement that behavior yourself if you
   ;; wanted to.
-  default-key-transform)
+  *default-key-transform-fn*)
 
 (defn normalize-map [key-xform m]
   {:pre [(fn? key-xform) (map? m)]}

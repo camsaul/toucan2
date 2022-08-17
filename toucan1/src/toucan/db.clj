@@ -15,7 +15,8 @@
    [toucan2.model :as model]
    [toucan2.select :as select]
    [toucan2.update :as update]
-   [toucan2.util :as u]))
+   [toucan2.util :as u]
+   [toucan2.instance :as instance]))
 
 (comment models/keep-me)
 
@@ -37,33 +38,35 @@
   (or *quoting-style*
       (get @compile/global-honeysql-options :dialect)))
 
-;; (def ^:dynamic ^{:deprecated "2.0.0"} *automatically-convert-dashes-and-underscores*
-;;   "DEPRECATED: binding [[toucan2.compile/*honeysql-options*]] instead."
-;;   nil)
+(def ^:dynamic ^{:deprecated "2.0.0"} *automatically-convert-dashes-and-underscores*
+  "DEPRECATED: binding [[toucan2.compile/*honeysql-options*]] instead."
+  nil)
 
-;; (defn ^{:deprecated "2.0.0"} set-default-automatically-convert-dashes-and-underscores!
-;;   "DEPRECATED: set [[toucan2.compile/global-honeysql-options]] directly."
-;;   [automatically-convert-dashes-and-underscores]
-;;   (swap! compile/global-honeysql-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores)))
+(defn ^{:deprecated "2.0.0"} set-default-automatically-convert-dashes-and-underscores!
+  "DEPRECATED: set [[toucan2.compile/global-honeysql-options]] directly."
+  [automatically-convert-dashes-and-underscores]
+  (swap! compile/global-honeysql-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores)))
 
-;; (defn ^{:deprecated "2.0.0"} automatically-convert-dashes-and-underscores?
-;;   []
-;;   (if (nil? *automatically-convert-dashes-and-underscores*)
-;;     (get @compile/global-honeysql-options :quoted-snake)
-;;     *automatically-convert-dashes-and-underscores*))
+(defn ^{:deprecated "2.0.0"} automatically-convert-dashes-and-underscores?
+  []
+  (if (nil? *automatically-convert-dashes-and-underscores*)
+    (get @compile/global-honeysql-options :quoted-snake)
+    *automatically-convert-dashes-and-underscores*))
+
+(defn honeysql-options []
+  (merge
+   ;; defaults
+   {:quoted true, :dialect :ansi, #_:quoted-snake #_true}
+   compile/*honeysql-options*
+   (when *quoting-style*
+     {:dialect *quoting-style*})
+   (when (some? *automatically-convert-dashes-and-underscores*)
+     {:quoted-snake *automatically-convert-dashes-and-underscores*})))
 
 (m/defmethod compile/do-with-compiled-query [:toucan1/model clojure.lang.IPersistentMap]
   [model honeysql f]
   (u/with-debug-result ["Compiling Honey SQL query for legacy Toucan 1 model %s" model]
-    (binding [compile/*honeysql-options* (merge
-                                          ;; defaults
-                                          {:quoted true, :dialect :ansi, #_:quoted-snake #_true}
-                                          compile/*honeysql-options*
-                                          (when *quoting-style*
-                                            {:dialect *quoting-style*})
-                                          ;; (when (false? *automatically-convert-dashes-and-underscores*)
-                                          ;;   {:quoted-snake false})
-                                          )]
+    (binding [compile/*honeysql-options* (honeysql-options)]
       (next-method model honeysql f))))
 
 ;; replaces `*db-connection*`
@@ -151,7 +154,7 @@
   (if (vector? field-name)
     [(qualify modelable (first field-name)) (second field-name)]
     (model/with-model [model modelable]
-      (keyword (str (name (model/table-name model)) \. field-name)))))
+      (keyword (str (name (model/table-name model)) \. (name field-name))))))
 
 (defn ^{:deprecated "2.0.0"} qualified?
   "Is `field-name` qualified (e.g. with its table name)?"
@@ -215,10 +218,13 @@
   ([modelable id k v & more]
    (update-non-nil-keys! modelable id (apply array-map k v more))))
 
-(defn- do-with-model-default-connectable [model thunk]
-  (if (= current/*connection* :toucan2/default)
-    (binding [current/*connection* (model/default-connectable model)]
-      (thunk))
+
+(defn- do-with-simple [model thunk]
+  (binding [current/*connection*                (if (= current/*connection* :toucan/default)
+                                                  (model/default-connectable model)
+                                                  current/*connection*)
+            compile/*honeysql-options*          (honeysql-options)
+            instance/*default-key-transform-fn* (instance/key-transform-fn model)]
     (thunk)))
 
 (defn ^{:deprecated "2.0.0"} simple-insert-many!
@@ -226,7 +232,7 @@
   [modelable row-maps]
   (when (seq row-maps)
     (model/with-model [model modelable]
-      (do-with-model-default-connectable
+      (do-with-simple
        model
        (^:once fn* []
         (insert/insert-returning-pks! (model/table-name model) row-maps))))))
@@ -300,7 +306,7 @@
 
   ([modelable conditions-map]
    (model/with-model [model modelable]
-     (do-with-model-default-connectable
+     (do-with-simple
       model
       (^:once fn* []
        (pos? (apply delete/delete! (model/table-name model) (into [] (mapcat vec) conditions-map)))))))
