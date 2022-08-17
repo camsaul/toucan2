@@ -102,7 +102,7 @@
 
 (deftest query-test
   (testing "Test query"
-    (binding [current/*connection* ::test/db]
+    (binding [current/*connectable* ::test/db]
       (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
              (db/query {:select   [:*]
                         :from     [:t1_users]

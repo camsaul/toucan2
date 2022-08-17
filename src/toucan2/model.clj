@@ -30,12 +30,12 @@
 
 (defn- current-connectable [model]
   (u/with-debug-result ["Realizing deferred current connectable for model %s." model]
-    (u/println-debug ["%s is %s" `current/*connection* current/*connection*])
-    (if (= current/*connection* :toucan/default)
+    (u/println-debug ["%s is %s" `current/*connectable* current/*connectable*])
+    (if (= current/*connectable* :toucan/default)
       (do
         (u/println-debug ["Using %s for model %s" `default-connectable model])
         (default-connectable model))
-      current/*connection*)))
+      current/*connectable*)))
 
 (defrecord DeferredCurrentConnectable [model]
   pretty/PrettyPrintable

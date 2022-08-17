@@ -41,7 +41,7 @@
            (into [] (map realize/realize) query))))
 
   (testing "with current connection"
-    (binding [current/*connection* ::test/db]
+    (binding [current/*connectable* ::test/db]
       (is (= [{:count 4}]
              (into [] (map #(select-keys % [:count])) (execute/reducible-query "SELECT count(*) FROM people;"))))))
 
@@ -73,7 +73,7 @@
   (is (= [{:count 4}]
          (execute/query ::test/db "SELECT count(*) FROM people;")))
   (testing "with current connection"
-    (binding [current/*connection* ::test/db]
+    (binding [current/*connectable* ::test/db]
       (is (= [{:count 4}]
              (execute/query "SELECT count(*) FROM people;")))))
   (testing "HoneySQL query"
@@ -91,7 +91,7 @@
          (execute/query-one ::test/db "SELECT count(*) FROM people")))
 
   (testing "with current connection"
-    (binding [current/*connection* ::test/db]
+    (binding [current/*connectable* ::test/db]
       (is (= {:count 4}
              (execute/query-one "SELECT count(*) FROM people;"))))))
 

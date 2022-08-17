@@ -135,7 +135,7 @@
     [\"DELETE FROM table WHERE ID = ?\" 1]"
   {:style/indent 0}
   [& body]
-  `(binding [current/*connection* ::compile]
+  `(binding [current/*connectable* ::compile]
      (let [query# (do ~@body)]
        (::query (realize/reduce-first query#)))))
 

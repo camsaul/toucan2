@@ -16,7 +16,7 @@
 (m/defmethod do-with-connection :around :default
   [connectable f]
   (next-method connectable (^:once fn* [conn]
-                            (binding [current/*connection* conn]
+                            (binding [current/*connectable* conn]
                               (f conn)))))
 
 ;; TODO -- don't love this syntax.
@@ -42,14 +42,14 @@
   [_connectable f]
   (do-with-connection ::current f))
 
-;; the difference between this and using [[current/*connection*]] directly is that this waits until it gets resolved by
-;; [[do-with-connection]] to get the value for [[current/*connection*]]. For a reducible query this means you'll get the
+;; the difference between this and using [[current/*connectable*]] directly is that this waits until it gets resolved by
+;; [[do-with-connection]] to get the value for [[current/*connectable*]]. For a reducible query this means you'll get the
 ;; value at the time you reduce the query rather than at the time you build the reducible query.
 (m/defmethod do-with-connection ::current
   [_connectable f]
-  (do-with-connection current/*connection* f))
+  (do-with-connection current/*connectable* f))
 
-;;; method called with the default value of [[toucan2.current/*connection*]] if no value of `:toucan/default` is
+;;; method called with the default value of [[toucan2.current/*connectable*]] if no value of `:toucan/default` is
 ;;; defined.
 (m/defmethod do-with-connection :toucan/default
   [_connectable _f]
@@ -100,7 +100,7 @@
   [connection f]
   (u/with-debug-result [(list `do-with-transaction (some-> connection class .getCanonicalName symbol))]
     (next-method connection (^:once fn* [conn]
-                             (binding [current/*connection* conn]
+                             (binding [current/*connectable* conn]
                                (f conn))))))
 
 (m/defmethod do-with-transaction java.sql.Connection

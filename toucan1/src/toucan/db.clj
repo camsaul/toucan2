@@ -70,7 +70,7 @@
       (next-method model honeysql f))))
 
 ;; replaces `*db-connection*`
-(p/import-vars [current *connection*])
+(p/import-vars [current *connectable*])
 
 (defn ^{:deprecated "2.0.0"} set-default-db-connection!
   "DEPRECATED: Implement [[toucan2.connection/do-with-connection]] for `:default` instead."
@@ -220,9 +220,9 @@
 
 
 (defn- do-with-simple [model thunk]
-  (binding [current/*connection*                (if (= current/*connection* :toucan/default)
+  (binding [current/*connectable*                (if (= current/*connectable* :toucan/default)
                                                   (model/default-connectable model)
-                                                  current/*connection*)
+                                                  current/*connectable*)
             compile/*honeysql-options*          (honeysql-options)
             instance/*default-key-transform-fn* (instance/key-transform-fn model)]
     (thunk)))
