@@ -1,7 +1,6 @@
 (ns toucan2.jdbc.query
   (:require
    [next.jdbc :as jdbc]
-   [toucan2.current :as current]
    [toucan2.jdbc.result-set :as t2.jdbc.rs]
    [toucan2.util :as u]))
 
@@ -16,7 +15,7 @@
 (defn- options []
   (merge @global-options *options*))
 
-(defn reduce-jdbc-query [^java.sql.Connection conn sql-args rf init]
+(defn reduce-jdbc-query [^java.sql.Connection conn model sql-args rf init]
   (let [opts (options)]
     (u/println-debug ["Preparing JDBC query with next.jdbc options %s" opts])
     (with-open [stmt (jdbc/prepare conn sql-args opts)]
@@ -27,11 +26,11 @@
           (do
             (u/println-debug ["Query was executed with %s; returning generated keys" :return-keys])
             (with-open [rset (.getGeneratedKeys stmt)]
-              (reduce rf init (t2.jdbc.rs/reducible-result-set conn current/*model* rset))))
+              (reduce rf init (t2.jdbc.rs/reducible-result-set conn model rset))))
 
           result-set?
           (with-open [rset (.getResultSet stmt)]
-            (reduce rf init (t2.jdbc.rs/reducible-result-set conn current/*model* rset)))
+            (reduce rf init (t2.jdbc.rs/reducible-result-set conn model rset)))
 
           :else
           (do

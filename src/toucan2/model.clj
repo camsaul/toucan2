@@ -18,10 +18,7 @@
   (f model))
 
 (defmacro with-model [[model-binding modelable] & body]
-  `(do-with-model ~modelable (^:once fn* [model#]
-                              (binding [current/*model* model#]
-                                (let [~model-binding model#]
-                                  ~@body)))))
+  `(do-with-model ~modelable (^:once fn* [~model-binding] ~@body)))
 
 (m/defmulti default-connectable
   {:arglists '([model])}

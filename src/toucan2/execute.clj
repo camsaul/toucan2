@@ -45,8 +45,8 @@
   init)
 
 (m/defmethod reduce-compiled-query-with-connection [java.sql.Connection :default clojure.lang.Sequential]
-  [conn _model sql-args rf init]
-  (t2.jdbc.query/reduce-jdbc-query conn sql-args rf init))
+  [conn model sql-args rf init]
+  (t2.jdbc.query/reduce-jdbc-query conn model sql-args rf init))
 
 (m/defmulti reduce-compiled-query
   {:arglists '([connectable model compiled-query rf init])}
