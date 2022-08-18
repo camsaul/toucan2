@@ -1,6 +1,7 @@
 (ns toucan2.tools.transformed
   (:require
    [methodical.core :as m]
+   [methodical.impl.combo.operator :as m.combo.operator]
    [toucan2.delete :as delete]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
@@ -10,16 +11,39 @@
    [toucan2.update :as update]
    [toucan2.util :as u]))
 
-(m/defmulti transforms*
-  "Return a map of
+;;; HACK Once https://github.com/camsaul/methodical/issues/96 is fixed we can remove this.
+(alter-meta! #'m.combo.operator/combine-methods-with-operator assoc :private false)
 
-    {column-name {:in <fn>, :out <fn>}}"
-  {:arglists '([model])}
-  u/dispatch-on-first-arg)
+;; combine the results of all matching methods into one map.
+(m.combo.operator/defoperator ::merge-transforms
+  [methods invoke]
+  (transduce
+   (map invoke)
+   ;; for the time being keep the values from map returned by the more-specific method in preference to the ones
+   ;; returned by the less-specific methods.
+   (completing (fn [m1 m2]
+                 ;; TODO -- we should probably throw an error if one of the transforms is stomping on the other.
+                 (merge-with merge m2 m1)))
+   {}
+   methods))
 
-(m/defmethod transforms* :default
-  [_model]
-  nil)
+(defonce ^{:doc "Return a map of
+
+    {column-name {:in <fn>, :out <fn>}}
+
+  For a given `model`, all matching transforms are combined with `merge-with merge` in an indeterminate order, so don't
+  try to specify multiple transforms for the same column in the same direction for a given model -- compose your
+  transform functions instead if you want to do that. See [[toucan2.tools.helpers/deftransforms]] for more info."
+           :arglists '([model])}
+  transforms
+  ;; TODO -- this has to be uncached for now because of https://github.com/camsaul/methodical/issues/98
+  (m/uncached-multifn
+   (m/standard-multifn-impl
+    (m.combo.operator/operator-method-combination ::merge-transforms)
+    ;; TODO -- once https://github.com/camsaul/methodical/issues/97 is implemented, use that.
+    (m/standard-dispatcher u/dispatch-on-first-arg)
+    (m/standard-method-table))
+   {:ns *ns*, :name `transforms}))
 
 ;;; I originally considered walking and transforming the HoneySQL, but decided against it because it's too ambiguous.
 ;;; It's too hard to tell if
@@ -79,7 +103,7 @@
        pk-vals))))
 
 (defn wrapped-transforms [model direction]
-  (when-let [transforms (not-empty (transforms* model))]
+  (when-let [transforms (not-empty (transforms model))]
     ;; make the transforms map an instance so we can get appropriate magic map behavior when looking for the
     ;; appropriate transform for a given key.
     (instance/instance

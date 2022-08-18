@@ -20,7 +20,7 @@
 (derive ::venues.transformed ::test/venues)
 (derive ::venues.transformed ::transformed/transformed)
 
-(m/defmethod transformed/transforms* ::venues.transformed
+(m/defmethod transformed/transforms ::venues.transformed
   [_model]
   {:category {:in  name
               :out keyword}})
@@ -30,12 +30,10 @@
 (defn- parse-int [^String s]
   (Integer/parseInt ^String s))
 
-(m/defmethod transformed/transforms* ::venues.id-is-string
+(m/defmethod transformed/transforms ::venues.id-is-string
   [model]
-  (merge
-   {:id {:in  parse-int
-         :out str}}
-   (next-method model)))
+  {:id {:in  parse-int
+        :out str}})
 
 (defmacro ^:private test-both-normal-and-magic-keys
   {:style/indent 1}
@@ -90,7 +88,7 @@
         (is (= nil
                (instance/changes instance)))))))
 
-(m/defmethod transformed/transforms* ::unnormalized
+(m/defmethod transformed/transforms ::unnormalized
   [_model]
   {:un_normalized {:in name, :out keyword}})
 
@@ -326,3 +324,66 @@
                :created-at (LocalDateTime/parse "2017-01-01T00:00")
                :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
              (select/select-one ::venues-transform-in-only :category :store))))))
+
+;;;; deftransforms
+
+(derive ::transformed-venues ::test/venues)
+
+(helpers/deftransforms ::transformed-venues
+  {:id {:in  parse-int
+        :out str}})
+
+(deftest deftransforms-test
+  (is (= (instance/instance
+          ::transformed-venues
+          {:id         "1"
+           :name       "Tempest"
+           :category   "bar"
+           :created-at (LocalDateTime/parse "2017-01-01T00:00")
+           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+         (select/select-one ::transformed-venues :toucan/pk "1"))))
+
+(helpers/deftransforms ::transformed-venues-2
+  {:category {:in name, :out keyword}})
+
+(derive ::venues.composed-deftransform ::test/venues)
+(derive ::venues.composed-deftransform ::transformed-venues)
+(derive ::venues.composed-deftransform ::transformed-venues-2)
+
+;;; Once https://github.com/camsaul/methodical/issues/97 is in place this should no longer be needed.
+(m/prefer-method! transformed/transforms ::transformed-venues-2 ::transformed-venues)
+
+(deftest compose-deftransforms-test
+  (is (= {:id {:in parse-int, :out str}}
+         (transformed/transforms ::transformed-venues)))
+  (is (= {:category {:in name, :out keyword}}
+         (transformed/transforms ::transformed-venues-2)))
+  (is (= {:id       {:in parse-int, :out str}
+          :category {:in name, :out keyword}}
+         (transformed/transforms ::venues.composed-deftransform)))
+  (is (= (instance/instance
+          ::venues.composed-deftransform
+          {:id         "1"
+           :name       "Tempest"
+           :category   :bar
+           :created-at (LocalDateTime/parse "2017-01-01T00:00")
+           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+         (select/select-one ::venues.composed-deftransform :toucan/pk "1"))))
+
+(derive ::venues.override-transforms ::venues.composed-deftransform)
+
+(m/defmethod transformed/transforms :around ::venues.override-transforms
+  [_model]
+  {})
+
+(deftest compose-deftransforms-override-test
+  (is (= {}
+         (transformed/transforms ::venues.override-transforms)))
+  (is (= (instance/instance
+          ::venues.override-transforms
+          {:id         1
+           :name       "Tempest"
+           :category   "bar"
+           :created-at (LocalDateTime/parse "2017-01-01T00:00")
+           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+         (select/select-one ::venues.override-transforms :toucan/pk 1))))

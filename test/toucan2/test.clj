@@ -119,10 +119,10 @@
   "venues")
 
 (defn- create-table-statements [db-type table-name]
-  (let [filename           (create-table-sql-file db-type table-name)
-        ^java.io.File file (io/resource filename)]
-    (assert (.exists file) (format "File does not exist: %s" (pr-str filename)))
-    (for [stmt (str/split (str/trim (slurp (.getCanonicalPath file))) #";")]
+  (let [filename (create-table-sql-file db-type table-name)
+        file     (some-> (io/resource filename) io/file)]
+    (assert (some-> file .exists) (format "File does not exist: %s" (pr-str filename)))
+    (for [stmt (str/split (str/trim (slurp file)) #";")]
       (str/trim stmt))))
 
 (defn create-table!

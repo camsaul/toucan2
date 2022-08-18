@@ -1,0 +1,2 @@
+{:deps
+ {com.github.camsaul/toucan2 {:local/root ".."}}}

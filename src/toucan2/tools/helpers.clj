@@ -126,14 +126,58 @@
 
 ;;;; [[deftransforms]]
 
+;;; TODO -- move this to [[toucan2.tools.transformed]]
+;;;
+;;; Not sure we even need this. Maybe remove this and just let people implement [[transformed/transforms]] directly.
 (defmacro deftransforms
-  "`transforms` should be a map of
+  "Define type transforms to use for a specific model. `transforms` should be a map of
 
-    {column-name {:in <fn>, :out <fn>}}"
+    {:column-name {:in <fn>, :out <fn>}}
+
+  `:in` transforms are applied to values going over the wire to the database; these generally only applied to values
+  passed at or near the top level to various functions; don't expect Toucan 2 to parse your SQL to find out which
+  parameter corresponds to what in order to apply transforms or to apply transforms inside JOINS in hand-written
+  HoneySQL. That said, unless you're doing something weird your transforms should generally get applied.
+
+  `:out` transforms are applied to values coming out of the database; since nothing weird really happens there this is
+  done consistently.
+
+  Transform functions for either case are skipped for `nil` values.
+
+  Example:
+
+    (deftransforms :models/user
+      {:type {:in name, :out keyword}})
+
+  You can also define transforms independently, and derive a model from them:
+
+    (deftransforms ::type-keyword
+      {:type {:in name, :out keyword}})
+
+    (derive :models/user ::type-keyword)
+    (derive :models/user ::some-other-transform)
+
+  Don't derive a model from multiple `deftransforms` for the same key in the same direction.
+
+  When multiple transforms match a given model they are combined into a single map of transforms with `merge-with
+  merge`. If multiple transforms match a given column in a given direction, only one of them will be used; you should
+  assume which one is used is indeterminate. (This may be made an error, or at least a warning, in the future.)
+
+  Until upstream issue https://github.com/camsaul/methodical/issues/97 is resolved, you will have to specify which
+  method should be applied first in cases of ambiguity using [[methodical.core/prefer-method!]]:
+
+    (m/prefer-method! transformed/transforms ::user-with-location ::user-with-password)
+
+  If you want to override transforms completely for a model, and ignore transforms from ancestors of a model, you can
+  create an `:around` method:
+
+    (defmethod toucan2.tools.transformed/transforms :around ::my-model
+      [_model]
+      {:field {:in name, :out keyword}})"
   {:style/indent 1}
   [model transforms]
   `(let [model# ~model]
      (u/maybe-derive model# ::transformed/transformed)
-     (m/defmethod transformed/transforms* model#
+     (m/defmethod transformed/transforms model#
        [~'&model]
        ~transforms)))

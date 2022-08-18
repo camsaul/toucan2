@@ -113,18 +113,4 @@
                (select/select [::venues.before-delete-exception :id :name :updated-at]
                               {:order-by [[:id :asc]]})))))))
 
-(derive ::transformed-venues ::test/venues)
-
-(helpers/deftransforms ::transformed-venues
-  {:id {:in  #(some-> % Integer/parseInt)
-        :out str}})
-
-(deftest deftransforms-test
-  (is (= (instance/instance
-          ::transformed-venues
-          {:id         "1"
-           :name       "Tempest"
-           :category   "bar"
-           :created-at (LocalDateTime/parse "2017-01-01T00:00")
-           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-         (select/select-one ::transformed-venues :toucan/pk "1"))))
+;;;; Tools for [[helpers/deftransforms]] now live in [[toucan2.tools.transformed-test]]
