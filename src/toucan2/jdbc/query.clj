@@ -19,7 +19,7 @@
   (let [opts (options)]
     (u/println-debug ["Preparing JDBC query with next.jdbc options %s" opts])
     (with-open [stmt (jdbc/prepare conn sql-args opts)]
-      (u/println-debug "Executing statement")
+      (u/println-debug ["Executing statement with %s" (.getCanonicalName (class conn))])
       (let [result-set? (.execute stmt)]
         (cond
           (:return-keys opts)

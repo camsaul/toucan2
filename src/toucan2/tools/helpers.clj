@@ -69,7 +69,7 @@
                             (or (not-empty columns)
                                 (default-fields model))))))
 
-(defmacro define-default-fields [model & body]
+(defmacro define-default-fields {:style/indent :defn} [model & body]
   `(let [model# ~model]
      (u/maybe-derive model# ::default-fields)
      (m/defmethod default-fields model# [~'&model] ~@body)))

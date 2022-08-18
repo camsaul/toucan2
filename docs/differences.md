@@ -72,3 +72,13 @@ transforms this way and build models that use several of them. See documentation
 ## `define-property!` -- derive model
 
 ## `hydration-keys` => `t2/table-for-automagic-hydration`
+
+## `toucan.db/*db-connection*` is now current `*connectable*` (TODO: not sure if this will be renamed)
+
+## `toucan.db/connection` removed
+
+`toucan.db/connection` is defines something you can use to get a `java.sql.Connection`, for example a database details
+map or a `javax.sql.DataSource`; it was meant to be used with something like `clojure.java.jdbc/with-db-connection`,
+which uses `with-open` under the hood, or `clojure.java.jdbc/get-connection` in combination with `with-open`. Toucan 2
+connectables handle their own lifecycle in their implementations of `do-with-connection` so you should not be using
+`with-open` yourself.

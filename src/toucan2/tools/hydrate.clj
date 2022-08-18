@@ -22,7 +22,7 @@
 
 ;;; TODO - rename this to `model-for-automagic-hydration`
 (m/defmulti table-for-automagic-hydration
-  "The table that should be used to automagically hydrate from based on values of `k`.
+  "The model that should be used to automagically hydrate the key `k` in instances of `source-model`.
 
     (table-for-automagic-hydration :some-table :user) :-> :myapp.models/user"
   {:arglists '([source-model k])}
