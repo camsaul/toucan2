@@ -16,8 +16,7 @@
    [toucan2.connection :as conn]
    [toucan2.current :as current]
    [toucan2.instance :as instance]
-   [toucan2.test :as test]
-   [toucan2.util :as u])
+   [toucan2.test :as test])
   (:import
    (java.util Locale)))
 
