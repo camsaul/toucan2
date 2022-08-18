@@ -18,7 +18,7 @@
     (realize/realize rows))
 
   clojure.lang.IReduceInit
-  (reduce [_ rf init]
+  (reduce [_this rf init]
     (reduce rf init rows)))
 
 (defn identity-query
@@ -41,3 +41,8 @@
 (m/defmethod query/build [::select/select :default IdentityQuery]
   [_query-type _model {:keys [query], :as _args}]
   query)
+
+;;; allow using an identity query as an 'identity model'
+(m/defmethod select/select-reducible* IdentityQuery
+  [identity-query _parsed-args]
+  identity-query)

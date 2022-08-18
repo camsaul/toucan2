@@ -49,7 +49,7 @@
                                   [{:id 1, :name "No Category", :category nil}])))))
 
 (m/defmethod select/select-reducible* :after ::select-reducible-identity-query
-  [_model _reducible-query]
+  [_model reducible-query]
   (identity-query/identity-query [{:a 1, :b 2}
                                   {:a 3, :b 4}]))
 
@@ -86,3 +86,13 @@
               (instance/instance ::my-after-select {:id 2, :name "Ho's Tavern", :after-select? true})]
              (do-after-select ::my-after-select reducible)
              (into [] (do-after-select-reducible ::my-after-select reducible)))))))
+
+(deftest identity-query-as-model-test
+  (testing "Can we use identity-query as an 'identity model'?"
+    (let [query   (identity-query/identity-query [{:a 1, :b 2} {:a 3, :b 4}])
+          results (select/select query)]
+      (is (= [{:a 1, :b 2}
+              {:a 3, :b 4}]
+             results))
+      (testing "Return plain rows, not instances"
+        (is (not (instance/instance? (first results))))))))
