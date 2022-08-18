@@ -336,21 +336,21 @@
 
 ;;; TODO -- not sure we want this or not. Seems like an unnecessary extra feature.
 #_(deftest type-metadata-test
-    (testing "Instances should get ^:type metadata when you create them, so you can dispatch with `type`."
-      (let [model (u/dispatch-on "my_table" ::my-type)]
-        (doseq [instance [(instance/instance model)
-                          (instance/instance model {})
-                          (instance/instance model {})
-                          (instance/instance model :x :y)]]
-          (is (= ::my-type
-                 (:type (meta instance))
-                 (type instance))))))
-    (testing "e2e test: make sure instances from something like select come back with ^:type metadata"
-      (let [instance (select/select-one [:test/postgres :venues] 1)]
-        (is (some? instance))
-        (is (= :venues
+  (testing "Instances should get ^:type metadata when you create them, so you can dispatch with `type`."
+    (let [model (u/dispatch-on "my_table" ::my-type)]
+      (doseq [instance [(instance/instance model)
+                        (instance/instance model {})
+                        (instance/instance model {})
+                        (instance/instance model :x :y)]]
+        (is (= ::my-type
                (:type (meta instance))
                (type instance))))))
+  (testing "e2e test: make sure instances from something like select come back with ^:type metadata"
+    (let [instance (select/select-one [:test/postgres :venues] 1)]
+      (is (some? instance))
+      (is (= :venues
+             (:type (meta instance))
+             (type instance))))))
 
 (deftest no-nil-maps-test
   (testing "Shouldn't be able to make the maps in an instance nil"

@@ -142,34 +142,34 @@
       (thunk))))
 
 #_(deftest select-out-only-transform-realized-columns-test
-    (testing "only columns that get realized should get transformed; don't realize others as a side-effect"
-      (testing "Realize both category and id"
-        (binding [*col-read-counts*      (atom nil)
-                  *thunk-resolve-counts* (atom nil)]
-          (is (= [(instance/instance
-                   ::venues.id-is-string-track-reads
-                   {:id "1", :category :bar})
-                  (instance/instance
-                   ::venues.id-is-string-track-reads
-                   {:id "2", :category :bar})]
-                 (select/select ::venues.id-is-string-track-reads
-                                :id [:in ["1" "2"]]
-                                {:select [:id :category]})))
-          (is (= {"category" 1, "id" 1}
-                 @*thunk-resolve-counts*))
-          (is (= {"category" 2, "id" 2}
-                 @*col-read-counts*))))
-      (testing "Realize only id"
-        (binding [*col-read-counts*      (atom nil)
-                  *thunk-resolve-counts* (atom nil)]
-          (is (= #{"1" "2"}
-                 (select/select-pks-set ::venues.id-is-string-track-reads
-                                        :id [:in ["1" "2"]]
-                                        {:select [:id :category]})))
-          (is (= {"id" 1}
-                 @*thunk-resolve-counts*))
-          (is (= {"id" 2}
-                 @*col-read-counts*))))))
+  (testing "only columns that get realized should get transformed; don't realize others as a side-effect"
+    (testing "Realize both category and id"
+      (binding [*col-read-counts*      (atom nil)
+                *thunk-resolve-counts* (atom nil)]
+        (is (= [(instance/instance
+                 ::venues.id-is-string-track-reads
+                 {:id "1", :category :bar})
+                (instance/instance
+                 ::venues.id-is-string-track-reads
+                 {:id "2", :category :bar})]
+               (select/select ::venues.id-is-string-track-reads
+                              :id [:in ["1" "2"]]
+                              {:select [:id :category]})))
+        (is (= {"category" 1, "id" 1}
+               @*thunk-resolve-counts*))
+        (is (= {"category" 2, "id" 2}
+               @*col-read-counts*))))
+    (testing "Realize only id"
+      (binding [*col-read-counts*      (atom nil)
+                *thunk-resolve-counts* (atom nil)]
+        (is (= #{"1" "2"}
+               (select/select-pks-set ::venues.id-is-string-track-reads
+                                      :id [:in ["1" "2"]]
+                                      {:select [:id :category]})))
+        (is (= {"id" 1}
+               @*thunk-resolve-counts*))
+        (is (= {"id" 2}
+               @*col-read-counts*))))))
 
 (deftest update!-test
   (test-both-normal-and-magic-keys [category-key]
