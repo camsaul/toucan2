@@ -1,7 +1,7 @@
 (ns toucan2.core
   "Convenience namespace exposing the most common parts of the library's public API for day-to-day usage (i.e., not
   implementing anything advanced)"
-  (:refer-clojure :exclude [compile])
+  (:refer-clojure :exclude [compile count instance?])
   (:require
    [potemkin :as p]
    [toucan2.compile]
@@ -20,6 +20,7 @@
    [toucan2.tools.helpers]
    [toucan2.tools.hydrate]
    [toucan2.tools.identity-query]
+   [toucan2.tools.transformed]
    [toucan2.update]
    [toucan2.util]))
 
@@ -40,6 +41,7 @@
   toucan2.tools.helpers/keep-me
   toucan2.tools.hydrate/keep-me
   toucan2.tools.identity-query/keep-me
+  toucan2.tools.transformed/keep-me
   toucan2.update/keep-me
   toucan2.util/keep-me)
 
@@ -50,6 +52,7 @@
   with-compiled-query]
 
  [toucan2.connection
+  do-with-connection
   with-connection
   with-transaction]
 
@@ -81,6 +84,7 @@
   original]
 
  [toucan2.model
+  default-connectable
   primary-key-values
   primary-keys
   primary-keys-vec
@@ -142,6 +146,9 @@
 
  #_[toucan2.tools.with-temp]
 
+ [toucan2.tools.transformed
+  transforms]
+
  [toucan2.update
   reducible-update
   reducible-update-returning-pks
@@ -149,4 +156,5 @@
   update-returning-pks!]
 
  [toucan2.util
-  *debug*])
+  *debug*
+  dispatch-value])

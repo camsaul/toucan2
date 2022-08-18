@@ -8,7 +8,6 @@
    [toucan2.model :as model]
    [toucan2.util :as u]))
 
-;; TODO -- this should probably also support.
 (m/defmulti do-with-model
   {:arglists '([modelable f])}
   u/dispatch-on-first-arg)

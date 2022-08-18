@@ -24,6 +24,8 @@ usable and tested and several alpha releases are available on Clojars. It's avai
 The re-implementation is pretty close to being ready for alpha usage and I will update the README when I publish the
 first alpha release.
 
+In the mean time, browse the [Documentation](docs/), which are a work in progress.
+
 ## License
 
 Code, documentation, and artwork copyright © 2017-2022 [Cam Saul](https://camsaul.com).

@@ -115,6 +115,6 @@
     `(do
        (derive ~model-keyword :toucan1/model)
        (m/defmethod model/table-name ~model-keyword
-         [model#]
+         [~'_]
          ~(name table-name))
        (def ~(symbol model) ~model-keyword))))
