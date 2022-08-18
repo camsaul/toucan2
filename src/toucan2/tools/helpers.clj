@@ -9,11 +9,6 @@
    [toucan2.tools.transformed :as transformed]
    [toucan2.util :as u]))
 
-(defn maybe-derive
-  [child parent]
-  (when-not (isa? child parent)
-    (derive child parent)))
-
 ;;;; [[define-before-select]], [[define-after-select-reducible]], [[define-after-select-each]]
 
 (defn do-before-select [model thunk]
@@ -76,7 +71,7 @@
 
 (defmacro define-default-fields [model & body]
   `(let [model# ~model]
-     (maybe-derive model# ::default-fields)
+     (u/maybe-derive model# ::default-fields)
      (m/defmethod default-fields model# [~'&model] ~@body)))
 
 
@@ -106,7 +101,7 @@
   {:style/indent :defn}
   [model [instance-binding] & body]
   `(let [model# ~model]
-     (maybe-derive model# ::before-delete)
+     (u/maybe-derive model# ::before-delete)
      (m/defmethod before-delete model#
        [~'&model ~instance-binding]
        ~@body)))
@@ -138,7 +133,7 @@
   {:style/indent 1}
   [model transforms]
   `(let [model# ~model]
-     (maybe-derive model# ::transformed/transformed)
+     (u/maybe-derive model# ::transformed/transformed)
      (m/defmethod transformed/transforms* model#
        [~'&model]
        ~transforms)))
