@@ -1,43 +1,46 @@
 (ns toucan2.tools.with-temp
-  #_(:require [clojure.test :refer [testing]]
-            [methodical.core :as m]
-            [toucan2.log :as log]
-            [toucan2.mutative :as mutative]
-            [toucan2.select :as select]
-            [toucan2.util :as u]))
+  (:require
+   [clojure.test :as t]
+   [methodical.core :as m]
+   [toucan2.delete :as delete]
+   [toucan2.insert :as insert]
+   [toucan2.model :as model]
+   [toucan2.select :as select]
+   [toucan2.util :as u]))
 
-;; (m/defmulti with-temp-defaults*
-;;   {:arglists '([tableableᵈᵗ])}
-;;   u/dispatch-on-first-arg)
+(m/defmulti with-temp-defaults
+  {:arglists '([model])}
+  u/dispatch-on-first-arg)
 
-;; (m/defmethod with-temp-defaults* :default
-;;   [_]
-;;   nil)
+(m/defmethod with-temp-defaults :default
+  [_model]
+  nil)
 
-;; (defn do-with-temp [tableable attributes f]
-;;   (let [defaults          (with-temp-defaults* tableable)
-;;         merged-attributes (merge {} defaults attributes)
-;;         [pk temp-object]  (log/with-trace ["Create temporary %s with attributes %s" tableable merged-attributes]
-;;                             (let [[pk] (try
-;;                                          (mutative/insert-returning-pks! tableable merged-attributes)
-;;                                          (catch Throwable e
-;;                                            (throw (ex-info (format "Error inserting temp %s: %s" (pr-str tableable) (ex-message e))
-;;                                                            {:tableable  tableable
-;;                                                             :attributes {:parameters attributes
-;;                                                                          :default    defaults
-;;                                                                          :merged     merged-attributes}}
-;;                                                            e))))]
-;;                               [pk (select/select-one tableable pk)]))]
+(defn do-with-temp [modelable attributes f]
+  (model/with-model [model modelable]
+    (let [defaults          (with-temp-defaults model)
+          merged-attributes (merge {} defaults attributes)
+          [pk temp-object]  (u/with-debug-result ["Create temporary %s with attributes %s" model merged-attributes]
+                              (let [[pk] (try
+                                           (insert/insert-returning-pks! model merged-attributes)
+                                           (catch Throwable e
+                                             (throw (ex-info (format "Error inserting temp %s: %s" (pr-str model) (ex-message e))
+                                                             {:model  model
+                                                              :attributes {:parameters attributes
+                                                                           :default    defaults
+                                                                           :merged     merged-attributes}}
+                                                             e))))]
+                                [pk (select/select-one model pk)]))]
 
-;;     (try
-;;       (testing (format "with temporary %s with attributes %s" (pr-str tableable) (pr-str merged-attributes))
-;;         (f temp-object))
-;;       (finally
-;;         (mutative/delete! tableable pk)))))
+      (try
+        (t/testing (format "with temporary %s with attributes %s" (pr-str model) (pr-str merged-attributes))
+          (f temp-object))
+        (finally
+          (delete/delete! model pk))))))
 
-;; (defmacro with-temp [[tableable temp-object-binding attributes & more] & body]
-;;   `(do-with-temp ~tableable ~attributes
-;;                  (fn [~temp-object-binding]
-;;                    ~(if (seq more)
-;;                       `(with-temp ~(vec more) ~@body)
-;;                       `(do ~@body)))))
+(defmacro with-temp [[modelable temp-object-binding attributes & more] & body]
+  `(do-with-temp ~modelable ~attributes
+                 (fn [~temp-object-binding]
+                   ~(if (seq more)
+                      `(with-temp ~(vec more) ~@body)
+                      `(do ~@body)))))
