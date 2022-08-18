@@ -11,6 +11,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(use-fixtures :each test/do-db-types-fixture)
+
 (set! *warn-on-reflection* true)
 
 (deftest parse-args-test
@@ -54,77 +56,73 @@
         (f returning-keys? insert!)))))
 
 (deftest insert-single-row-test
-  (test/do-db-types [_db-type]
-    (do-both-types-of-insert
-     (fn [returning-keys? insert!]
-       (is (= (if returning-keys?
-                [4]
-                1)
-              (insert! ::test/venues {:name "Grant & Green", :category "bar"})))
-       (testing "Venue 4 should exist now"
-         (is (= (instance/instance ::test/venues {:id         4
-                                                  :name       "Grant & Green"
-                                                  :category   "bar"
-                                                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-                (select/select-one ::test/venues 4))))))))
+  (do-both-types-of-insert
+   (fn [returning-keys? insert!]
+     (is (= (if returning-keys?
+              [4]
+              1)
+            (insert! ::test/venues {:name "Grant & Green", :category "bar"})))
+     (testing "Venue 4 should exist now"
+       (is (= (instance/instance ::test/venues {:id         4
+                                                :name       "Grant & Green"
+                                                :category   "bar"
+                                                :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+              (select/select-one ::test/venues 4)))))))
 
 (deftest multiple-rows-test
-  (test/do-db-types [_db-type]
-    (doseq [rows-fn [#'list #'vector]
-            :let    [rows (rows-fn
-                           {:name "Black Horse London Pub", :category "bar"}
-                           {:name "Nick's Crispy Tacos", :category "bar"})]]
-      (testing (format "rows = %s %s\n" rows-fn (pr-str rows))
-        (do-both-types-of-insert
-         (fn [returning-keys? insert!]
-           (is (= (if returning-keys?
-                    [4 5]
-                    2)
-                  (insert! ::test/venues rows)))
-           (testing "Venues 4 and 6 should exist now"
-             (is (= [(instance/instance ::test/venues {:id         4
-                                                       :name       "Black Horse London Pub"
-                                                       :category   "bar"
-                                                       :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                       :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-                     (instance/instance ::test/venues {:id         5
-                                                       :name       "Nick's Crispy Tacos"
-                                                       :category   "bar"
-                                                       :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                       :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
-                    (select/select ::test/venues :id [:>= 4] {:order-by [[:id :asc]]}))))))))))
-
-(deftest key-values-test
-  (test/do-db-types [_db-type]
-    (do-both-types-of-insert
-     (fn [returning-keys? insert!]
-       (is (= (if returning-keys?
-                [4]
-                1)
-              (insert! ::test/venues :name "HiDive SF", :category "bar")))
-       (testing "Venue 4 should exist now"
-         (is (= (instance/instance ::test/venues {:id         4
-                                                  :name       "HiDive SF"
-                                                  :category   "bar"
-                                                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-                (select/select-one ::test/venues :id 4))))))))
-
-(deftest multiple-rows-with-column-names-test
-  (test/do-db-types [_db-type]
-    (do-both-types-of-insert
-     (fn [returning-keys? insert!]
-       (testing "Insert multiple rows with column names"
+  (doseq [rows-fn [#'list #'vector]
+          :let    [rows (rows-fn
+                         {:name "Black Horse London Pub", :category "bar"}
+                         {:name "Nick's Crispy Tacos", :category "bar"})]]
+    (testing (format "rows = %s %s\n" rows-fn (pr-str rows))
+      (do-both-types-of-insert
+       (fn [returning-keys? insert!]
          (is (= (if returning-keys?
                   [4 5]
                   2)
-                (insert! ::test/venues [:name :category] [["The Ramp" "bar"]
-                                                          ["Louie's" "bar"]])))
-         (testing "Venues 4 and 5 should exist now"
-           (is (= [(instance/instance ::test/venues {:id 4, :name "The Ramp"})
-                   (instance/instance ::test/venues {:id 5, :name "Louie's"})]
-                  (select/select ::test/venues :id [:> 3] {:select [:id :name], :order-by [[:id :asc]]})))))))))
+                (insert! ::test/venues rows)))
+         (testing "Venues 4 and 6 should exist now"
+           (is (= [(instance/instance ::test/venues {:id         4
+                                                     :name       "Black Horse London Pub"
+                                                     :category   "bar"
+                                                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                   (instance/instance ::test/venues {:id         5
+                                                     :name       "Nick's Crispy Tacos"
+                                                     :category   "bar"
+                                                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                  (select/select ::test/venues :id [:>= 4] {:order-by [[:id :asc]]})))))))))
+
+(deftest key-values-test
+  (do-both-types-of-insert
+   (fn [returning-keys? insert!]
+     (is (= (if returning-keys?
+              [4]
+              1)
+            (insert! ::test/venues :name "HiDive SF", :category "bar")))
+     (testing "Venue 4 should exist now"
+       (is (= (instance/instance ::test/venues {:id         4
+                                                :name       "HiDive SF"
+                                                :category   "bar"
+                                                :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+              (select/select-one ::test/venues :id 4)))))))
+
+(deftest multiple-rows-with-column-names-test
+  (do-both-types-of-insert
+   (fn [returning-keys? insert!]
+     (testing "Insert multiple rows with column names"
+       (is (= (if returning-keys?
+                [4 5]
+                2)
+              (insert! ::test/venues [:name :category] [["The Ramp" "bar"]
+                                                        ["Louie's" "bar"]])))
+       (testing "Venues 4 and 5 should exist now"
+         (is (= [(instance/instance ::test/venues {:id 4, :name "The Ramp"})
+                 (instance/instance ::test/venues {:id 5, :name "Louie's"})]
+                (select/select ::test/venues :id [:> 3] {:select [:id :name], :order-by [[:id :asc]]}))))))))
 
 (derive ::venues.composite-pk ::test/venues)
 
@@ -136,7 +134,7 @@
   ;; TODO FIXME -- insert-returning-pks! currently only works for Postgres, at least with the venues table that doesn't
   ;; ACTUALLY have a composite PK. H2 only returns the actual generated PK value, `:id`. Maybe we can create a new test
   ;; table or something in order to test this against H2
-  (test/do-db-types [_db-type #{:postgres}]
+  (when (= (test/current-db-type) :postgres)
     (test/with-discarded-table-changes :venues
       (is (= [[4 "Grant & Green"]]
              (insert/insert-returning-pks! ::venues.composite-pk {:name "Grant & Green", :category "bar"}))))))
@@ -175,44 +173,42 @@
 ;;                (insert/insert-returning-pks! ::venues.custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))))))
 
 (deftest insert!-no-changes-no-op-test
-  (test/do-db-types [_db-type]
-    (test/with-discarded-table-changes :venues
-      (testing "If there are no rows, insert! should no-op and return zero"
-        (is (= 0
-               (insert/insert! ::test/venues [])))))))
+  (test/with-discarded-table-changes :venues
+    (testing "If there are no rows, insert! should no-op and return zero"
+      (is (= 0
+             (insert/insert! ::test/venues []))))))
 
 (deftest insert-returning-instances-test
-  (test/do-db-types [_db-type]
+  (test/with-discarded-table-changes :venues
+    (is (= [(instance/instance
+             ::test/venues
+             {:id         4
+              :name       "Grant & Green"
+              :category   "bar"
+              :created-at (LocalDateTime/parse "2017-01-01T00:00")
+              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+            (instance/instance
+             ::test/venues
+             {:id         5
+              :name       "North Beach Cantina"
+              :category   "resturaunt"
+              :created-at (LocalDateTime/parse "2017-01-01T00:00")
+              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+           (insert/insert-returning-instances!
+            ::test/venues
+            [{:name "Grant & Green", :category "bar"}
+             {:name "North Beach Cantina", :category "resturaunt"}]))))
+  (testing "Support wrapping the model in a vector, because why not?"
     (test/with-discarded-table-changes :venues
       (is (= [(instance/instance
                ::test/venues
-               {:id         4
-                :name       "Grant & Green"
-                :category   "bar"
-                :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+               {:id   4
+                :name "Grant & Green"})
               (instance/instance
                ::test/venues
-               {:id         5
-                :name       "North Beach Cantina"
-                :category   "resturaunt"
-                :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+               {:id   5
+                :name "North Beach Cantina"})]
              (insert/insert-returning-instances!
-              ::test/venues
+              [::test/venues :id :name]
               [{:name "Grant & Green", :category "bar"}
-               {:name "North Beach Cantina", :category "resturaunt"}]))))
-    (testing "Support wrapping the model in a vector, because why not?"
-      (test/with-discarded-table-changes :venues
-        (is (= [(instance/instance
-                 ::test/venues
-                 {:id   4
-                  :name "Grant & Green"})
-                (instance/instance
-                 ::test/venues
-                 {:id   5
-                  :name "North Beach Cantina"})]
-               (insert/insert-returning-instances!
-                [::test/venues :id :name]
-                [{:name "Grant & Green", :category "bar"}
-                 {:name "North Beach Cantina", :category "resturaunt"}])))))))
+               {:name "North Beach Cantina", :category "resturaunt"}]))))))

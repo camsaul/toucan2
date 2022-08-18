@@ -23,7 +23,7 @@
 (comment heroes/keep-me
          test-setup/keep-me)
 
-(use-fixtures :each test-setup/do-with-default-quoting-style)
+(use-fixtures :each test-setup/do-with-default-quoting-style test/do-db-types-fixture)
 
 (deftest simple-model-test
   (testing "Simple model should use the same key transform as the original model"
@@ -88,42 +88,38 @@
                (finally
                  (db/set-default-jdbc-options! original-options)))))))
 
-;;; TODO
 (deftest transaction-test
-  (test/do-db-types [_db-type]
-    (testing "Test transaction"
-      ;; attempt to insert! two of the same Venues. Since the second has a duplicate name,
-      ;; the whole transaction should fail, and neither should get inserted.
-      (test/with-discarded-table-changes :venues
-        (try
-          (db/transaction
-           (db/insert! Venue :name "Cam's Toucannery", :category "Pet Store")
-           (db/insert! Venue :name "Cam's Toucannery", :category "Pet Store"))
-          (catch Throwable _))
-        (is (zero? (db/count Venue :name "Cam's Toucannery")))))))
+  (testing "Test transaction"
+    ;; attempt to insert! two of the same Venues. Since the second has a duplicate name,
+    ;; the whole transaction should fail, and neither should get inserted.
+    (test/with-discarded-table-changes :venues
+      (try
+        (db/transaction
+         (db/insert! Venue :name "Cam's Toucannery", :category "Pet Store")
+         (db/insert! Venue :name "Cam's Toucannery", :category "Pet Store"))
+        (catch Throwable _))
+      (is (zero? (db/count Venue :name "Cam's Toucannery"))))))
 
 (deftest with-call-counting-test
-  (test/do-db-types [_db-type]
-    (testing "Test with-call-counting"
-      (is (= 2
-             (db/with-call-counting [call-count]
-               (db/select-one User)
-               (db/select-one User)
-               (call-count)))))))
+  (testing "Test with-call-counting"
+    (is (= 2
+           (db/with-call-counting [call-count]
+             (db/select-one User)
+             (db/select-one User)
+             (call-count))))))
 
 (deftest query-test
-  (test/do-db-types [_db-type]
-    (testing "Test query"
-      (binding [current/*connectable* ::test-setup/db]
-        (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
-               (db/query {:select   [:*]
-                          :from     [:t1_users]
-                          :order-by [:id]
-                          :limit    1})))))))
+  (testing "Test query"
+    (binding [current/*connectable* ::test-setup/db]
+      (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
+             (db/query {:select   [:*]
+                        :from     [:t1_users]
+                        :order-by [:id]
+                        :limit    1}))))))
 
 (deftest lower-case-identifiers-test
   ;; only test postgres, since H2 has uppercase identifiers
-  (test/do-db-types [_db-type #{:postgres}]
+  (when (= (test/current-db-type) :postgres)
     (testing "Test that identifiers are correctly lower cased in Turkish locale (toucan#59)"
       (let [original-locale (Locale/getDefault)]
         (try
@@ -144,45 +140,39 @@
   (transduce (map identity) conj #{} reducible-query-result))
 
 (deftest query-reducible-test
-  (test/do-db-types [_db-type]
-    (conn/with-connection [_conn ::test-setup/db]
-      (testing "Test query-reducible"
-        (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
-               (transduce-to-set (db/reducible-query {:select   [:*]
-                                                      :from     [:t1_users]
-                                                      :order-by [:id]
-                                                      :limit    1}))))))))
+  (conn/with-connection [_conn ::test-setup/db]
+    (testing "Test query-reducible"
+      (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
+             (transduce-to-set (db/reducible-query {:select   [:*]
+                                                    :from     [:t1_users]
+                                                    :order-by [:id]
+                                                    :limit    1})))))))
 
 (deftest qualify-test
-  (test/do-db-types [_db-type]
-    (is (= :t1_users.first-name
-           (db/qualify User :first-name)))
-    (is (= :t1_users.first-name
-           (db/qualify User "first-name")))))
+  (is (= :t1_users.first-name
+         (db/qualify User :first-name)))
+  (is (= :t1_users.first-name
+         (db/qualify User "first-name"))))
 
 (deftest qualified?-test
-  (test/do-db-types [_db-type]
-    (is (db/qualified? :users.first-name))
-    (is (db/qualified? "users.first-name"))
-    (is (not (db/qualified? :first-name)))
-    (is (not (db/qualified? "first-name")))))
+  (is (db/qualified? :users.first-name))
+  (is (db/qualified? "users.first-name"))
+  (is (not (db/qualified? :first-name)))
+  (is (not (db/qualified? "first-name"))))
 
 (deftest simple-select-test
-  (test/do-db-types [_db-type]
-    (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
-           (db/simple-select User {:where [:= :id 1]})))
-    (is (= [{:id 3, :first-name "Lucky", :last-name "Bird"}]
-           (db/simple-select User {:where [:and [:not= :id 1] [:not= :id 2]]})))))
+  (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
+         (db/simple-select User {:where [:= :id 1]})))
+  (is (= [{:id 3, :first-name "Lucky", :last-name "Bird"}]
+         (db/simple-select User {:where [:and [:not= :id 1] [:not= :id 2]]}))))
 
 (deftest simple-select-reducible-test
-  (test/do-db-types [_db-type]
-    (testing "Test simple-select-reducible"
-      (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
-             (transduce-to-set (db/simple-select-reducible User {:where [:= :id 1]})))))))
+  (testing "Test simple-select-reducible"
+    (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
+           (transduce-to-set (db/simple-select-reducible User {:where [:= :id 1]}))))))
 
 ;; TODO
 #_(deftest test-37
-    (test/do-db-types [_db-type]
       (testing "reducible-query should pass default JDBC options along to clojure.java.jdbc"
         (is (= [:connection [""] {:a 1, :b 3, :c 4}]
                (let [fn-args (atom nil)]
@@ -190,12 +180,11 @@
                                #_db/default-jdbc-options #_ (atom {:a 1, :b 2})
                                #_jdbc/reducible-query    #_ (fn [& args]
                                                               (reset! fn-args args))]
-                   (db/reducible-query {} :b 3, :c 4))))))))
+                   (db/reducible-query {} :b 3, :c 4)))))))
 
 (deftest simple-select-one-test
-  (test/do-db-types [_db-type]
-    (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
-           (db/simple-select-one User {:where [:= :first-name "Cam"]})))))
+  (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
+         (db/simple-select-one User {:where [:= :first-name "Cam"]}))))
 
 ;; (defn do-with-default-connection [thunk]
 ;;   (try
@@ -210,178 +199,162 @@
 ;;   `(do-with-default-connection (^:once fn* [] ~@body)))
 
 (deftest update!-test
-  (test/do-db-types [_db-type]
-    (test/with-discarded-table-changes User
-      (db/update! User 1 :last-name "Era")
-      (is (= {:id 1, :first-name "Cam", :last-name "Era"}
-             (db/select-one User :id 1))))
-    (test/with-discarded-table-changes PhoneNumber
-      (let [id "012345678"]
-        (db/simple-insert! PhoneNumber {:number id, :country_code "US"})
-        (db/update! PhoneNumber id :country_code "AU")
-        (is (= {:number id, :country_code "AU"}
-               (db/select-one PhoneNumber :number id)))))))
+  (test/with-discarded-table-changes User
+    (db/update! User 1 :last-name "Era")
+    (is (= {:id 1, :first-name "Cam", :last-name "Era"}
+           (db/select-one User :id 1))))
+  (test/with-discarded-table-changes PhoneNumber
+    (let [id "012345678"]
+      (db/simple-insert! PhoneNumber {:number id, :country_code "US"})
+      (db/update! PhoneNumber id :country_code "AU")
+      (is (= {:number id, :country_code "AU"}
+             (db/select-one PhoneNumber :number id))))))
 
 (deftest update-where!-test
-  (test/do-db-types [_db-type]
-    (test/with-discarded-table-changes User
-      (db/update-where! User {:first-name [:not= "Cam"]}
-                        :first-name "Cam")
-      (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
-              {:id 2, :first-name "Cam", :last-name "Toucan"}
-              {:id 3, :first-name "Cam", :last-name "Bird"}]
-             (db/select User {:order-by [:id]}))))
-    (test/with-discarded-table-changes User
-      (db/update-where! User {:first-name "Cam"}
-                        :first-name "Not Cam")
-      (is (= [{:id 1, :first-name "Not Cam", :last-name "Saul"}
-              {:id 2, :first-name "Rasta", :last-name "Toucan"}
-              {:id 3, :first-name "Lucky", :last-name "Bird"}]
-             (db/select User {:order-by [:id]}))))))
-
-(deftest update-non-nil-keys!-test
-  (test/do-db-types [_db-type]
-    (test/with-discarded-table-changes User
-      (db/update-non-nil-keys! User 2
-                               :first-name nil
-                               :last-name "Can")
-      (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
-             (db/select-one User 2))))
-    (test/with-discarded-table-changes User
-      (db/update-non-nil-keys! User 2
-                               {:first-name nil
-                                :last-name  "Can"})
-      (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
-             (db/select-one User 2))))))
-
-(deftest simple-insert-many!-test
-  (test/do-db-types [_db-type]
-    (testing "It must return the inserted ids"
-      (test/with-discarded-table-changes Category
-        (is (= [5]
-               (db/simple-insert-many! Category [{:name "seafood" :parent-category-id 100}])))))
-    (testing "it must not fail when using SQL function calls."
-      (test/with-discarded-table-changes User
-        (is (= [4 5]
-               (db/simple-insert-many! User [{:first-name "Grass" :last-name (hsql/call :upper "Hopper")}
-                                             {:first-name "Ko" :last-name "Libri"}])))))))
-
-(deftest insert-many!-test
-  (test/do-db-types [_db-type]
-    (testing "It must return the inserted ids, it must not fail when using SQL function calls."
-      (test/with-discarded-table-changes User
-        (is (= [4 5]
-               (db/insert-many! User [{:first-name "Grass" :last-name (hsql/call :upper "Hopper")}
-                                      {:first-name "Ko" :last-name "Libri"}])))))
-    (testing "It must call pre-insert hooks"
-      (test/with-discarded-table-changes Category
-        (is (thrown-with-msg?
-             Exception
-             #"A category with ID 100 does not exist"
-             (db/insert-many! Category [{:name "seafood" :parent-category-id 100}])))))))
-
-(deftest insert!-test
-  (test/do-db-types [_db-type]
-    (testing "It must return the inserted row"
-      (test/with-discarded-table-changes User
-        (is (= {:id 4, :first-name "Trash", :last-name "Bird"}
-               (db/insert! User {:first-name "Trash", :last-name "Bird"}))))
-      (test/with-discarded-table-changes PhoneNumber
-        (is (= {:number "012345678", :country_code "AU"}
-               (db/insert! PhoneNumber {:number "012345678", :country_code "AU"})))))
-    (testing "The returned data must match what's been inserted in the table"
-      (test/with-discarded-table-changes User
-        (is (= {:id 4, :first-name "Grass", :last-name "HOPPER"}
-               (db/insert! User {:first-name "Grass" :last-name (hsql/call :upper "Hopper")})))))))
-
-(deftest select-one-test
-  (test/do-db-types [_db-type]
-    (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
-           (db/select-one User, :first-name "Cam")))
-    (is (= {:id 3, :first-name "Lucky", :last-name "Bird"}
-           (db/select-one User {:order-by [[:id :desc]]})))
-    (is (= {:first-name "Lucky", :last-name "Bird"}
-           (db/select-one [User :first-name :last-name] {:order-by [[:id :desc]]})))))
-
-(deftest select-one-field-test
-  (test/do-db-types [_db-type]
-    (is (= "Cam"
-           (db/select-one-field :first-name User, :id 1)))
-    (is (= 1
-           (db/select-one-field :id User, :first-name "Cam")))))
-
-(deftest select-one-id-test
-  (test/do-db-types [_db-type]
-    (is (= 1
-           (db/select-one-id User, :first-name "Cam")))))
-
-(deftest count-test
-  (test/do-db-types [_db-type]
-    (is (= 3
-           (db/count User)))
-    (is (= 1
-           (db/count User, :first-name "Cam")))
-    (is (= 2
-           (db/count User, :first-name [:not= "Cam"])))))
-
-(deftest select-test
-  (test/do-db-types [_db-type]
+  (test/with-discarded-table-changes User
+    (db/update-where! User {:first-name [:not= "Cam"]}
+                      :first-name "Cam")
     (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
+            {:id 2, :first-name "Cam", :last-name "Toucan"}
+            {:id 3, :first-name "Cam", :last-name "Bird"}]
+           (db/select User {:order-by [:id]}))))
+  (test/with-discarded-table-changes User
+    (db/update-where! User {:first-name "Cam"}
+                      :first-name "Not Cam")
+    (is (= [{:id 1, :first-name "Not Cam", :last-name "Saul"}
             {:id 2, :first-name "Rasta", :last-name "Toucan"}
             {:id 3, :first-name "Lucky", :last-name "Bird"}]
-           (db/select User {:order-by [:id]})))
-    (is (= [{:id 2, :first-name "Rasta", :last-name "Toucan"}
-            {:id 3, :first-name "Lucky", :last-name "Bird"}]
-           (db/select User
-                      :first-name [:not= "Cam"]
-                      {:order-by [:id]})))
+           (db/select User {:order-by [:id]})))))
+
+(deftest update-non-nil-keys!-test
+  (test/with-discarded-table-changes User
+    (db/update-non-nil-keys! User 2
+                             :first-name nil
+                             :last-name "Can")
+    (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
+           (db/select-one User 2))))
+  (test/with-discarded-table-changes User
+    (db/update-non-nil-keys! User 2
+                             {:first-name nil
+                              :last-name  "Can"})
+    (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
+           (db/select-one User 2)))))
+
+(deftest simple-insert-many!-test
+  (testing "It must return the inserted ids"
+    (test/with-discarded-table-changes Category
+      (is (= [5]
+             (db/simple-insert-many! Category [{:name "seafood" :parent-category-id 100}])))))
+  (testing "it must not fail when using SQL function calls."
+    (test/with-discarded-table-changes User
+      (is (= [4 5]
+             (db/simple-insert-many! User [{:first-name "Grass" :last-name (hsql/call :upper "Hopper")}
+                                           {:first-name "Ko" :last-name "Libri"}]))))))
+
+(deftest insert-many!-test
+  (testing "It must return the inserted ids, it must not fail when using SQL function calls."
+    (test/with-discarded-table-changes User
+      (is (= [4 5]
+             (db/insert-many! User [{:first-name "Grass" :last-name (hsql/call :upper "Hopper")}
+                                    {:first-name "Ko" :last-name "Libri"}])))))
+  (testing "It must call pre-insert hooks"
+    (test/with-discarded-table-changes Category
+      (is (thrown-with-msg?
+           Exception
+           #"A category with ID 100 does not exist"
+           (db/insert-many! Category [{:name "seafood" :parent-category-id 100}]))))))
+
+(deftest insert!-test
+  (testing "It must return the inserted row"
+    (test/with-discarded-table-changes User
+      (is (= {:id 4, :first-name "Trash", :last-name "Bird"}
+             (db/insert! User {:first-name "Trash", :last-name "Bird"}))))
+    (test/with-discarded-table-changes PhoneNumber
+      (is (= {:number "012345678", :country_code "AU"}
+             (db/insert! PhoneNumber {:number "012345678", :country_code "AU"})))))
+  (testing "The returned data must match what's been inserted in the table"
+    (test/with-discarded-table-changes User
+      (is (= {:id 4, :first-name "Grass", :last-name "HOPPER"}
+             (db/insert! User {:first-name "Grass" :last-name (hsql/call :upper "Hopper")}))))))
+
+(deftest select-one-test
+  (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
+         (db/select-one User, :first-name "Cam")))
+  (is (= {:id 3, :first-name "Lucky", :last-name "Bird"}
+         (db/select-one User {:order-by [[:id :desc]]})))
+  (is (= {:first-name "Lucky", :last-name "Bird"}
+         (db/select-one [User :first-name :last-name] {:order-by [[:id :desc]]}))))
+
+(deftest select-one-field-test
+  (is (= "Cam"
+         (db/select-one-field :first-name User, :id 1)))
+  (is (= 1
+         (db/select-one-field :id User, :first-name "Cam"))))
+
+(deftest select-one-id-test
+  (is (= 1
+         (db/select-one-id User, :first-name "Cam"))))
+
+(deftest count-test
+  (is (= 3
+         (db/count User)))
+  (is (= 1
+         (db/count User, :first-name "Cam")))
+  (is (= 2
+         (db/count User, :first-name [:not= "Cam"]))))
+
+(deftest select-test
+  (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
+          {:id 2, :first-name "Rasta", :last-name "Toucan"}
+          {:id 3, :first-name "Lucky", :last-name "Bird"}]
+         (db/select User {:order-by [:id]})))
+  (is (= [{:id 2, :first-name "Rasta", :last-name "Toucan"}
+          {:id 3, :first-name "Lucky", :last-name "Bird"}]
+         (db/select User
+                    :first-name [:not= "Cam"]
+                    {:order-by [:id]})))
+  (is (= [{:first-name "Cam", :last-name "Saul"}
+          {:first-name "Rasta", :last-name "Toucan"}
+          {:first-name "Lucky", :last-name "Bird"}]
+         (db/select [User :first-name :last-name] {:order-by [:id]})))
+  (testing "Check that `select` works as we'd expect with where clauses with more than two arguments, for example BETWEEN"
     (is (= [{:first-name "Cam", :last-name "Saul"}
-            {:first-name "Rasta", :last-name "Toucan"}
-            {:first-name "Lucky", :last-name "Bird"}]
-           (db/select [User :first-name :last-name] {:order-by [:id]})))
-    (testing "Check that `select` works as we'd expect with where clauses with more than two arguments, for example BETWEEN"
-      (is (= [{:first-name "Cam", :last-name "Saul"}
-              {:first-name "Rasta", :last-name "Toucan"}]
-             (db/select [User :first-name :last-name] :id [:between 1 2] {:order-by [:id]}))))))
+            {:first-name "Rasta", :last-name "Toucan"}]
+           (db/select [User :first-name :last-name] :id [:between 1 2] {:order-by [:id]})))))
 
 (deftest select-reducible-test
-  (test/do-db-types [_db-type]
-    (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}
-             {:id 2, :first-name "Rasta", :last-name "Toucan"}
-             {:id 3, :first-name "Lucky", :last-name "Bird"}}
-           (transduce-to-set (db/select-reducible User {:order-by [:id]}))))
-    (testing "Add up the ids of the users in a transducer"
-      (is (= 6
-             (transduce (map :id) + 0 (db/select-reducible User {:order-by [:id]})))))))
+  (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}
+           {:id 2, :first-name "Rasta", :last-name "Toucan"}
+           {:id 3, :first-name "Lucky", :last-name "Bird"}}
+         (transduce-to-set (db/select-reducible User {:order-by [:id]}))))
+  (testing "Add up the ids of the users in a transducer"
+    (is (= 6
+           (transduce (map :id) + 0 (db/select-reducible User {:order-by [:id]}))))))
 
 (deftest select-field-test
-  (test/do-db-types [_db-type]
-    (is (= #{"Lucky" "Rasta" "Cam"}
-           (db/select-field :first-name User)))
-    (is (= #{"Lucky" "Rasta"}
-           (db/select-field :first-name User, :id [:> 1])))
-    (testing "Test select-ids"
-      (is (= #{1 3 2}
-             (db/select-ids User))))))
+  (is (= #{"Lucky" "Rasta" "Cam"}
+         (db/select-field :first-name User)))
+  (is (= #{"Lucky" "Rasta"}
+         (db/select-field :first-name User, :id [:> 1])))
+  (testing "Test select-ids"
+    (is (= #{1 3 2}
+           (db/select-ids User)))))
 
 (deftest select-ids-test
-  (test/do-db-types [_db-type]
-    (is (= #{3 2}
-           (db/select-ids User, :id [:not= 1])))))
+  (is (= #{3 2}
+         (db/select-ids User, :id [:not= 1]))))
 
 (deftest select-field->field-test
-  (test/do-db-types [_db-type]
+  (is (= {1 "Cam", 2 "Rasta", 3 "Lucky"}
+         (db/select-field->field :id :first-name User)))
+  (is (= {"Cam" 1, "Rasta" 2, "Lucky" 3}
+         (db/select-field->field :first-name :id User)))
+  (testing "Test select-id->field"
     (is (= {1 "Cam", 2 "Rasta", 3 "Lucky"}
-           (db/select-field->field :id :first-name User)))
-    (is (= {"Cam" 1, "Rasta" 2, "Lucky" 3}
-           (db/select-field->field :first-name :id User)))
-    (testing "Test select-id->field"
-      (is (= {1 "Cam", 2 "Rasta", 3 "Lucky"}
-             (db/select-id->field :first-name User))))))
+           (db/select-id->field :first-name User)))))
 
 (deftest exists?-test
-  (test/do-db-types [_db-type]
-    (is (db/exists? User, :first-name "Cam"))
-    (is (db/exists? User, :first-name "Rasta", :last-name "Toucan"))
-    (is (= false
-           (db/exists? User, :first-name "Kanye", :last-name "Nest")))))
+  (is (db/exists? User, :first-name "Cam"))
+  (is (db/exists? User, :first-name "Rasta", :last-name "Toucan"))
+  (is (= false
+         (db/exists? User, :first-name "Kanye", :last-name "Nest"))))

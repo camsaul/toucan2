@@ -242,15 +242,14 @@
 (derive :toucan2.instance-test.no-key-transform/venues ::test/venues)
 
 (deftest no-key-xform-test
-  (test/do-db-types [db-type]
-    (is (= (instance/instance ::test/venues {:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")})
-           (select/select-one ::test/venues {:select [:id :created-at]})))
-    (testing "Should be able to disable key transforms by overriding `key-transform-fn*`"
-      (let [[id created-at] (case db-type
-                              :h2       [:ID :CREATED_AT]
-                              :postgres [:id :created_at])]
-        (is (= {id 1, created-at (LocalDateTime/parse "2017-01-01T00:00")}
-               (select/select-one :toucan2.instance-test.no-key-transform/venues {:select [:id :created-at]})))))))
+  (is (= (instance/instance ::test/venues {:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")})
+         (select/select-one ::test/venues {:select [:id :created-at]})))
+  (testing "Should be able to disable key transforms by overriding `key-transform-fn*`"
+    (let [[id created-at] (case (test/current-db-type)
+                            :h2       [:ID :CREATED_AT]
+                            :postgres [:id :created_at])]
+      (is (= {id 1, created-at (LocalDateTime/parse "2017-01-01T00:00")}
+             (select/select-one :toucan2.instance-test.no-key-transform/venues {:select [:id :created-at]}))))))
 
 (deftest pretty-print-test
   (testing "Should pretty-print"

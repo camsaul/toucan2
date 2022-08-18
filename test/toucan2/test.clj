@@ -63,52 +63,16 @@
 
 (println "Running tests against DB types:" (pr-str (db-types)))
 
-(defn do-db-types* [pred f]
-  (let [pred (or pred identity)]
-    (doseq [db-type (db-types)
-            :when (pred db-type)]
-      (binding [*current-db-type* db-type]
-        (testing (str db-type \newline)
-          (f db-type))))))
-
-(defmacro do-db-types
-  "Execute `body` once for each of the currently enabled test [[db-types]]. Pass an optional predicate function, such as a
-  set of DB types, to only execute body for db types that satisfy that predicate.
-
-    ;; run against all the enabled test [[db-types]]
-    (do-db-types [_db-type]
-      ...)
-
-    ;; run against :h2 if it one of the enabled test [[db-types]]
-    (do-db-types [_db-type #{:h2}]
-      ...)
-
-    ;; run against any enabled test [[db-types]] whose name starts with `m`
-    (do-db-types [_db-type #(str/starts-with? (name %) \"m\")]
-      ...)"
-  {:style/indent :defn
-   :arglists     '([[db-type-binding] & body]
-                   [[db-type-binding pred] & body])}
-  [[db-type-binding pred] & body]
-  `(do-db-types* ~pred (^:once fn* [~db-type-binding] ~@body)))
-
-;;; TODO -- doesn't seem to work correctly inside CIDER.
-#_(defn do-db-types-fixture
-    "[[clojure.test]] fixture for running tests in a namespace against various db types using [[do-db-types]].
+(defn do-db-types-fixture
+  "[[clojure.test]] fixture for running tests in a namespace against various db types using [[do-db-types]].
 
     ;; run tests in this namespace against all the enabled test [[db-types]]
-    (use-fixtures :each (do-db-types-fixture))
-
-    ;; run tests in this namespace only against `:h2` iff `:h2` is one of the enabled test [[db-types]]
-    (use-fixtures :each (do-db-types-fixture #{:h2}))"
-    ([]
-     (do-db-types-fixture identity))
-
-    ([pred]
-     (fn [thunk]
-       (do-db-types [_db-type pred]
-         (assert (fn? thunk))
-         (thunk)))))
+    (use-fixtures :each (do-db-types-fixture))"
+  [thunk]
+  (doseq [db-type (db-types)]
+    (binding [*current-db-type* db-type]
+      (testing (str db-type \newline)
+        (thunk)))))
 
 ;;;; URLs for test DBs.
 
