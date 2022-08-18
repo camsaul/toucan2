@@ -28,7 +28,7 @@
   {:style/indent :defn}
   [model [instance-binding] & body]
   `(let [model# ~model]
-     (derive model# ::before-insert)
+     (u/maybe-derive model# ::before-insert)
      (m/defmethod before-insert model#
        [~'&model ~instance-binding]
        ~@body)))
