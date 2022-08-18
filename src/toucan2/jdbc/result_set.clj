@@ -145,3 +145,12 @@
                          java.time.OffsetDateTime
                          java.time.LocalDateTime)]
       (get-object-of-class-thunk rset i klass))))
+
+(when-let [c3p0-connection-class (try
+                                   (Class/forName "com.mchange.v2.c3p0.impl.NewProxyConnection")
+                                   (catch Throwable _
+                                     nil))]
+  (extend c3p0-connection-class
+    u/DispatchValue
+    {:dispatch-value (fn [^java.sql.Wrapper conn]
+                       (u/dispatch-value (.unwrap conn java.sql.Connection)))}))
