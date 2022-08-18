@@ -31,7 +31,7 @@
   (Integer/parseInt ^String s))
 
 (m/defmethod transformed/transforms ::venues.id-is-string
-  [model]
+  [_model]
   {:id {:in  parse-int
         :out str}})
 

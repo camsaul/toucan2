@@ -78,7 +78,6 @@
   [category]
   (delete-child-categories! category))
 
-
 (m/defmethod test/create-table-sql-file [:postgres Category]
   [_db-type _table-name]
   "toucan/test_models/category.postgres.sql")

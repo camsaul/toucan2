@@ -19,7 +19,6 @@
    [toucan2.tools.before-update]
    [toucan2.tools.helpers]
    [toucan2.tools.hydrate]
-   [toucan2.tools.identity-query]
    [toucan2.tools.transformed]
    [toucan2.update]
    [toucan2.util]))
@@ -40,7 +39,6 @@
   toucan2.tools.before-update/keep-me
   toucan2.tools.helpers/keep-me
   toucan2.tools.hydrate/keep-me
-  toucan2.tools.identity-query/keep-me
   toucan2.tools.transformed/keep-me
   toucan2.update/keep-me
   toucan2.util/keep-me)
@@ -136,15 +134,15 @@
 
  [toucan2.tools.hydrate
   batched-hydrate
-  fk-keys-for-automagic-hydration
   hydrate
   simple-hydrate
   table-for-automagic-hydration]
 
- [toucan2.tools.identity-query
-  identity-query]
+ #_[toucan2.tools.identity-query
+    identity-query]
 
- #_[toucan2.tools.with-temp]
+ #_[toucan2.tools.with-temp
+    with-temp]
 
  [toucan2.tools.transformed
   transforms]
@@ -156,5 +154,4 @@
   update-returning-pks!]
 
  [toucan2.util
-  *debug*
-  dispatch-value])
+  *debug*])

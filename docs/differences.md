@@ -64,3 +64,11 @@ transforms this way and build models that use several of them. See documentation
 ## `toucan.models/primary-key` is replaced with `primary-keys`
 
 ## `do-pre-update` etc removed
+
+## `with-temp` syntax; `with-temp*` removed
+
+## `define-before-insert`, etc.
+
+## `define-property!` -- derive model
+
+## `hydration-keys` => `t2/table-for-automagic-hydration`

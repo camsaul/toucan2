@@ -20,11 +20,12 @@
 ;;;                                  Automagic Batched Hydration (via :table-keys)
 ;;; ==================================================================================================================
 
+;;; TODO - rename this to `model-for-automagic-hydration`
 (m/defmulti table-for-automagic-hydration
   "The table that should be used to automagically hydrate from based on values of `k`.
 
     (table-for-automagic-hydration :some-table :user) :-> :myapp.models/user"
-  {:arglists '([model k])}
+  {:arglists '([source-model k])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod table-for-automagic-hydration :default
