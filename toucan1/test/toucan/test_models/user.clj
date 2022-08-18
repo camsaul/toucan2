@@ -9,8 +9,8 @@
 
 (m/defmethod test/create-table-sql-file [:postgres User]
   [_db-type _table-name]
-  "toucan1/test/toucan/test_models/user.postgres.sql")
+  "toucan/test_models/user.postgres.sql")
 
 (m/defmethod test/create-table-sql-file [:h2 User]
   [_db-type _table-name]
-  "toucan1/test/toucan/test_models/user.h2.sql")
+  "toucan/test_models/user.h2.sql")

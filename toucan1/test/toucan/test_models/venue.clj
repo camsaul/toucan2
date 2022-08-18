@@ -34,8 +34,8 @@
 
 (m/defmethod test/create-table-sql-file [:postgres Venue]
   [_db-type _table-name]
-  "toucan1/test/toucan/test_models/venue.postgres.sql")
+  "toucan/test_models/venue.postgres.sql")
 
 (m/defmethod test/create-table-sql-file [:h2 Venue]
   [_db-type _table-name]
-  "toucan1/test/toucan/test_models/venue.h2.sql")
+  "toucan/test_models/venue.h2.sql")

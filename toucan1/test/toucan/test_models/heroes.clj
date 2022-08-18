@@ -4,4 +4,4 @@
 
 (m/defmethod test/create-table-sql-file [:default ::heroes]
   [_db-type _table-name]
-  "toucan1/test/toucan/test_models/heroes.sql")
+  "toucan/test_models/heroes.sql")

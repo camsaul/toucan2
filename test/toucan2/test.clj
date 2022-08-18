@@ -1,5 +1,6 @@
 (ns toucan2.test
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer :all]
    [methodical.core :as m]
@@ -100,10 +101,10 @@
   (fn [db-type model-or-table-name]
     [(keyword db-type) (keyword model-or-table-name)]))
 
-(m/defmethod create-table-sql-file [:postgres :people] [_db-type _table] "test/toucan2/test/people.postgres.sql")
-(m/defmethod create-table-sql-file [:h2 :people]       [_db-type _table] "test/toucan2/test/people.h2.sql")
-(m/defmethod create-table-sql-file [:postgres :venues] [_db-type _table] "test/toucan2/test/venues.postgres.sql")
-(m/defmethod create-table-sql-file [:h2 :venues]       [_db-type _table] "test/toucan2/test/venues.h2.sql")
+(m/defmethod create-table-sql-file [:postgres :people] [_db-type _table] "toucan2/test/people.postgres.sql")
+(m/defmethod create-table-sql-file [:h2 :people]       [_db-type _table] "toucan2/test/people.h2.sql")
+(m/defmethod create-table-sql-file [:postgres :venues] [_db-type _table] "toucan2/test/venues.postgres.sql")
+(m/defmethod create-table-sql-file [:h2 :venues]       [_db-type _table] "toucan2/test/venues.h2.sql")
 
 (derive ::people ::models)
 
@@ -118,8 +119,11 @@
   "venues")
 
 (defn- create-table-statements [db-type table-name]
-  (for [stmt (str/split (str/trim (slurp (create-table-sql-file db-type table-name))) #";")]
-    (str/trim stmt)))
+  (let [filename           (create-table-sql-file db-type table-name)
+        ^java.io.File file (io/resource filename)]
+    (assert (.exists file) (format "File does not exist: %s" (pr-str filename)))
+    (for [stmt (str/split (str/trim (slurp (.getCanonicalPath file))) #";")]
+      (str/trim stmt))))
 
 (defn create-table!
   "Create the table named `table-name` for the [[current-db-type]] using the SQL from [[create-table-sql-file]]."
