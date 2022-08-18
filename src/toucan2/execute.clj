@@ -64,8 +64,13 @@
 
 (m/defmethod reduce-compiled-query :default
   [connectable model compiled-query rf init]
-  (conn/with-connection [conn connectable]
-    (reduce-compiled-query-with-connection conn model compiled-query rf init)))
+  ;; TODO -- this logic should be abstracted out somewhere. Maybe in a new function in [[conn/with-connection]] itself
+  (let [connectable (or connectable
+                        (if (not= current/*connectable* :toucan/default)
+                          current/*connectable*
+                          (model/default-connectable model)))]
+    (conn/with-connection [conn connectable]
+      (reduce-compiled-query-with-connection conn model compiled-query rf init))))
 
 (m/defmulti reduce-uncompiled-query
   {:arglists '([connectable model query rf init])}

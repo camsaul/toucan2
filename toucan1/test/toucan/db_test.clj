@@ -10,6 +10,7 @@
    [toucan.test-models.heroes :as heroes]
    [toucan.test-models.phone-number :refer [PhoneNumber]]
    [toucan.test-models.user :refer [User]]
+   [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
@@ -19,7 +20,15 @@
   (:import
    (java.util Locale)))
 
-(comment test-setup/keep-me)
+(comment heroes/keep-me
+         test-setup/keep-me)
+
+(use-fixtures :each test-setup/do-with-default-quoting-style test/do-db-types-fixture)
+
+(deftest simple-model-test
+  (testing "Simple model should use the same key transform as the original model"
+    (is (identical? (instance/key-transform-fn PhoneNumber)
+                    (instance/key-transform-fn (db/->SimpleModel PhoneNumber))))))
 
 ;;; TODO
 #_(deftest override-quote-style-test
@@ -79,18 +88,17 @@
                (finally
                  (db/set-default-jdbc-options! original-options)))))))
 
-;;; TODO
-#_(deftest transaction-test
-    (testing "Test transaction"
-      ;; attempt to insert! two of the same Venues. Since the second has a duplicate name,
-      ;; the whole transaction should fail, and neither should get inserted.
-      (test/with-discarded-table-changes :venues
-        (try
-          (db/transaction
-              (db/insert! Venue :name "Cam's Toucannery", :category "Pet Store")
-              (db/insert! Venue :name "Cam's Toucannery", :category "Pet Store"))
-          (catch Throwable _))
-        (is (zero? (db/count Venue :name "Cam's Toucannery"))))))
+(deftest transaction-test
+  (testing "Test transaction"
+    ;; attempt to insert! two of the same Venues. Since the second has a duplicate name,
+    ;; the whole transaction should fail, and neither should get inserted.
+    (test/with-discarded-table-changes :venues
+      (try
+        (db/transaction
+         (db/insert! Venue :name "Cam's Toucannery", :category "Pet Store")
+         (db/insert! Venue :name "Cam's Toucannery", :category "Pet Store"))
+        (catch Throwable _))
+      (is (zero? (db/count Venue :name "Cam's Toucannery"))))))
 
 (deftest with-call-counting-test
   (testing "Test with-call-counting"
@@ -102,7 +110,7 @@
 
 (deftest query-test
   (testing "Test query"
-    (binding [current/*connectable* ::test/db]
+    (binding [current/*connectable* ::test-setup/db]
       (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
              (db/query {:select   [:*]
                         :from     [:t1_users]
@@ -110,19 +118,21 @@
                         :limit    1}))))))
 
 (deftest lower-case-identifiers-test
-  (testing "Test that identifiers are correctly lower cased in Turkish locale (toucan#59)"
-    (let [original-locale (Locale/getDefault)]
-      (try
-        (Locale/setDefault (Locale/forLanguageTag "tr"))
-        (conn/with-connection [conn ::test/db]
-          (test/create-table! conn ::heroes/heroes)
-          (binding [compile/*honeysql-options* (assoc compile/*honeysql-options* :quoted true)]
-            (let [first-row (first (db/query {:select [:ID] :from [:t1_heroes]}))]
-              ;; If `db/query` (jdbc) uses [[clojure.string/lower-case]], `:ID` will be converted to `:ıd` in Turkish locale
-              (is (= :id
-                     (first (keys first-row)))))))
-        (finally
-          (Locale/setDefault original-locale))))))
+  ;; only test postgres, since H2 has uppercase identifiers
+  (when (= (test/current-db-type) :postgres)
+    (testing "Test that identifiers are correctly lower cased in Turkish locale (toucan#59)"
+      (let [original-locale (Locale/getDefault)]
+        (try
+          (Locale/setDefault (Locale/forLanguageTag "tr"))
+          (test/create-table! ::heroes/heroes)
+          (conn/with-connection [_conn ::test-setup/db]
+            (binding [compile/*honeysql-options* (assoc compile/*honeysql-options* :quoted true)]
+              (let [first-row (first (db/query {:select [:ID] :from [:t1_heroes]}))]
+                ;; If `db/query` (jdbc) uses [[clojure.string/lower-case]], `:ID` will be converted to `:ıd` in Turkish locale
+                (is (= :id
+                       (first (keys first-row)))))))
+          (finally
+            (Locale/setDefault original-locale)))))))
 
 (defn- transduce-to-set
   "Process `reducible-query-result` using a transducer that puts the rows from the resultset into a set"
@@ -130,7 +140,7 @@
   (transduce (map identity) conj #{} reducible-query-result))
 
 (deftest query-reducible-test
-  (conn/with-connection [_conn ::test/db]
+  (conn/with-connection [_conn ::test-setup/db]
     (testing "Test query-reducible"
       (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
              (transduce-to-set (db/reducible-query {:select   [:*]
@@ -163,14 +173,14 @@
 
 ;; TODO
 #_(deftest test-37
-    (testing "reducible-query should pass default JDBC options along to clojure.java.jdbc"
-      (is (= [:connection [""] {:a 1, :b 3, :c 4}]
-             (let [fn-args (atom nil)]
-               (with-redefs [db/connection           (constantly :connection)
-                             #_db/default-jdbc-options #_(atom {:a 1, :b 2})
-                             #_jdbc/reducible-query  #_ (fn [& args]
-                                                          (reset! fn-args args))]
-                 (db/reducible-query {} :b 3, :c 4)))))))
+      (testing "reducible-query should pass default JDBC options along to clojure.java.jdbc"
+        (is (= [:connection [""] {:a 1, :b 3, :c 4}]
+               (let [fn-args (atom nil)]
+                 (with-redefs [db/connection             (constantly :connection)
+                               #_db/default-jdbc-options #_ (atom {:a 1, :b 2})
+                               #_jdbc/reducible-query    #_ (fn [& args]
+                                                              (reset! fn-args args))]
+                   (db/reducible-query {} :b 3, :c 4)))))))
 
 (deftest simple-select-one-test
   (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
@@ -180,7 +190,7 @@
 ;;   (try
 ;;     (m/defmethod conn/do-with-connection :toucan/default
 ;;       [connectable f]
-;;       (next-method ::test/db f))
+;;       (next-method ::test-setup/db f))
 ;;     (thunk)
 ;;     (finally
 ;;       (m/remove-primary-method! #'conn/do-with-connection :toucan/default))))
@@ -203,14 +213,14 @@
 (deftest update-where!-test
   (test/with-discarded-table-changes User
     (db/update-where! User {:first-name [:not= "Cam"]}
-      :first-name "Cam")
+                      :first-name "Cam")
     (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
             {:id 2, :first-name "Cam", :last-name "Toucan"}
             {:id 3, :first-name "Cam", :last-name "Bird"}]
            (db/select User {:order-by [:id]}))))
   (test/with-discarded-table-changes User
     (db/update-where! User {:first-name "Cam"}
-      :first-name "Not Cam")
+                      :first-name "Not Cam")
     (is (= [{:id 1, :first-name "Not Cam", :last-name "Saul"}
             {:id 2, :first-name "Rasta", :last-name "Toucan"}
             {:id 3, :first-name "Lucky", :last-name "Bird"}]
@@ -219,14 +229,14 @@
 (deftest update-non-nil-keys!-test
   (test/with-discarded-table-changes User
     (db/update-non-nil-keys! User 2
-      :first-name nil
-      :last-name "Can")
+                             :first-name nil
+                             :last-name "Can")
     (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
            (db/select-one User 2))))
   (test/with-discarded-table-changes User
     (db/update-non-nil-keys! User 2
-      {:first-name nil
-       :last-name  "Can"})
+                             {:first-name nil
+                              :last-name  "Can"})
     (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
            (db/select-one User 2)))))
 
@@ -266,11 +276,6 @@
     (test/with-discarded-table-changes User
       (is (= {:id 4, :first-name "Grass", :last-name "HOPPER"}
              (db/insert! User {:first-name "Grass" :last-name (hsql/call :upper "Hopper")}))))))
-
-#_(deftest get-inserted-id-test
-  (testing "get-inserted-id shouldn't fail if nothing is returned for some reason"
-    (is (= nil
-           (db/get-inserted-id :id nil)))))
 
 (deftest select-one-test
   (is (= {:id 1, :first-name "Cam", :last-name "Saul"}

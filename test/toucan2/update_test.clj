@@ -11,7 +11,9 @@
   (:import
    (java.time LocalDateTime)))
 
-(deftest ^:parallel parse-update-args-test
+(use-fixtures :each test/do-db-types-fixture)
+
+(deftest parse-update-args-test
   (is (= {:changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
          (query/parse-args ::update/update nil [1 {:a 1}])))
   (is (= {:kv-args {:id 1}, :changes {:a 1}, :queryable {}}
@@ -115,7 +117,8 @@
 (deftest update-returning-pks-test
   (test/with-discarded-table-changes :venues
     (is (= [1 2]
-           (update/update-returning-pks! ::test/venues :category "bar" {:category "BARRR"})))
+           ;; the order these come back in is indeterminate but as long as we get back a sequence of [1 2] we're fine
+           (sort (update/update-returning-pks! ::test/venues :category "bar" {:category "BARRR"}))))
     (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
             (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
            (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]})))))

@@ -8,6 +8,7 @@
    [toucan2.test :as test]
    [toucan2.util :as u])
   (:import
+   (java.time LocalDateTime)
    (java.util Locale)))
 
 (deftest default-key-transform-turkish-test
@@ -241,11 +242,14 @@
 (derive :toucan2.instance-test.no-key-transform/venues ::test/venues)
 
 (deftest no-key-xform-test
-  (is (= (instance/instance ::test/venues {:id 1, :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00")})
+  (is (= (instance/instance ::test/venues {:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")})
          (select/select-one ::test/venues {:select [:id :created-at]})))
   (testing "Should be able to disable key transforms by overriding `key-transform-fn*`"
-    (is (= {:id 1, :created_at (java.time.LocalDateTime/parse "2017-01-01T00:00")}
-           (select/select-one :toucan2.instance-test.no-key-transform/venues {:select [:id :created-at]})))))
+    (let [[id created-at] (case (test/current-db-type)
+                            :h2       [:ID :CREATED_AT]
+                            :postgres [:id :created_at])]
+      (is (= {id 1, created-at (LocalDateTime/parse "2017-01-01T00:00")}
+             (select/select-one :toucan2.instance-test.no-key-transform/venues {:select [:id :created-at]}))))))
 
 (deftest pretty-print-test
   (testing "Should pretty-print"
@@ -330,6 +334,7 @@
   (is (not (instance/instance-of? {} ::toucan)))
   (is (not (instance/instance-of? (instance/instance ::shoe {}) ::toucan))))
 
+;;; TODO -- not sure we want this or not. Seems like an unnecessary extra feature.
 #_(deftest type-metadata-test
   (testing "Instances should get ^:type metadata when you create them, so you can dispatch with `type`."
     (let [model (u/dispatch-on "my_table" ::my-type)]

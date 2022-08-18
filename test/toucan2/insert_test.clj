@@ -11,6 +11,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(use-fixtures :each test/do-db-types-fixture)
+
 (set! *warn-on-reflection* true)
 
 (deftest parse-args-test
@@ -70,9 +72,9 @@
 
 (deftest multiple-rows-test
   (doseq [rows-fn [#'list #'vector]
-          :let [rows (rows-fn
-                      {:name "Black Horse London Pub", :category "bar"}
-                      {:name "Nick's Crispy Tacos", :category "bar"})]]
+          :let    [rows (rows-fn
+                         {:name "Black Horse London Pub", :category "bar"}
+                         {:name "Nick's Crispy Tacos", :category "bar"})]]
     (testing (format "rows = %s %s\n" rows-fn (pr-str rows))
       (do-both-types-of-insert
        (fn [returning-keys? insert!]
@@ -129,9 +131,13 @@
   [:id :name])
 
 (deftest insert-returning-pks!-composite-pk-test
-  (test/with-discarded-table-changes :venues
-    (is (= [[4 "Grant & Green"]]
-           (insert/insert-returning-pks! ::venues.composite-pk {:name "Grant & Green", :category "bar"})))))
+  ;; TODO FIXME -- insert-returning-pks! currently only works for Postgres, at least with the venues table that doesn't
+  ;; ACTUALLY have a composite PK. H2 only returns the actual generated PK value, `:id`. Maybe we can create a new test
+  ;; table or something in order to test this against H2
+  (when (= (test/current-db-type) :postgres)
+    (test/with-discarded-table-changes :venues
+      (is (= [[4 "Grant & Green"]]
+             (insert/insert-returning-pks! ::venues.composite-pk {:name "Grant & Green", :category "bar"}))))))
 
 ;;; TODO
 

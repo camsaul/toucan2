@@ -11,7 +11,7 @@
   (:import
    (java.time LocalDateTime)))
 
-(comment test-setup/keep-me)
+(use-fixtures :each test-setup/do-with-default-quoting-style test/do-db-types-fixture)
 
 (set! *warn-on-reflection* true)
 
@@ -75,7 +75,7 @@
 ;; before setting it.
 
 (deftest pre-insert-test
-  #_(is (thrown-with-msg?
+  (is (thrown-with-msg?
        Exception
        #"A category with ID 100 does not exist"
        (test/with-discarded-table-changes Category

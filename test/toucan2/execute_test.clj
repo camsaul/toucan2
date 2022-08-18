@@ -13,6 +13,8 @@
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
+(use-fixtures :each test/do-db-types-fixture)
+
 ;; TODO -- not 100% sure it makes sense for Toucan to be doing the magic key transformations automatically here without
 ;; us even asking!
 
@@ -37,13 +39,17 @@
 
 (deftest reducible-query-test-2
   (is (= [{:count 4}]
-         (let [query (execute/reducible-query ::test/db "SELECT count(*) FROM people;")]
+         (let [query (execute/reducible-query ::test/db "SELECT count(*) AS \"count\" FROM people;")]
            (into [] (map realize/realize) query))))
 
   (testing "with current connection"
     (binding [current/*connectable* ::test/db]
       (is (= [{:count 4}]
-             (into [] (map #(select-keys % [:count])) (execute/reducible-query "SELECT count(*) FROM people;"))))))
+             (into []
+                   ;; TODO -- not idea why Kondo is complaining about this
+                   #_{:clj-kondo/ignore [:unused-binding]}
+                   (map #(select-keys % [:count]))
+                   (execute/reducible-query "SELECT count(*) AS \"count\" FROM people;"))))))
 
   (testing "eductions"
     (is (= [{:id 2, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}]
@@ -51,6 +57,7 @@
             []
             (map realize/realize)
             (eduction
+             #_{:clj-kondo/ignore [:unused-binding]}
              (comp (map #(update % :id inc))
                    (take 1))
              (execute/reducible-query ::test/db "SELECT * FROM people;")))))))
@@ -67,15 +74,15 @@
 
 (m/defmethod compile/do-with-compiled-query [:default ::named-query]
   [_model _query f]
-  (f ["SELECT count(*) FROM people;"]))
+  (f ["SELECT count(*) AS \"count\" FROM people;"]))
 
 (deftest query-test-2
   (is (= [{:count 4}]
-         (execute/query ::test/db "SELECT count(*) FROM people;")))
+         (execute/query ::test/db "SELECT count(*) AS \"count\" FROM people;")))
   (testing "with current connection"
     (binding [current/*connectable* ::test/db]
       (is (= [{:count 4}]
-             (execute/query "SELECT count(*) FROM people;")))))
+             (execute/query "SELECT count(*) AS \"count\" FROM people;")))))
   (testing "HoneySQL query"
     (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}
             {:id 2, :name "Sam", :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")}
@@ -88,12 +95,12 @@
 
 (deftest query-one-test
   (is (= {:count 4}
-         (execute/query-one ::test/db "SELECT count(*) FROM people")))
+         (execute/query-one ::test/db "SELECT count(*) AS \"count\" FROM people")))
 
   (testing "with current connection"
     (binding [current/*connectable* ::test/db]
       (is (= {:count 4}
-             (execute/query-one "SELECT count(*) FROM people;"))))))
+             (execute/query-one "SELECT count(*) AS \"count\" FROM people;"))))))
 
 (deftest reducible-query-as-test
   (is (= [(instance/instance :people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]
@@ -179,19 +186,20 @@
     (is (= 3
            (call-count)))))
 
+(deftest current-connectable-test
+  (binding [current/*connectable* ::test/db]
+    (is (= [{:one 1}]
+           (execute/query "SELECT 1 AS one;")))))
+
+(deftest default-connectable-for-model-test
+  (testing "Should be able to query things using the default connectables for a model"
+    (is (= [{:one 1}]
+           (execute/query nil ::test/venues "SELECT 1 AS one;")))
+    (test/with-discarded-table-changes :venues
+      (is (= [1]
+             (execute/query nil ::test/venues "DELETE FROM venues WHERE id = 1;"))))))
+
 ;;; TODO
-
-#_(m/defmethod conn.current/default-connectable-for-tableable* ::venues
-    [_ _]
-    ::test/db)
-
-#_(deftest default-connectable-for-tableable-test
-  (is (= [{:one 1}]
-         (execute/query nil ::venues "SELECT 1 AS one;")))
-  (test/with-venues-reset
-    (is (= 1
-           (execute/query nil ::venues "DELETE FROM venues WHERE id = 1;")))))
-
 #_(deftest readable-column-test
   (testing "Toucan 2 should call next.jdbc.result-set/read-column-by-index"
     (is (= [{:n 100.0M}]

@@ -205,9 +205,16 @@
           (apply select-reducible model-columns conditions))))))
 
 (defn return-pks-eduction
-  "Given a `reducible-update` returning whatever (presumably returning update counts) wrap it in an eduction and
+  "Given a `reducible-operation` returning whatever (presumably returning affected row counts) wrap it in an eduction and
   in [[->WithReturnKeys]] so it returns a sequence of primary key vectors."
-  [model reducible-update]
-  (eduction
-   (map (select-pks-fn model))
-   (execute/->WithReturnKeys reducible-update)))
+  [model reducible-operation]
+  (let [pks-fn (select-pks-fn model)]
+    (eduction
+     (map (fn [row]
+            (u/with-debug-result ["%s: map pk function %s to row %s" `return-pks-eduction pks-fn row]
+              (let [pks (pks-fn row)]
+                (when (nil? pks)
+                  (throw (ex-info (format "Error returning PKs: pks-fn returned nil for row %s" (pr-str row))
+                                  {:row (realize/realize row), :pks-fn pks-fn})))
+                pks))))
+     (execute/->WithReturnKeys reducible-operation))))

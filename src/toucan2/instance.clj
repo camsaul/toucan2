@@ -20,6 +20,7 @@
 (def ^:dynamic *default-key-transform-fn* default-key-transform)
 
 (m/defmulti key-transform-fn
+  "Function to use to magically transform map keywords when building a new instance of `model`."
   {:arglists '([model])}
   u/dispatch-on-first-arg)
 

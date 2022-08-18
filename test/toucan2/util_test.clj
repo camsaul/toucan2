@@ -92,5 +92,5 @@
               reducible (->Reducible realized?)
               x         (f reducible)]
           (testing (.getCanonicalName (class x))
-            (is (string? (u/pprint-to-str x)))
+            (is (string? (#'u/pprint-to-str x)))
             (is (false? @realized?))))))))

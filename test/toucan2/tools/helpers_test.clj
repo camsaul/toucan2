@@ -11,6 +11,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(use-fixtures :each test/do-db-types-fixture)
+
 (derive ::people ::test/people)
 
 (helpers/define-before-select ::people
@@ -46,16 +48,7 @@
            (query/build ::select/select ::venues.default-fields {:query {}, :columns [:id :name]})))
     (is (= (instance/instance ::venues.default-fields
                               {:id 1, :name "Tempest"})
-           (select/select-one [::venues.default-fields :id :name])))))
-
-
-
-;;; TODO -- should `after-update` automatically do things in a transaction? So if `after-update` fails, the original
-;;; updates were canceled?
-
-
-
-
+           (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]})))))
 
 (derive ::venues.before-delete ::test/venues)
 
@@ -117,7 +110,8 @@
                                    {:id         3
                                     :name       "BevMo"
                                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
-               (select/select [::venues.before-delete-exception :id :name :updated-at] {:order-by [[:id :asc]]})))))))
+               (select/select [::venues.before-delete-exception :id :name :updated-at]
+                              {:order-by [[:id :asc]]})))))))
 
 (derive ::transformed-venues ::test/venues)
 

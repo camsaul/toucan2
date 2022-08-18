@@ -5,6 +5,7 @@
 .cpcache
 .nrepl-port
 /*.iml
+/.clj-kondo/com.github.camsaul/
 /.eastwood
 /.env
 /.envrc

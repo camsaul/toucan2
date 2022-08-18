@@ -63,17 +63,15 @@
     (for [row results]
       (if (get row dest-key)
         (do
-          (u/println-debug (format "Don't need to hydrate %s: already has %s" row dest-key))
+          (u/println-debug ["Don't need to hydrate %s: already has %s" row dest-key])
           row)
         (let [fk-vals (get-fk-values row)]
           (if (every? some? fk-vals)
             (do
-              (u/println-debug (format "Attempting to hydrate with values of %s %s" fk-keys fk-vals))
-              (binding [u/*debug-indent-level* (inc u/*debug-indent-level*)]
-                (u/println-debug row))
+              (u/println-debug ["Attempting to hydrate %s with values of %s %s" row fk-keys fk-vals])
               (assoc row ::fk fk-vals))
             (do
-              (u/println-debug (format "Skipping %s: values of %s are %s" row fk-keys fk-vals))
+              (u/println-debug ["Skipping %s: values of %s are %s" row fk-keys fk-vals])
               row)))))))
 
 (defn- automagic-batched-hydration-fetch-pk->instance [hydrating-model rows]
@@ -87,12 +85,12 @@
                             (if (> (count clauses) 1)
                               (cons :and clauses)
                               (first clauses)))}]
-        (u/with-debug-result (format "Fetching %s with PKs %s %s" hydrating-model pk-keys query)
+        (u/with-debug-result ["Fetching %s with PKs %s %s" hydrating-model pk-keys query]
           (select/select-pk->fn realize/realize hydrating-model query)))
-      (u/println-debug (format "Not hydrating %s because no rows have non-nil FK values" hydrating-model)))))
+      (u/println-debug ["Not hydrating %s because no rows have non-nil FK values" hydrating-model]))))
 
 (defn- do-automagic-batched-hydration [dest-key rows pk->fetched-instance]
-  (u/with-debug-result #_-no-result (format "Attempting to hydrate %d/%d rows" (count (filter ::fk rows)) (count rows))
+  (u/with-debug-result #_-no-result ["Attempting to hydrate %d/%d rows" (count (filter ::fk rows)) (count rows)]
     (for [row rows]
       (if-not (::fk row)
         row
@@ -102,10 +100,8 @@
                                  (first fk-vals)
                                  fk-vals)
               fetched-instance (get pk->fetched-instance fk-vals)]
-          (u/with-debug-result ["Hydrate %s" dest-key]
-            (u/println-debug [row])
-            (u/println-debug "with")
-            (u/println-debug (or (some-> fetched-instance u/pprint-to-str) "nil (no matching fetched row)"))
+          (u/with-debug-result ["Hydrate %s %s with %s" dest-key [row] (or fetched-instance
+                                                                           "nil (no matching fetched row)")]
             (cond-> (dissoc row ::fk)
               fetched-instance (assoc dest-key fetched-instance))))))))
 
@@ -113,12 +109,12 @@
   [model _strategy dest-key rows]
   (try
     (let [hydrating-model      (table-for-automagic-hydration model dest-key)
-          _                    (u/println-debug (format "Hydrating %s key %s with rows from %s" (or model "map") dest-key hydrating-model))
+          _                    (u/println-debug ["Hydrating %s key %s with rows from %s" (or model "map") dest-key hydrating-model])
           fk-keys              (fk-keys-for-automagic-hydration model dest-key hydrating-model)
-          _                    (u/println-debug (format "Hydrating with FKs %s" fk-keys))
+          _                    (u/println-debug ["Hydrating with FKs %s" fk-keys])
           rows                 (automagic-batched-hydration-add-fks dest-key rows fk-keys)
           pk->fetched-instance (automagic-batched-hydration-fetch-pk->instance hydrating-model rows)]
-      (u/println-debug (format "Fetched %d rows of %s" (count pk->fetched-instance) hydrating-model))
+      (u/println-debug ["Fetched %d rows of %s" (count pk->fetched-instance) hydrating-model])
       (do-automagic-batched-hydration dest-key rows pk->fetched-instance))
     (catch Throwable e
       (throw (ex-info (format "Error doing automagic batched hydration: %s" (ex-message e))
@@ -187,10 +183,10 @@
 (defn- hydrate-key
   [model rows k]
   (if-let [strategy (hydration-strategy model k)]
-    (u/with-debug-result (format "Hydrating %s %s with strategy %s" (or model "map") k strategy)
+    (u/with-debug-result ["Hydrating %s %s with strategy %s" (or model "map") k strategy]
       (hydrate-with-strategy model strategy k rows))
     (do
-      (u/println-debug (format "Don't know how to hydrate %s" k))
+      (u/println-debug ["Don't know how to hydrate %s" k])
       rows)))
 
 (defn- hydrate-key-seq

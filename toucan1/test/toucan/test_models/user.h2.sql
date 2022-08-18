@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS T1_USERS;
+
+CREATE TABLE t1_users (
+  ID SERIAL PRIMARY KEY,
+  "FIRST-NAME" VARCHAR(256) NOT NULL,
+  "LAST-NAME" VARCHAR(256) NOT NULL
+);
+
+INSERT INTO t1_users ("FIRST-NAME", "LAST-NAME")
+VALUES
+('Cam', 'Saul'),
+('Rasta', 'Toucan'),
+('Lucky', 'Bird');

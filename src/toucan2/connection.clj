@@ -15,6 +15,7 @@
 
 (m/defmethod do-with-connection :around :default
   [connectable f]
+  (assert (fn? f))
   (next-method connectable (^:once fn* [conn]
                             (binding [current/*connectable* conn]
                               (f conn)))))
@@ -43,8 +44,11 @@
   (do-with-connection ::current f))
 
 ;; the difference between this and using [[current/*connectable*]] directly is that this waits until it gets resolved by
-;; [[do-with-connection]] to get the value for [[current/*connectable*]]. For a reducible query this means you'll get the
-;; value at the time you reduce the query rather than at the time you build the reducible query.
+;; [[do-with-connection]] to get the value for [[current/*connectable*]]. For a reducible query this means you'll get
+;; the value at the time you reduce the query rather than at the time you build the reducible query.
+;;
+;; TODO -- I think we should just make `nil` mean "use current connection" and then we can do away with this magic
+;; keyword completely.
 (m/defmethod do-with-connection ::current
   [_connectable f]
   (do-with-connection current/*connectable* f))
@@ -112,5 +116,4 @@
   {:style/indent 1}
   [[conn-binding connectable] & body]
   `(with-connection [conn# ~connectable]
-     (do-with-transaction conn#
-                          (^:once fn* [~conn-binding] ~@body))))
+     (do-with-transaction conn# (^:once fn* [~conn-binding] ~@body))))

@@ -15,6 +15,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(use-fixtures :each test/do-db-types-fixture)
+
 (derive ::venues.transformed ::test/venues)
 (derive ::venues.transformed ::transformed/transformed)
 
@@ -75,7 +77,7 @@
       (is (= [{:id 1, :name "Tempest"}
               {:id 2, :name "Ho's Tavern"}
               {:id 3, :name "BevMo"}]
-             (select/select ::venues.transformed {:select [:id :name]}))))
+             (select/select ::venues.transformed {:select [:id :name], :order-by [[:id :asc]]}))))
     (testing "should work with select-one and other special functions"
       (is (= :bar
              (select/select-one-fn :category ::venues.transformed :id 1)))
@@ -96,33 +98,33 @@
   (testing "Should work if transform keys are defined in snake_case or whatever (for legacy compatibility purposes)"))
 
 (deftest apply-row-transform-test
-    (doseq [[message m] {"plain map"        {:id 1}
-                         "Instance"         (instance/instance :x {:id 1})
-                         ;; TODO
-                         #_"custom IInstance" #_(test.custom-types/->CustomIInstance {:id 1} {:id 1})}
-            [message m] (list*
-                         [message m]
-                         ;; TODO
-                         nil
-                         #_(when (instance/instance? m)
-                             (for [[row-message row] {"wrapping Row"         (row/row {:id (constantly 1)})
-                                                      "wrapping custom IRow" (test.custom-types/->CustomIRow
-                                                                              {:id (constantly 1)})}]
-                               [(str message " " row-message)
-                                (-> m
-                                    (instance/with-original row)
-                                    (instance/with-current row))])))]
-      (testing message
-        (let [m2 (transformed/apply-row-transform m :id str)]
-          (testing "current value"
+  (doseq [[message m] {"plain map" {:id 1}
+                       "Instance"  (instance/instance :x {:id 1})
+                       ;; TODO
+                       #_          "custom IInstance" #_ (test.custom-types/->CustomIInstance {:id 1} {:id 1})}
+          [message m] (list*
+                       [message m]
+                       ;; TODO
+                       nil
+                       #_(when (instance/instance? m)
+                           (for [[row-message row] {"wrapping Row"         (row/row {:id (constantly 1)})
+                                                    "wrapping custom IRow" (test.custom-types/->CustomIRow
+                                                                            {:id (constantly 1)})}]
+                             [(str message " " row-message)
+                              (-> m
+                                  (instance/with-original row)
+                                  (instance/with-current row))])))]
+    (testing message
+      (let [m2 (transformed/apply-row-transform m :id str)]
+        (testing "current value"
+          (is (= {:id "1"}
+                 m2)))
+        (when (instance/instance? m)
+          (testing "original value"
             (is (= {:id "1"}
-                   m2)))
-          (when (instance/instance? m)
-            (testing "original value"
-              (is (= {:id "1"}
-                     (instance/original m2))))
-            (is (identical? (instance/current m2)
-                            (instance/original m2))))))))
+                   (instance/original m2))))
+          (is (identical? (instance/current m2)
+                          (instance/original m2))))))))
 
 #_(derive ::venues.id-is-string-track-reads ::venues.id-is-string)
 
@@ -253,27 +255,27 @@
                  (f ::venues.id-is-string [{:name "Hi-Dive", category-key "bar"}]))))))))
 
 (deftest delete!-test
-    (testing "Delete row by PK"
+  (testing "Delete row by PK"
+    (test/with-discarded-table-changes :venues
+      (is (= 1
+             (delete/delete! ::venues.id-is-string :toucan/pk "1")))
+      (is (= []
+             (select/select ::test/venues 1)))
+      (is (= #{2}
+             (select/select-fn-set :id ::test/venues 2)))))
+  (test-both-normal-and-magic-keys [category-key]
+    (testing "Delete row by key-value conditions"
       (test/with-discarded-table-changes :venues
-        (is (= 1
-               (delete/delete! ::venues.id-is-string :toucan/pk "1")))
+        (is (= 2
+               (delete/delete! ::venues.transformed category-key :bar)))
         (is (= []
-               (select/select ::test/venues 1)))
-        (is (= #{2}
-               (select/select-fn-set :id ::test/venues 2)))))
-    (test-both-normal-and-magic-keys [category-key]
-      (testing "Delete row by key-value conditions"
+               (select/select ::venues.transformed category-key :bar))))
+      (testing "Toucan-style fn-args vector"
         (test/with-discarded-table-changes :venues
           (is (= 2
-                 (delete/delete! ::venues.transformed category-key :bar)))
+                 (delete/delete! ::venues.transformed category-key [:in [:bar]])))
           (is (= []
-                 (select/select ::venues.transformed category-key :bar))))
-        (testing "Toucan-style fn-args vector"
-          (test/with-discarded-table-changes :venues
-            (is (= 2
-                   (delete/delete! ::venues.transformed category-key [:in [:bar]])))
-            (is (= []
-                   (select/select ::venues.transformed category-key :bar))))))))
+                 (select/select ::venues.transformed category-key :bar))))))))
 
 (deftest no-npes-test
   (testing "Don't apply transforms to values that are nil (avoid NPEs)"
@@ -283,7 +285,9 @@
           ;; this should still throw an error, but it shouldn't be an NPE from the transform.
           (is (thrown-with-msg?
                clojure.lang.ExceptionInfo
-               #"ERROR: null value in column .* violates not-null constraint"
+               (case (test/current-db-type)
+                 :postgres #"ERROR: null value in column .* violates not-null constraint"
+                 :h2       #"NULL not allowed for column \"CATEGORY\"")
                (insert/insert! ::venues.transformed {:name "No Category", :category nil})))))
       (testing "conditions"
         (is (= nil

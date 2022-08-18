@@ -51,7 +51,10 @@
 
 (defn- row-instance [model #_key-xform col-name->thunk]
   (let [row (row/row col-name->thunk)]
-    (instance/instance model row)))
+    (u/with-debug-result ["Creating new instance of %s, which has key transform fn %s"
+                          model
+                          (instance/key-transform-fn model)]
+      (instance/instance model row))))
 
 (defn row-thunk
   "Return a thunk that when called fetched the current row from the cursor and returns it as a [[row-instance]]."

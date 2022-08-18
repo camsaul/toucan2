@@ -7,6 +7,10 @@
 
 (models/defmodel User :t1_users)
 
-(m/defmethod test/create-table-sql-file User
-  [_table-name]
-  "toucan1/test/toucan/test_models/user.sql")
+(m/defmethod test/create-table-sql-file [:postgres User]
+  [_db-type _table-name]
+  "toucan1/test/toucan/test_models/user.postgres.sql")
+
+(m/defmethod test/create-table-sql-file [:h2 User]
+  [_db-type _table-name]
+  "toucan1/test/toucan/test_models/user.h2.sql")
