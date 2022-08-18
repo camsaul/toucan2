@@ -1,6 +1,7 @@
 (ns toucan.test-models.phone-number
   "A model with a custom primary key."
   (:require
+   [clojure.string :as str]
    [methodical.core :as m]
    [toucan.models :as models]
    [toucan2.instance :as instance]
@@ -13,9 +14,12 @@
   [_model]
   :number)
 
+(defn- key-xform [k]
+  (keyword (str/lower-case (name k))))
+
 (m/defmethod instance/key-transform-fn PhoneNumber
   [_model]
-  identity)
+  key-xform)
 
 (m/defmethod test/create-table-sql-file [:default PhoneNumber]
   [_db-type _table-name]

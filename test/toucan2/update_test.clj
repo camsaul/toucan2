@@ -11,7 +11,7 @@
   (:import
    (java.time LocalDateTime)))
 
-(deftest ^:parallel parse-update-args-test
+(deftest parse-update-args-test
   (is (= {:changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
          (query/parse-args ::update/update nil [1 {:a 1}])))
   (is (= {:kv-args {:id 1}, :changes {:a 1}, :queryable {}}
@@ -36,20 +36,22 @@
                                                      :kv-args {:name "Tempest"}}))))
 
 (deftest pk-and-map-conditions-test
-  (test/with-discarded-table-changes :venues
-    (is (= 1
-           (update/update! ::test/venues 1 {:name "Hi-Dive"})))
-    (is (= (instance/instance ::test/venues {:id         1
-                                             :name       "Hi-Dive"
-                                             :category   "bar"
-                                             :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                             :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-           (select/select-one ::test/venues 1)))))
+  (test/do-db-types [_db-type]
+    (test/with-discarded-table-changes :venues
+      (is (= 1
+             (update/update! ::test/venues 1 {:name "Hi-Dive"})))
+      (is (= (instance/instance ::test/venues {:id         1
+                                               :name       "Hi-Dive"
+                                               :category   "bar"
+                                               :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                               :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+             (select/select-one ::test/venues 1))))))
 
 (deftest key-value-conditions-test
-  (test/with-discarded-table-changes :venues
-    (is (= 1
-           (update/update! ::test/venues :name "Tempest" {:name "Hi-Dive"})))))
+  (test/do-db-types [_db-type]
+    (test/with-discarded-table-changes :venues
+      (is (= 1
+             (update/update! ::test/venues :name "Tempest" {:name "Hi-Dive"}))))))
 
 (derive ::venues.composite-pk ::test/venues)
 
@@ -58,9 +60,10 @@
   [:id :name])
 
 (deftest composite-pk-test
-  (test/with-discarded-table-changes :venues
-    (is (= 1
-           (update/update! ::venues.composite-pk [1 "Tempest"] {:name "Hi-Dive"})))))
+  (test/do-db-types [_db-type]
+    (test/with-discarded-table-changes :venues
+      (is (= 1
+             (update/update! ::venues.composite-pk [1 "Tempest"] {:name "Hi-Dive"}))))))
 
 ;; (m/defmethod honeysql.compile/to-sql* [:default ::venues.custom-honeysql :id String]
 ;;   [_ _ _ v _]
@@ -93,29 +96,33 @@
 ;;              (select/select-one ::venues.custom-honeysql "100" {:select [:id :name]}))))))
 
 (deftest update!-no-changes-no-op-test
-  (testing "If there are no changes, update! should no-op and return zero"
-    (test/with-discarded-table-changes :venues
-      (is (= 0
-             (update/update! ::test/venues 1 {})
-             (update/update! ::test/venues {}))))))
+  (test/do-db-types [_db-type]
+    (testing "If there are no changes, update! should no-op and return zero"
+      (test/with-discarded-table-changes :venues
+        (is (= 0
+               (update/update! ::test/venues 1 {})
+               (update/update! ::test/venues {})))))))
 
 (m/defmethod query/do-with-query [:default ::named-conditions]
   [model _queryable f]
   (query/do-with-query model {:id 1} f))
 
 (deftest named-conditions-test
-  (test/with-discarded-table-changes :venues
-    (is (= "Tempest"
-           (select/select-one-fn :name ::test/venues 1)))
-    (is (= 1
-           (update/update! ::test/venues ::named-conditions {:name "Grant & Green"})))
-    (is (= "Grant & Green"
-           (select/select-one-fn :name ::test/venues 1)))))
+  (test/do-db-types [_db-type]
+    (test/with-discarded-table-changes :venues
+      (is (= "Tempest"
+             (select/select-one-fn :name ::test/venues 1)))
+      (is (= 1
+             (update/update! ::test/venues ::named-conditions {:name "Grant & Green"})))
+      (is (= "Grant & Green"
+             (select/select-one-fn :name ::test/venues 1))))))
 
 (deftest update-returning-pks-test
-  (test/with-discarded-table-changes :venues
-    (is (= [1 2]
-           (update/update-returning-pks! ::test/venues :category "bar" {:category "BARRR"})))
-    (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
-            (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
-           (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]})))))
+  (test/do-db-types [_db-type]
+    (test/with-discarded-table-changes :venues
+      (is (= [1 2]
+             ;; the order these come back in is indeterminate but as long as we get back a sequence of [1 2] we're fine
+             (sort (update/update-returning-pks! ::test/venues :category "bar" {:category "BARRR"}))))
+      (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
+              (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
+             (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]}))))))

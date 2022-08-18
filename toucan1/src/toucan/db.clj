@@ -4,6 +4,7 @@
   (:require
    [methodical.core :as m]
    [potemkin :as p]
+   [pretty.core :as pretty]
    [toucan.models :as models]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
@@ -14,6 +15,7 @@
    [toucan2.instance :as instance]
    [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.model :as model]
+   [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.update :as update]
    [toucan2.util :as u]))
@@ -24,22 +26,28 @@
  [models resolve-model]
  [select select select-one count select-reducible exists?])
 
-(def ^:dynamic ^{:deprecated "2.0.0"} *quoting-style*
-  "DEPRECATED: binding [[toucan2.compile/*honeysql-options*]] instead."
+(def ^:dynamic *quoting-style*
+  "Temporarily override the default [[quoting-style]]. DEPRECATED: bind [[toucan2.compile/*honeysql-options*]]
+  instead."
   nil)
 
 (defn ^{:deprecated "2.0.0"} set-default-quoting-style!
-  "DEPRECATED: set [[toucan2.compile/global-honeysql-options]] directly."
+  "Set the default [[quoting-style]]. DEPRECATED: set [[toucan2.compile/global-honeysql-options]] directly."
   [new-quoting-style]
   (swap! compile/global-honeysql-options assoc :dialect new-quoting-style, :quoted (boolean new-quoting-style)))
 
 (defn ^{:deprecated "2.0.0"} quoting-style
+  "In Toucan 1, this was the `:quoting` option to pass to Honey SQL 1. This now corresponds to the `:dialect` option
+  passed to Honey SQL 2."
   []
   (or *quoting-style*
       (get @compile/global-honeysql-options :dialect)))
 
 (def ^:dynamic ^{:deprecated "2.0.0"} *automatically-convert-dashes-and-underscores*
-  "DEPRECATED: binding [[toucan2.compile/*honeysql-options*]] instead."
+  "Whether to automatically convert dashes in keywords to `snake_case` when compiling HoneySQL queries, even when
+  quoting. This is `false` by default.
+
+  DEPRECATED: binding [[toucan2.compile/*honeysql-options*]] instead."
   nil)
 
 (defn ^{:deprecated "2.0.0"} set-default-automatically-convert-dashes-and-underscores!
@@ -53,15 +61,16 @@
     (get @compile/global-honeysql-options :quoted-snake)
     *automatically-convert-dashes-and-underscores*))
 
-(defn honeysql-options []
+(defn- honeysql-options []
   (merge
    ;; defaults
    {:quoted true, :dialect :ansi, #_:quoted-snake #_true}
    compile/*honeysql-options*
-   (when *quoting-style*
-     {:dialect *quoting-style*})
-   (when (some? *automatically-convert-dashes-and-underscores*)
-     {:quoted-snake *automatically-convert-dashes-and-underscores*})))
+   (when-let [style (quoting-style)]
+     {:dialect style})
+   (when-let [convert? (automatically-convert-dashes-and-underscores?)]
+     (when (some? convert?)
+       {:quoted-snake convert?}))))
 
 (m/defmethod compile/do-with-compiled-query [:toucan1/model clojure.lang.IPersistentMap]
   [model honeysql f]
@@ -94,26 +103,18 @@
 ;;;                                         TRANSACTION & CONNECTION UTIL FNS
 ;;; ==================================================================================================================
 
-;; (def ^:dynamic *transaction-connection* nil)
+#_(def ^:dynamic *transaction-connection* nil)
 
 (defn ^{:deprecated "2.0.0"} connection
   "DEPRECATED: use `:toucan2.connection/current` instead."
   []
   ::conn/current)
 
-;; (defn do-in-transaction
-;;   "Execute F inside a DB transaction. Prefer macro form `transaction` to using this directly."
-;;   [f]
-;;   (jdbc/with-db-transaction [conn (connection)]
-;;     (binding [*transaction-connection* conn]
-;;       (f))))
-
-;; (defmacro transaction
-;;   "Execute all queries within the body in a single transaction."
-;;   {:arglists '([body] [options & body]), :style/indent 0}
-;;   [& body]
-;;   `(do-in-transaction (fn [] ~@body)))
-
+(defmacro ^{:deprecated "2.0.0"} transaction
+  "DEPRECATED: use [[toucan2.connection/with-connection]] instead."
+  [& body]
+  `(conn/with-connection [~'&transaction-connection current/*connectable*]
+     ~@body))
 
 (defmacro with-call-counting
   "DEPRECATED: Use [[toucan2.execute/with-call-count]] instead."
@@ -135,19 +136,27 @@
   (compile/with-compiled-query [query [nil honeysql-form]]
     query))
 
-(defn ^{:deprecated "2.0.0"} query
-  "DEPRECATED: use [[toucan2.execute/query]] instead."
-  [honeysql-form & {:as options}]
-  (binding [t2.jdbc.query/*options* (merge t2.jdbc.query/*options* options)]
-    (execute/query ::conn/current honeysql-form)))
+(defrecord Toucan1ReducibleQuery [honeysql-form jdbc-options]
+  clojure.lang.IReduceInit
+  (reduce [this rf init]
+    (u/with-debug-result ["reduce Toucan 1 reducible query %s" this]
+      (binding [t2.jdbc.query/*options*    (merge t2.jdbc.query/*options* jdbc-options)
+                compile/*honeysql-options* (honeysql-options)]
+        (reduce rf init (execute/reducible-query ::conn/current honeysql-form)))))
+
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `->Toucan1ReducibleQuery honeysql-form jdbc-options)))
 
 (defn ^{:deprecated "2.0.0"} reducible-query
   "DEPRECATED: Use [[toucan2.execute/reducible-query]] instead."
-  [honeysql-form & {:as options}]
-  (reify clojure.lang.IReduceInit
-    (reduce [_this rf init]
-      (binding [t2.jdbc.query/*options* (merge t2.jdbc.query/*options* options)]
-        (reduce rf init (execute/reducible-query ::conn/current honeysql-form))))))
+  [honeysql-form & {:as jdbc-options}]
+  (->Toucan1ReducibleQuery honeysql-form jdbc-options))
+
+(defn ^{:deprecated "2.0.0"} query
+  "DEPRECATED: use [[toucan2.execute/query]] instead."
+  [honeysql-form & jdbc-options]
+  (realize/realize (apply reducible-query honeysql-form jdbc-options)))
 
 (defn ^{:deprecated "2.0.0"} qualify
   ^clojure.lang.Keyword [modelable field-name]
@@ -218,24 +227,41 @@
   ([modelable id k v & more]
    (update-non-nil-keys! modelable id (apply array-map k v more))))
 
+;;; wraps a model to prevent `before-update` and stuff like that from happening.
+;;;
+;;; TODO -- maybe this belongs in the main part of Toucan 2.
+(defrecord SimpleModel [original-model]
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `->SimpleModel original-model)))
 
-(defn- do-with-simple [model thunk]
-  (binding [current/*connectable*                (if (= current/*connectable* :toucan/default)
-                                                  (model/default-connectable model)
-                                                  current/*connectable*)
-            compile/*honeysql-options*          (honeysql-options)
-            instance/*default-key-transform-fn* (instance/key-transform-fn model)]
-    (thunk)))
+(m/defmethod model/table-name SimpleModel
+  [{:keys [original-model]}]
+  (model/table-name original-model))
+
+(m/defmethod model/default-connectable SimpleModel
+  [{:keys [original-model]}]
+  (model/default-connectable original-model))
+
+(m/defmethod model/primary-keys SimpleModel
+  [{:keys [original-model]}]
+  (model/primary-keys original-model))
+
+(m/defmethod instance/key-transform-fn SimpleModel
+  [{:keys [original-model]}]
+  (instance/key-transform-fn original-model))
+
+(m/defmethod model/do-with-model SimpleModel
+  [model f]
+  (binding [compile/*honeysql-options* (honeysql-options)])
+  (f model))
 
 (defn ^{:deprecated "2.0.0"} simple-insert-many!
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead. Returns the ID of the "
   [modelable row-maps]
   (when (seq row-maps)
     (model/with-model [model modelable]
-      (do-with-simple
-       model
-       (^:once fn* []
-        (insert/insert-returning-pks! (model/table-name model) row-maps))))))
+      (insert/insert-returning-pks! (->SimpleModel model) row-maps))))
 
 (defn ^{:deprecated "2.0.0"} insert-many!
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead."
@@ -306,10 +332,7 @@
 
   ([modelable conditions-map]
    (model/with-model [model modelable]
-     (do-with-simple
-      model
-      (^:once fn* []
-       (pos? (apply delete/delete! (model/table-name model) (into [] (mapcat vec) conditions-map)))))))
+     (pos? (apply delete/delete! (->SimpleModel model) (into [] (mapcat vec) conditions-map)))))
 
   ([modelable k v & {:as more}]
    (simple-delete! modelable (merge {k v} more))))

@@ -11,7 +11,7 @@
   (:import
    (java.time LocalDateTime)))
 
-(comment test-setup/keep-me)
+(use-fixtures :each test-setup/do-with-default-quoting-style)
 
 (set! *warn-on-reflection* true)
 

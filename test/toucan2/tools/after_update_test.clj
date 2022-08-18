@@ -45,3 +45,6 @@
                                                               :created-at (LocalDateTime/parse "2017-01-01T00:00")
                                                               :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
                    @*venues-awaiting-moderation*))))))))
+
+;;; TODO -- should `after-update` automatically do things in a transaction? So if `after-update` fails, the original
+;;; updates were canceled?

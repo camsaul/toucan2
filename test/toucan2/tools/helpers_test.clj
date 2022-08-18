@@ -21,10 +21,11 @@
   (assoc person ::after-select? true))
 
 (deftest select-helpers-test
-  (is (= (instance/instance ::people {:id             1
-                                      :name           "Cam"
-                                      ::after-select? true})
-         (select/select-one ::people 1))))
+  (test/do-db-types [_db-type]
+    (is (= (instance/instance ::people {:id             1
+                                        :name           "Cam"
+                                        ::after-select? true})
+           (select/select-one ::people 1)))))
 
 (derive ::venues.default-fields ::test/venues)
 
@@ -32,30 +33,22 @@
   [:id :name :category])
 
 (deftest define-default-fields-test
-  (is (= {:select [:id :name :category], :from [[:venues]]}
-         (query/build ::select/select ::venues.default-fields {:query {}})))
-  (is (= [(instance/instance ::venues.default-fields
-                             {:id 1, :name "Tempest", :category "bar"})
-          (instance/instance ::venues.default-fields
-                             {:id 2, :name "Ho's Tavern", :category "bar"})
-          (instance/instance ::venues.default-fields
-                             {:id 3, :name "BevMo", :category "store"})]
-         (select/select ::venues.default-fields)))
-  (testing "should still be able to override default fields"
-    (is (= {:select [:id :name], :from [[:venues]]}
-           (query/build ::select/select ::venues.default-fields {:query {}, :columns [:id :name]})))
-    (is (= (instance/instance ::venues.default-fields
-                              {:id 1, :name "Tempest"})
-           (select/select-one [::venues.default-fields :id :name])))))
-
-
-
-;;; TODO -- should `after-update` automatically do things in a transaction? So if `after-update` fails, the original
-;;; updates were canceled?
-
-
-
-
+  (test/do-db-types [_db-type]
+    (is (= {:select [:id :name :category], :from [[:venues]]}
+           (query/build ::select/select ::venues.default-fields {:query {}})))
+    (is (= [(instance/instance ::venues.default-fields
+                               {:id 1, :name "Tempest", :category "bar"})
+            (instance/instance ::venues.default-fields
+                               {:id 2, :name "Ho's Tavern", :category "bar"})
+            (instance/instance ::venues.default-fields
+                               {:id 3, :name "BevMo", :category "store"})]
+           (select/select ::venues.default-fields)))
+    (testing "should still be able to override default fields"
+      (is (= {:select [:id :name], :from [[:venues]]}
+             (query/build ::select/select ::venues.default-fields {:query {}, :columns [:id :name]})))
+      (is (= (instance/instance ::venues.default-fields
+                                {:id 1, :name "Tempest"})
+             (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]}))))))
 
 (derive ::venues.before-delete ::test/venues)
 
@@ -68,26 +61,27 @@
   nil)
 
 (deftest before-delete-test
-  (test/with-discarded-table-changes :venues
-    (binding [*deleted-venues* (atom [])]
-      (is (= 2
-             (delete/delete! ::venues.before-delete :category "bar")))
-      (is (= [(instance/instance ::venues.before-delete
-                                 {:id 3, :name "BevMo", :category "store"})]
-             (select/select [::venues.before-delete :id :name :category])))
-      (is (= [(instance/instance ::venues.before-delete
-                                 {:id         1
-                                  :name       "Tempest"
-                                  :category   "bar"
-                                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-              (instance/instance ::venues.before-delete
-                                 {:id         2
-                                  :name       "Ho's Tavern"
-                                  :category   "bar"
-                                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
-             @*deleted-venues*)))))
+  (test/do-db-types [_db-type]
+    (test/with-discarded-table-changes :venues
+      (binding [*deleted-venues* (atom [])]
+        (is (= 2
+               (delete/delete! ::venues.before-delete :category "bar")))
+        (is (= [(instance/instance ::venues.before-delete
+                                   {:id 3, :name "BevMo", :category "store"})]
+               (select/select [::venues.before-delete :id :name :category])))
+        (is (= [(instance/instance ::venues.before-delete
+                                   {:id         1
+                                    :name       "Tempest"
+                                    :category   "bar"
+                                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                (instance/instance ::venues.before-delete
+                                   {:id         2
+                                    :name       "Ho's Tavern"
+                                    :category   "bar"
+                                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+               @*deleted-venues*))))))
 
 (derive ::venues.before-delete-exception ::test/venues)
 
@@ -98,26 +92,28 @@
     (throw (ex-info "Don't delete a store!" {:venue venue}))))
 
 (deftest before-delete-exception-test
-  (testing "exception in before-delete"
-    (test/with-discarded-table-changes :venues
-      (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Don't delete a store"
-           (delete/delete! ::venues.before-delete-exception)))
-      (testing "Should be done inside a transaction"
-        (is (= [(instance/instance ::venues.before-delete-exception
-                                   {:id         1
-                                    :name       "Tempest"
-                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-                (instance/instance ::venues.before-delete-exception
-                                   {:id         2
-                                    :name       "Ho's Tavern"
-                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-                (instance/instance ::venues.before-delete-exception
-                                   {:id         3
-                                    :name       "BevMo"
-                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
-               (select/select [::venues.before-delete-exception :id :name :updated-at] {:order-by [[:id :asc]]})))))))
+  (test/do-db-types [_db-type]
+    (testing "exception in before-delete"
+      (test/with-discarded-table-changes :venues
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Don't delete a store"
+             (delete/delete! ::venues.before-delete-exception)))
+        (testing "Should be done inside a transaction"
+          (is (= [(instance/instance ::venues.before-delete-exception
+                                     {:id         1
+                                      :name       "Tempest"
+                                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                  (instance/instance ::venues.before-delete-exception
+                                     {:id         2
+                                      :name       "Ho's Tavern"
+                                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                  (instance/instance ::venues.before-delete-exception
+                                     {:id         3
+                                      :name       "BevMo"
+                                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                 (select/select [::venues.before-delete-exception :id :name :updated-at]
+                                {:order-by [[:id :asc]]}))))))))
 
 (derive ::transformed-venues ::test/venues)
 
@@ -126,11 +122,12 @@
         :out str}})
 
 (deftest deftransforms-test
-  (is (= (instance/instance
-          ::transformed-venues
-          {:id         "1"
-           :name       "Tempest"
-           :category   "bar"
-           :created-at (LocalDateTime/parse "2017-01-01T00:00")
-           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-         (select/select-one ::transformed-venues :toucan/pk "1"))))
+  (test/do-db-types [_db-type]
+    (is (= (instance/instance
+            ::transformed-venues
+            {:id         "1"
+             :name       "Tempest"
+             :category   "bar"
+             :created-at (LocalDateTime/parse "2017-01-01T00:00")
+             :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+           (select/select-one ::transformed-venues :toucan/pk "1")))))

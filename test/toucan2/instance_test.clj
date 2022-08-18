@@ -8,6 +8,7 @@
    [toucan2.test :as test]
    [toucan2.util :as u])
   (:import
+   (java.time LocalDateTime)
    (java.util Locale)))
 
 (deftest default-key-transform-turkish-test
@@ -241,11 +242,15 @@
 (derive :toucan2.instance-test.no-key-transform/venues ::test/venues)
 
 (deftest no-key-xform-test
-  (is (= (instance/instance ::test/venues {:id 1, :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00")})
-         (select/select-one ::test/venues {:select [:id :created-at]})))
-  (testing "Should be able to disable key transforms by overriding `key-transform-fn*`"
-    (is (= {:id 1, :created_at (java.time.LocalDateTime/parse "2017-01-01T00:00")}
-           (select/select-one :toucan2.instance-test.no-key-transform/venues {:select [:id :created-at]})))))
+  (test/do-db-types [db-type]
+    (is (= (instance/instance ::test/venues {:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")})
+           (select/select-one ::test/venues {:select [:id :created-at]})))
+    (testing "Should be able to disable key transforms by overriding `key-transform-fn*`"
+      (let [[id created-at] (case db-type
+                              :h2       [:ID :CREATED_AT]
+                              :postgres [:id :created_at])]
+        (is (= {id 1, created-at (LocalDateTime/parse "2017-01-01T00:00")}
+               (select/select-one :toucan2.instance-test.no-key-transform/venues {:select [:id :created-at]})))))))
 
 (deftest pretty-print-test
   (testing "Should pretty-print"
@@ -330,22 +335,23 @@
   (is (not (instance/instance-of? {} ::toucan)))
   (is (not (instance/instance-of? (instance/instance ::shoe {}) ::toucan))))
 
+;;; TODO -- not sure we want this or not. Seems like an unnecessary extra feature.
 #_(deftest type-metadata-test
-  (testing "Instances should get ^:type metadata when you create them, so you can dispatch with `type`."
-    (let [model (u/dispatch-on "my_table" ::my-type)]
-      (doseq [instance [(instance/instance model)
-                        (instance/instance model {})
-                        (instance/instance model {})
-                        (instance/instance model :x :y)]]
-        (is (= ::my-type
+    (testing "Instances should get ^:type metadata when you create them, so you can dispatch with `type`."
+      (let [model (u/dispatch-on "my_table" ::my-type)]
+        (doseq [instance [(instance/instance model)
+                          (instance/instance model {})
+                          (instance/instance model {})
+                          (instance/instance model :x :y)]]
+          (is (= ::my-type
+                 (:type (meta instance))
+                 (type instance))))))
+    (testing "e2e test: make sure instances from something like select come back with ^:type metadata"
+      (let [instance (select/select-one [:test/postgres :venues] 1)]
+        (is (some? instance))
+        (is (= :venues
                (:type (meta instance))
                (type instance))))))
-  (testing "e2e test: make sure instances from something like select come back with ^:type metadata"
-    (let [instance (select/select-one [:test/postgres :venues] 1)]
-      (is (some? instance))
-      (is (= :venues
-             (:type (meta instance))
-             (type instance))))))
 
 (deftest no-nil-maps-test
   (testing "Shouldn't be able to make the maps in an instance nil"

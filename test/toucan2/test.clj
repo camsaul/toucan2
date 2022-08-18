@@ -25,10 +25,11 @@
 
 (defn- db-types-from-env
   ([]
-   (db-types-from-env (System/getenv "TEST_DBS")))
+   (db-types-from-env (or (System/getenv "TEST_DBS")
+                          (System/getProperty "test.dbs"))))
   ([s]
    (when (string? s)
-     (not-empty (vec (for [s (str/split (str/lower-case (str/trim s)) #"\s*,\s*")
+     (not-empty (set (for [s (str/split (str/lower-case (str/trim s)) #"\s*,\s*")
                            :when (seq s)]
                        (keyword s)))))))
 
@@ -41,20 +42,23 @@
     "postgres"    [:postgres]
     "postgres,h2" [:postgres :h2]))
 
-(def ^:private default-db-types
+(defonce ^:private db-types*
   (atom (or (db-types-from-env)
-            [:postgres])))
+            #{:postgres :h2})))
 
 (defn- db-types
   "The enabled test DB types that we should run tests against inside of [[for-all-db-types]] forms."
   []
-  @default-db-types)
+  (set @db-types*))
 
 (def ^:dynamic ^:private *current-db-type*
   nil)
 
 (defn current-db-type []
   (or *current-db-type*
+      ;; default to `:postgres` if it's enabled.
+      (when (contains? (db-types) :postgres)
+        :postgres)
       (first (db-types))))
 
 (println "Running tests against DB types:" (pr-str (db-types)))
@@ -88,21 +92,23 @@
   [[db-type-binding pred] & body]
   `(do-db-types* ~pred (^:once fn* [~db-type-binding] ~@body)))
 
-(defn do-db-types-fixture
-  "[[clojure.test]] fixture for running tests in a namespace against various db types using [[do-db-types]].
+;;; TODO -- doesn't seem to work correctly inside CIDER.
+#_(defn do-db-types-fixture
+    "[[clojure.test]] fixture for running tests in a namespace against various db types using [[do-db-types]].
 
     ;; run tests in this namespace against all the enabled test [[db-types]]
     (use-fixtures :each (do-db-types-fixture))
 
     ;; run tests in this namespace only against `:h2` iff `:h2` is one of the enabled test [[db-types]]
     (use-fixtures :each (do-db-types-fixture #{:h2}))"
-  ([]
-   (do-db-types-fixture identity))
+    ([]
+     (do-db-types-fixture identity))
 
-  ([pred]
-   (fn [thunk]
-     (do-db-types [_db-type pred]
-       (thunk)))))
+    ([pred]
+     (fn [thunk]
+       (do-db-types [_db-type pred]
+         (assert (fn? thunk))
+         (thunk)))))
 
 ;;;; URLs for test DBs.
 
@@ -116,7 +122,7 @@
 
 (defmethod default-test-db-url :h2
   [_db-type]
-  "jdbc:h2:mem:toucan2")
+  "jdbc:h2:mem:toucan2;DB_CLOSE_DELAY=-1")
 
 (defn- test-db-url [db-type]
   (let [env-var (format "JDBC_URL_%s" (str/upper-case (name db-type)))]
@@ -130,13 +136,10 @@
   (fn [db-type model-or-table-name]
     [(keyword db-type) (keyword model-or-table-name)]))
 
-(m/defmethod create-table-sql-file [:default :people]
-  [_db-type _table-name]
-  "test/toucan2/test/people.sql")
-
-(m/defmethod create-table-sql-file [:default :venues]
-  [_db-type _table-name]
-  "test/toucan2/test/venues.sql")
+(m/defmethod create-table-sql-file [:postgres :people] [_db-type _table] "test/toucan2/test/people.postgres.sql")
+(m/defmethod create-table-sql-file [:h2 :people]       [_db-type _table] "test/toucan2/test/people.h2.sql")
+(m/defmethod create-table-sql-file [:postgres :venues] [_db-type _table] "test/toucan2/test/venues.postgres.sql")
+(m/defmethod create-table-sql-file [:h2 :venues]       [_db-type _table] "test/toucan2/test/venues.h2.sql")
 
 (derive ::people ::models)
 
@@ -179,7 +182,6 @@
                        {:table table-name}
                        e))))))
 
-
 ;;;; test DB init and test connectables.
 
 (def ^:private initialized-test-dbs (atom #{}))
@@ -219,9 +221,9 @@
 
 (defn set-db-types!
   "Change the DB types to run tests against for the current REPL session."
-  [db-types]
-  {:pre [(sequential? db-types) (every? keyword? db-types) (seq db-types)]}
-  (reset! default-db-types db-types))
+  [& db-types]
+  {:pre [(every? keyword? db-types) (seq db-types)]}
+  (reset! db-types* (set db-types)))
 
 (derive ::convenience-connectable ::db)
 (derive :repl/h2                  ::convenience-connectable)

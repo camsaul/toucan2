@@ -79,6 +79,10 @@
   (delete-child-categories! category))
 
 
-(m/defmethod test/create-table-sql-file [:default Category]
+(m/defmethod test/create-table-sql-file [:postgres Category]
   [_db-type _table-name]
-  "toucan1/test/toucan/test_models/category.sql")
+  "toucan1/test/toucan/test_models/category.postgres.sql")
+
+(m/defmethod test/create-table-sql-file [:h2 Category]
+  [_db-type _table-name]
+  "toucan1/test/toucan/test_models/category.h2.sql")

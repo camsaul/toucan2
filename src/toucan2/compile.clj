@@ -29,7 +29,7 @@
 
 ;;;; HoneySQL options
 
-(def global-honeysql-options
+(defonce global-honeysql-options
   (atom nil))
 
 (def ^:dynamic *honeysql-options* nil)

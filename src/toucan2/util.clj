@@ -9,11 +9,11 @@
 
 (def ^:dynamic *debug* false)
 
-(def ^:dynamic *debug-indent-level* 0)
+(def ^:private ^:dynamic *debug-indent-level* 0)
 
 (def ^:private ^:dynamic *last-indentation-separator* "| ")
 
-(defn indentation []
+(defn- indentation []
   (str/join (concat (repeat (dec *debug-indent-level*) "|  ")
                     (when (pos? *debug-indent-level*)
                       (str *last-indentation-separator* \space)))))
@@ -26,15 +26,16 @@
       (println first-line))
     (doseq [line more]
       (print (indentation))
-      (if (= (first line) \space)
-        (do (print "⋮")
-            (println (str/join (rest line))))
-        (println line)))))
+      (println line)
+      #_(if (= (first line) \space)
+          (do (print "⋮")
+              (println (str/join (rest line))))
+          (println line)))))
 
 (defn println-debug* [& args]
   (println-debug-lines (with-out-str (apply println args))))
 
-(def ^:dynamic *color*
+(def ^:private ^:dynamic *color*
   "Whether or not to print the trace in color. True by default, unless the env var `NO_COLOR` is true."
   (if-let [env-var-value (System/getenv "NO_COLOR")]
     (Boolean/parseBoolean env-var-value)
@@ -92,7 +93,7 @@
 (defn- default-boring-printer [x]
   (puget/pprint x {:print-handlers print-handler}))
 
-(defn pretty-printer []
+(defn- pretty-printer []
   (if *color*
     default-color-printer
     default-boring-printer))
@@ -126,7 +127,7 @@
                               ~@more)
         `(println-debug* ~arg ~@more))))
 
-(defn print-debug-result [result]
+(defn- print-debug-result [result]
   (print (indentation))
   (print "↳ ")
 
@@ -157,12 +158,6 @@
        (if-not *debug*
          (thunk#)
          (do-with-debug-result ~message thunk#)))))
-
-;; TODO -- consider renaming to dispatch-value
-(defn keyword-or-type [x]
-  (if (keyword? x)
-    x
-    (type x)))
 
 (p/defprotocol+ DispatchValue
   (dispatch-value [x]))
@@ -197,8 +192,8 @@
   [(dispatch-value x) (dispatch-value y) (dispatch-value z)])
 
 (defn lower-case-en
-  "Locale-agnostic version of [[clojure.string/lower-case]]. `clojure.string/lower-case` uses the default locale in conversions, turning `ID` into `ıd`, in the Turkish locale.
-  This function always uses the `Locale/US` locale."
+  "Locale-agnostic version of [[clojure.string/lower-case]]. `clojure.string/lower-case` uses the default locale in
+  conversions, turning `ID` into `ıd`, in the Turkish locale. This function always uses the `Locale/US` locale."
   [^CharSequence s]
   (.. s toString (toLowerCase (java.util.Locale/US))))
 
