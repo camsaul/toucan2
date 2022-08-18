@@ -15,22 +15,28 @@
 
   realize/Realize
   (realize [_this]
-    rows))
+    (realize/realize rows))
+
+  clojure.lang.IReduceInit
+  (reduce [_ rf init]
+    (reduce rf init rows)))
 
 (defn identity-query
   "A queryable that returns `rows` as-is without compiling anything or running anything against a database.
   Good for mocking stuff."
-  [rows]
-  (->IdentityQuery rows))
+  [reducible-rows]
+  (->IdentityQuery reducible-rows))
 
 (m/defmethod execute/reduce-uncompiled-query [:default IdentityQuery]
   [_connectable model {:keys [rows]} rf init]
-  (reduce
-   rf
+  (transduce
+   (map (if model
+          (fn [row]
+            (instance/instance model row))
+          identity))
+   (completing rf)
    init
-   (cond->> rows
-     model (eduction (map (fn [row]
-                            (instance/instance model row)))))))
+   rows))
 
 (m/defmethod query/build [::select/select :default IdentityQuery]
   [_query-type _model {:keys [query], :as _args}]

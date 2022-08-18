@@ -6,6 +6,8 @@
    [toucan2.instance :as instance]
    [toucan2.query :as query]
    [toucan2.select :as select]
+   [toucan2.test :as test]
+   [toucan2.tools.helpers :as helpers]
    [toucan2.tools.identity-query :as identity-query]))
 
 (deftest query-test
@@ -45,3 +47,42 @@
   (is (= [(instance/instance ::venues {:id 1, :name "No Category", :category nil})]
          (select/select ::venues (identity-query/identity-query
                                   [{:id 1, :name "No Category", :category nil}])))))
+
+(m/defmethod select/select-reducible* :after ::select-reducible-identity-query
+  [_model _reducible-query]
+  (identity-query/identity-query [{:a 1, :b 2}
+                                  {:a 3, :b 4}]))
+
+(deftest identity-query-in-select-reducible-test
+  (testing "Can we have select-reducible* return an identity query, and have things still work?"
+    (is (= [{:a 1, :b 2}
+            {:a 3, :b 4}]
+           (select/select ::select-reducible-identity-query)))))
+
+(m/defmethod select/select-reducible* :after ::wrap-reducible-query
+  [_model _reducible-query]
+  (identity-query/identity-query (select/select-reducible [::test/venues :id :name] {:order-by [[:id :asc]], :limit 2})))
+
+(deftest wrap-reducible-query-test
+  (testing "Can identity-query wrap another reducible query?"
+    (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest"})
+            (instance/instance ::test/venues {:id 2, :name "Ho's Tavern"})]
+           (select/select ::wrap-reducible-query)))))
+
+(helpers/define-after-select-each ::my-after-select
+  [instance]
+  (assoc instance :after-select? true))
+
+(defn- do-after-select [model rows]
+  (select/select model (identity-query/identity-query rows)))
+
+(defn- do-after-select-reducible [model rows]
+  (select/select-reducible* model {:query (identity-query/identity-query rows)}))
+
+(deftest do-after-select-test
+  (testing "Can we use `identity-query` to build some sort of abomination like Toucan 1 do-post-select?"
+    (let [reducible (select/select-reducible [::test/venues :id :name] {:order-by [[:id :asc]], :limit 2})]
+      (is (= [(instance/instance ::my-after-select {:id 1, :name "Tempest", :after-select? true})
+              (instance/instance ::my-after-select {:id 2, :name "Ho's Tavern", :after-select? true})]
+             (do-after-select ::my-after-select reducible)
+             (into [] (do-after-select-reducible ::my-after-select reducible)))))))
