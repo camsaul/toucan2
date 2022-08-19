@@ -116,6 +116,11 @@
   `(conn/with-connection [~'&transaction-connection current/*connectable*]
      ~@body))
 
+(defn ^{:deprecated "2.0.0"} quote-fn
+  []
+  (or (some-> (honeysql-options) :dialect hsql/get-dialect :quote)
+      identity))
+
 (defmacro with-call-counting
   "DEPRECATED: Use [[toucan2.execute/with-call-count]] instead."
   {:deprecated "2.0.0", :style/indent 1}
