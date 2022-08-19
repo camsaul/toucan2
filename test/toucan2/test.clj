@@ -68,12 +68,17 @@
   "[[clojure.test]] fixture for running tests in a namespace against various db types using [[do-db-types]].
 
     ;; run tests in this namespace against all the enabled test [[db-types]]
-    (use-fixtures :each (do-db-types-fixture))"
+    (use-fixtures :each test/do-db-types-fixture)"
   [thunk]
-  (doseq [db-type (db-types)]
-    (binding [*current-db-type* db-type]
-      (testing (str db-type \newline)
-        (thunk)))))
+  (letfn [(do-db-type [db-type]
+            (let [output (with-out-str
+                           (binding [*current-db-type* db-type]
+                             (testing (str db-type \newline)
+                               (thunk))))]
+              (when-not (str/blank? output)
+                (locking println
+                  (println output)))))]
+    (dorun (pmap do-db-type (db-types)))))
 
 ;;;; URLs for test DBs.
 
