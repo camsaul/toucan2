@@ -176,6 +176,17 @@
       (is (= expected
              (instance/default-key-transform k))))))
 
+(deftest default-key-transform-test-2
+  (are [k expected] (= expected
+                       (instance/default-key-transform k))
+    :my_col              :my-col
+    :MyCol               :my-col
+    :myCol               :my-col
+    :my-col              :my-col
+    :my_namespace/my_col :my-namespace/my-col
+    "my_col"             :my-col
+    'my_namespace/my_col :my-namespace/my-col))
+
 (deftest normalize-map-test
   (testing "Should normalize keys"
     (is (= {:abc 100, :d-ef 200}

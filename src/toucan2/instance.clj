@@ -13,7 +13,7 @@
 
 (defn default-key-transform [k]
   (when k
-    (if (and (keyword? k) (namespace k))
+    (if (and (clojure.core/instance? clojure.lang.Named k) (namespace k))
       (keyword (->kebab-case (namespace k)) (->kebab-case (name k)))
       (keyword (->kebab-case (name k))))))
 
