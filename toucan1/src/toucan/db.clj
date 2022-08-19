@@ -2,6 +2,7 @@
   "Helper functions for querying the DB and inserting or updating records using Toucan models."
   (:refer-clojure :exclude [count])
   (:require
+   [honey.sql :as hsql]
    [methodical.core :as m]
    [potemkin :as p]
    [pretty.core :as pretty]
@@ -103,13 +104,6 @@
 ;;;                                         TRANSACTION & CONNECTION UTIL FNS
 ;;; ==================================================================================================================
 
-#_(def ^:dynamic *transaction-connection* nil)
-
-(defn ^{:deprecated "2.0.0"} connection
-  "DEPRECATED: use `:toucan2.connection/current` instead."
-  []
-  ::conn/current)
-
 (defmacro ^{:deprecated "2.0.0"} transaction
   "DEPRECATED: use [[toucan2.connection/with-connection]] instead."
   [& body]
@@ -176,6 +170,13 @@
   (if (vector? field-name)
     (qualified? (first field-name))
     (boolean (re-find #"\." (name field-name)))))
+
+;; (defn ^{:deprecated "2.0.0"} do-post-select
+;;   "DEPRECATED: You almost certainly don't need to be using this -- us [[toucan2.select/select]] instead, which can now
+;;   handle arbitrary queries."
+;;   [modelable rows]
+;;   (model/with-model [model modelable]
+;;     (select/select model (identity-query/identity-query rows))))
 
 (defn ^{:deprecated "2.0.0"} simple-select
   "DEPRECATED: Use [[toucan2.select/select]] instead."
