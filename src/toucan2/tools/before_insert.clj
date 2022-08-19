@@ -12,7 +12,7 @@
   (mapv
    (fn [row]
      (try
-       (u/with-debug-result ["Do before-insert for %s" model]
+       (u/with-debug-result ["Do before-insert to %s" row]
          (before-insert model row))
        (catch Throwable e
          (throw (ex-info (format "Error in before-insert for %s: %s" (pr-str model) (ex-message e))
@@ -22,7 +22,8 @@
 
 (m/defmethod insert/reducible-insert* :before ::before-insert
   [model parsed-args]
-  (update parsed-args :rows do-before-insert-to-rows model))
+  (u/with-debug-result ["Do before insert for %s" model]
+    (update parsed-args :rows do-before-insert-to-rows model)))
 
 (defmacro define-before-insert
   {:style/indent :defn}
@@ -31,4 +32,5 @@
      (u/maybe-derive model# ::before-insert)
      (m/defmethod before-insert model#
        [~'&model ~instance-binding]
-       ~@body)))
+       (cond->> (do ~@body)
+         ~'next-method (~'next-method ~'&model)))))

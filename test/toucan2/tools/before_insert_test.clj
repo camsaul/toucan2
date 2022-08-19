@@ -22,3 +22,17 @@
            (insert/insert! ::venues.before-insert {:name "Tin Vietnamese", :category "resturaunt"})))
     (is (= (instance/instance ::venues.before-insert {:id 4, :name "TIN VIETNAMESE"})
            (select/select-one [::venues.before-insert :id :name] :id 4)))))
+
+(derive ::venues.composed ::venues.before-insert)
+
+(before-insert/define-before-insert ::venues.composed
+  [venue]
+  (update venue :category str/upper-case))
+
+(deftest compose-before-insert-test
+  (testing "If a model has multiple before-inserts, they should compose"
+    (test/with-discarded-table-changes :venues
+      (is (= 1
+             (insert/insert! ::venues.composed {:name "Tin Vietnamese", :category "resturaunt"})))
+      (is (= (instance/instance ::venues.composed {:id 4, :name "TIN VIETNAMESE", :category "RESTURAUNT"})
+             (select/select-one [::venues.composed :id :name :category] :id 4))))))
