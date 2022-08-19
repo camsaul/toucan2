@@ -167,9 +167,13 @@
          (db/simple-select User {:where [:and [:not= :id 1] [:not= :id 2]]}))))
 
 (deftest simple-select-reducible-test
-  (testing "Test simple-select-reducible"
-    (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
-           (transduce-to-set (db/simple-select-reducible User {:where [:= :id 1]}))))))
+  (doseq [model [User
+                 'User]
+          model [model
+                 [model :id :first-name :last-name]]]
+    (testing (format "model = %s" (pr-str model))
+      (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
+             (transduce-to-set (db/simple-select-reducible model {:where [:= :id 1]})))))))
 
 ;; TODO
 #_(deftest test-37

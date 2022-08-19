@@ -35,9 +35,9 @@
 (deftest types-test
   (testing ":bar should come back as a Keyword even though it's a VARCHAR in the DB, just like :name"
     (doseq [model [Venue
-                   'Venue
-                   [Venue :id :name :category]
-                   ['Venue :id :name :category]]]
+                   'Venue]
+            model [model
+                   [model :id :name :category]]]
       (testing (format "model = %s" (pr-str model)))
       (is (= {:category :bar, :name "Tempest", :id 1}
              (db/select-one Venue :id 1)))))
