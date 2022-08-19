@@ -71,16 +71,24 @@
   table)
 
 (m/defmulti primary-keys
+  "Return a sequence of the primary key columns names, as keywords, for a model."
   {:arglists '([model])}
   u/dispatch-on-first-arg)
 
-;; if the PK comes back unwrapped, wrap it.
+;;; if the PK comes back unwrapped, wrap it.
 (m/defmethod primary-keys :around :default
   [model]
-  (let [pk (next-method model)]
-    (if (sequential? pk)
-      pk
-      [pk])))
+  (let [pk-or-pks (next-method model)
+        pks       (if (sequential? pk-or-pks)
+                    pk-or-pks
+                    [pk-or-pks])]
+    (when-not (every? keyword? pks)
+      (throw (ex-info (format "Bad %s for model %s: should return keyword or sequence of keywords, got %s"
+                              `primary-keys
+                              (pr-str model)
+                              (pr-str pk-or-pks))
+                      {:model model, :result pk-or-pks})))
+    pks))
 
 (m/defmethod primary-keys :default
   [_model]
