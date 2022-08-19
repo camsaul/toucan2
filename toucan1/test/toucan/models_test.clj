@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer :all]
    [toucan.db :as db]
+   [toucan.models :as models]
    [toucan.test-models.category :as category :refer [Category]]
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
@@ -15,10 +16,31 @@
 
 (set! *warn-on-reflection* true)
 
+(deftest resolve-model-test
+  (are [x] (= :toucan.test-models.category/Category
+              (models/resolve-model x))
+    Category
+    'Category
+    [Category]
+    ['Category])
+  (is (thrown-with-msg?
+       clojure.lang.ExceptionInfo
+       #"Invalid model: 2"
+       (models/resolve-model 2)))
+  (is (thrown-with-msg?
+       clojure.lang.ExceptionInfo
+       #"Invalid model: :some-other-keyword"
+       (models/resolve-model :some-other-keyword))))
+
 (deftest types-test
   (testing ":bar should come back as a Keyword even though it's a VARCHAR in the DB, just like :name"
-    (is (= {:category :bar, :name "Tempest", :id 1}
-           (db/select-one Venue :id 1))))
+    (doseq [model [Venue
+                   'Venue
+                   [Venue :id :name :category]
+                   ['Venue :id :name :category]]]
+      (testing (format "model = %s" (pr-str model)))
+      (is (= {:category :bar, :name "Tempest", :id 1}
+             (db/select-one Venue :id 1)))))
   (testing "should still work when not fetching whole object"
     (is (= :bar
            (db/select-one-field :category Venue :id 1))))

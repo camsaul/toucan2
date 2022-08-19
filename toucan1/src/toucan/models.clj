@@ -40,11 +40,13 @@
 (defn ^{:deprecated "2.0.0"} resolve-model
   "Deprecated: use [[toucan2.model/with-model]] to resolve models instead."
   [model]
+  {:post [(isa? % :toucan1/model)]}
   (cond
-    (vector? model) (resolve-model (first model))
-    (symbol? model) (resolve-model-from-symbol model)
-    :else           (throw (ex-info (str "Invalid model: " (pr-str model))
-                                    {:model model}))))
+    (isa? model :toucan1/model) model
+    (vector? model)             (resolve-model (first model))
+    (symbol? model)             (resolve-model-from-symbol model)
+    :else                       (throw (ex-info (str "Invalid model: " (pr-str model))
+                                                {:model model}))))
 
 (m/defmethod model/do-with-model clojure.lang.Symbol
   [symb f]
