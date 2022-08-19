@@ -127,8 +127,6 @@
 ;;;; [[deftransforms]]
 
 ;;; TODO -- move this to [[toucan2.tools.transformed]]
-;;;
-;;; Not sure we even need this. Maybe remove this and just let people implement [[transformed/transforms]] directly.
 (defmacro deftransforms
   "Define type transforms to use for a specific model. `transforms` should be a map of
 

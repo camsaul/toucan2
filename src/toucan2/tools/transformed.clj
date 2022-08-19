@@ -200,6 +200,7 @@
        reducible-query))
     reducible-query))
 
+;;; TODO -- shouldn't this be an `:after` method?
 (m/defmethod select/select-reducible* :around ::transformed
   [model parsed-args]
   (let [reducible-query (next-method model parsed-args)]
@@ -229,17 +230,13 @@
         row-xform (apply comp row-xforms)]
     (map row-xform rows)))
 
-(m/defmethod query/parse-args :after [::insert/insert ::transformed]
-  [_query-type model parsed-args]
+(m/defmethod insert/reducible-insert* :before ::transformed
+  [model parsed-args]
+  (assert (isa? model ::transformed))
   (if-let [transforms (in-transforms model)]
     (u/with-debug-result ["Apply %s transforms to %s" transforms parsed-args]
       (update parsed-args :rows transform-insert-rows transforms))
     parsed-args))
-
-;; (m/remove-all-aux-methods! #'insert/reducible-insert-returning-pks* :after ::transformed)
-;; (m/defmethod insert/reducible-insert-returning-pks* :after ::transformed
-;;   [model reducible-results]
-;;   (transform-results model reducible-results))
 
 (m/defmethod insert/reducible-insert-returning-pks* :after ::transformed
   [model reducible-results]
@@ -254,11 +251,3 @@
                                                         pk-vec
                                                         [pk-vec]))))
                                reducible-results)))))
-
-(m/defmethod insert/reducible-insert-returning-instances* :after ::transformed
-  [model reducible-results]
-  (transform-results model reducible-results))
-
-;; (m/defmethod insert/reducible-insert-returning-instances* :after ::transformed
-;;   [model reducible-results]
-;;   (transform-results model reducible-results))

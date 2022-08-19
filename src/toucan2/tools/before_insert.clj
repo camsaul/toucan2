@@ -25,6 +25,14 @@
   (u/with-debug-result ["Do before insert for %s" model]
     (update parsed-args :rows do-before-insert-to-rows model)))
 
+;;; Important! before-insert should be done BEFORE any [[toucan2.tools.transformed/transforms]]. Transforms are often
+;;; for serializing and deserializing values; we don't want before insert methods to have to work with
+;;; already-serialized values.
+;;;
+;;; By marking `::before-insert` as preferred over `:toucan2.tools.transformed/transformed` it will be done first (see
+;;; https://github.com/camsaul/methodical#before-methods)
+(m/prefer-method! #'insert/reducible-insert* ::before-insert :toucan2.tools.transformed/transformed)
+
 (defmacro define-before-insert
   {:style/indent :defn}
   [model [instance-binding] & body]
