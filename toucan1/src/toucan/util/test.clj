@@ -12,3 +12,7 @@
                                  [modelable binding properties])
                                (partition-all 2 model-bindings)))
      ~@body))
+
+(defn ^{:deprecated "2.0.0"} with-temp-defaults
+  [model]
+  (with-temp/with-temp-defaults model))
