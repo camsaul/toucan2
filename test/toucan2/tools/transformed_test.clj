@@ -212,45 +212,43 @@
                (select/select-one ::venues.transformed 1)))))))
 
 (deftest insert!-test
-  (test-both-normal-and-magic-keys [category-key]
-    (testing "single map row"
-      (test/with-discarded-table-changes :venues
-        (is (= 1
-               (insert/insert! ::venues.transformed {:name "Hi-Dive", category-key :bar})))
-        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-               (select/select-fn-set :name ::venues.transformed category-key :bar)))))
-    (testing "multiple map rows"
-      (test/with-discarded-table-changes :venues
-        (is (= 1
-               (insert/insert! ::venues.transformed [{:name "Hi-Dive", category-key :bar}])))
-        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-               (select/select-fn-set :name ::venues.transformed category-key :bar)))))
-    (testing "kv args"
-      (test/with-discarded-table-changes :venues
-        (is (= 1
-               (insert/insert! ::venues.transformed :name "Hi-Dive", category-key :bar)))
-        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-               (select/select-fn-set :name ::venues.transformed category-key :bar)))))
-    (testing "columns + vector rows"
-      (test/with-discarded-table-changes :venues
-        (is (= 1
-               (insert/insert! ::venues.transformed [:name category-key] [["Hi-Dive" :bar]])))
-        (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-               (select/select-fn-set :name ::venues.transformed category-key :bar)))))
-    (doseq [f [#'insert/insert-returning-pks!
-               #'insert/insert-returning-instances!]]
-      (testing f
-        (test/with-discarded-table-changes :venues
-          (is (= (condp = f
-                   #'insert/insert-returning-pks!       ["4"]
-                   #'insert/insert-returning-instances! [(instance/instance
-                                                          ::venues.id-is-string
-                                                          {:id         "4"
-                                                           :name       "Hi-Dive"
-                                                           :category   :bar
-                                                           :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
-                 (f ::venues.id-is-string [{:name "Hi-Dive", category-key "bar"}]))))))))
+  (doseq [insert! [#'insert/insert!
+                   #'insert/insert-returning-pks!
+                   #'insert/insert-returning-instances!]]
+    (testing insert!
+      (test-both-normal-and-magic-keys [category-key]
+        (doseq [[args-description args] {"single map row"        [{:name "Hi-Dive", category-key :bar}]
+                                         "multiple map rows"     [[{:name "Hi-Dive", category-key :bar}]]
+                                         "kv args"               [:name "Hi-Dive", category-key :bar]
+                                         "columns + vector rows" [[:name category-key] [["Hi-Dive" :bar]]]}]
+          (testing (str args-description \newline (pr-str (list* insert! ::venues.transformed args)))
+            (test/with-discarded-table-changes :venues
+              (is (= (condp = insert!
+                       #'insert/insert!                     1
+                       #'insert/insert-returning-pks!       [4]
+                       #'insert/insert-returning-instances! [(instance/instance
+                                                              ::venues.transformed
+                                                              {:id         4
+                                                               :name       "Hi-Dive"
+                                                               :category   :bar
+                                                               :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                               :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
+                     (apply insert! ::venues.transformed args)))
+              (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+                     (select/select-fn-set :name ::venues.transformed category-key :bar))))))
+        (testing "transformed primary key"
+          (test/with-discarded-table-changes :venues
+            (is (= (condp = insert!
+                     #'insert/insert!                     1
+                     #'insert/insert-returning-pks!       ["4"]
+                     #'insert/insert-returning-instances! [(instance/instance
+                                                            ::venues.id-is-string
+                                                            {:id         "4"
+                                                             :name       "Hi-Dive"
+                                                             :category   :bar
+                                                             :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                             :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
+                   (insert! ::venues.id-is-string [{:name "Hi-Dive", category-key "bar"}])))))))))
 
 (deftest delete!-test
   (testing "Delete row by PK"
