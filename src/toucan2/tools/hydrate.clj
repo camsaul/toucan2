@@ -146,6 +146,7 @@
 (declare simple-hydrate)
 
 (m/defmulti simple-hydrate
+  "Implementations should return a version of map `row` with the key `k` added."
   {:arglists '([model k row])}
   u/dispatch-on-first-two-args)
 

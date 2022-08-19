@@ -82,3 +82,5 @@ map or a `javax.sql.DataSource`; it was meant to be used with something like `cl
 which uses `with-open` under the hood, or `clojure.java.jdbc/get-connection` in combination with `with-open`. Toucan 2
 connectables handle their own lifecycle in their implementations of `do-with-connection` so you should not be using
 `with-open` yourself.
+
+## No need to flush hydration key caches

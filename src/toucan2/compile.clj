@@ -11,7 +11,12 @@
 (m/defmethod do-with-compiled-query :around :default
   [model query f]
   (u/println-debug ["compile %s query %s" model query])
-  (next-method model query f))
+  (try
+    (next-method model query f)
+    (catch Throwable e
+      (throw (ex-info (.getMessage e)
+                      {:model model, :uncompiled-query query}
+                      e)))))
 
 (defmacro with-compiled-query [[query-binding [model query]] & body]
   `(do-with-compiled-query
@@ -32,6 +37,8 @@
 (defonce global-honeysql-options
   (atom nil))
 
+;; TODO -- rename this to `*options*` or something, because even if we don't use Honey SQL 2 as a backend we might still
+;; want to use them and include them in the error message.
 (def ^:dynamic *honeysql-options* nil)
 
 ;;; TODO -- should there be a model-specific HoneySQL options method as well? Or can model just bind
@@ -40,15 +47,13 @@
 
 (m/defmethod do-with-compiled-query [:default clojure.lang.IPersistentMap]
   [model honeysql f]
-  (let [options (merge @global-honeysql-options
-                       *honeysql-options*)]
-    (u/println-debug ["Compiling Honey SQL with options %s" options])
-    (let [sql-args (try
+  (let [options  (merge @global-honeysql-options
+                        *honeysql-options*)
+        sql-args (u/with-debug-result ["Compiling Honey SQL with options %s" options]
+                   (try
                      (hsql/format honeysql options)
                      (catch Throwable e
-                       (throw (ex-info (format "Error building Honey SQL query: %s" (ex-message e))
-                                       {:model    model
-                                        :honeysql honeysql
-                                        :options  options}
-                                       e))))]
-      (do-with-compiled-query model sql-args f))))
+                       (throw (ex-info (format "Error building query: %s" (ex-message e))
+                                       {:model model, :honeysql honeysql, :options options}
+                                       e)))))]
+    (do-with-compiled-query model sql-args f)))

@@ -27,7 +27,7 @@
 
 (m/defmulti build
   "Dispatches on `query-type`, `model`, and the `:query` in `parsed-args`."
-  {:arglists '([query-type model parsed-args])}
+  {:arglists '([query-type model {:keys [query], :as parsed-args}])}
   (fn [query-type model parsed-args]
     (mapv u/dispatch-value [query-type
                             model

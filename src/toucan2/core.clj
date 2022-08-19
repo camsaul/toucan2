@@ -45,7 +45,6 @@
 
 (p/import-vars
  [toucan2.compile
-  *honeysql-options*
   global-honeysql-options
   with-compiled-query]
 
@@ -53,6 +52,8 @@
   do-with-connection
   with-connection
   with-transaction]
+
+ ;; TODO -- shouldn't current connectable be in here too?
 
  [toucan2.delete
   delete!]
@@ -153,5 +154,5 @@
   update!
   update-returning-pks!]
 
- [toucan2.util
-  *debug*])
+ ;; TODO -- a debug macro. Binding vars imported this way doesn't work.
+ #_[toucan2.util])

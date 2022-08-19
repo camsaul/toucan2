@@ -49,7 +49,7 @@
                                   [{:id 1, :name "No Category", :category nil}])))))
 
 (m/defmethod select/select-reducible* :after ::select-reducible-identity-query
-  [_model reducible-query]
+  [_model _reducible-query]
   (identity-query/identity-query [{:a 1, :b 2}
                                   {:a 3, :b 4}]))
 
