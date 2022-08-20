@@ -103,25 +103,30 @@
        pk-vals))))
 
 (defn wrapped-transforms [model direction]
-  (when-let [transforms (not-empty (transforms model))]
-    ;; make the transforms map an instance so we can get appropriate magic map behavior when looking for the
-    ;; appropriate transform for a given key.
-    (instance/instance
-     model
-     (into {} (for [[k direction->xform] transforms
-                    :let                 [xform (get direction->xform direction)]
-                    :when                xform]
-                [k (fn xform-fn [v]
-                     (try
-                       (xform v)
-                       (catch Throwable e
-                         (throw (ex-info (format "Error transforming %s %s value %s: %s"
-                                                 (pr-str model)
-                                                 (pr-str k)
-                                                 (pr-str v)
-                                                 (ex-message e))
-                                         {:model model, :k k, :v v, :xform xform}
-                                         e)))))])))))
+  (try
+    (when-let [transforms (not-empty (transforms model))]
+      ;; make the transforms map an instance so we can get appropriate magic map behavior when looking for the
+      ;; appropriate transform for a given key.
+      (instance/instance
+       model
+       (into {} (for [[k direction->xform] transforms
+                      :let                 [xform (get direction->xform direction)]
+                      :when                xform]
+                  [k (fn xform-fn [v]
+                       (try
+                         (xform v)
+                         (catch Throwable e
+                           (throw (ex-info (format "Error transforming %s %s value %s: %s"
+                                                   (pr-str model)
+                                                   (pr-str k)
+                                                   (pr-str v)
+                                                   (ex-message e))
+                                           {:model model, :k k, :v v, :xform xform}
+                                           e)))))]))))
+    (catch Throwable e
+      (throw (ex-info (format "Error calculating %s transforms for %s: %s" direction (pr-str model) (ex-message e))
+                      {:model model, :direction direction}
+                      e)))))
 
 (defn in-transforms [model]
   (wrapped-transforms model :in))
