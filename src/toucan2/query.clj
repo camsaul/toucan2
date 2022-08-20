@@ -73,6 +73,10 @@
                       (update :kv-args assoc :toucan/pk nil))]
     (build query-type model parsed-args)))
 
+(m/defmethod build [:default :default Integer]
+  [query-type model parsed-args]
+  (build query-type model (update parsed-args :query long)))
+
 (m/defmethod build [:default :default Long]
   [query-type model {pk :query, :as parsed-args}]
   (build query-type model (-> parsed-args
