@@ -42,7 +42,7 @@
  [{:pattern "^toucan\\..*"
    :name    toucan-1}]
 
- :config-in-ns
- {toucan-1
-  {:linters
-   {:deprecated-var {:level :off}}}}}
+ #_:config-in-ns
+ #_{toucan-1
+    {:linters
+     {:deprecated-var {:level :off}}}}}

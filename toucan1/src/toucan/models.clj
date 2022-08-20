@@ -13,7 +13,7 @@
 
 (defonce ^:private -root-namespace (atom 'models))
 
-(defn ^{:deprecated "2.0.0"} set-root-namespace!
+(defn set-root-namespace!
   "DEPRECATED: In Toucan 2, models do not get resolved from namespaces the way they did in Toucan 1. You generally do not
   need to resolve models, since they are generally just keywords. If you want to introduce special model resolution
   code, you can provide an aux method for [[model/with-model]]."
@@ -21,7 +21,7 @@
   {:pre [(symbol? new-root-namespace)]}
   (reset! -root-namespace new-root-namespace))
 
-(defn ^{:deprecated "2.0.0"} root-namespace
+(defn root-namespace
   "DEPRECATED: Toucan 2 retires the concept of a 'root namespace'. See the docstring for [[set-root-namespace!]] for more
   information."
   []
@@ -37,7 +37,7 @@
             (require model-ns)
             (ns-resolve model-ns symb)))))
 
-(defn ^{:deprecated "2.0.0"} resolve-model
+(defn resolve-model
   "Deprecated: use [[toucan2.model/with-model]] to resolve models instead."
   [model]
   {:post [(isa? % :toucan1/model)]}
@@ -78,7 +78,7 @@
                [instance#]
                (select-fn# instance#)))))))
 
-(defn ^{:deprecated "2.0.0"} primary-key
+(defn primary-key
   "DEPRECATED: use [[toucan2.model/primary-keys]] instead."
   [modelable]
   (let [modelable (resolve-model modelable)]
@@ -100,14 +100,14 @@
 (defn do-post-select [modelable object]
   (select/select-one modelable (identity-query/identity-query [object])))
 
-(defn ^{:deprecated "2.0.0"} model?
+(defn model?
   "Is model a legacy-compatibility model defined with [[defmodel]]?
 
    DEPRECATED: in Toucan 2 anything can be a 'model', so this check no longer makes sense."
   [model]
   (isa? model :toucan1/model))
 
-(defmacro ^{:deprecated "2.0.0"} defmodel
+(defmacro defmodel
   "DEPRECATED: In Toucan 2, you do not generally define models it this fashion. Instead, use [[derive]] to define a model
   as a keyword, and define [[model/table-name]] if needed."
   {:arglists     '([model table-name] [model docstr? table-name])

@@ -32,31 +32,31 @@
   instead."
   nil)
 
-(defn ^{:deprecated "2.0.0"} set-default-quoting-style!
+(defn set-default-quoting-style!
   "Set the default [[quoting-style]]. DEPRECATED: set [[toucan2.compile/global-honeysql-options]] directly."
   [new-quoting-style]
   (swap! compile/global-honeysql-options assoc :dialect new-quoting-style, :quoted (boolean new-quoting-style)))
 
-(defn ^{:deprecated "2.0.0"} quoting-style
+(defn quoting-style
   "In Toucan 1, this was the `:quoting` option to pass to Honey SQL 1. This now corresponds to the `:dialect` option
   passed to Honey SQL 2."
   []
   (or *quoting-style*
       (get @compile/global-honeysql-options :dialect)))
 
-(def ^:dynamic ^{:deprecated "2.0.0"} *automatically-convert-dashes-and-underscores*
+(def ^:dynamic *automatically-convert-dashes-and-underscores*
   "Whether to automatically convert dashes in keywords to `snake_case` when compiling HoneySQL queries, even when
   quoting. This is `false` by default.
 
   DEPRECATED: binding [[toucan2.compile/*honeysql-options*]] instead."
   nil)
 
-(defn ^{:deprecated "2.0.0"} set-default-automatically-convert-dashes-and-underscores!
+(defn set-default-automatically-convert-dashes-and-underscores!
   "DEPRECATED: set [[toucan2.compile/global-honeysql-options]] directly."
   [automatically-convert-dashes-and-underscores]
   (swap! compile/global-honeysql-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores)))
 
-(defn ^{:deprecated "2.0.0"} automatically-convert-dashes-and-underscores?
+(defn automatically-convert-dashes-and-underscores?
   []
   (if (nil? *automatically-convert-dashes-and-underscores*)
     (get @compile/global-honeysql-options :quoted-snake)
@@ -82,7 +82,7 @@
 ;; replaces `*db-connection*`
 (p/import-vars [current *connectable*])
 
-(defn ^{:deprecated "2.0.0"} set-default-db-connection!
+(defn set-default-db-connection!
   "DEPRECATED: Implement [[toucan2.connection/do-with-connection]] for `:default` instead."
   [connectable]
   (m/defmethod conn/do-with-connection :toucan/default
@@ -94,7 +94,7 @@
 ;; (defonce ^:private default-jdbc-options
 ;;   (atom default-default-jdbc-options))
 
-(defn ^{:deprecated "2.0.0"} set-default-jdbc-options!
+(defn set-default-jdbc-options!
   "DEPRECATED: Set [[toucan2.jdbc.query/global-options]] directly instead."
   [jdbc-options]
   (swap! t2.jdbc.query/global-options jdbc-options))
@@ -104,32 +104,32 @@
 ;;;                                         TRANSACTION & CONNECTION UTIL FNS
 ;;; ==================================================================================================================
 
-(defmacro ^{:deprecated "2.0.0"} transaction
+(defmacro transaction
   "DEPRECATED: use [[toucan2.connection/with-connection]] instead."
   [& body]
   `(conn/with-connection [~'&transaction-connection current/*connectable*]
      ~@body))
 
-(defn ^{:deprecated "2.0.0"} quote-fn
+(defn quote-fn
   []
   (or (some-> (honeysql-options) :dialect hsql/get-dialect :quote)
       identity))
 
 (defmacro with-call-counting
   "DEPRECATED: Use [[toucan2.execute/with-call-count]] instead."
-  {:deprecated "2.0.0", :style/indent 1}
+  {:style/indent 1}
   [[call-count-fn-binding] & body]
   `(execute/with-call-count [~call-count-fn-binding]
      ~@body))
 
 (defmacro debug-print-queries
   "DEPRECATED: Bind [[toucan2.util/*debug*]] directly instead."
-  {:deprecated "2.0.0", :style/indent 0}
+  {:style/indent 0}
   [& body]
   `(binding [u/*debug* true]
      ~@body))
 
-(defn ^{:deprecated "2.0.0"} honeysql->sql
+(defn honeysql->sql
   "DEPRECATED: Use [[toucan2.compile/with-compiled-query]] instead."
   [honeysql-form]
   (compile/with-compiled-query [query [nil honeysql-form]]
@@ -147,55 +147,55 @@
   (pretty [_this]
     (list `->Toucan1ReducibleQuery honeysql-form jdbc-options)))
 
-(defn ^{:deprecated "2.0.0"} reducible-query
+(defn reducible-query
   "DEPRECATED: Use [[toucan2.execute/reducible-query]] instead."
   [honeysql-form & {:as jdbc-options}]
   (->Toucan1ReducibleQuery honeysql-form jdbc-options))
 
-(defn ^{:deprecated "2.0.0"} query
+(defn query
   "DEPRECATED: use [[toucan2.execute/query]] instead."
   [honeysql-form & jdbc-options]
   (realize/realize (apply reducible-query honeysql-form jdbc-options)))
 
-(defn ^{:deprecated "2.0.0"} qualify
+(defn qualify
   ^clojure.lang.Keyword [modelable field-name]
   (if (vector? field-name)
     [(qualify modelable (first field-name)) (second field-name)]
     (model/with-model [model modelable]
       (keyword (str (name (model/table-name model)) \. (name field-name))))))
 
-(defn ^{:deprecated "2.0.0"} qualified?
+(defn qualified?
   "Is `field-name` qualified (e.g. with its table name)?"
   ^Boolean [field-name]
   (if (vector? field-name)
     (qualified? (first field-name))
     (boolean (re-find #"\." (name field-name)))))
 
-;; (defn ^{:deprecated "2.0.0"} do-post-select
+;; (defn do-post-select
 ;;   "DEPRECATED: You almost certainly don't need to be using this -- us [[toucan2.select/select]] instead, which can now
 ;;   handle arbitrary queries."
 ;;   [modelable rows]
 ;;   (model/with-model [model modelable]
 ;;     (select/select model (identity-query/identity-query rows))))
 
-(defn ^{:deprecated "2.0.0"} simple-select
+(defn simple-select
   "DEPRECATED: Use [[toucan2.select/select]] instead."
   [modelable honeysql-form]
   (select/select modelable honeysql-form))
 
-(defn ^{:deprecated "2.0.0"} simple-select-reducible
+(defn simple-select-reducible
   "DEPRECATED: Use [[toucan2.select/select-reducible]] instead."
   [modelable honeysql-form]
   (select/select-reducible modelable honeysql-form))
 
-(defn ^{:deprecated "2.0.0"} simple-select-one
+(defn simple-select-one
   "DEPRECATED: use [[toucan2.select/select-one]] instead."
   ([modelable]
    (select/select-one modelable))
   ([modelable honeysql-form]
    (select/select-one modelable (assoc honeysql-form :limit 1))))
 
-(defn ^{:deprecated "2.0.0"} execute!
+(defn execute!
   "DEPRECATED: use [[toucan2.execute/query-one]] instead."
   [honeysql-form & {:as options}]
   (binding [t2.jdbc.query/*options* (merge t2.jdbc.query/*options* options)]
@@ -205,7 +205,7 @@
   "DEPRECATED: use [[toucan2.update/update!]] instead. The difference between this version and the Toucan 2 version is the
   key-value args are treated as conditions in Toucan 2; in Toucan 1 you generally would have had to
   use [[update-where!]] to update something without using the primary key. In Toucan 2, changes "
-  {:deprecated "2.0.0", :arglists '([modelable honeysql-form]
+  {:arglists '([modelable honeysql-form]
                                     [modelable pk changes-map]
                                     [modelable pk key-to-change new-value & more])}
   ([modelable honeysql-form]
@@ -218,12 +218,12 @@
    (let [changes-map (merge {k v} more)]
      (update! modelable pk changes-map))))
 
-(defn ^{:deprecated "2.0.0"} update-where!
+(defn update-where!
   "DEPRECATED: use [[toucan2.update/update!]] instead."
   [modelable conditions-map & {:as changes}]
   (pos? (update/update! modelable conditions-map changes)))
 
-(defn ^{:deprecated "2.0.0"} update-non-nil-keys!
+(defn update-non-nil-keys!
   "DEPRECATED: there is currently no equivalent function in Toucan 2; use [[toucan2.update/update!]] and manually filter
   non-nil keys instead. This function may be added in the future."
   ([modelable id kvs]
@@ -262,21 +262,21 @@
   (binding [compile/*honeysql-options* (honeysql-options)])
   (f model))
 
-(defn ^{:deprecated "2.0.0"} simple-insert-many!
+(defn simple-insert-many!
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead. Returns the ID of the "
   [modelable row-maps]
   (when (seq row-maps)
     (model/with-model [model modelable]
       (insert/insert-returning-pks! (->SimpleModel model) row-maps))))
 
-(defn ^{:deprecated "2.0.0"} insert-many!
+(defn insert-many!
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead."
   [modelable row-maps]
   (when (seq row-maps)
     (model/with-model [_model modelable]
       (insert/insert-returning-pks! modelable row-maps))))
 
-(defn ^{:deprecated "2.0.0"} simple-insert!
+(defn simple-insert!
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead."
   ([modelable row-map]
    (first (simple-insert-many! modelable [row-map])))
@@ -284,7 +284,7 @@
   ([modelable k v & more]
    (simple-insert! modelable (apply array-map k v more))))
 
-(defn ^{:deprecated "2.0.0"} insert!
+(defn insert!
   "DEPRECATED: use [[toucan2.insert/insert-returning-instances!]] instead."
   {:style/indent 1}
   ([modelable row-map]
@@ -293,45 +293,45 @@
   ([modelable k v & {:as more}]
    (insert! modelable (merge {k v} more))))
 
-(defn ^{:deprecated "2.0.0"} select-one-field
+(defn select-one-field
   "DEPRECATED: Use [[toucan2.select/select-one-fn]] instead."
   [field modelable & options]
   (apply select/select-one-fn field modelable options))
 
-(defn ^{:deprecated "2.0.0"} select-one-id
+(defn select-one-id
   "DEPRECATED: Use [[toucan2.select/select-one-pk]] instead."
   [modelable & options]
   (apply select/select-one-pk modelable options))
 
-(defn ^{:deprecated "2.0.0"} select-field
+(defn select-field
   "DEPRECATED: Use [[toucan2.select/select-fn-set]] instead."
   [field modelable & options]
   (apply select/select-fn-set field modelable options))
 
-(defn ^{:deprecated "2.0.0"} select-ids
+(defn select-ids
   "DEPRECATED: Use [[toucan2.select/select-pk-set]] instead."
   [modelable & options]
   (apply select/select-pks-set modelable options))
 
-(defn ^{:deprecated "2.0.0"} select-field->field
+(defn select-field->field
   "DEPRECATED: use [[toucan2.select/select-fn->fn]] instead."
   [k v modelable & options]
   (apply select/select-fn->fn k v modelable options))
 
-(defn ^{:deprecated "2.0.0"} select-field->id
+(defn select-field->id
   "DEPRECATED: use [[toucan2.select/select-fn->pk]] instead."
   {:style/indent 2}
   [field modelable & options]
   (apply select/select-fn->pk field modelable options))
 
-(defn ^{:deprecated "2.0.0"} select-id->field
+(defn select-id->field
   "DEPRECATED: use [[toucan2.select/select-pk->fn]] instead."
   {:style/indent 2}
   [field modelable & options]
   (apply select/select-pk->fn field modelable options))
 
 ;;; Sort of weird that this accepts a different args syntax than [[delete!]] does.
-(defn ^{:deprecated "2.0.0"} simple-delete!
+(defn simple-delete!
   "DEPRECATED: use [[toucan2.delete/delete!]] with a plain table name instead."
   ([modelable]
    (simple-delete! modelable nil))
@@ -343,7 +343,7 @@
   ([modelable k v & {:as more}]
    (simple-delete! modelable (merge {k v} more))))
 
-(defn ^{:deprecated "2.0.0"} delete!
+(defn delete!
   "DEPRECATED: use [[toucan2.delete/delete!]] instead."
   {:style/indent 1}
   [modelable & conditions]
