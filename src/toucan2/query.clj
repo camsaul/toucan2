@@ -67,9 +67,11 @@
 ;;; Something like (select my-model nil) should basically mean SELECT * FROM my_model WHERE id IS NULL
 (m/defmethod build [:default :default nil]
   [query-type model parsed-args]
-  (build query-type model (-> parsed-args
-                              (assoc :query {})
-                              (update :kv-args assoc :toucan/pk nil))))
+  (let [parsed-args (cond-> (assoc parsed-args :query {})
+                      ;; if `:query` is present but equal to `nil`, treat that as if the pk value IS NULL
+                      (contains? parsed-args :query)
+                      (update :kv-args assoc :toucan/pk nil))]
+    (build query-type model parsed-args)))
 
 (m/defmethod build [:default :default Long]
   [query-type model {pk :query, :as parsed-args}]

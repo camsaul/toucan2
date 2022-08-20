@@ -102,7 +102,7 @@
   (u/with-debug-result [(list* `insert! modelable unparsed-args)]
     (model/with-model [model modelable]
       (try
-        (reduce + 0 (apply reducible-insert model unparsed-args))
+        (reduce (fnil + 0 0) 0 (apply reducible-insert model unparsed-args))
         (catch Throwable e
           (throw (ex-info (format "Error inserting %s rows: %s" (pr-str model) (ex-message e))
                           {:model model, :unparsed-args unparsed-args}

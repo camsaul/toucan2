@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.query :as query]
@@ -129,10 +130,16 @@
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
     (is (= {:kv-args {:toucan/pk nil}, :changes {:name "Taco Bell"}, :queryable {}}
            (query/parse-args ::update/update nil [nil {:name "Taco Bell"}])))
-    (is (= {:update [:venues]
-            :set    {:name "Taco Bell"}
-            :where  [:= :id nil]}
-           (query/build ::update/update ::test/venues {:pk nil, :changes {:name "Taco Bell"}, :queryable {}}) ))
+    (query/with-parsed-args-with-query [parsed-args [::update/update ::test/venues [nil {:name "Taco Bell"}]]]
+      (is (= {:kv-args {:toucan/pk nil}, :changes {:name "Taco Bell"}, :query {}}
+             parsed-args))
+      (is (= {:update [:venues]
+              :set    {:name "Taco Bell"}
+              :where  [:= :id nil]}
+             (query/build ::update/update ::test/venues parsed-args))))
+    (is (= ["UPDATE venues SET name = ? WHERE id IS NULL" "Taco Bell"]
+           (execute/compile
+             (update/update! ::test/venues nil {:name "Taco Bell"}))))
     (test/with-discarded-table-changes :venues
       (is (= 0
              (update/update! ::test/venues nil {:name "Taco Bell"}))))))

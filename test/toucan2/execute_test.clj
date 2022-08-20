@@ -5,11 +5,14 @@
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
    [toucan2.current :as current]
+   [toucan2.delete :as delete]
    [toucan2.execute :as execute]
+   [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.update :as update])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -160,7 +163,16 @@
 
 (deftest compile-test
   (is (= ["SELECT * FROM people WHERE id > ?" 1]
-         (execute/compile (select/select ::test/people :id [:> 1])))))
+         (execute/compile (select/select ::test/people :id [:> 1]))))
+  (is (= ["UPDATE venues SET name = ? WHERE id IS NULL" "Taco Bell"]
+         (execute/compile
+           (update/update! ::test/venues nil {:name "Taco Bell"}))))
+  (is (= ["DELETE FROM venues WHERE id IS NULL"]
+         (execute/compile
+           (delete/delete! ::test/venues nil))))
+  (is (= ["INSERT INTO venues (a) VALUES (?)" 1]
+         (execute/compile
+           (insert/insert! ::test/venues {:a 1})))))
 
 (deftest with-call-counts-test
   (execute/with-call-count [call-count]

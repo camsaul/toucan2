@@ -130,7 +130,9 @@
 
 (m/defmethod reduce-compiled-query-with-connection [::compile :default :default]
   [_connectable _model compiled-query rf init]
-  (reduce rf init [{::query compiled-query}]))
+  (if (instance? clojure.lang.ITransientCollection init)
+    (rf init {::query compiled-query})
+    [{::query compiled-query}]))
 
 ;;; TODO -- this is a weird place to put this. `query/compile` or something would make more sense. Or maybe
 ;;; `tools/compile`
@@ -144,7 +146,8 @@
   [& body]
   `(binding [current/*connectable* ::compile]
      (let [query# (do ~@body)]
-       (::query (realize/reduce-first query#)))))
+       (or (::query query#)
+           (::query (realize/reduce-first query#))))))
 
 ;;;; [[with-call-count]]
 

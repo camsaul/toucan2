@@ -99,7 +99,7 @@
   (u/with-debug-result [(list* `update! modelable unparsed-args)]
     (model/with-model [model modelable]
       (try
-        (reduce + 0 (apply reducible-update model unparsed-args))
+        (reduce (fnil + 0 0) 0 (apply reducible-update model unparsed-args))
         (catch Throwable e
           (throw (ex-info (format "Error updating %s: %s" (pr-str model) (ex-message e))
                           {:model model, :unparsed-args unparsed-args}

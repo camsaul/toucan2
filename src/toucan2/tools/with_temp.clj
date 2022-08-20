@@ -42,7 +42,6 @@
                                                                          :default    defaults
                                                                          :merged     merged-attributes}}
                                                            e))))]
-                              (println "pk:" pk) ; NOCOMMIT
                               [pk (select/select-one model :toucan/pk pk)]))]
 
     (try

@@ -8,7 +8,8 @@
    [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.execute :as execute])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -418,9 +419,15 @@
 (deftest select-nil-test
   (testing "(select model nil) should basically be the same as (select model :toucan/pk nil)"
     (is (= {:queryable nil}
-           (query/parse-args ::select/select nil [nil])))
-    (is (= {:select [:*], :where [:= :id nil]}
-           (query/build ::select/select nil {:queryable nil})))
+           (query/parse-args ::select/select ::test/venues [nil])))
+    (query/with-parsed-args-with-query [parsed-args [::select/select ::test/venues [nil]]]
+      (is (= {:query nil}
+             parsed-args))
+      (is (= {:select [:*], :from [[:venues]], :where [:= :id nil]}
+             (query/build ::select/select ::test/venues parsed-args))))
+    (is (= ["SELECT * FROM venues WHERE id IS NULL"]
+           (execute/compile
+             (select/select ::test/venues nil))))
     (is (= []
            (select/select ::test/venues nil)))
     (is (= nil
