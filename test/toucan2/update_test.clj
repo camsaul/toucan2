@@ -16,6 +16,8 @@
 (deftest parse-update-args-test
   (is (= {:changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
          (query/parse-args ::update/update nil [1 {:a 1}])))
+  (is (= {:changes {:a 1}, :kv-args {:toucan/pk nil}, :queryable {}}
+         (query/parse-args ::update/update nil [nil {:a 1}])))
   (is (= {:kv-args {:id 1}, :changes {:a 1}, :queryable {}}
          (query/parse-args ::update/update nil [:id 1 {:a 1}])))
   (testing "composite PK"
@@ -122,3 +124,15 @@
     (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
             (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
            (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]})))))
+
+(deftest update-nil-test
+  (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
+    (is (= {:kv-args {:toucan/pk nil}, :changes {:name "Taco Bell"}, :queryable {}}
+           (query/parse-args ::update/update nil [nil {:name "Taco Bell"}])))
+    (is (= {:update [:venues]
+            :set    {:name "Taco Bell"}
+            :where  [:= :id nil]}
+           (query/build ::update/update ::test/venues {:pk nil, :changes {:name "Taco Bell"}, :queryable {}}) ))
+    (test/with-discarded-table-changes :venues
+      (is (= 0
+             (update/update! ::test/venues nil {:name "Taco Bell"}))))))

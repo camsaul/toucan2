@@ -32,10 +32,10 @@
 
 (m/defmethod query/parse-args [::update :default]
   [query-type model unparsed-args]
-  (let [{:keys [pk], :as parsed} (next-method query-type model unparsed-args)]
+  (let [parsed (next-method query-type model unparsed-args)]
     (cond-> parsed
-      pk (-> (dissoc :pk)
-             (update :kv-args assoc :toucan/pk pk)))))
+      (contains? parsed :pk) (-> (dissoc :pk)
+                                 (update :kv-args assoc :toucan/pk (:pk parsed))))))
 
 (m/defmethod query/build [::update :default clojure.lang.IPersistentMap]
   [query-type model {:keys [kv-args query changes], :as parsed-args}]

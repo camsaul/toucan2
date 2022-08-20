@@ -90,3 +90,14 @@
                  (delete/delete! ::venues.custom-honeysql :id [:in ["1"]])))
           (is (= []
                  (select/select ::test/venues :id 1)))))))
+
+(deftest delete-nil-test
+  (testing "(delete! model nil) should basically be the same as (delete! model :toucan/pk nil)"
+    (is (= {:queryable nil}
+           (query/parse-args ::delete/delete nil [nil])))
+    (is (= {:delete-from [:venues]
+            :where       [:= :id nil]}
+           (query/build ::delete/delete ::test/venues {:queryable nil})))
+    (test/with-discarded-table-changes :venues
+      (is (= 0
+             (delete/delete! ::test/venues nil))))))

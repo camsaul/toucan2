@@ -414,3 +414,16 @@
     (is (= []
            (realize/realize (select/select-reducible-with-pks [::test/venues :id :name] []))
            (realize/realize (select/select-reducible-with-pks [::test/venues :id :name] nil))))))
+
+(deftest select-nil-test
+  (testing "(select model nil) should basically be the same as (select model :toucan/pk nil)"
+    (is (= {:queryable nil}
+           (query/parse-args ::select/select nil [nil])))
+    (is (= {:select [:*], :where [:= :id nil]}
+           (query/build ::select/select nil {:queryable nil})))
+    (is (= []
+           (select/select ::test/venues nil)))
+    (is (= nil
+           (select/select-one ::test/venues nil)
+           (select/select-one-fn :id ::test/venues nil)
+           (select/select-one-fn int ::test/venues nil)))))

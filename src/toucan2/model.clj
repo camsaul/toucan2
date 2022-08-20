@@ -16,6 +16,14 @@
   [model f]
   (f model))
 
+(m/defmethod do-with-model :around :default
+  [modelable f]
+  (next-method modelable
+               (^:once fn* [model]
+                (when-not (= model modelable)
+                  (u/println-debug ["Resolved modelable %s => model %s" modelable model]))
+                (f model))))
+
 (defmacro with-model [[model-binding modelable] & body]
   `(do-with-model ~modelable (^:once fn* [~model-binding] ~@body)))
 

@@ -42,13 +42,14 @@
                                                                          :default    defaults
                                                                          :merged     merged-attributes}}
                                                            e))))]
-                              [pk (select/select-one model pk)]))]
+                              (println "pk:" pk) ; NOCOMMIT
+                              [pk (select/select-one model :toucan/pk pk)]))]
 
     (try
       (t/testing (format "with temporary %s with attributes %s" (pr-str model) (pr-str merged-attributes))
         (f temp-object))
       (finally
-        (delete/delete! model pk)))))
+        (delete/delete! model :toucan/pk pk)))))
 
 (defn do-with-temp [modelable attributes f]
   (model/with-model [model modelable]

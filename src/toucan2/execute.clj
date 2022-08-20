@@ -132,6 +132,8 @@
   [_connectable _model compiled-query rf init]
   (reduce rf init [{::query compiled-query}]))
 
+;;; TODO -- this is a weird place to put this. `query/compile` or something would make more sense. Or maybe
+;;; `tools/compile`
 (defmacro compile
   "Return the compiled query that would be executed by a form, rather than executing that form itself.
 

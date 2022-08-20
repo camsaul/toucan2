@@ -35,6 +35,8 @@
 
 (m/defmethod build :around :default
   [query-type model parsed-args]
+  (assert (map? parsed-args)
+          (format "%s expects map parsed-args, got %s." `build (pr-str parsed-args)))
   (try
     (u/with-debug-result [(list `build query-type model parsed-args)]
       (next-method query-type model parsed-args))
@@ -62,11 +64,12 @@
                    :method         #'build
                    :dispatch-value (m/dispatch-value build query-type model parsed-args)})))
 
+;;; Something like (select my-model nil) should basically mean SELECT * FROM my_model WHERE id IS NULL
 (m/defmethod build [:default :default nil]
   [query-type model parsed-args]
-  (assert (map? parsed-args)
-          (format "%s expects map parsed-args, got %s." `build (pr-str parsed-args)))
-  (build query-type model (assoc parsed-args :query {})))
+  (build query-type model (-> parsed-args
+                              (assoc :query {})
+                              (update :kv-args assoc :toucan/pk nil))))
 
 (m/defmethod build [:default :default Long]
   [query-type model {pk :query, :as parsed-args}]
@@ -174,9 +177,9 @@
     (if-not (map? parsed)
       parsed
       (cond-> parsed
-        (nil? (:queryable parsed)) (assoc :queryable {})
-        (seq (:kv-args parsed))    (update :kv-args (fn [kv-args]
-                                                      (into {} (map (juxt :k :v)) kv-args)))))))
+        (not (contains? parsed :queryable)) (assoc :queryable {})
+        (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
+                                                               (into {} (map (juxt :k :v)) kv-args)))))))
 
 (defn do-with-parsed-args-with-query
   [query-type model unparsed-args f]
