@@ -1,5 +1,6 @@
 (ns toucan2.tools.before-update-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.execute :as execute]
@@ -8,9 +9,12 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.before-update :as before-update]
+   [toucan2.tools.helpers :as helpers]
    [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
+
+(use-fixtures :each test/do-db-types-fixture)
 
 (def ^:dynamic ^:private *updated-venues* nil)
 
@@ -247,3 +251,18 @@
   (testing "before-update should run in a transaction; an error during some part should cause all updates to be discarded"
     ;; TODO
     ))
+
+(derive ::venues.short-name ::test/venues)
+
+(helpers/define-after-select-each ::venues.short-name
+  [venue]
+  (assoc venue :short-name (str/join (take 4 (:name venue)))))
+
+(before-update/define-before-update ::venues.short-name
+  [venue]
+  (update venue :name str/upper-case))
+
+(deftest before-update-ignore-columns-added-by-after-select-test
+  (test/with-discarded-table-changes :venues
+    (is (= 1
+           (update/update! ::venues.short-name 3 {:name "BevLess"})))))

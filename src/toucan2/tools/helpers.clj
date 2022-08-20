@@ -3,6 +3,7 @@
    [methodical.core :as m]
    [toucan2.connection :as conn]
    [toucan2.delete :as delete]
+   [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.query :as query]
    [toucan2.select :as select]
@@ -40,9 +41,9 @@
 
 (defn do-after-select-each [model reducible-query f]
   (eduction (map (fn [instance]
-                   (u/with-debug-result [(list `define-after-select-each model instance)]
+                   (u/with-debug-result ["do after-select for %s %s" model instance]
                      (try
-                       (f instance)
+                       (instance/reset-original (f instance))
                        (catch Throwable e
                          (throw (ex-info (format "Error in %s for %s: %s"
                                                  `define-after-select-each (pr-str model) (ex-message e))
