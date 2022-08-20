@@ -2,4 +2,4 @@
 
 (defmacro defmodel
   [model _table-name]
-  `(def ~model ~(keyword (name model))))
+  `(def ~model "Docstring." ~(keyword (name model))))
