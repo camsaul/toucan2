@@ -14,7 +14,9 @@
 ![Toucan 2](https://github.com/camsaul/toucan2/blob/master/assets/toucan2.png)
 
 Toucan 2 is a successor library to [Toucan](https://github.com/metabase/toucan) with a modern and more-extensible API,
-more consistent behavior, and support for different backends including non-JDBC databases and non-HoneySQL queries. Toucan 2 uses [Honey SQL 2](https://github.com/seancorfield/honeysql) and [`next.jdbc`](https://github.com/seancorfield/next-jdbc) (a bit) under the hood.
+more consistent behavior (less gotchas), support for different backends including non-JDBC databases and non-HoneySQL queries, and more useful utilities. 
+
+Toucan 2 uses [Honey SQL 2](https://github.com/seancorfield/honeysql), [`next.jdbc`](https://github.com/seancorfield/next-jdbc) (a bit), and [Methodical](https://github.com/camsaul/methodical) under the hood. Everything is super efficient and reducible under the hood (even inserts, updates, and deletes!) and magical (in a good way).
 
 After working on this off and on for several years I decided that the library was overly complicated (at nearly 8000
 lines of code) and decided to start over and re-implement things in a ~simpler fashion~ (EDIT: back up to 7000 LoC, but it's easier to use this time). The library is mostly usable now but I have a big pile of things to do before the official announcement -- [take a look at the Trello board](https://trello.com/b/DFx8rVa8/toucan-2-todo) -- when things get a little further along I'll move things over to GitHub issues. I will update this README when I publish the
