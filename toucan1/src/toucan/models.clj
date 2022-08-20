@@ -110,8 +110,6 @@
 (defmacro defmodel
   "DEPRECATED: In Toucan 2, you do not generally define models it this fashion. Instead, use [[derive]] to define a model
   as a keyword, and define [[model/table-name]] if needed."
-  {:arglists     '([model table-name] [model docstr? table-name])
-   :style/indent [2 :form :form [1]]}
   [model table-name]
   (let [model-keyword (keyword (name (ns-name *ns*)) (name model))]
     `(do
