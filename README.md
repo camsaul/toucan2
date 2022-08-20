@@ -17,11 +17,7 @@ Toucan 2 is a successor library to [Toucan](https://github.com/metabase/toucan) 
 more consistent behavior, and support for different backends including non-JDBC databases and non-HoneySQL queries.
 
 After working on this off and on for several years I decided that the library was overly complicated (at nearly 8000
-lines of code) and decided to start over and re-implement things in a simpler fashion. The old library was mostly
-usable and tested and several alpha releases are available on Clojars. It's available in the
-[`old-implementation`](https://github.com/camsaul/toucan2/tree/old-implementation) branch.
-
-The re-implementation is pretty close to being ready for alpha usage and I will update the README when I publish the
+lines of code) and decided to start over and re-implement things in a ~simpler fashion~ (EDIT: back up to 7000 LoC, but it's easier to use this time). The library is mostly usable now but I have a big pile of things to do before the official announcement -- [take a look at the Trello board](https://trello.com/b/DFx8rVa8/toucan-2-todo) -- when things get a little further along I'll move things over to GitHub issues. I will update this README when I publish the
 first alpha release.
 
 In the mean time, browse the [Documentation](docs/), which are a work in progress.
