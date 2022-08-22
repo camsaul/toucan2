@@ -10,7 +10,7 @@
   (doseq [[model expected] {"ABC"    "ABC"
                             :abc     "abc"
                             :ns/abc  "abc"
-                            :default "default"!
+                            :default "default"
                             'symbol  "symbol"}]
     (testing (pr-str `(model/table-name ~model))
       (is (= expected

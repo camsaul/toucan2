@@ -54,6 +54,8 @@
     "Get a map with any changes made to `instance` since it came out of the DB. Only includes keys that have been
     added or given different values; keys that were removed are not counted. Returns `nil` if there are no changes.")
 
+  ;;; TODO -- should this be its own protocol? It seems like things like reducible queries or whatever should be able to
+  ;;; implement an `IModel` protocol so you can get their model for whatever weird reason you might want to
   (model [instance]
     "Get the model associated with `instance`.")
 

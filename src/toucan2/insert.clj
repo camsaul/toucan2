@@ -3,13 +3,10 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
-   [pretty.core :as pretty]
-   [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.operation :as op]
    [toucan2.query :as query]
-   [toucan2.realize :as realize]
-   [toucan2.select :as select]
    [toucan2.util :as u]))
 
 (s/def ::default-args
@@ -42,56 +39,26 @@
     (throw (ex-info "Cannot build insert query with empty :values"
                     {:query-type query-type, :model model, :args parsed-args})))
   {:insert-into [(keyword (model/table-name model))]
-   :values      rows})
+   :values      (map (partial instance/instance model)
+                     rows)})
 
 ;;;; [[reducible-insert]] and [[insert!]]
 
-(m/defmulti reducible-insert*
-  {:arglists '([model parsed-args])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod reducible-insert* :around :default
-  [model parsed-args]
-  (u/with-debug-result [(list `reducible-insert* model parsed-args)]
-    (next-method model parsed-args)))
-
-(defn reduce-reducible-insert! [model {:keys [rows], :as parsed-args} rf init]
+(m/defmethod op/reducible* [::insert :default]
+  [query-type model {:keys [rows], :as parsed-args}]
   (if (empty? rows)
     (do
       (u/println-debug "No rows to insert.")
-      (reduce rf init []))
+      nil)
     (u/with-debug-result ["Inserting %s rows into %s" (count rows) model]
-      (let [query (query/build ::insert model (update parsed-args :rows (fn [rows]
-                                                                          (mapv (partial instance/instance model)
-                                                                                rows))))]
-        (try
-          (reduce rf init (execute/reducible-query (model/deferred-current-connectable model) model query))
-          (catch Throwable e
-            (throw (ex-info (format "Error updating rows: %s" (ex-message e))
-                            {:model model, :args parsed-args, :query query}
-                            e))))))))
-
-(defrecord ReducibleInsert [model parsed-args]
-  clojure.lang.IReduceInit
-  (reduce [_this rf init]
-    (reduce-reducible-insert! model parsed-args rf init))
-
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `->ReducibleInsert model parsed-args)))
-
-(m/defmethod reducible-insert* :default
-  [model parsed-args]
-  (->ReducibleInsert model parsed-args))
+      (next-method query-type model parsed-args))))
 
 (defn reducible-insert
   {:arglists '([modelable row-or-rows]
                [modelable k v & more]
                [modelable columns row-vectors])}
   [modelable & unparsed-args]
-  (model/with-model [model modelable]
-    (let [parsed-args (query/parse-args ::insert model unparsed-args)]
-      (reducible-insert* model parsed-args))))
+  (op/reducible ::insert modelable unparsed-args))
 
 (defn insert!
   "Returns number of rows inserted."
@@ -99,31 +66,14 @@
                [modelable k v & more]
                [modelable columns row-vectors])}
   [modelable & unparsed-args]
-  (u/with-debug-result [(list* `insert! modelable unparsed-args)]
-    (model/with-model [model modelable]
-      (try
-        (reduce (fnil + 0 0) 0 (apply reducible-insert model unparsed-args))
-        (catch Throwable e
-          (throw (ex-info (format "Error inserting %s rows: %s" (pr-str model) (ex-message e))
-                          {:model model, :unparsed-args unparsed-args}
-                          e)))))))
-
-;;;; [[reducible-insert-returning-pks]] and [[insert-returning-pks!]]
-
-(m/defmulti reducible-insert-returning-pks*
-  {:arglists '([model parsed-args])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod reducible-insert-returning-pks* :default
-  [model parsed-args]
-  (select/return-pks-eduction model (reducible-insert* model parsed-args)))
+  (op/returning-update-count! ::insert modelable unparsed-args))
 
 (defn reducible-insert-returning-pks
-  {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
+  {:arglists '([modelable row-or-rows]
+               [modelable k v & more]
+               [modelable columns row-vectors])}
   [modelable & unparsed-args]
-  (model/with-model [model modelable]
-    (query/with-parsed-args-with-query [parsed-args [::insert model unparsed-args]]
-      (reducible-insert-returning-pks* model parsed-args))))
+  (op/reducible-returning-pks ::insert modelable unparsed-args))
 
 (defn insert-returning-pks!
   "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
@@ -135,45 +85,18 @@
                [modelable k v & more]
                [modelable columns row-vectors])}
   [modelable & unparsed-args]
-  (u/with-debug-result [(list* `insert-returning-pks! modelable unparsed-args)]
-    (realize/realize (apply reducible-insert-returning-pks modelable unparsed-args))))
+  (op/returning-pks! ::insert modelable unparsed-args))
 
-;;;; [[reducible-insert-returning-instances]] and [[insert-returning-instances!]]
-
-(m/defmulti reducible-insert-returning-instances*
-  {:arglists '([model parsed-args])}
-  u/dispatch-on-first-arg)
-
-(defrecord ReducibleInsertReturningInstances [model fields reducible-returning-pks]
-  clojure.lang.IReduceInit
-  (reduce [_this rf init]
-    (when-let [row-pks (not-empty (realize/realize reducible-returning-pks))]
-      (u/with-debug-result ["return instances for PKs %s" row-pks]
-        (reduce
-         rf
-         init
-         (select/select-reducible-with-pks (into [model] fields) row-pks)))))
-
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `->ReducibleInsertReturningInstances model fields reducible-returning-pks)))
-
-;;; TODO -- should use `:columns`, not `:fields`
-
-(m/defmethod reducible-insert-returning-instances* :default
-  [model {:keys [fields], :as parsed-args}]
-  (->ReducibleInsertReturningInstances model fields (reducible-insert-returning-pks* model parsed-args)))
 
 (defn reducible-insert-returning-instances
-  {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map]
-               [[modelable & columns] pk? conditions-map-or-query? & conditions-kv-args changes-map])}
+  {:arglists '([modelable row-or-rows]
+               [modelable k v & more]
+               [modelable columns row-vectors]
+               [[modelable & columns-to-return] row-or-rows]
+               [[modelable & columns-to-return] k v & more]
+               [[modelable & columns-to-return] columns row-vectors])}
   [modelable-columns & unparsed-args]
-  (let [[modelable & columns] (if (sequential? modelable-columns)
-                                modelable-columns
-                                [modelable-columns])]
-    (model/with-model [model modelable]
-      (query/with-parsed-args-with-query [parsed-args [::insert model unparsed-args]]
-        (reducible-insert-returning-instances* model (assoc parsed-args :fields columns))))))
+  (op/reducible-returning-instances ::insert modelable-columns unparsed-args))
 
 (defn insert-returning-instances!
   "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
@@ -184,9 +107,8 @@
   {:arglists '([modelable row-or-rows]
                [modelable k v & more]
                [modelable columns row-vectors]
-               [[modelable & columns] row-or-rows]
-               [[modelable & columns] k v & more]
-               [[modelable & columns] columns row-vectors])}
+               [[modelable & columns-to-return] row-or-rows]
+               [[modelable & columns-to-return] k v & more]
+               [[modelable & columns-to-return] columns row-vectors])}
   [modelable-columns & unparsed-args]
-  (u/with-debug-result [(list* `insert-returning-instances! modelable-columns unparsed-args)]
-    (realize/realize (apply reducible-insert-returning-instances modelable-columns unparsed-args))))
+  (op/returning-instances! ::insert modelable-columns unparsed-args))

@@ -211,6 +211,8 @@
   (let [pks-fn (select-pks-fn model)]
     (eduction
      (map (fn [row]
+            (assert (map? row)
+                    (format "Expected row to be a map, got ^%s %s" (some-> row class .getCanonicalName) (pr-str row)))
             (u/with-debug-result ["%s: map pk function %s to row %s" `return-pks-eduction pks-fn row]
               (let [pks (pks-fn row)]
                 (when (nil? pks)

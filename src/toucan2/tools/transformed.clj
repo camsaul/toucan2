@@ -6,6 +6,7 @@
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.operation :as op]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.update :as update]
@@ -235,16 +236,16 @@
         row-xform (apply comp row-xforms)]
     (map row-xform rows)))
 
-(m/defmethod insert/reducible-insert* :before ::transformed
-  [model parsed-args]
+(m/defmethod op/reducible* :before [::insert/insert ::transformed]
+  [_query-type model parsed-args]
   (assert (isa? model ::transformed))
   (if-let [transforms (in-transforms model)]
     (u/with-debug-result ["Apply %s transforms to %s" transforms parsed-args]
       (update parsed-args :rows transform-insert-rows transforms))
     parsed-args))
 
-(m/defmethod insert/reducible-insert-returning-pks* :after ::transformed
-  [model reducible-results]
+(m/defmethod op/reducible-returning-pks* :after [::insert/insert ::transformed]
+  [_query-type model reducible-results]
   (let [pk-keys (model/primary-keys model)]
     (eduction
      (map (if (= (count pk-keys) 1)

@@ -2,6 +2,7 @@
   (:require
    [methodical.core :as m]
    [toucan2.insert :as insert]
+   [toucan2.operation :as op]
    [toucan2.util :as u]))
 
 (m/defmulti before-insert
@@ -20,8 +21,8 @@
                          e)))))
    rows))
 
-(m/defmethod insert/reducible-insert* :before ::before-insert
-  [model parsed-args]
+(m/defmethod op/reducible* :before [::insert/insert ::before-insert]
+  [_query-type model parsed-args]
   (u/with-debug-result ["Do before insert for %s" model]
     (update parsed-args :rows do-before-insert-to-rows model)))
 
@@ -31,7 +32,9 @@
 ;;;
 ;;; By marking `::before-insert` as preferred over `:toucan2.tools.transformed/transformed` it will be done first (see
 ;;; https://github.com/camsaul/methodical#before-methods)
-(m/prefer-method! #'insert/reducible-insert* ::before-insert :toucan2.tools.transformed/transformed)
+(m/prefer-method! #'op/reducible*
+                  [::insert/insert ::before-insert]
+                  [::insert/insert :toucan2.tools.transformed/transformed])
 
 (defmacro define-before-insert
   {:style/indent :defn}

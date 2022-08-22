@@ -3,6 +3,7 @@
    [methodical.core :as m]
    [pretty.core :as pretty]
    [toucan2.insert :as insert]
+   [toucan2.operation :as op]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.util :as u]))
@@ -49,35 +50,35 @@
   (pretty [_this]
     (list `->AfterReduciblePKs model reducible-pks)))
 
-(m/defmethod insert/reducible-insert* :around ::after-insert
-  [model {::keys [after-insert?], :as parsed-args}]
+(m/defmethod op/reducible* :around [::insert/insert ::after-insert]
+  [query-type model {::keys [after-insert?], :as parsed-args}]
   (if after-insert?
-    (next-method model parsed-args)
+    (next-method query-type model parsed-args)
     (u/with-debug-result ["do after-insert for %s in %s" model `insert/reducible-insert*]
       (let [parsed-args     (assoc parsed-args ::after-insert? true)
-            reducible-count (next-method model parsed-args)
+            reducible-count (next-method query-type model parsed-args)
             reducible-pks   (select/return-pks-eduction model reducible-count)]
         (eduction
          (map (constantly 1))
          (->AfterReduciblePKs model reducible-pks))))))
 
-(m/defmethod insert/reducible-insert-returning-pks* :around ::after-insert
-  [model {::keys [after-insert?], :as parsed-args}]
+(m/defmethod op/reducible-returning-pks* :around [::insert/insert ::after-insert]
+  [query-type model {::keys [after-insert?], :as parsed-args}]
   (if after-insert?
-    (next-method model parsed-args)
+    (next-method query-type model parsed-args)
     (u/with-debug-result ["do after-insert for %s in %s" model `insert/reducible-insert-returning-pks*]
       (let [parsed-args   (assoc parsed-args ::after-insert? true)
-            reducible-pks (next-method model parsed-args)]
+            reducible-pks (next-method query-type model parsed-args)]
         (eduction
          (map (select/select-pks-fn model))
          (->AfterReduciblePKs model reducible-pks))))))
 
-(m/defmethod insert/reducible-insert-returning-instances* :around ::after-insert
-  [model {::keys [after-insert?], :as parsed-args}]
+(m/defmethod op/reducible-returning-instances* :around [::insert/insert ::after-insert]
+  [query-type model {::keys [after-insert?], :as parsed-args}]
   (if after-insert?
-    (next-method model parsed-args)
+    (next-method query-type model parsed-args)
     (let [parsed-args (assoc parsed-args ::after-insert? true)]
-      (after-reducible-instances model (next-method model parsed-args)))))
+      (after-reducible-instances model (next-method query-type model parsed-args)))))
 
 (defmacro define-after-insert
   {:style/indent :defn}
