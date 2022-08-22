@@ -94,3 +94,18 @@
           (testing (.getCanonicalName (class x))
             (is (string? (#'u/pprint-to-str x)))
             (is (false? @realized?))))))))
+
+(deftest interleave-all-test
+  (are [x y expected] (= expected
+                         (#'u/interleave-all x y))
+    [1 2 3] [:a :b :c] [1 :a 2 :b 3 :c]
+    [1 2 3] [:a]       [1 :a 2 3]
+    [1 2 3] []         [1 2 3]
+    [1]     [:a :b :c] [1 :a :b :c]
+    []      [:a :b :c] [:a :b :c]))
+
+(deftest format-doc-test
+  (testing "Text after the last argument should be included"
+    (is (= `(u/pprint-to-str
+             (u/->Doc [(u/->Text "") ~'x (u/->Text "") ~'y (u/->Text " returning instances")]))
+           (macroexpand-1 `(u/format-doc "%s %s returning instances" ~'x ~'y))))))

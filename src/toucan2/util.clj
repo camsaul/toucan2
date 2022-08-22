@@ -107,11 +107,28 @@
 (defn pprint-to-str [x]
   (str/trim (with-out-str (pprint x))))
 
-(defmacro format-doc [s & args]
-  `(pprint-to-str (->Doc ~(vec (interleave (map (fn [s]
-                                                  (list `->Text (str/trimr s)))
-                                                (str/split s #"%s"))
-                                           args)))))
+(defn- interleave-all
+  "Exactly like [[interleave]] but includes the entirety of both collections even if the other collection is shorter. If
+  one collection 'runs out', the remaining elements of the other collection are appended directly to the end of the
+  resulting collection."
+  [x y]
+  (loop [acc [], x x, y y]
+    (let [acc (cond-> acc
+                (seq x) (conj (first x))
+                (seq y) (conj (first y)))
+          x   (next x)
+          y   (next y)]
+      (if (and (empty? x) (empty? y))
+        acc
+        (recur acc x y)))))
+
+(defmacro format-doc
+  "Convert `format-string` and `args` into something that can be pretty-printed by puget."
+  [format-string & args]
+  (let [->Text (fn [s]
+                 (list `->Text (str/trimr s)))
+        texts  (map ->Text (str/split format-string #"%s"))]
+    `(pprint-to-str (->Doc ~(vec (interleave-all texts args))))))
 
 (defmacro println-debug
   [arg & more]
