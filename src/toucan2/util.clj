@@ -26,11 +26,7 @@
       (println first-line))
     (doseq [line more]
       (print (indentation))
-      (println line)
-      #_(if (= (first line) \space)
-          (do (print "⋮")
-              (println (str/join (rest line))))
-          (println line)))))
+      (println line))))
 
 (defn println-debug* [& args]
   (println-debug-lines (with-out-str (apply println args))))
@@ -160,7 +156,10 @@
          (do-with-debug-result ~message thunk#)))))
 
 (p/defprotocol+ DispatchValue
-  (dispatch-value [x]))
+  (dispatch-value
+   [this]
+    "Get the value that we should dispatch off of in multimethods for `this`. By default, the dispatch of a keyword is
+    itself while the dispatch value of everything else is its [[type]]."))
 
 (extend-protocol DispatchValue
   Object
@@ -176,18 +175,17 @@
     k))
 
 (defn dispatch-on-first-arg
+  "Dispatch on the first argument using [[dispatch-value]], and ignore all other args."
   [x & _]
   (dispatch-value x))
 
-(defn dispatch-on-second-arg
-  [_ y & _]
-  (dispatch-value y))
-
 (defn dispatch-on-first-two-args
+  "Dispatch on the two arguments using [[dispatch-value]], and ignore all other args."
   [x y & _]
   [(dispatch-value x) (dispatch-value y)])
 
 (defn dispatch-on-first-three-args
+  "Dispatch on the three arguments using [[dispatch-value]], and ignore all other args."
   [x y z & _]
   [(dispatch-value x) (dispatch-value y) (dispatch-value z)])
 
@@ -198,6 +196,7 @@
   (.. s toString (toLowerCase (java.util.Locale/US))))
 
 (defn maybe-derive
+  "Derive `child` from `parent` only if `child` is not already a descendant of `parent`."
   [child parent]
   (when-not (isa? child parent)
     (derive child parent)))
