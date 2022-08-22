@@ -1,8 +1,7 @@
 (ns toucan2.connection-test
   (:require
    [clojure.test :refer :all]
-   [toucan2.connection :as conn]
-   [toucan2.test :as test]))
+   [toucan2.connection :as conn]))
 
 (deftest ^:parallel connection-string-protocol-test
   (doseq [[s expected] {"jdbc:postgres://localhost:5432/my_db" "jdbc"
