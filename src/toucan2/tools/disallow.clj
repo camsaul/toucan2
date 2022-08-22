@@ -19,6 +19,6 @@
   [model _parsed-args]
   (throw (UnsupportedOperationException. (format "You cannot create new instances of %s." model))))
 
-(m/defmethod update/reducible-update* ::update
+(m/defmethod op/reducible* [::update/update ::update]
   [model _parsed-args]
   (throw (UnsupportedOperationException. (format "You cannot update a %s after it has been created." model))))

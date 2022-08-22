@@ -2,6 +2,7 @@
   (:require
    [methodical.core :as m]
    [pretty.core :as pretty]
+   [toucan2.operation :as op]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.update :as update]
@@ -45,25 +46,25 @@
   (pretty [_this]
     (list `->ReducibleAfterUpdate model reducible-update-returning-pks)))
 
-(m/defmethod update/reducible-update* :around ::after-update
-  [model {::keys [doing-after-update?], :as parsed-args}]
+(m/defmethod op/reducible* :around [::update/update ::after-update]
+  [query-type model {::keys [doing-after-update?], :as parsed-args}]
   (if doing-after-update?
-    (next-method model parsed-args)
+    (next-method query-type model parsed-args)
     (u/with-debug-result ["do after-update for %s in %s" model `update/reducible-update*]
       (let [parsed-args                      (assoc parsed-args ::doing-after-update? true)
-            reducible-update-returning-count (next-method model parsed-args)
+            reducible-update-returning-count (next-method query-type model parsed-args)
             reducible-update-returning-pks   (select/return-pks-eduction model reducible-update-returning-count)]
         (eduction
          (map (constantly 1))
          (->ReducibleAfterUpdate model reducible-update-returning-pks))))))
 
-(m/defmethod update/reducible-update-returning-pks* :around ::after-update
-  [model {::keys [doing-after-update?], :as parsed-args}]
+(m/defmethod op/reducible-returning-pks* :around [::update/update ::after-update]
+  [query-type model {::keys [doing-after-update?], :as parsed-args}]
   (if doing-after-update?
-    (next-method model parsed-args)
+    (next-method query-type model parsed-args)
     (u/with-debug-result ["do after-update for %s in %s" model `update/reducible-update-returning-pks*]
       (let [parsed-args                    (assoc parsed-args ::doing-after-update? true)
-            reducible-update-returning-pks (next-method model parsed-args)]
+            reducible-update-returning-pks (next-method query-type model parsed-args)]
         (eduction
          (map (select/select-pks-fn model))
          (->ReducibleAfterUpdate model reducible-update-returning-pks))))))

@@ -36,7 +36,7 @@
 
 (defn reducible [query-type modelable unparsed-args]
   (model/with-model [model modelable]
-    (let [parsed-args (query/parse-args query-type model unparsed-args)]
+    (query/with-parsed-args-with-query [parsed-args [query-type model unparsed-args]]
       (reducible* query-type model parsed-args))))
 
 (defn returning-update-count! [query-type modelable unparsed-args]
@@ -54,7 +54,7 @@
 (defn reducible-returning-pks
   [query-type modelable unparsed-args]
   (model/with-model [model modelable]
-    (let [parsed-args (query/parse-args query-type model unparsed-args)]
+    (query/with-parsed-args-with-query [parsed-args [query-type model unparsed-args]]
       (reducible-returning-pks* query-type model parsed-args))))
 
 (defn returning-pks! [query-type modelable unparsed-args]
@@ -89,7 +89,7 @@
                                 modelable-columns
                                 [modelable-columns])]
     (model/with-model [model modelable]
-      (let [parsed-args (query/parse-args query-type model unparsed-args)]
+      (query/with-parsed-args-with-query [parsed-args [query-type model unparsed-args]]
         (reducible-returning-instances* query-type model (assoc parsed-args :columns columns))))))
 
 (defn returning-instances! [query-type modelable-columns unparsed-args]

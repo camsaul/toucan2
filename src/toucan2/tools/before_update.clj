@@ -3,6 +3,7 @@
    [methodical.core :as m]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.operation :as op]
    [toucan2.select :as select]
    [toucan2.update :as update]
    [toucan2.util :as u]))
@@ -43,14 +44,14 @@
             pk-map pk-maps]
         (assoc parsed-args :changes changes, :kv-args pk-map)))))
 
-(m/defmethod update/reducible-update* :around ::before-update
-  [model {::keys [doing-before-update?], :keys [changes], :as parsed-args}]
+(m/defmethod op/reducible* :around [::update/update ::before-update]
+  [query-type model {::keys [doing-before-update?], :keys [changes], :as parsed-args}]
   (cond
     doing-before-update?
-    (next-method model parsed-args)
+    (next-method query-type model parsed-args)
 
     (empty? changes)
-    (next-method model parsed-args)
+    (next-method query-type model parsed-args)
 
     :else
     (u/with-debug-result ["applying before update for %s" model]
@@ -58,7 +59,7 @@
         (u/println-debug ["Doing recursive updates with new args maps %s" new-args-maps])
         (eduction
          (mapcat (fn [args-map]
-                   (next-method model args-map)))
+                   (next-method query-type model args-map)))
          new-args-maps)))))
 
 (defmacro define-before-update [model [row-binding] & body]
