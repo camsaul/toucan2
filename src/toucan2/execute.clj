@@ -6,7 +6,6 @@
    [pretty.core :as pretty]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
-   [toucan2.current :as current]
    [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.model :as model]
    [toucan2.query :as query]
@@ -64,11 +63,9 @@
 
 (m/defmethod reduce-compiled-query :default
   [connectable model compiled-query rf init]
-  ;; TODO -- this logic should be abstracted out somewhere. Maybe in a new function in [[conn/with-connection]] itself
   (let [connectable (or connectable
-                        (if (not= current/*connectable* :toucan/default)
-                          current/*connectable*
-                          (model/default-connectable model)))]
+                        conn/*current-connectable*
+                        (model/default-connectable model))]
     (conn/with-connection [conn connectable]
       (reduce-compiled-query-with-connection conn model compiled-query rf init))))
 
@@ -98,7 +95,7 @@
 
 (defn reducible-query
   ([queryable]
-   (reducible-query ::conn/current queryable))
+   (reducible-query nil queryable))
   ([connectable queryable]
    (reducible-query connectable nil queryable))
   ([connectable modelable queryable]
@@ -144,7 +141,7 @@
     [\"DELETE FROM table WHERE ID = ?\" 1]"
   {:style/indent 0}
   [& body]
-  `(binding [current/*connectable* ::compile]
+  `(binding [conn/*current-connectable* ::compile]
      (let [query# (do ~@body)]
        (or (::query query#)
            (::query (realize/reduce-first query#))))))

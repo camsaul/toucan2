@@ -10,7 +10,7 @@
   (doseq [[model expected] {"ABC"    "ABC"
                             :abc     "abc"
                             :ns/abc  "abc"
-                            :default "default"
+                            :default "default"!
                             'symbol  "symbol"}]
     (testing (pr-str `(model/table-name ~model))
       (is (= expected
@@ -32,3 +32,6 @@
         ;; this is what HoneySQL normally does with a namespaced keyword
         (is (= ["SELECT * FROM \"people\" WHERE \"id\" = ?" 1]
                query))))))
+
+;;; [[model/default-connectable]] gets tested basically everywhere, because we define it for the models in
+;;; [[toucan2.test]] and use it in almost every test namespace

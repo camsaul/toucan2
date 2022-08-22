@@ -14,7 +14,6 @@
    [toucan.test-setup :as test-setup]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
-   [toucan2.current :as current]
    [toucan2.instance :as instance]
    [toucan2.test :as test])
   (:import
@@ -110,7 +109,7 @@
 
 (deftest query-test
   (testing "Test query"
-    (binding [current/*connectable* ::test-setup/db]
+    (binding [conn/*current-connectable* ::test-setup/db]
       (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
              (db/query {:select   [:*]
                         :from     [:t1_users]
@@ -192,12 +191,12 @@
 
 ;; (defn do-with-default-connection [thunk]
 ;;   (try
-;;     (m/defmethod conn/do-with-connection :toucan/default
+;;     (m/defmethod conn/do-with-connection :default
 ;;       [connectable f]
 ;;       (next-method ::test-setup/db f))
 ;;     (thunk)
 ;;     (finally
-;;       (m/remove-primary-method! #'conn/do-with-connection :toucan/default))))
+;;       (m/remove-primary-method! #'conn/do-with-connection :default))))
 
 ;; (defmacro with-default-connection [& body]
 ;;   `(do-with-default-connection (^:once fn* [] ~@body)))

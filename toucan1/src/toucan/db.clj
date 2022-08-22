@@ -9,7 +9,6 @@
    [toucan.models :as models]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
-   [toucan2.current :as current]
    [toucan2.delete :as delete]
    [toucan2.execute :as execute]
    [toucan2.insert :as insert]
@@ -80,12 +79,12 @@
       (next-method model honeysql f))))
 
 ;; replaces `*db-connection*`
-(p/import-vars [current *connectable*])
+(p/import-vars [conn *current-connectable*])
 
 (defn set-default-db-connection!
   "DEPRECATED: Implement [[toucan2.connection/do-with-connection]] for `:default` instead."
   [connectable]
-  (m/defmethod conn/do-with-connection :toucan/default
+  (m/defmethod conn/do-with-connection :default
     [_connectable f]
     (conn/do-with-connection connectable f)))
 
@@ -107,7 +106,7 @@
 (defmacro transaction
   "DEPRECATED: use [[toucan2.connection/with-connection]] instead."
   [& body]
-  `(conn/with-connection [~'&transaction-connection current/*connectable*]
+  `(conn/with-connection [~'&transaction-connection nil]
      ~@body))
 
 (defn quote-fn
@@ -141,7 +140,7 @@
     (u/with-debug-result ["reduce Toucan 1 reducible query %s" this]
       (binding [t2.jdbc.query/*options*    (merge t2.jdbc.query/*options* jdbc-options)
                 compile/*honeysql-options* (honeysql-options)]
-        (reduce rf init (execute/reducible-query ::conn/current honeysql-form)))))
+        (reduce rf init (execute/reducible-query nil honeysql-form)))))
 
   pretty/PrettyPrintable
   (pretty [_this]

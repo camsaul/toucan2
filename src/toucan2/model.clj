@@ -3,7 +3,6 @@
    [methodical.core :as m]
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
-   [toucan2.current :as current]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.util :as u]))
@@ -28,21 +27,24 @@
   `(do-with-model ~modelable (^:once fn* [~model-binding] ~@body)))
 
 (m/defmulti default-connectable
+  "The default connectable that should be used when executing queries for `model` if
+  no [[toucan2.connection/*current-connectable*]] is currently bound. By default, this just returns the global default
+  connectable, `:default`, but you can tell Toucan to use a different default connectable for a model by implementing
+  this method."
   {:arglists '([model])}
   u/dispatch-on-first-arg)
 
 (m/defmethod default-connectable :default
   [_model]
-  :toucan/default)
+  :default)
 
 (defn- current-connectable [model]
   (u/with-debug-result ["Realizing deferred current connectable for model %s." model]
-    (u/println-debug ["%s is %s" `current/*connectable* current/*connectable*])
-    (if (= current/*connectable* :toucan/default)
-      (do
-        (u/println-debug ["Using %s for model %s" `default-connectable model])
-        (default-connectable model))
-      current/*connectable*)))
+    (u/println-debug ["%s is %s" `conn/*current-connectable* conn/*current-connectable*])
+    (or conn/*current-connectable*
+        (do
+          (u/println-debug ["Using %s for model %s" `default-connectable model])
+          (default-connectable model)))))
 
 (defrecord DeferredCurrentConnectable [model]
   pretty/PrettyPrintable

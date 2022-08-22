@@ -371,32 +371,30 @@
         (is (= [{:id 1, :name "Cam"}]
                (select/select :people/custom-honeysql ["1"] {:select [:id :name]})))))))
 
-#_(m/defmethod instance/key-transform-fn* [:default :people/custom-instance-type]
-  [_ _]
-  identity)
+#_(derive ::people.custom-instance-type ::test/people)
 
-#_(m/defmethod instance/instance* [:default :people/custom-instance-type]
+#_(m/defmethod instance/key-transform-fn* [:default ::people.custom-instance-type]
+    [_ _]
+    identity)
+
+#_(m/defmethod instance/instance* [:default ::people.custom-instance-type]
   [_ _ _ m _ metta]
   (with-meta m metta))
 
-#_(m/defmethod conn.current/default-connectable-for-model* :people/custom-instance-type
-  [_ _]
-  :test/postgres)
-
 #_(deftest custom-instance-type-test
-  (let [m (select/select-one :people/custom-instance-type 1)]
+  (let [m (select/select-one ::people.custom-instance-type 1)]
     (is (= {:id 1, :name "Cam", :created_at (OffsetDateTime/parse "2020-04-21T23:56Z")}
            m))
     (is (map? m))
     (is (not (instance/toucan2-instance? m)))))
 
-#_(deftest dont-add-from-if-it-already-exists-test
+(deftest dont-add-from-if-it-already-exists-test
   (testing "Select shouldn't add a :from clause if one is passed in explicitly already"
-    (is (= (instance/instance ::people {:id 1})
-           (select/select-one ::people {:select [:p.id], :from [[::people :p]], :where [:= :p.id 1]})))
-    (is (= ["SELECT p.id FROM people p WHERE p.id = ?" 1]
-           (query/compiled
-             (select/select-one ::people {:select [:p.id], :from [[::people :p]], :where [:= :p.id 1]}))))))
+    (is (= (instance/instance ::test/people {:id 1})
+           (select/select-one ::test/people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]})))
+    (is (= ["SELECT p.id FROM people AS p WHERE p.id = ?" 1]
+           (execute/compile
+             (select/select-one :people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]}))))))
 
 (deftest select-reducible-with-pks-test
   (is (= [(instance/instance ::test/venues {:id         1

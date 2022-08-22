@@ -4,7 +4,6 @@
    [methodical.core :as m]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
-   [toucan2.current :as current]
    [toucan2.delete :as delete]
    [toucan2.execute :as execute]
    [toucan2.insert :as insert]
@@ -46,7 +45,7 @@
            (into [] (map realize/realize) query))))
 
   (testing "with current connection"
-    (binding [current/*connectable* ::test/db]
+    (binding [conn/*current-connectable* ::test/db]
       (is (= [{:count 4}]
              (into []
                    ;; TODO -- not idea why Kondo is complaining about this
@@ -83,7 +82,7 @@
   (is (= [{:count 4}]
          (execute/query ::test/db "SELECT count(*) AS \"count\" FROM people;")))
   (testing "with current connection"
-    (binding [current/*connectable* ::test/db]
+    (binding [conn/*current-connectable* ::test/db]
       (is (= [{:count 4}]
              (execute/query "SELECT count(*) AS \"count\" FROM people;")))))
   (testing "HoneySQL query"
@@ -101,7 +100,7 @@
          (execute/query-one ::test/db "SELECT count(*) AS \"count\" FROM people")))
 
   (testing "with current connection"
-    (binding [current/*connectable* ::test/db]
+    (binding [conn/*current-connectable* ::test/db]
       (is (= {:count 4}
              (execute/query-one "SELECT count(*) AS \"count\" FROM people;"))))))
 
@@ -199,7 +198,7 @@
            (call-count)))))
 
 (deftest current-connectable-test
-  (binding [current/*connectable* ::test/db]
+  (binding [conn/*current-connectable* ::test/db]
     (is (= [{:one 1}]
            (execute/query "SELECT 1 AS one;")))))
 

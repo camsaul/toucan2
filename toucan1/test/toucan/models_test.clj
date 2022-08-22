@@ -6,7 +6,7 @@
    [toucan.test-models.category :as category :refer [Category]]
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
-   [toucan2.current :as current]
+   [toucan2.connection :as conn]
    [toucan2.model :as model]
    [toucan2.test :as test])
   (:import
@@ -174,7 +174,7 @@
     (is (= [{:id 1, :name "Tempest"}
             {:id 2, :name "Ho's Tavern"}
             {:id 3, :name "BevMo"}]
-           (binding [current/*connectable* ::test-setup/db]
+           (binding [conn/*current-connectable* ::test-setup/db]
              (db/query {:select   [:id :name]
                         :from     [(keyword (model/table-name Venue))]
                         :order-by [:id]}))))))
