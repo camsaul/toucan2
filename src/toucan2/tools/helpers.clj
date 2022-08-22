@@ -1,10 +1,12 @@
 (ns toucan2.tools.helpers
   (:require
    [methodical.core :as m]
+   [pretty.core :as pretty]
    [toucan2.connection :as conn]
    [toucan2.delete :as delete]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.operation :as op]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.tools.transformed :as transformed]
@@ -87,16 +89,26 @@
   (u/with-debug-result [(list `before-delete model instance)]
     (next-method model instance)))
 
-(m/defmethod delete/delete!* :around ::before-delete
-  [model parsed-args]
-  (conn/with-transaction [_conn (model/deferred-current-connectable model)]
-    (transduce
-     (map (fn [row]
-            (before-delete model row)))
-     (constantly nil)
-     nil
-     (select/select-reducible* model parsed-args))
-    (next-method model parsed-args)))
+(defrecord ReducibleDelete [model parsed-args reducible-delete]
+  clojure.lang.IReduceInit
+  (reduce [_this rf init]
+    (conn/with-transaction [_conn (model/deferred-current-connectable model)]
+      (transduce
+       (map (fn [row]
+              (before-delete model row)))
+       (constantly nil)
+       nil
+       (select/select-reducible* model parsed-args))
+      (reduce rf init reducible-delete)))
+
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `->ReducibleDelete model parsed-args reducible-delete)))
+
+(m/defmethod op/reducible* :around [::delete/delete ::before-delete]
+  [query-type model parsed-args]
+  (let [reducible-delete (next-method query-type model parsed-args)]
+    (->ReducibleDelete model parsed-args reducible-delete)))
 
 (defmacro define-before-delete
   {:style/indent :defn}

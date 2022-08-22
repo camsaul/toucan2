@@ -11,7 +11,7 @@
   [model _parsed-args]
   (throw (UnsupportedOperationException. (format "You cannot select %s." model))))
 
-(m/defmethod delete/delete!* ::delete
+(m/defmethod op/reducible* [::delete/delete ::delete]
   [model _parsed-args]
   (throw (UnsupportedOperationException. (format "You cannot delete instances of %s." model))))
 
