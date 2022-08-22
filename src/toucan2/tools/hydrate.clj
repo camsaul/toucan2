@@ -20,21 +20,20 @@
 ;;;                                  Automagic Batched Hydration (via :table-keys)
 ;;; ==================================================================================================================
 
-;;; TODO - rename this to `model-for-automagic-hydration`
-(m/defmulti table-for-automagic-hydration
+(m/defmulti model-for-automagic-hydration
   "The model that should be used to automagically hydrate the key `k` in instances of `source-model`.
 
-    (table-for-automagic-hydration :some-table :user) :-> :myapp.models/user"
+    (model-for-automagic-hydration :some-table :user) :-> :myapp.models/user"
   {:arglists '([source-model k])}
   u/dispatch-on-first-two-args)
 
-(m/defmethod table-for-automagic-hydration :default
+(m/defmethod model-for-automagic-hydration :default
   [_model _k]
   nil)
 
 (m/defmethod can-hydrate-with-strategy? [:default ::automagic-batched :default]
   [model _strategy dest-key]
-  (boolean (table-for-automagic-hydration model dest-key)))
+  (boolean (model-for-automagic-hydration model dest-key)))
 
 (m/defmulti fk-keys-for-automagic-hydration
   {:arglists '([original-model dest-key hydrated-model])}
@@ -109,7 +108,7 @@
 (m/defmethod hydrate-with-strategy ::automagic-batched
   [model _strategy dest-key rows]
   (try
-    (let [hydrating-model      (table-for-automagic-hydration model dest-key)
+    (let [hydrating-model      (model-for-automagic-hydration model dest-key)
           _                    (u/println-debug ["Hydrating %s key %s with rows from %s" (or model "map") dest-key hydrating-model])
           fk-keys              (fk-keys-for-automagic-hydration model dest-key hydrating-model)
           _                    (u/println-debug ["Hydrating with FKs %s" fk-keys])
@@ -272,10 +271,10 @@
 (defn hydrate
   "Hydrate a single object or sequence of objects.
 
-  #### Automagic Batched Hydration (via [[toucan2.hydrate/table-for-automagic-hydration]])
+  #### Automagic Batched Hydration (via [[toucan2.hydrate/model-for-automagic-hydration]])
 
   [[toucan2.hydrate/hydrate]] attempts to do a *batched hydration* where possible. If the key being hydrated is
-  defined as one of some table's [[toucan2.hydrate/table-for-automagic-hydration]], `hydrate` will do a batched
+  defined as one of some table's [[toucan2.hydrate/model-for-automagic-hydration]], `hydrate` will do a batched
   [[toucan2.select/select]] if a corresponding key (by default, the same key suffixed by `-id`) is found in the
   objects being batch hydrated. The corresponding key can be customized by
   implementing [[toucan2.hydrate/fk-keys-for-automagic-hydration]].
@@ -290,7 +289,7 @@
 
   #### Function-Based Batched Hydration (via [[toucan2.hydrate/batched-hydrate]] methods)
 
-  If the key can't be hydrated auto-magically with the appropriate [[toucan2.hydrate/table-for-automagic-hydration]],
+  If the key can't be hydrated auto-magically with the appropriate [[toucan2.hydrate/model-for-automagic-hydration]],
   [[toucan2.hydrate/hydrate]] will attempt to do batched hydration if it can find a matching method
   for [[toucan2.hydrate/batched-hydrate]]. If a matching function is found, it is called with a collection of
   objects, e.g.

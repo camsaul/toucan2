@@ -121,7 +121,7 @@
   (let [[model] (dispatch-value-2 dispatch-value)]
     `(do
        ~@(for [k ks]
-           `(m/defmethod hydrate/table-for-automagic-hydration* [~~model ~k]
+           `(m/defmethod hydrate/model-for-automagic-hydration* [~~model ~k]
               [~'_ ~'_ ~'_]
               ~model)))))
 

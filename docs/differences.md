@@ -71,7 +71,7 @@ transforms this way and build models that use several of them. See documentation
 
 ## `define-property!` -- derive model
 
-## `hydration-keys` => `t2/table-for-automagic-hydration`
+## `hydration-keys` => `t2/model-for-automagic-hydration`
 
 ## `toucan.db/*db-connection*` is now current `*connectable*` (TODO: not sure if this will be renamed)
 

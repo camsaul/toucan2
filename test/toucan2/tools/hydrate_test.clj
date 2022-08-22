@@ -21,11 +21,11 @@
     {:category {:in  name
                 :out keyword}})
 
-(m/defmethod hydrate/table-for-automagic-hydration [:default ::user]
+(m/defmethod hydrate/model-for-automagic-hydration [:default ::user]
   [_model _k]
   :user)
 
-(m/defmethod hydrate/table-for-automagic-hydration [:default ::venue]
+(m/defmethod hydrate/model-for-automagic-hydration [:default ::venue]
   [_model _k]
   ::venues.category-keyword)
 
@@ -44,7 +44,7 @@
 
 ;; custom automagic hydration
 
-(m/defmethod hydrate/table-for-automagic-hydration [::hydrate-venue-with-people ::venue]
+(m/defmethod hydrate/model-for-automagic-hydration [::hydrate-venue-with-people ::venue]
   [_model _k]
   ::people)
 
@@ -324,7 +324,7 @@
   [_model]
   [:id :name])
 
-(m/defmethod hydrate/table-for-automagic-hydration [:default ::people]
+(m/defmethod hydrate/model-for-automagic-hydration [:default ::people]
   [_model _k]
   ::people.composite-pk)
 

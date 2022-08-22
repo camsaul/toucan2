@@ -136,8 +136,8 @@
  [toucan2.tools.hydrate
   batched-hydrate
   hydrate
-  simple-hydrate
-  table-for-automagic-hydration]
+  model-for-automagic-hydration
+  simple-hydrate]
 
  #_[toucan2.tools.identity-query
     identity-query]
