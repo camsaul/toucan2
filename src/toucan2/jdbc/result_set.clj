@@ -153,4 +153,7 @@
   (extend c3p0-connection-class
     u/DispatchValue
     {:dispatch-value (fn [^java.sql.Wrapper conn]
-                       (u/dispatch-value (.unwrap conn java.sql.Connection)))}))
+                       (try
+                         (u/dispatch-value (.unwrap conn java.sql.Connection))
+                         (catch Throwable _
+                           c3p0-connection-class)))}))
