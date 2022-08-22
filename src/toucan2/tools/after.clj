@@ -7,7 +7,6 @@
    [toucan2.model :as model]
    [toucan2.operation :as op]
    [toucan2.realize :as realize]
-   [toucan2.select :as select]
    [toucan2.util :as u]))
 
 (m/defmulti after
@@ -64,7 +63,7 @@
          (after-reducible-instances
           query-type
           model
-          (select/select-reducible-with-pks model affected-pks))))))
+          (op/select-reducible-with-pks model affected-pks))))))
 
   pretty/PrettyPrintable
   (pretty [_this]

@@ -84,6 +84,34 @@
 
 ;;;; things that return instances
 
+(defn select-reducible-with-pks
+  "Return a [[select/select-reducible]] for instances of `model` that match a sequence of PKs. Each PK should be either a
+  single value or vector of values (for models with a composite PK)."
+  {:arglists '([model row-pks]
+               [[model & columns] row-pks])}
+  [modelable-columns row-pks]
+  (if (empty? row-pks)
+    []
+    (let [[modelable & columns] (if (sequential? modelable-columns)
+                                  modelable-columns
+                                  [modelable-columns])]
+      (model/with-model [model modelable]
+        (let [pk-vecs       (for [pk row-pks]
+                              (if (sequential? pk)
+                                pk
+                                [pk]))
+              pk-keys       (model/primary-keys-vec model)
+              pk-maps       (for [pk-vec pk-vecs]
+                              (zipmap pk-keys pk-vec))
+              conditions    (mapcat
+                             (juxt identity (fn [k]
+                                              [:in (mapv k pk-maps)]))
+                             pk-keys)
+              model-columns (if (seq columns)
+                              (cons model columns)
+                              model)]
+          (apply select/select-reducible model-columns conditions))))))
+
 (m/defmulti reducible-returning-instances*
   {:arglists '([query-type model parsed-args])}
   u/dispatch-on-first-two-args)
@@ -96,7 +124,7 @@
         (reduce
          rf
          init
-         (select/select-reducible-with-pks (into [model] columns) row-pks)))))
+         (select-reducible-with-pks (into [model] columns) row-pks)))))
 
   pretty/PrettyPrintable
   (pretty [_this]
