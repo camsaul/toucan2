@@ -8,8 +8,8 @@
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.tools.after-select :as after-select]
    [toucan2.tools.before-update :as before-update]
-   [toucan2.tools.helpers :as helpers]
    [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
@@ -254,7 +254,7 @@
 
 (derive ::venues.short-name ::test/venues)
 
-(helpers/define-after-select-each ::venues.short-name
+(after-select/define-after-select-each ::venues.short-name
   [venue]
   (assoc venue :short-name (str/join (take 4 (:name venue)))))
 

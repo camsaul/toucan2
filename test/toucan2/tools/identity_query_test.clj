@@ -7,7 +7,7 @@
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
-   [toucan2.tools.helpers :as helpers]
+   [toucan2.tools.after-select :as after-select]
    [toucan2.tools.identity-query :as identity-query]))
 
 (deftest query-test
@@ -69,7 +69,7 @@
             (instance/instance ::test/venues {:id 2, :name "Ho's Tavern"})]
            (select/select ::wrap-reducible-query)))))
 
-(helpers/define-after-select-each ::my-after-select
+(after-select/define-after-select-each ::my-after-select
   [instance]
   (assoc instance :after-select? true))
 

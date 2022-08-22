@@ -14,6 +14,7 @@
    [toucan2.save]
    [toucan2.select]
    [toucan2.tools.after-insert]
+   [toucan2.tools.after-select]
    [toucan2.tools.after-update]
    [toucan2.tools.before-insert]
    [toucan2.tools.before-update]
@@ -34,6 +35,7 @@
   toucan2.save/keep-me
   toucan2.select/keep-me
   toucan2.tools.after-insert/keep-me
+  toucan2.tools.after-select/keep-me
   toucan2.tools.after-update/keep-me
   toucan2.tools.before-insert/keep-me
   toucan2.tools.before-update/keep-me
@@ -114,6 +116,10 @@
  [toucan2.tools.after-insert
   define-after-insert]
 
+ [toucan2.tools.after-select
+  define-after-select-each
+  define-after-select-reducible]
+
  [toucan2.tools.after-update
   define-after-update]
 
@@ -126,8 +132,6 @@
  #_[toucan2.tools.disallow]
 
  [toucan2.tools.helpers
-  define-after-select-each
-  define-after-select-reducible
   define-before-delete
   define-before-select
   define-default-fields

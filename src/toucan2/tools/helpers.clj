@@ -4,7 +4,6 @@
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
    [toucan2.delete :as delete]
-   [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.operation :as op]
    [toucan2.query :as query]
@@ -12,7 +11,7 @@
    [toucan2.tools.transformed :as transformed]
    [toucan2.util :as u]))
 
-;;;; [[define-before-select]], [[define-after-select-reducible]], [[define-after-select-each]]
+;;;; [[define-before-select]]
 
 (defn do-before-select [model thunk]
   (u/with-debug-result ["%s %s" `define-before-select model]
@@ -34,30 +33,6 @@
        [~'&query-type ~'&model ~args-binding]
        (do-before-select ~'&model (^:once fn* [] ~@body)))))
 
-(defmacro define-after-select-reducible
-  {:style/indent :defn}
-  [model [reducible-query-binding] & body]
-  `(m/defmethod select/select-reducible* :after ~model
-     [~'&model ~reducible-query-binding]
-     ~@body))
-
-(defn do-after-select-each [model reducible-query f]
-  (eduction (map (fn [instance]
-                   (u/with-debug-result ["do after-select for %s %s" model instance]
-                     (try
-                       (instance/reset-original (f instance))
-                       (catch Throwable e
-                         (throw (ex-info (format "Error in %s for %s: %s"
-                                                 `define-after-select-each (pr-str model) (ex-message e))
-                                         {:model model, :instance instance}
-                                         e)))))))
-            reducible-query))
-
-(defmacro define-after-select-each
-  {:style/indent :defn}
-  [model [instance-binding] & body]
-  `(define-after-select-reducible ~model [reducible-query#]
-     (do-after-select-each ~'&model reducible-query# (fn [~instance-binding] ~@body))))
 
 ;;;; [[define-default-fields]]
 
