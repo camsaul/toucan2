@@ -69,7 +69,7 @@
   [model]
   (if (instance? clojure.lang.Named model)
     ((m/effective-method table-name clojure.lang.Named) model)
-    (throw (ex-info (format "Invalid model %s: don't know how to get its table name." (pr-str model))
+    (throw (ex-info (format "Invalid model %s: don't know how to get its table name." (u/safe-pr-str model))
                     {:model model}))))
 
 (m/defmethod table-name clojure.lang.Named
@@ -95,8 +95,8 @@
     (when-not (every? keyword? pks)
       (throw (ex-info (format "Bad %s for model %s: should return keyword or sequence of keywords, got %s"
                               `primary-keys
-                              (pr-str model)
-                              (pr-str pk-or-pks))
+                              (u/safe-pr-str model)
+                              (u/safe-pr-str pk-or-pks))
                       {:model model, :result pk-or-pks})))
     pks))
 

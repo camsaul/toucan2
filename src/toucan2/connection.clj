@@ -39,7 +39,7 @@
   [connectable _f]
   (throw (ex-info (format "Don't know how to get a connection from ^%s %s. Do you need to implement %s for %s?"
                           (some-> connectable class .getCanonicalName)
-                          (pr-str connectable)
+                          (u/safe-pr-str connectable)
                           `do-with-connection
                           (u/dispatch-value connectable))
                   {:connectable connectable})))

@@ -4,19 +4,22 @@
    [methodical.core :as m]
    [toucan2.util :as u]))
 
+;;; TODO -- is there any circumstance in the universe where it makes sense to have this be a `do-with` method and not
+;;; just have a `compile` multimethod instead?
 (m/defmulti do-with-compiled-query
   {:arglists '([model query f])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod do-with-compiled-query :around :default
   [model query f]
-  (u/println-debug ["compile %s query %s" model query])
-  (try
-    (next-method model query f)
-    (catch Throwable e
-      (throw (ex-info (.getMessage e)
-                      {:model model, :uncompiled-query query}
-                      e)))))
+  #_(u/println-debug ["compile %s query %s" model query])
+  (let [f* (^:once fn* [compiled]
+            (when (and u/*debug*
+                       (not= query compiled))
+              (u/with-debug-result ["compile %s query %s" model query]
+                compiled))
+            (f compiled))]
+    (next-method model query f*)))
 
 (defmacro with-compiled-query [[query-binding [model query]] & body]
   `(do-with-compiled-query
@@ -49,11 +52,11 @@
   [model honeysql f]
   (let [options  (merge @global-honeysql-options
                         *honeysql-options*)
-        sql-args (u/with-debug-result ["Compiling Honey SQL with options %s" options]
-                   (try
-                     (hsql/format honeysql options)
-                     (catch Throwable e
-                       (throw (ex-info (format "Error building query: %s" (ex-message e))
-                                       {:model model, :honeysql honeysql, :options options}
-                                       e)))))]
+        _        (u/println-debug ["Compiling Honey SQL 2 with options %s" options])
+        sql-args (try
+                   (hsql/format honeysql options)
+                   (catch Throwable e
+                     (throw (ex-info (format "Error building query: %s" (ex-message e))
+                                     {:model model, :honeysql honeysql, :options options}
+                                     e))))]
     (do-with-compiled-query model sql-args f)))

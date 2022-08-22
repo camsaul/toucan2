@@ -16,13 +16,14 @@
        (u/with-debug-result ["Do before-insert to %s" row]
          (before-insert model row))
        (catch Throwable e
-         (throw (ex-info (format "Error in before-insert for %s: %s" (pr-str model) (ex-message e))
+         (throw (ex-info (format "Error in before-insert for %s: %s" (u/safe-pr-str model) (ex-message e))
                          {:model model, :row row}
                          e)))))
    rows))
 
 (m/defmethod op/reducible* :before [::insert/insert ::before-insert]
   [_query-type model parsed-args]
+  (assert (map? parsed-args))
   (u/with-debug-result ["Do before insert for %s" model]
     (update parsed-args :rows do-before-insert-to-rows model)))
 

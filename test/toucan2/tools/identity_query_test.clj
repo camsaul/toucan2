@@ -4,6 +4,7 @@
    [methodical.core :as m]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
+   [toucan2.operation :as op]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -48,8 +49,8 @@
          (select/select ::venues (identity-query/identity-query
                                   [{:id 1, :name "No Category", :category nil}])))))
 
-(m/defmethod select/select-reducible* :after ::select-reducible-identity-query
-  [_model _reducible-query]
+(m/defmethod op/reducible-returning-instances* :after [::select/select ::select-reducible-identity-query]
+  [_query-type _model _reducible-query]
   (identity-query/identity-query [{:a 1, :b 2}
                                   {:a 3, :b 4}]))
 
@@ -59,8 +60,8 @@
             {:a 3, :b 4}]
            (select/select ::select-reducible-identity-query)))))
 
-(m/defmethod select/select-reducible* :after ::wrap-reducible-query
-  [_model _reducible-query]
+(m/defmethod op/reducible-returning-instances* :after [::select/select ::wrap-reducible-query]
+  [_query-type _model _reducible-query]
   (identity-query/identity-query (select/select-reducible [::test/venues :id :name] {:order-by [[:id :asc]], :limit 2})))
 
 (deftest wrap-reducible-query-test
@@ -77,7 +78,7 @@
   (select/select model (identity-query/identity-query rows)))
 
 (defn- do-after-select-reducible [model rows]
-  (select/select-reducible* model {:query (identity-query/identity-query rows)}))
+  (op/reducible-returning-instances* ::select/select model {:queryable (identity-query/identity-query rows)}))
 
 (deftest do-after-select-test
   (testing "Can we use `identity-query` to build some sort of abomination like Toucan 1 do-post-select?"

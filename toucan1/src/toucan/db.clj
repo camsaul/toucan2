@@ -134,7 +134,7 @@
   (compile/with-compiled-query [query [nil honeysql-form]]
     query))
 
-(defrecord Toucan1ReducibleQuery [honeysql-form jdbc-options]
+(deftype Toucan1ReducibleQuery [honeysql-form jdbc-options]
   clojure.lang.IReduceInit
   (reduce [this rf init]
     (u/with-debug-result ["reduce Toucan 1 reducible query %s" this]

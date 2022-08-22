@@ -9,7 +9,7 @@
   (try
     (thunk)
     (catch Throwable e
-      (throw (ex-info (format "Error realizing column %s: %s" (pr-str k) (ex-message e))
+      (throw (ex-info (format "Error realizing column %s: %s" (u/safe-pr-str k) (ex-message e))
                       {:k k, :thunk thunk}
                       e)))))
 

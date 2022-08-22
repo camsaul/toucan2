@@ -2,14 +2,15 @@
   (:require
    [methodical.core :as m]
    [toucan2.instance :as instance]
+   [toucan2.operation :as op]
    [toucan2.select :as select]
    [toucan2.util :as u]))
 
 (defmacro define-after-select-reducible
   {:style/indent :defn}
   [model [reducible-query-binding] & body]
-  `(m/defmethod select/select-reducible* :after ~model
-     [~'&model ~reducible-query-binding]
+  `(m/defmethod op/reducible-returning-instances* :after [::select/select ~model]
+     [~'&query-type ~'&model ~reducible-query-binding]
      ~@body))
 
 (defn do-after-select-each [model reducible-query f]
@@ -19,7 +20,7 @@
                        (instance/reset-original (f instance))
                        (catch Throwable e
                          (throw (ex-info (format "Error in %s for %s: %s"
-                                                 `define-after-select-each (pr-str model) (ex-message e))
+                                                 `define-after-select-each (u/safe-pr-str model) (ex-message e))
                                          {:model model, :instance instance}
                                          e)))))))
             reducible-query))

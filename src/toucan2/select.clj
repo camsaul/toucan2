@@ -4,54 +4,47 @@
    [methodical.core :as m]
    [toucan2.execute :as execute]
    [toucan2.model :as model]
+   [toucan2.operation :as op]
    [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
 (m/defmethod query/build [::select :default clojure.lang.IPersistentMap]
-  [query-type model {:keys [columns], :as args}]
-  (let [args (update args :query (fn [query]
-                                   (merge {:select (or (not-empty columns)
-                                                       [:*])}
-                                          (when model
-                                            {:from [[(keyword (model/table-name model))]]})
-                                          query)))]
-    (next-method query-type model args)))
+  [query-type model {:keys [columns], :as parsed-args}]
+  (let [parsed-args (-> parsed-args
+                        (update :query (fn [query]
+                                         (merge {:select (or (not-empty columns)
+                                                             [:*])}
+                                                (when model
+                                                  {:from [[(keyword (model/table-name model))]]})
+                                                query)))
+                        (dissoc :columns))]
+    (next-method query-type model parsed-args)))
 
-(m/defmulti select-reducible*
-  "The actual args depend on what [[query/parse-args]] returns."
-  {:arglists '([model parsed-args])}
-  u/dispatch-on-first-arg)
+(m/defmethod op/reducible-returning-instances* [::select :default]
+  [query-type model parsed-args]
+  (query/with-query [query [model (:queryable parsed-args)]]
+    (let [query (query/build query-type model (assoc parsed-args :query query))]
+      (execute/reducible-query (model/deferred-current-connectable model)
+                               model
+                               query))))
 
-(m/defmethod select-reducible* :default
-  [model parsed-args]
-  (let [query (query/build ::select model parsed-args)]
-    (execute/reducible-query (model/deferred-current-connectable model)
-                             model
-                             query)))
-
-(defn select-reducible [modelable-columns & unparsed-args]
+(defn select-reducible
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
-  (u/with-debug-result [(list* `select-reducible modelable-columns unparsed-args)]
-    (let [[modelable & columns] (if (sequential? modelable-columns)
-                                  modelable-columns
-                                  [modelable-columns])]
-      (model/with-model [model modelable]
-        (query/with-parsed-args-with-query [parsed-args [::select model unparsed-args]]
-          (select-reducible* model (assoc parsed-args :columns columns)))))))
+  [modelable-columns & unparsed-args]
+  (op/reducible-returning-instances ::select modelable-columns unparsed-args))
 
 (defn select
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
-  [modelable & args]
-  (u/with-debug-result [(list* `select args)]
-    (realize/realize (apply select-reducible modelable args))))
+  [modelable-columns & unparsed-args]
+  (op/returning-instances! ::select modelable-columns unparsed-args))
 
 (defn select-one {:arglists '([modelable & kv-args? query?]
                               [[modelable & columns] & kv-args? query?])}
-  [modelable & args]
-  (realize/reduce-first (apply select-reducible modelable args)))
+  [modelable-columns & unparsed-args]
+  (realize/reduce-first (apply select-reducible modelable-columns unparsed-args)))
 
 (defn select-fn-reducible
   {:arglists '([f modelable & kv-args? query?])}

@@ -4,9 +4,9 @@
    [pretty.core :as pretty]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
+   [toucan2.operation :as op]
    [toucan2.query :as query]
-   [toucan2.realize :as realize]
-   [toucan2.select :as select]))
+   [toucan2.realize :as realize]))
 
 (defrecord IdentityQuery [rows]
   pretty/PrettyPrintable
@@ -38,11 +38,11 @@
    init
    rows))
 
-(m/defmethod query/build [::select/select :default IdentityQuery]
+(m/defmethod query/build [:toucan2.select/select :default IdentityQuery]
   [_query-type _model {:keys [query], :as _args}]
   query)
 
 ;;; allow using an identity query as an 'identity model'
-(m/defmethod select/select-reducible* IdentityQuery
-  [identity-query _parsed-args]
+(m/defmethod op/reducible-returning-instances* [:toucan2.select/select IdentityQuery]
+  [_query-type identity-query _parsed-args]
   identity-query)

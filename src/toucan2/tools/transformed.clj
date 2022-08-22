@@ -80,7 +80,7 @@
       :else
       nil)
     (catch Throwable e
-      (throw (ex-info (format "Error transforming %s: %s" (pr-str v) (ex-message e))
+      (throw (ex-info (format "Error transforming %s: %s" (u/safe-pr-str v) (ex-message e))
                       {:v v, :transform xform}
                       e)))))
 
@@ -103,7 +103,10 @@
        pk-keys
        pk-vals))))
 
-(defn wrapped-transforms [model direction]
+(defn wrapped-transforms
+  "Get the [[transforms]] functions for a model in a either the `:in` or `:out` direction; wrap the functions in
+  `try-catch` forms so we can meaningful error messages if they fail."
+  [model direction]
   (try
     (when-let [transforms (not-empty (transforms model))]
       ;; make the transforms map an instance so we can get appropriate magic map behavior when looking for the
@@ -118,14 +121,14 @@
                          (xform v)
                          (catch Throwable e
                            (throw (ex-info (format "Error transforming %s %s value %s: %s"
-                                                   (pr-str model)
-                                                   (pr-str k)
-                                                   (pr-str v)
+                                                   (u/safe-pr-str model)
+                                                   (u/safe-pr-str k)
+                                                   (u/safe-pr-str v)
                                                    (ex-message e))
                                            {:model model, :k k, :v v, :xform xform}
                                            e)))))]))))
     (catch Throwable e
-      (throw (ex-info (format "Error calculating %s transforms for %s: %s" direction (pr-str model) (ex-message e))
+      (throw (ex-info (format "Error calculating %s transforms for %s: %s" direction (u/safe-pr-str model) (ex-message e))
                       {:model model, :direction direction}
                       e)))))
 
@@ -160,6 +163,8 @@
   (instance/update-original-and-current
    instance
    (fn [row]
+     (assert (map? row)
+             (format "%s expected map rows, got %s" `apply-row-transform (u/safe-pr-str row)))
      ;; Special Optimization 2: if the underlying original/current maps of `instance` are instances of `IRow` (which
      ;; themselves have underlying key->value thunks) we can compose the thunk itself rather than immediately
      ;; realizing and transforming the value. This means transforms don't get applied to values that are never
@@ -173,9 +178,13 @@
          (update row k xform))
      (u/with-debug-result ["Transform %s %s" k (get row k)]
        (try
-         (update row k xform)
+         (doto (update row k xform)
+           ((fn [row]
+              (assert (map? row)
+                      (format "%s: expected row transform function to return a map, got %s"
+                              `apply-row-transform (u/safe-pr-str row))))))
          (catch Throwable e
-           (throw (ex-info (format "Error transforming %s %s: %s" (pr-str k) (pr-str (get row k)) (ex-message e))
+           (throw (ex-info (format "Error transforming %s %s: %s" (u/safe-pr-str k) (u/safe-pr-str (get row k)) (ex-message e))
                            {:k k, :v (get row k), :row row, :xform xform}
                            e))))))))
 
@@ -196,21 +205,21 @@
    identity
    transforms))
 
-(defn transform-results [model reducible-query]
+(defn transform-result-rows-transducer
+  "Return a transducer to transform rows of `model` using its [[out-transforms]]."
+  [model]
   (if-let [transforms (not-empty (out-transforms model))]
-    (u/with-debug-result [(list `transform-results model)]
-      (u/println-debug [transforms])
-      reducible-query
-      (eduction
-       (map (row-transform-fn transforms))
-       reducible-query))
-    reducible-query))
+    (map (let [f (row-transform-fn transforms)]
+           (fn [row]
+             (u/with-debug-result ["Transform %s row %s" model row]
+               (f row)))))
+    identity))
 
-;;; TODO -- shouldn't this be an `:after` method?
-(m/defmethod select/select-reducible* :around ::transformed
-  [model parsed-args]
-  (let [reducible-query (next-method model parsed-args)]
-    (transform-results model reducible-query)))
+(m/defmethod op/reducible-returning-instances* :after [:toucan2.select/select ::transformed]
+  [_query-type model reducible-query]
+  (eduction
+   (transform-result-rows-transducer model)
+   reducible-query))
 
 (m/defmethod query/build :before [::update/update ::transformed :default]
   [_query-type model {:keys [query], :as args}]
@@ -244,16 +253,40 @@
       (update parsed-args :rows transform-insert-rows transforms))
     parsed-args))
 
+(def ^:dynamic ^:private *already-transforming-insert-results*
+  "This is used to tell the [[op/reducible-returning-pks*]] method for handling insert transforms not to do anything if it
+  is getting called inside a [[op/reducible-returning-instances*]] call. If we're inside
+  a [[op/reducible-returning-instances*]] call it means we need to use the PK columns to fetch results from the DB and
+  we should use them as-is; the transform handler for `::select/select` will transform the instances the correct way. If
+  we are *not* inside a call to [[op/reducible-returning-instances*]], it means we are expected to return just the PKs;
+  those should be transformed."
+  false)
+
 (m/defmethod op/reducible-returning-pks* :after [::insert/insert ::transformed]
   [_query-type model reducible-results]
-  (let [pk-keys (model/primary-keys model)]
-    (eduction
-     (map (if (= (count pk-keys) 1)
-            (first pk-keys)
-            (juxt pk-keys)))
-     (transform-results model (eduction
-                               (map (fn [pk-vec]
-                                      (zipmap pk-keys (if (sequential? pk-vec)
-                                                        pk-vec
-                                                        [pk-vec]))))
-                               reducible-results)))))
+  (if *already-transforming-insert-results*
+    reducible-results
+    (let [pk-keys (model/primary-keys model)]
+      (eduction
+       ;; 1. convert result PKs to a map of PK key -> value
+       (map (fn [pk-or-pks]
+              (u/with-debug-result ["convert result PKs %s to map of PK key -> value" pk-or-pks]
+                (zipmap pk-keys (if (sequential? pk-or-pks)
+                                  pk-or-pks
+                                  [pk-or-pks])))))
+       ;; 2. transform the PK results using the model's [[out-transforms]]
+       (transform-result-rows-transducer model)
+       ;; 3. Now flatten the maps of PK key -> value back into plain PK values or vectors of plain PK values (if the model
+       ;; has a composite primary key)
+       (map (let [f (if (= (count pk-keys) 1)
+                      (first pk-keys)
+                      (juxt pk-keys))]
+              (fn [row]
+                (u/with-debug-result "convert PKs map back to flat PKs"
+                  (f row)))))
+       reducible-results))))
+
+(m/defmethod op/reducible-returning-instances* :around [::insert/insert ::transformed]
+  [query-type model reducible-results]
+  (binding [*already-transforming-insert-results* true]
+    (next-method query-type model reducible-results)))

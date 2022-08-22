@@ -248,7 +248,8 @@
                                                              :category   :bar
                                                              :created-at (LocalDateTime/parse "2017-01-01T00:00")
                                                              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
-                   (insert! ::venues.id-is-string [{:name "Hi-Dive", category-key "bar"}])))))))))
+                   (binding [toucan2.util/*debug* false #_true] ; NOCOMMIT
+                     (insert! ::venues.id-is-string [{:name "Hi-Dive", category-key "bar"}]))))))))))
 
 (deftest delete!-test
   (testing "Delete row by PK"
@@ -280,7 +281,7 @@
         (test/with-discarded-table-changes :venues
           ;; this should still throw an error, but it shouldn't be an NPE from the transform.
           (is (thrown-with-msg?
-               clojure.lang.ExceptionInfo
+               Exception
                (case (test/current-db-type)
                  :postgres #"ERROR: null value in column .* violates not-null constraint"
                  :h2       #"NULL not allowed for column \"CATEGORY\"")

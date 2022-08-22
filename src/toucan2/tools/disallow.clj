@@ -1,24 +1,20 @@
 (ns toucan2.tools.disallow
   (:require
    [methodical.core :as m]
-   [toucan2.delete :as delete]
-   [toucan2.insert :as insert]
-   [toucan2.operation :as op]
-   [toucan2.select :as select]
-   [toucan2.update :as update]))
+   [toucan2.operation :as op]))
 
-(m/defmethod select/select-reducible* ::select
+(m/defmethod op/reducible-returning-instances* [:toucan2.select/select ::select]
   [model _parsed-args]
   (throw (UnsupportedOperationException. (format "You cannot select %s." model))))
 
-(m/defmethod op/reducible* [::delete/delete ::delete]
+(m/defmethod op/reducible* [:toucan2.delete/delete ::delete]
   [model _parsed-args]
   (throw (UnsupportedOperationException. (format "You cannot delete instances of %s." model))))
 
-(m/defmethod op/reducible* [::insert/insert ::insert]
+(m/defmethod op/reducible* [:toucan2.insert/insert ::insert]
   [model _parsed-args]
   (throw (UnsupportedOperationException. (format "You cannot create new instances of %s." model))))
 
-(m/defmethod op/reducible* [::update/update ::update]
+(m/defmethod op/reducible* [:toucan2.update/update ::update]
   [model _parsed-args]
   (throw (UnsupportedOperationException. (format "You cannot update a %s after it has been created." model))))

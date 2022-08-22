@@ -87,7 +87,6 @@
   [modelable & unparsed-args]
   (op/returning-pks! ::insert modelable unparsed-args))
 
-
 (defn reducible-insert-returning-instances
   {:arglists '([modelable row-or-rows]
                [modelable k v & more]

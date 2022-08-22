@@ -12,6 +12,14 @@
   (realize [x]
     "Fully realize either a reducible query, or a result row from that query."))
 
+(defn- realize-IReduceInit [this]
+  (u/with-debug-result ["%s %s" `realize (symbol (.getCanonicalName (class this))) #_this]
+    (into []
+          (map (fn [row]
+                 (u/with-debug-result [(list `realize (some-> row class .getCanonicalName symbol) row)]
+                   (realize row))))
+          this)))
+
 (extend-protocol Realize
   Object
   (realize [this]
@@ -25,21 +33,7 @@
 
   clojure.lang.IReduceInit
   (realize [this]
-    (try
-      (u/with-debug-result ["%s %s" `realize (symbol (.getCanonicalName (class this))) #_this]
-        (into []
-              (map (fn [row]
-                     (u/with-debug-result [(list `realize (some-> row class .getCanonicalName symbol) row)]
-                       (realize row))))
-              this))
-      (catch Throwable e
-        (throw (ex-info (format "Error reducing ^%s %s: %s"
-                                (.getCanonicalName (class this))
-                                (binding [*print-meta* true]
-                                  (pr-str this))
-                                (ex-message e))
-                        {:this this}
-                        e)))))
+    (realize-IReduceInit this))
 
   ;; TODO -- actually pass the real Connection somehow.
   DatafiableRow

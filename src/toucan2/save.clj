@@ -18,7 +18,7 @@
       (next-method object))
     (catch Throwable e
       (throw (ex-info (format "Error saving %s: %s"
-                              (pr-str (instance/model object))
+                              (u/safe-pr-str (instance/model object))
                               (ex-message e))
                       {:model  (instance/model object)
                        :object object
@@ -30,15 +30,15 @@
   (assert (instance/instance? object)
           (format "Don't know how to save something that's not a Toucan instance. Got: ^%s %s"
                   (some-> object class .getCanonicalName)
-                  (pr-str object)))
+                  (u/safe-pr-str object)))
   (if-let [changes (not-empty (instance/changes object))]
     (model/with-model [model (instance/model object)]
       (let [pk-values     (select-keys object (model/primary-keys (instance/model object)))
             rows-affected (update/update! model pk-values changes)]
         (when-not (pos? rows-affected)
           (throw (ex-info (format "Unable to save object: %s with primary key %s does not exist."
-                                  (pr-str model)
-                                  (pr-str pk-values))
+                                  (u/safe-pr-str model)
+                                  (u/safe-pr-str pk-values))
                           {:object object
                            :pk     pk-values})))
         (when (> rows-affected 1)

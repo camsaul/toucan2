@@ -36,7 +36,7 @@
                             (let [[pk] (try
                                          (insert/insert-returning-pks! model merged-attributes)
                                          (catch Throwable e
-                                           (throw (ex-info (format "Error inserting temp %s: %s" (pr-str model) (ex-message e))
+                                           (throw (ex-info (format "Error inserting temp %s: %s" (u/safe-pr-str model) (ex-message e))
                                                            {:model  model
                                                             :attributes {:parameters attributes
                                                                          :default    defaults
@@ -45,7 +45,7 @@
                               [pk (select/select-one model :toucan/pk pk)]))]
 
     (try
-      (t/testing (format "with temporary %s with attributes %s" (pr-str model) (pr-str merged-attributes))
+      (t/testing (format "with temporary %s with attributes %s" (u/safe-pr-str model) (u/safe-pr-str merged-attributes))
         (f temp-object))
       (finally
         (delete/delete! model :toucan/pk pk)))))

@@ -52,15 +52,6 @@
   (fn [_connectable model compiled-query _rf _init]
     [(u/dispatch-value model) (u/dispatch-value compiled-query)]))
 
-(m/defmethod reduce-compiled-query :around :default
-  [connectable model compiled-query rf init]
-  (try
-    (next-method connectable model compiled-query rf init)
-    (catch Throwable e
-      (throw (ex-info (str "Error reducing compiled query: " (ex-message e))
-                      {:model model, :compiled-query compiled-query}
-                      e)))))
-
 (m/defmethod reduce-compiled-query :default
   [connectable model compiled-query rf init]
   (let [connectable (or connectable
@@ -84,7 +75,7 @@
     (query/with-query [query [model queryable]]
       (reduce-uncompiled-query connectable model query rf init))))
 
-(defrecord ReducibleQuery [connectable modelable queryable]
+(deftype ReducibleQuery [connectable modelable queryable]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (reduce-impl connectable modelable queryable rf init))
@@ -173,8 +164,8 @@
   [[call-count-fn-binding] & body]
   `(do-with-call-counts (^:once fn* [~call-count-fn-binding] ~@body)))
 
-;;; TODO -- this is kind of JDBC specific
-(defrecord WithReturnKeys [reducible]
+;;; TODO -- this is kind of [[next.jdbc]] specific
+(deftype WithReturnKeys [reducible]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (binding [t2.jdbc.query/*options* (assoc t2.jdbc.query/*options* :return-keys true)]

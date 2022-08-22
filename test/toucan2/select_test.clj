@@ -6,11 +6,14 @@
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.operation :as op]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test])
   (:import
    (java.time OffsetDateTime)))
+
+(use-fixtures :each test/do-db-types-fixture)
 
 (derive ::people ::test/people)
 
@@ -175,14 +178,14 @@
 (derive ::people.no-timestamps ::people)
 
 ;;; this could also be done as part a `:before` method.
-(m/defmethod select/select-reducible* ::people.no-timestamps
-  [model args]
-  (let [args (update args :columns (fn [columns]
-                                     (or columns [:id :name])))]
-    (next-method model args)))
+(m/defmethod op/reducible-returning-instances* [::select/select ::people.no-timestamps]
+  [query-type model parsed-args]
+  (let [parsed-args (update parsed-args :columns (fn [columns]
+                                                   (or columns [:id :name])))]
+    (next-method query-type model parsed-args)))
 
-(m/defmethod select/select-reducible* :after ::people.no-timestamps
-  [_model {reducible-query :query, :as args}]
+(m/defmethod op/reducible-returning-instances* :after [::select/select ::people.no-timestamps]
+  [_query-type _model reducible-query]
   (testing "should not be an eduction yet -- if it is it means this method is getting called more than once"
     (is (not (instance? clojure.core.Eduction reducible-query))))
   (assert (not (instance? clojure.core.Eduction reducible-query)))
@@ -193,7 +196,7 @@
           (testing "instance table should be a ::people.no-timestamps"
             (is (isa? (instance/model person) ::people.no-timestamps)))
           (assoc person :after-select? true)))
-   args))
+   reducible-query))
 
 (deftest default-query-test
   (testing "Should be able to set some defaults by implementing `select*`"
@@ -214,10 +217,10 @@
 ;; TODO this is probably not the way you'd want to accomplish this in real life -- I think you'd probably actually want
 ;; to implement [[toucan2.query/build]] instead. But it does do a good job of letting us test that combining aux methods
 ;; work like we'd expect.
-(m/defmethod select/select-reducible* :before ::people.limit-2
-  [_model args]
-  (cond-> args
-    (map? args) (update :query assoc :limit 2)))
+(m/defmethod op/reducible-returning-instances* :before [::select/select ::people.limit-2]
+  [_query-type _model {:keys [queryable], :as parsed-args}]
+  (cond-> parsed-args
+    (map? queryable) (update :queryable assoc :limit 2)))
 
 (deftest pre-select-test
   (testing "Should be able to do cool stuff in pre-select (select* :before)"
@@ -397,13 +400,14 @@
 
 (deftest select-nil-test
   (testing "(select model nil) should basically be the same as (select model :toucan/pk nil)"
-    (is (= {:queryable nil}
-           (query/parse-args ::select/select ::test/venues [nil])))
-    (query/with-parsed-args-with-query [parsed-args [::select/select ::test/venues [nil]]]
-      (is (= {:query nil}
+    (let [parsed-args (query/parse-args ::select/select ::test/venues [nil])]
+      (is (= {:queryable nil}
              parsed-args))
-      (is (= {:select [:*], :from [[:venues]], :where [:= :id nil]}
-             (query/build ::select/select ::test/venues parsed-args))))
+      (query/with-query [query [::test/venues (:queryable parsed-args)]]
+        (is (= nil
+               query))
+        (is (= {:select [:*], :from [[:venues]], :where [:= :id nil]}
+               (query/build ::select/select ::test/venues (assoc parsed-args :query query))))))
     (is (= ["SELECT * FROM venues WHERE id IS NULL"]
            (execute/compile
              (select/select ::test/venues nil))))

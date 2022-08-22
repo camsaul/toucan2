@@ -11,13 +11,14 @@
 
 (csk.macros/defconversion "kebab-case" u/lower-case-en u/lower-case-en "-")
 
+;;; TODO -- give this a better name that accurately reflects the fact that it's doing magic
 (defn default-key-transform [k]
   (when k
     (if (and (clojure.core/instance? clojure.lang.Named k) (namespace k))
       (keyword (->kebab-case (namespace k)) (->kebab-case (name k)))
       (keyword (->kebab-case (name k))))))
 
-(def ^:dynamic *default-key-transform-fn* default-key-transform)
+(def ^:dynamic *default-key-transform-fn* #'default-key-transform)
 
 (m/defmulti key-transform-fn
   "Function to use to magically transform map keywords when building a new instance of `model`."
@@ -31,7 +32,7 @@
   *default-key-transform-fn*)
 
 (defn normalize-map [key-xform m]
-  {:pre [(fn? key-xform) (map? m)]}
+  {:pre [(ifn? key-xform) (map? m)]}
   (into (empty m)
         (map (fn [[k v]]
                [(key-xform k) v]))

@@ -7,11 +7,11 @@
    [toucan2.query :as query]))
 
 (m/defmethod query/build [::delete :default clojure.lang.IPersistentMap]
-  [query-type model args]
-  (let [args (update args :query (fn [query]
-                                   (merge {:delete-from [(keyword (model/table-name model))]}
-                                          query)))]
-    (next-method query-type model args)))
+  [query-type model parsed-args]
+  (let [parsed-args (update parsed-args :query (fn [query]
+                                                 (merge {:delete-from [(keyword (model/table-name model))]}
+                                                        query)))]
+    (next-method query-type model parsed-args)))
 
 (defn reducible-delete
   {:arglists '([modelable & conditions? query?])}

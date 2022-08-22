@@ -5,7 +5,6 @@
  {toucan2.compile/with-compiled-query       clojure.core/let
   toucan2.core/with-model                   clojure.core/let
   toucan2.model/with-model                  clojure.core/let
-  toucan2.query/with-parsed-args-with-query clojure.core/let
   toucan2.query/with-query                  clojure.core/let}
 
  :hooks

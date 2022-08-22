@@ -50,7 +50,7 @@
     (when-not (and (sequential? result)
                    (seq result)
                    (every? keyword? result))
-      (throw (ex-info (format "fk-keys-for-automagic-hydration should return a non-empty sequence of keywords. Got: %s" (pr-str result))
+      (throw (ex-info (format "fk-keys-for-automagic-hydration should return a non-empty sequence of keywords. Got: %s" (u/safe-pr-str result))
                       {:original-model original-model
                        :dest-key       dest-key
                        :hydrated-model hydrated-model

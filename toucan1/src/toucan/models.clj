@@ -9,7 +9,8 @@
    [toucan2.tools.before-insert :as before-insert]
    [toucan2.tools.before-update :as before-update]
    [toucan2.tools.helpers :as helpers]
-   [toucan2.tools.identity-query :as identity-query]))
+   [toucan2.tools.identity-query :as identity-query]
+   [toucan2.util :as u]))
 
 (defonce ^:private -root-namespace (atom 'models))
 
@@ -45,7 +46,7 @@
     (isa? model :toucan1/model) model
     (vector? model)             (resolve-model (first model))
     (symbol? model)             (resolve-model-from-symbol model)
-    :else                       (throw (ex-info (str "Invalid model: " (pr-str model))
+    :else                       (throw (ex-info (str "Invalid model: " (u/safe-pr-str model))
                                                 {:model model}))))
 
 (m/defmethod model/do-with-model clojure.lang.Symbol

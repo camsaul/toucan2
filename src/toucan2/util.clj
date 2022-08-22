@@ -1,6 +1,7 @@
 (ns toucan2.util
   (:require
    [clojure.string :as str]
+   [clojure.walk :as walk]
    [potemkin :as p]
    [pretty.core :as pretty]
    [puget.printer :as puget]))
@@ -217,3 +218,33 @@
   [child parent]
   (when-not (isa? child parent)
     (derive child parent)))
+
+(defprotocol SafePRStr
+  (^:private safe-printable [this]
+    "Convert `this` to a safe representation for printing by [[safe-pr-str]]."))
+
+(defn- walk-safe-printable [x]
+  (walk/postwalk safe-printable x))
+
+(defn safe-pr-str
+  "Like [[clojure.core/pr-str]], but does not evaluate reducibles or eductions, and
+  handles [[pretty.core/PrettyPrintable]] things recursively."
+  [x]
+  (pr-str (walk-safe-printable x)))
+
+(extend-protocol SafePRStr
+  nil
+  (safe-printable [this]
+    this)
+
+  Object
+  (safe-printable [this]
+    this)
+
+  pretty.core.PrettyPrintable
+  (safe-printable [this]
+    (walk-safe-printable (pretty/pretty this)))
+
+  clojure.core.Eduction
+  (safe-printable [^clojure.core.Eduction ed]
+    (walk-safe-printable (list 'eduction (.xform ed) (.coll ed)))))

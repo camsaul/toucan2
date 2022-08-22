@@ -18,7 +18,7 @@
     (try
       (thunk)
       (catch Throwable e
-        (throw (ex-info (format "Error in %s for %s: %s" `define-before-select (pr-str model) (ex-message e))
+        (throw (ex-info (format "Error in %s for %s: %s" `define-before-select (u/safe-pr-str model) (ex-message e))
                         {:model model}
                         e))))))
 
@@ -64,7 +64,7 @@
   (u/with-debug-result [(list `before-delete model instance)]
     (next-method model instance)))
 
-(defrecord ReducibleBeforeDelete [model parsed-args reducible-delete]
+(deftype ReducibleBeforeDelete [model parsed-args reducible-delete]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (conn/with-transaction [_conn (model/deferred-current-connectable model)]
@@ -73,7 +73,7 @@
               (before-delete model row)))
        (constantly nil)
        nil
-       (select/select-reducible* model parsed-args))
+       (op/reducible-returning-instances* :toucan2.select/select model parsed-args))
       (reduce rf init reducible-delete)))
 
   pretty/PrettyPrintable

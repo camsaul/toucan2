@@ -33,9 +33,10 @@
   "Fetch the matching rows based on original `parsed-args`; apply [[before-update]] to each. Return a new *sequence* of
   parsed args map that should be used to perform 'replacement' update operations."
   [model {:keys [changes], :as parsed-args}]
-  (when-let [changes->pk-maps (not-empty (changes->affected-pk-maps model
-                                                                    (select/select-reducible* model parsed-args)
-                                                                    changes))]
+  (when-let [changes->pk-maps (not-empty (changes->affected-pk-maps
+                                          model
+                                          (op/reducible-returning-instances* ::select/select model parsed-args)
+                                          changes))]
     (if (= (count changes->pk-maps) 1)
       ;; every row has the same exact changes: we only need to perform a single update, using the original conditions.
       [(assoc parsed-args :changes (first (keys changes->pk-maps)))]

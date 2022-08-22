@@ -19,7 +19,7 @@
     (try
       (next-method query-type model instance)
       (catch Throwable e
-        (throw (ex-info (format "Error in %s %s for %s: %s" `after query-type (pr-str model) (ex-message e))
+        (throw (ex-info (format "Error in %s %s for %s: %s" `after query-type (u/safe-pr-str model) (ex-message e))
                         {:model model, :row instance}
                         e))))))
 
@@ -51,7 +51,7 @@
 
 ;;;; reducible PKs
 
-(defrecord AfterReduciblePKs [query-type model reducible-pks]
+(deftype AfterReduciblePKs [query-type model reducible-pks]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (u/with-debug-result ["reducing %s %s for %s" `after query-type model]
@@ -63,7 +63,7 @@
          (after-reducible-instances
           query-type
           model
-          (op/select-reducible-with-pks model affected-pks))))))
+          (op/select-reducible-with-pks model nil affected-pks))))))
 
   pretty/PrettyPrintable
   (pretty [_this]

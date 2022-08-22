@@ -69,7 +69,7 @@
 
 ;; (m/defmethod honeysql.compile/to-sql* [:default ::venues.custom-honeysql :id String]
 ;;   [_ _ _ v _]
-;;   (assert (string? v) (format "V should be a string, got %s" (pr-str v)))
+;;   (assert (string? v) (format "V should be a string, got %s" (u/safe-pr-str v)))
 ;;   ["?::integer" v])
 
 ;; (derive ::venues.custom-honeysql-composite-pk ::venues.composite-pk)
@@ -128,15 +128,16 @@
 
 (deftest update-nil-test
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
-    (is (= {:kv-args {:toucan/pk nil}, :changes {:name "Taco Bell"}, :queryable {}}
-           (query/parse-args ::update/update nil [nil {:name "Taco Bell"}])))
-    (query/with-parsed-args-with-query [parsed-args [::update/update ::test/venues [nil {:name "Taco Bell"}]]]
-      (is (= {:kv-args {:toucan/pk nil}, :changes {:name "Taco Bell"}, :query {}}
+    (let [parsed-args (query/parse-args ::update/update ::test/venues [nil {:name "Taco Bell"}])]
+      (is (= {:kv-args {:toucan/pk nil}, :changes {:name "Taco Bell"}, :queryable {}}
              parsed-args))
-      (is (= {:update [:venues]
-              :set    {:name "Taco Bell"}
-              :where  [:= :id nil]}
-             (query/build ::update/update ::test/venues parsed-args))))
+      (query/with-query [query [::test/venues (:queryable parsed-args)]]
+        (is (= {}
+               query))
+        (is (= {:update [:venues]
+                :set    {:name "Taco Bell"}
+                :where  [:= :id nil]}
+               (query/build ::update/update ::test/venues (assoc parsed-args :query query))))))
     (is (= ["UPDATE venues SET name = ? WHERE id IS NULL" "Taco Bell"]
            (execute/compile
              (update/update! ::test/venues nil {:name "Taco Bell"}))))
