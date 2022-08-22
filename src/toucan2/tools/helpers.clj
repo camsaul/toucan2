@@ -125,18 +125,6 @@
       [~'&~'&model _ ~'&options]
       ~@body))
 
-;;;; [[define-keys-for-automagic-hydration]]
-
-#_(defmacro define-keys-for-automagic-hydration
-  {:style/indent 1}
-  [dispatch-value & ks]
-  (let [[model] (dispatch-value-2 dispatch-value)]
-    `(do
-       ~@(for [k ks]
-           `(m/defmethod hydrate/model-for-automagic-hydration* [~~model ~k]
-              [~'_ ~'_ ~'_]
-              ~model)))))
-
 ;;;; [[deftransforms]]
 
 ;;; TODO -- move this to [[toucan2.tools.transformed]]
