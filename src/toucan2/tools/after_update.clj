@@ -22,12 +22,12 @@
                         {:model model, :row instance}
                         e))))))
 
-(defrecord ReducibleAfterUpdate [model reducible-update-returning-pks]
+(defrecord ReducibleAfterUpdate [model reducible-pks]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (u/with-debug-result ["reducing after-update for %s" model]
       (try
-        (let [affected-pks (realize/realize reducible-update-returning-pks)]
+        (let [affected-pks (realize/realize reducible-pks)]
           (u/println-debug ["Doing after-update for %s with PKs %s" model affected-pks])
           (reduce
            rf
@@ -39,35 +39,35 @@
             (select/select-reducible-with-pks model affected-pks))))
         (catch Throwable e
           (throw (ex-info (format "Error doing after update for %s: %s" (pr-str model) (ex-message e))
-                          {:model model, :parent-update reducible-update-returning-pks}
+                          {:model model, :parent-update reducible-pks}
                           e))))))
 
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `->ReducibleAfterUpdate model reducible-update-returning-pks)))
+    (list `->ReducibleAfterUpdate model reducible-pks)))
 
 (m/defmethod op/reducible* :around [::update/update ::after-update]
   [query-type model {::keys [doing-after-update?], :as parsed-args}]
   (if doing-after-update?
     (next-method query-type model parsed-args)
     (u/with-debug-result ["do after-update for %s in %s" model `update/reducible-update*]
-      (let [parsed-args                      (assoc parsed-args ::doing-after-update? true)
-            reducible-update-returning-count (next-method query-type model parsed-args)
-            reducible-update-returning-pks   (select/return-pks-eduction model reducible-update-returning-count)]
+      (let [parsed-args     (assoc parsed-args ::doing-after-update? true)
+            reducible-count (next-method query-type model parsed-args)
+            reducible-pks   (select/return-pks-eduction model reducible-count)]
         (eduction
          (map (constantly 1))
-         (->ReducibleAfterUpdate model reducible-update-returning-pks))))))
+         (->ReducibleAfterUpdate model reducible-pks))))))
 
 (m/defmethod op/reducible-returning-pks* :around [::update/update ::after-update]
   [query-type model {::keys [doing-after-update?], :as parsed-args}]
   (if doing-after-update?
     (next-method query-type model parsed-args)
-    (u/with-debug-result ["do after-update for %s in %s" model `update/reducible-update-returning-pks*]
+    (u/with-debug-result ["do after-update for %s in %s" model `update/reducible-pks*]
       (let [parsed-args                    (assoc parsed-args ::doing-after-update? true)
-            reducible-update-returning-pks (next-method query-type model parsed-args)]
+            reducible-pks (next-method query-type model parsed-args)]
         (eduction
          (map (select/select-pks-fn model))
-         (->ReducibleAfterUpdate model reducible-update-returning-pks))))))
+         (->ReducibleAfterUpdate model reducible-pks))))))
 
 (defmacro define-after-update
   {:style/indent :defn}
