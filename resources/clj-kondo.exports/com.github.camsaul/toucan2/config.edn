@@ -3,18 +3,17 @@
 
  :lint-as
  {toucan2.compile/with-compiled-query       clojure.core/let
-  toucan2.connection/with-connection        clojure.core/let
-  toucan2.connection/with-transaction       clojure.core/let
-  toucan2.core/with-connection              clojure.core/let
   toucan2.core/with-model                   clojure.core/let
-  toucan2.core/with-transaction             clojure.core/let
   toucan2.model/with-model                  clojure.core/let
   toucan2.query/with-parsed-args-with-query clojure.core/let
   toucan2.query/with-query                  clojure.core/let}
 
  :hooks
  {:analyze-call
-  {}
+  {toucan2.connection/with-connection  hooks.toucan2.connection/with-connection
+   toucan2.connection/with-transaction hooks.toucan2.connection/with-transaction
+   toucan2.core/with-connection        hooks.toucan2.connection/with-connection
+   toucan2.core/with-transaction       hooks.toucan2.connection/with-transaction}
 
   :macroexpand
   {toucan.db/with-call-counting                        macros.toucan2.execute/with-call-count
