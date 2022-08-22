@@ -99,6 +99,7 @@
  [toucan2.select
   count
   exists?
+  reducible-select
   select
   select-fn->fn
   select-fn->pk
@@ -110,8 +111,7 @@
   select-one-pk
   select-pk->fn
   select-pks-set
-  select-pks-vec
-  select-reducible]
+  select-pks-vec]
 
  [toucan2.tools.after-insert
   define-after-insert]

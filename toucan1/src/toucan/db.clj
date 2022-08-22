@@ -24,7 +24,7 @@
 
 (p/import-vars
  [models resolve-model]
- [select select select-one count select-reducible exists?])
+ [select select select-one count exists?])
 
 (def ^:dynamic *quoting-style*
   "Temporarily override the default [[quoting-style]]. DEPRECATED: bind [[toucan2.compile/*honeysql-options*]]
@@ -183,9 +183,16 @@
   (select/select modelable honeysql-form))
 
 (defn simple-select-reducible
-  "DEPRECATED: Use [[toucan2.select/select-reducible]] instead."
+  "DEPRECATED: Use [[toucan2.select/reducible-select]] instead."
   [modelable honeysql-form]
-  (select/select-reducible modelable honeysql-form))
+  (select/reducible-select modelable honeysql-form))
+
+(defn select-reducible
+  "DEPRECATED: Use [[toucan2.select/reducible-select]] instead."
+  {:arglists '([modelable & kv-args? query?]
+               [[modelable & columns] & kv-args? query?])}
+  [& args]
+  (apply select/reducible-select args))
 
 (defn simple-select-one
   "DEPRECATED: use [[toucan2.select/select-one]] instead."

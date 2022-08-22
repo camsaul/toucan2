@@ -29,7 +29,7 @@
                                model
                                query))))
 
-(defn select-reducible
+(defn reducible-select
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
   [modelable-columns & unparsed-args]
@@ -44,14 +44,14 @@
 (defn select-one {:arglists '([modelable & kv-args? query?]
                               [[modelable & columns] & kv-args? query?])}
   [modelable-columns & unparsed-args]
-  (realize/reduce-first (apply select-reducible modelable-columns unparsed-args)))
+  (realize/reduce-first (apply reducible-select modelable-columns unparsed-args)))
 
 (defn select-fn-reducible
   {:arglists '([f modelable & kv-args? query?])}
   [f & args]
   (eduction
    (map f)
-   (apply select-reducible args)))
+   (apply reducible-select args)))
 
 (defn select-fn-set
   "Like `select`, but returns a set of values of `(f instance)` for the results. Returns `nil` if the set is empty."
@@ -99,7 +99,7 @@
    (into
     {}
     (map (juxt f1 f2))
-    (apply select-reducible args))))
+    (apply reducible-select args))))
 
 (defn select-fn->pk
   {:arglists '([f modelable & kv-args? query?])}
@@ -114,7 +114,7 @@
     (apply select-fn->fn pks-fn f modelable args)))
 
 ;;; TODO -- [[count]] and [[exists?]] implementations seem kinda dumb, maybe we should just hand off to
-;;; [[select-reducible]] by default so it can handle the parsing and stuff.
+;;; [[reducible-select]] by default so it can handle the parsing and stuff.
 
 (m/defmulti count*
   {:arglists '([model unparsed-args])}
@@ -122,12 +122,12 @@
 
 (m/defmethod count* :default
   [model unparsed-args]
-  (u/println-debug ["No efficient implementation of count* for %s, doing select-reducible and counting the rows..." model])
+  (u/println-debug ["No efficient implementation of count* for %s, doing reducible-select and counting the rows..." model])
   (reduce
    (fn [acc _]
      (inc acc))
    0
-   (apply select-reducible model unparsed-args)))
+   (apply reducible-select model unparsed-args)))
 
 (defn count
   {:arglists '([modelable & kv-args? query?])}
@@ -141,7 +141,7 @@
 
 (m/defmethod exists?* :default
   [model unparsed-args]
-  (u/println-debug ["No efficient implementation of exists?* for %s, doing select-reducible and seeing if it returns a row..." model])
+  (u/println-debug ["No efficient implementation of exists?* for %s, doing reducible-select and seeing if it returns a row..." model])
   (transduce
    (take 1)
    (fn
@@ -150,7 +150,7 @@
      ([_ _]
       true))
    false
-   (apply select-reducible model unparsed-args)))
+   (apply reducible-select model unparsed-args)))
 
 (defn exists?
   {:arglists '([modelable & kv-args? query?])}

@@ -54,15 +54,15 @@
   (identity-query/identity-query [{:a 1, :b 2}
                                   {:a 3, :b 4}]))
 
-(deftest identity-query-in-select-reducible-test
-  (testing "Can we have select-reducible* return an identity query, and have things still work?"
+(deftest identity-query-in-reducible-select-test
+  (testing "Can we have reducible-select* return an identity query, and have things still work?"
     (is (= [{:a 1, :b 2}
             {:a 3, :b 4}]
            (select/select ::select-reducible-identity-query)))))
 
 (m/defmethod op/reducible-returning-instances* :after [::select/select ::wrap-reducible-query]
   [_query-type _model _reducible-query]
-  (identity-query/identity-query (select/select-reducible [::test/venues :id :name] {:order-by [[:id :asc]], :limit 2})))
+  (identity-query/identity-query (select/reducible-select [::test/venues :id :name] {:order-by [[:id :asc]], :limit 2})))
 
 (deftest wrap-reducible-query-test
   (testing "Can identity-query wrap another reducible query?"
@@ -77,16 +77,16 @@
 (defn- do-after-select [model rows]
   (select/select model (identity-query/identity-query rows)))
 
-(defn- do-after-select-reducible [model rows]
+(defn- do-after-reducible-select [model rows]
   (op/reducible-returning-instances* ::select/select model {:queryable (identity-query/identity-query rows)}))
 
 (deftest do-after-select-test
   (testing "Can we use `identity-query` to build some sort of abomination like Toucan 1 do-post-select?"
-    (let [reducible (select/select-reducible [::test/venues :id :name] {:order-by [[:id :asc]], :limit 2})]
+    (let [reducible (select/reducible-select [::test/venues :id :name] {:order-by [[:id :asc]], :limit 2})]
       (is (= [(instance/instance ::my-after-select {:id 1, :name "Tempest", :after-select? true})
               (instance/instance ::my-after-select {:id 2, :name "Ho's Tavern", :after-select? true})]
              (do-after-select ::my-after-select reducible)
-             (into [] (do-after-select-reducible ::my-after-select reducible)))))))
+             (into [] (do-after-reducible-select ::my-after-select reducible)))))))
 
 (deftest identity-query-as-model-test
   (testing "Can we use identity-query as an 'identity model'?"
