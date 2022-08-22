@@ -30,7 +30,8 @@
 (defn after-reducible-instances [query-type model reducible-instances]
   (eduction
    (map (fn [row]
-          (after query-type model row)))
+          (or (after query-type model row)
+              row)))
    reducible-instances))
 
 (m/defmethod op/reducible-returning-instances* :around [::after ::after]
@@ -53,7 +54,7 @@
   (reduce [_this rf init]
     (u/with-debug-result ["reducing %s %s for %s" `after query-type model]
       (let [affected-pks (realize/realize reducible-pks)]
-        (u/println-debug ["Doing after-insert for %s with PKs %s" model affected-pks])
+        (u/println-debug ["Doing %s %s for %s with PKs %s" `after query-type model affected-pks])
         (reduce
          rf
          init
@@ -78,6 +79,7 @@
     :else
     (let [parsed-args   (assoc parsed-args ::doing-after? true)
           reducible-pks (next-method query-type model parsed-args)]
+      (assert (instance? clojure.lang.IReduceInit reducible-pks))
       (eduction
        (map (select/select-pks-fn model))
        (->AfterReduciblePKs query-type model reducible-pks)))))

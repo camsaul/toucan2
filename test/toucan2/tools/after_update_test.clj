@@ -9,6 +9,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(use-fixtures :each test/do-db-types-fixture)
+
 (def ^:private ^:dynamic *venues-awaiting-moderation* nil)
 
 (derive ::venues.after-update ::test/venues)
