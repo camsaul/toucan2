@@ -78,21 +78,10 @@
   [& args]
   (realize/reduce-first (apply select-fn-reducible args)))
 
-(defn select-pks-fn
-  "Return a function to get the value(s) of the primary key(s) from a row. Used by [[select-pks-reducible]] and thus
-  by [[select-pks-set]], [[select-pks-vec]], etc.
-
-  The primary keys are determined by [[model/primary-keys]]. By default this is simply the keyword `:id`."
-  [modelable]
-  (let [pk-keys (model/primary-keys modelable)]
-    (if (= (clojure.core/count pk-keys) 1)
-      (first pk-keys)
-      (apply juxt pk-keys))))
-
 (defn select-pks-reducible
   {:arglists '([modelable & kv-args? query?])}
   [modelable & args]
-  (let [f (select-pks-fn modelable)]
+  (let [f (model/select-pks-fn modelable)]
     (apply select-fn-reducible f modelable args)))
 
 (defn select-pks-set
@@ -122,13 +111,13 @@
 (defn select-fn->pk
   {:arglists '([f modelable & kv-args? query?])}
   [f modelable & args]
-  (let [pks-fn (select-pks-fn modelable)]
+  (let [pks-fn (model/select-pks-fn modelable)]
     (apply select-fn->fn f pks-fn modelable args)))
 
 (defn select-pk->fn
   {:arglists '([f modelable & kv-args? query?])}
   [f modelable & args]
-  (let [pks-fn (select-pks-fn modelable)]
+  (let [pks-fn (model/select-pks-fn modelable)]
     (apply select-fn->fn pks-fn f modelable args)))
 
 ;;; TODO -- [[count]] and [[exists?]] implementations seem kinda dumb, maybe we should just hand off to
@@ -203,20 +192,3 @@
                               (cons model columns)
                               model)]
           (apply select-reducible model-columns conditions))))))
-
-(defn return-pks-eduction
-  "Given a `reducible-operation` returning whatever (presumably returning affected row counts) wrap it in an eduction and
-  in [[->WithReturnKeys]] so it returns a sequence of primary key vectors."
-  [model reducible-operation]
-  (let [pks-fn (select-pks-fn model)]
-    (eduction
-     (map (fn [row]
-            (assert (map? row)
-                    (format "Expected row to be a map, got ^%s %s" (some-> row class .getCanonicalName) (pr-str row)))
-            (u/with-debug-result ["%s: map pk function %s to row %s" `return-pks-eduction pks-fn row]
-              (let [pks (pks-fn row)]
-                (when (nil? pks)
-                  (throw (ex-info (format "Error returning PKs: pks-fn returned nil for row %s" (pr-str row))
-                                  {:row (realize/realize row), :pks-fn pks-fn})))
-                pks))))
-     (execute/->WithReturnKeys reducible-operation))))

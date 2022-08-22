@@ -10,6 +10,8 @@
    [toucan2.select :as select]
    [toucan2.util :as u]))
 
+;;;; things that return update count
+
 ;;; TODO -- should this be a multimethod?
 (defn- reduce-reducible [query-type model parsed-args rf init]
   (let [query           (query/build query-type model parsed-args)
@@ -43,13 +45,32 @@
   (u/with-debug-result ["%s %s returning update count" query-type modelable]
     (reduce (fnil + 0 0) 0 (reducible query-type modelable unparsed-args))))
 
+;;;; things that return PKs
+
+(defn return-pks-eduction
+  "Given a `reducible-operation` returning whatever (presumably returning affected row counts) wrap it in an eduction and
+  in [[->WithReturnKeys]] so it returns a sequence of primary key vectors."
+  [model reducible-operation]
+  (let [pks-fn (model/select-pks-fn model)]
+    (eduction
+     (map (fn [row]
+            (assert (map? row)
+                    (format "Expected row to be a map, got ^%s %s" (some-> row class .getCanonicalName) (pr-str row)))
+            (u/with-debug-result ["%s: map pk function %s to row %s" `return-pks-eduction pks-fn row]
+              (let [pks (pks-fn row)]
+                (when (nil? pks)
+                  (throw (ex-info (format "Error returning PKs: pks-fn returned nil for row %s" (pr-str row))
+                                  {:row (realize/realize row), :pks-fn pks-fn})))
+                pks))))
+     (execute/->WithReturnKeys reducible-operation))))
+
 (m/defmulti reducible-returning-pks*
   {:arglists '([query-type model parsed-args])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod reducible-returning-pks* :default
   [query-type model parsed-args]
-  (select/return-pks-eduction model (reducible* query-type model parsed-args)))
+  (return-pks-eduction model (reducible* query-type model parsed-args)))
 
 (defn reducible-returning-pks
   [query-type modelable unparsed-args]
@@ -60,6 +81,8 @@
 (defn returning-pks! [query-type modelable unparsed-args]
   (u/with-debug-result ["%s %s returning PKs" query-type modelable]
     (realize/realize (reducible-returning-pks query-type modelable unparsed-args))))
+
+;;;; things that return instances
 
 (m/defmulti reducible-returning-instances*
   {:arglists '([query-type model parsed-args])}

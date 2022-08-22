@@ -119,3 +119,15 @@
    (primary-key-values (instance/model instance) instance))
   ([model m]
    (select-keys m (primary-keys-vec model))))
+
+(defn select-pks-fn
+  "Return a function to get the value(s) of the primary key(s) from a row. Used by [[toucan2.select/select-pks-reducible]]
+  and thus by [[toucan2.select/select-pks-set]], [[toucan2.select/select-pks-vec]], etc.
+
+  The primary keys are determined by [[toucan2.model/primary-keys]]. By default this is simply the keyword `:id`."
+  [modelable]
+  (with-model [model modelable]
+    (let [pk-keys (primary-keys model)]
+      (if (= (count pk-keys) 1)
+        (first pk-keys)
+        (apply juxt pk-keys)))))

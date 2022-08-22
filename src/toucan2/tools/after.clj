@@ -1,7 +1,10 @@
 (ns toucan2.tools.after
+  "Shared low-level implementation for doing transformations to the results of different operations defined
+  with [[toucan2.operation]]."
   (:require
    [methodical.core :as m]
    [pretty.core :as pretty]
+   [toucan2.model :as model]
    [toucan2.operation :as op]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
@@ -81,7 +84,7 @@
           reducible-pks (next-method query-type model parsed-args)]
       (assert (instance? clojure.lang.IReduceInit reducible-pks))
       (eduction
-       (map (select/select-pks-fn model))
+       (map (model/select-pks-fn model))
        (->AfterReduciblePKs query-type model reducible-pks)))))
 
 ;;;; reducible update count
@@ -98,7 +101,7 @@
     :else
     (let [parsed-args     (assoc parsed-args ::doing-after? true)
           reducible-count (next-method query-type model parsed-args)
-          reducible-pks   (select/return-pks-eduction model reducible-count)]
+          reducible-pks   (op/return-pks-eduction model reducible-count)]
       (eduction
        (map (constantly 1))
        (->AfterReduciblePKs query-type model reducible-pks)))))

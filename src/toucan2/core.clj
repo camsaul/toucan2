@@ -89,6 +89,7 @@
   primary-key-values
   primary-keys
   primary-keys-vec
+  select-pks-fn
   table-name
   with-model]
 
@@ -108,7 +109,6 @@
   select-one-fn
   select-one-pk
   select-pk->fn
-  select-pks-fn
   select-pks-set
   select-pks-vec
   select-reducible]
