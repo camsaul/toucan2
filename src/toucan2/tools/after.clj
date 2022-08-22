@@ -10,6 +10,8 @@
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
+;;; TODO -- Consider whether the various methods here should be `:after` methods rather than `:around`
+
 (m/defmulti after
   {:arglists '([query-type model instance])}
   u/dispatch-on-first-two-args)
