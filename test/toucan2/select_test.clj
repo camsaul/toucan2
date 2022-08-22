@@ -111,7 +111,7 @@
              (sort-by :id (select/select ::people))))
       (is (= all-rows
              (sort-by :id (select/select ::test/people))))
-      (is (every? #(instance/instance-of? % ::test/people)
+      (is (every? (partial instance/instance-of? ::test/people)
                   (select/select ::test/people {:order-by [[:id :asc]]})))))
   (testing "one arg (id)"
     (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]

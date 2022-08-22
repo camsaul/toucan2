@@ -66,21 +66,12 @@
   [x]
   (clojure.core/instance? toucan2.instance.IInstance x))
 
-;; I know the args are in the opposite order of `instance?`, but it seems like a Yoda Condition to write the code as
-;;
-;;    (instance-of? ::toucan my-instance)
-;;
-;; I read that as "::toucan instance-of? my-instance".
-;;
-;;    (instance-of? my-instance ::toucan)
-;;
-;; Makes more sense. It also follows the same order as `isa?`.
 (defn instance-of?
   "True if `x` is a Toucan2 instance, and its [[model]] `isa?` `a-model`.
 
-    (instance-of? (instance ::toucan {}) ::bird) ; -> true
-    (instance-of? (instance ::bird {}) ::toucan) ; -> false"
-  [x a-model]
+    (instance-of? ::bird (instance ::toucan {})) ; -> true
+    (instance-of?  ::toucan (instance ::bird {})) ; -> false"
+  [a-model x]
   (and (instance? x)
        (isa? (model x) a-model)))
 

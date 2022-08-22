@@ -339,11 +339,12 @@
 (derive ::toucan ::bird)
 
 (deftest instance-of?-test
-  (is (instance/instance-of? (instance/instance ::toucan {}) ::bird))
-  (is (not (instance/instance-of? (instance/instance ::bird {}) ::toucan)))
-  (is (not (instance/instance-of? nil ::toucan)))
-  (is (not (instance/instance-of? {} ::toucan)))
-  (is (not (instance/instance-of? (instance/instance ::shoe {}) ::toucan))))
+  (is (instance/instance-of? ::bird (instance/instance ::toucan {})))
+  (are [x] (not (instance/instance-of? ::toucan x))
+    (instance/instance ::bird {})
+    nil
+    {}
+    (instance/instance ::shoe {})))
 
 ;;; TODO -- not sure we want this or not. Seems like an unnecessary extra feature.
 #_(deftest type-metadata-test
