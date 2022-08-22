@@ -89,7 +89,7 @@
   (u/with-debug-result [(list `before-delete model instance)]
     (next-method model instance)))
 
-(defrecord ReducibleDelete [model parsed-args reducible-delete]
+(defrecord ReducibleBeforeDelete [model parsed-args reducible-delete]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (conn/with-transaction [_conn (model/deferred-current-connectable model)]
@@ -103,12 +103,12 @@
 
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `->ReducibleDelete model parsed-args reducible-delete)))
+    (list `->ReducibleBeforeDelete model parsed-args reducible-delete)))
 
 (m/defmethod op/reducible* :around [::delete/delete ::before-delete]
   [query-type model parsed-args]
   (let [reducible-delete (next-method query-type model parsed-args)]
-    (->ReducibleDelete model parsed-args reducible-delete)))
+    (->ReducibleBeforeDelete model parsed-args reducible-delete)))
 
 (defmacro define-before-delete
   {:style/indent :defn}
