@@ -20,7 +20,7 @@
   [args]
   (assoc args :columns [:id :name]))
 
-(after-select/define-after-select-each ::people [person]
+(after-select/define-after-select ::people [person]
   (assoc person ::after-select? true))
 
 (deftest select-helpers-test

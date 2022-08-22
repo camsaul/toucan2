@@ -117,8 +117,7 @@
   define-after-insert]
 
  [toucan2.tools.after-select
-  define-after-select-each
-  define-after-select-reducible]
+  define-after-select]
 
  [toucan2.tools.after-update
   define-after-update]

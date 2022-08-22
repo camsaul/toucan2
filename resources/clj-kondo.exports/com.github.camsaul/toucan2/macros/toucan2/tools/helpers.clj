@@ -8,17 +8,11 @@
           ~args-binding]
        ~@body)))
 
-(defmacro define-after-select-reducible [model [reducible-query-binding] & body]
+(defmacro define-after-select [model [instance-binding] & body]
   `(do
      ~model
-     (fn [~(vary-meta '&model assoc :clj-kondo/ignore [:unused-binding])
-          ~reducible-query-binding]
-       ~@body)))
-
-(defmacro define-after-select-each [model [instance-binding] & body]
-  `(do
-     ~model
-     (fn [~(vary-meta '&model assoc :clj-kondo/ignore [:unused-binding])
+     (fn [~(vary-meta '&query-type assoc :clj-kondo/ignore [:unused-binding])
+          ~(vary-meta '&model assoc :clj-kondo/ignore [:unused-binding])
           ~instance-binding]
        ~@body)))
 

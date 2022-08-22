@@ -70,7 +70,7 @@
             (instance/instance ::test/venues {:id 2, :name "Ho's Tavern"})]
            (select/select ::wrap-reducible-query)))))
 
-(after-select/define-after-select-each ::my-after-select
+(after-select/define-after-select ::my-after-select
   [instance]
   (assoc instance :after-select? true))
 

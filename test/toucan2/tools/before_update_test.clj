@@ -254,7 +254,7 @@
 
 (derive ::venues.short-name ::test/venues)
 
-(after-select/define-after-select-each ::venues.short-name
+(after-select/define-after-select ::venues.short-name
   [venue]
   (assoc venue :short-name (str/join (take 4 (:name venue)))))
 

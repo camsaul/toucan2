@@ -4,6 +4,7 @@
   (:require
    [methodical.core :as m]
    [pretty.core :as pretty]
+   [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.operation :as op]
    [toucan2.realize :as realize]
@@ -32,7 +33,7 @@
 (defn after-reducible-instances [query-type model reducible-instances]
   (eduction
    (map (fn [row]
-          (or (after query-type model row)
+          (or (some-> (after query-type model row) instance/reset-original)
               row)))
    reducible-instances))
 
