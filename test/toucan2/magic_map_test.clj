@@ -2,7 +2,8 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
-   [toucan2.magic-map :as magic-map])
+   [toucan2.magic-map :as magic-map]
+   [toucan2.util :as u])
   (:import
    (java.util Locale)))
 
@@ -63,11 +64,22 @@
 
 (deftest magic-create-test
   (let [m (magic-map/magic-map {:snake/snake_case 1, "SCREAMING_SNAKE_CASE" 2, :lisp-case 3, :ANGRY/LISP-CASE 4})]
-    (is (= (magic-map/magic-map {:snake/snake-case 1, "screaming-snake-case" 2, :lisp-case 3, :angry/lisp-case 4})
+    (testing "keys"
+      (is (= [:snake/snake-case :screaming-snake-case :lisp-case :angry/lisp-case]
+             (keys m))))
+    (is (= {:snake/snake-case 1, :screaming-snake-case 2, :lisp-case 3, :angry/lisp-case 4}
            m)))
   (testing "Should preserve metadata"
     (is (= {:x 100}
            (meta (magic-map/magic-map (with-meta {} {:x 100})))))))
+
+(deftest into-test
+  (let [m (into (magic-map/magic-map) {:snake/snake-case 1, "screaming-snake-case" 2, :lisp-case 3, :angry/lisp-case 4})]
+    (testing "keys"
+      (is (= [:snake/snake-case :screaming-snake-case :lisp-case :angry/lisp-case]
+             (keys m))))
+    (is (= {:snake/snake-case 1, :screaming-snake-case 2, :lisp-case 3, :angry/lisp-case 4}
+           m))))
 
 (deftest magic-keys-test
   (testing "keys"
@@ -115,5 +127,30 @@
 
 (deftest pretty-print-test
   (testing "Should pretty-print"
-    (is (= "(toucan2.map-types.magic-map/magic-map {:id 1} #'toucan2.map-types.magic-map/kebab-case-xform)"
-           (pr-str (magic-map/magic-map {:id 1}))))))
+    (testing "default output"
+      (is (= (pr-str {:id 1})
+             (pr-str (magic-map/magic-map {:id 1})))))
+    (testing "output with debugging enabled"
+      (binding [u/*debug* true]
+        (is (= (pr-str (list
+                        'toucan2.magic-map/magic-map
+                        {:id 1}
+                        #'toucan2.magic-map/kebab-case-xform))
+               (pr-str (magic-map/magic-map {:id 1}))))))))
+
+(deftest transient-test
+  (testing "key transforms should be applied"
+    (let [transient-map (magic-map/->TransientMagicMap (transient {}) magic-map/kebab-case-xform {})]
+      (is (instance? clojure.lang.ITransientMap transient-map))
+      (assoc! transient-map "string-key" 1000)
+      (let [m (persistent! transient-map)]
+        (is (= {:string-key 1000}
+               m)))))
+  (let [m  (transient (magic-map/magic-map {:a 100}))
+        m' (-> m
+               (assoc! :b 200)
+               (assoc! :C 300)
+               (dissoc! :A)
+               persistent!)]
+    (is (= {:b 200, :c 300}
+           m'))))

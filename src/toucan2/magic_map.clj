@@ -7,6 +7,8 @@
    [pretty.core :as pretty]
    [toucan2.util :as u]))
 
+(set! *warn-on-reflection* true)
+
 (csk.macros/defconversion "kebab-case" u/lower-case-en u/lower-case-en "-")
 
 (defn kebab-case-xform
@@ -25,6 +27,8 @@
         (map (fn [[k v]]
                [(key-xform k) v]))
         m))
+
+(declare ->TransientMagicMap)
 
 (p/def-map-type MagicMap [^clojure.lang.IPersistentMap m key-xform mta]
   (get [_ k default-value]
@@ -65,13 +69,38 @@
   (containsKey [_ k]
     (.containsKey m (key-xform k)))
 
+  clojure.lang.IEditableCollection
+  (asTransient [_this]
+    (->TransientMagicMap (transient m) key-xform mta))
+
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `magic-map
-          (if (instance? pretty.core.PrettyPrintable m)
-            (pretty/pretty m)
-            m)
-          key-xform)))
+    (if-not u/*debug*
+      m
+      (list `magic-map
+            (cond-> m
+              (instance? pretty.core.PrettyPrintable m)
+              pretty/pretty)
+            key-xform))))
+
+(deftype TransientMagicMap [^clojure.lang.ITransientMap m key-xform mta]
+  clojure.lang.ITransientMap
+  (conj [this [k v]]
+    (.conj m [(key-xform k) v])
+    this)
+  (persistent [_this]
+    (let [m (persistent! m)]
+      (MagicMap. m key-xform mta)))
+  (assoc [this k v]
+    (.assoc m (key-xform k) v)
+    this)
+  (without [this k]
+    (.without m (key-xform k))
+    this)
+
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `->TransientMagicMap m key-xform mta)))
 
 (defn magic-map
   ([]

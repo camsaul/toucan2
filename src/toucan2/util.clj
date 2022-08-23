@@ -2,9 +2,9 @@
   (:require
    [clojure.string :as str]
    [clojure.walk :as walk]
-   [potemkin :as p]
    [pretty.core :as pretty]
-   [puget.printer :as puget]))
+   [puget.printer :as puget]
+   [toucan2.protocols :as protocols]))
 
 (set! *warn-on-reflection* true)
 
@@ -173,39 +173,20 @@
          (thunk#)
          (do-with-debug-result ~message thunk#)))))
 
-(p/defprotocol+ DispatchValue
-  (dispatch-value
-   [this]
-    "Get the value that we should dispatch off of in multimethods for `this`. By default, the dispatch of a keyword is
-    itself while the dispatch value of everything else is its [[type]]."))
-
-(extend-protocol DispatchValue
-  Object
-  (dispatch-value [x]
-    (type x))
-
-  nil
-  (dispatch-value [_nil]
-    nil)
-
-  clojure.lang.Keyword
-  (dispatch-value [k]
-    k))
-
 (defn dispatch-on-first-arg
   "Dispatch on the first argument using [[dispatch-value]], and ignore all other args."
   [x & _]
-  (dispatch-value x))
+  (protocols/dispatch-value x))
 
 (defn dispatch-on-first-two-args
-  "Dispatch on the two arguments using [[dispatch-value]], and ignore all other args."
+  "Dispatch on the two arguments using [[protocols/dispatch-value]], and ignore all other args."
   [x y & _]
-  [(dispatch-value x) (dispatch-value y)])
+  [(protocols/dispatch-value x) (protocols/dispatch-value y)])
 
 (defn dispatch-on-first-three-args
-  "Dispatch on the three arguments using [[dispatch-value]], and ignore all other args."
+  "Dispatch on the three arguments using [[protocols/dispatch-value]], and ignore all other args."
   [x y z & _]
-  [(dispatch-value x) (dispatch-value y) (dispatch-value z)])
+  [(protocols/dispatch-value x) (protocols/dispatch-value y) (protocols/dispatch-value z)])
 
 (defn lower-case-en
   "Locale-agnostic version of [[clojure.string/lower-case]]. `clojure.string/lower-case` uses the default locale in
