@@ -120,7 +120,7 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: whitespace-linter
+        key: codecov
     - run: clojure -X:dev:test-h2:cloverage
       name: Run tests with Cloverage
     - name: Upload results to codecov.io

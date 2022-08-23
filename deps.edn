@@ -81,4 +81,9 @@
                  toucan2.util/println-debug-lines]
 
                 :ns-regex
-                ["^toucan\\..*" "^toucan2\\..*"]}}}}
+                ["^toucan\\..*" "^toucan2\\..*"]}}
+
+  ;; clojure -T:build
+  :build
+  {:deps       {io.github.seancorfield/build-clj {:git/tag "v0.8.3", :git/sha "7ac1f8d"}}
+   :ns-default build}}}
