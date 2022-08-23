@@ -39,6 +39,8 @@
 (m/defmethod do-with-temp* :default
   [model explicit-attributes f]
   (assert (some? model) (format "%s model cannot be nil." `with-temp))
+  (when (some? explicit-attributes)
+    (assert (map? explicit-attributes) (format "attributes passed to %s must be a map." `with-temp)))
   (let [defaults          (with-temp-defaults model)
         merged-attributes (merge {} defaults explicit-attributes)]
     (binding [u/*error-context* (update u/*error-context*
@@ -72,9 +74,9 @@
 
 (defmacro with-temp
   "Define a temporary instance of a model and bind it to `temp-object-binding`. The object is inserted
-  using [[insert/insert-returning-instances!]] using the values from [[with-temp-defaults]] merged with `attributes`. At
-  the conclusion of `body`, the object is deleted. This is primarily intended for usage in tests, so this adds
-  a [[clojure.test/testing]] context around `body` as well.
+  using [[insert/insert-returning-instances!]] using the values from [[with-temp-defaults]] merged with a map of
+  `attributes`. At the conclusion of `body`, the object is deleted. This is primarily intended for usage in tests, so
+  this adds a [[clojure.test/testing]] context around `body` as well.
 
   [[with-temp]] can create multiple objects in one form if you pass additional bindings.
 

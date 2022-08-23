@@ -130,3 +130,12 @@
            (is (= :not-here
                   :here)
                "should never get here."))))))
+
+(deftest validate-attributes-test
+  (is (thrown-with-msg?
+       AssertionError
+       #"Assert failed: attributes passed to toucan2.tools.with-temp/with-temp must be a map"
+       (with-temp/with-temp [::test/venues _ 123]
+         (is (= :not-here
+                :here)
+             "should never get here.")))))
