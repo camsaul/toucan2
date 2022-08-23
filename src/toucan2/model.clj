@@ -3,7 +3,6 @@
    [methodical.core :as m]
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
-   [toucan2.model :as model]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 

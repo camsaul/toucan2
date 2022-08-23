@@ -40,8 +40,8 @@
     nil           nil
     ""            nil
     " "           nil
-    "postgres"    [:postgres]
-    "postgres,h2" [:postgres :h2]))
+    "postgres"    #{:postgres}
+    "postgres,h2" #{:postgres :h2}))
 
 (defonce ^:private db-types*
   (atom (or (db-types-from-env)

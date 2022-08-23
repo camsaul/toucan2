@@ -6,7 +6,6 @@
    [toucan2.model :as model]
    [toucan2.operation :as op]
    [toucan2.query :as query]
-   [toucan2.update :as update]
    [toucan2.util :as u]))
 
 ;;; this is basically the same as the args for `select` and `delete` but the difference is that it has an additional
@@ -57,21 +56,21 @@
 (defn reducible-update
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [modelable & unparsed-args]
-  (op/reducible* ::update/update modelable unparsed-args))
+  (op/reducible* ::update modelable unparsed-args))
 
 (defn update!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [modelable & unparsed-args]
-  (op/returning-update-count! ::update/update modelable unparsed-args))
+  (op/returning-update-count! ::update modelable unparsed-args))
 
 (defn reducible-update-returning-pks
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [modelable & unparsed-args]
-  (op/reducible-returning-pks* ::update/update modelable unparsed-args))
+  (op/reducible-returning-pks* ::update modelable unparsed-args))
 
 (defn update-returning-pks!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [modelable & unparsed-args]
-  (op/returning-pks! ::update/update modelable unparsed-args))
+  (op/returning-pks! ::update modelable unparsed-args))
 
 ;;; TODO -- add `update-returning-instances!`, similar to [[toucan2.update/insert-returning-instances!]]
