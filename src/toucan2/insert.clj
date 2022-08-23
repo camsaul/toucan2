@@ -2,6 +2,7 @@
   "Implementation of [[insert!]]."
   (:require
    [clojure.spec.alpha :as s]
+   [honey.sql :as hsql]
    [methodical.core :as m]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
@@ -33,14 +34,33 @@
                                   (mapv (partial zipmap columns)
                                         rows)))}))
 
+;;; Support
+;;;
+;;;    INSERT INTO table DEFAULT VALUES
+;;;
+;;; syntax. Not currently part of Honey SQL -- see upstream issue https://github.com/seancorfield/honeysql/issues/423
+(hsql/register-clause!
+ ::default-values
+ (fn [_clause _value]
+   ["DEFAULT VALUES"])
+ nil)
+
 (m/defmethod query/build [::insert :default :default]
   [query-type model {:keys [rows], :as parsed-args}]
   (when (empty? rows)
     (throw (ex-info "Cannot build insert query with empty :values"
-                    {:query-type query-type, :model model, :args parsed-args})))
-  {:insert-into [(keyword (model/table-name model))]
-   :values      (map (partial instance/instance model)
-                     rows)})
+                    {:context u/*error-context*, :query-type query-type, :model model, :args parsed-args})))
+  (merge
+   {:insert-into [(keyword (model/table-name model))]}
+   ;; if `rows` is just a single empty row then insert it with
+   ;;
+   ;; INSERT INTO table DEFAULT VALUES
+   ;;
+   ;; syntax. See the clause registered above
+   (if (= rows [{}])
+     {::default-values true}
+     {:values (map (partial instance/instance model)
+                   rows)})))
 
 ;;;; [[reducible-insert]] and [[insert!]]
 

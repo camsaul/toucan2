@@ -119,6 +119,8 @@
   [_model]
   "venues")
 
+(derive ::birds ::models)
+
 (m/defmethod model/table-name ::birds
   [_model]
   "birds")

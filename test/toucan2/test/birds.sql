@@ -1,9 +1,11 @@
+-- The birds table has default values for all of its NOT NULL columns.
+
 DROP TABLE IF EXISTS birds;
 
 CREATE TABLE birds (
   id SERIAL PRIMARY KEY NOT NULL,
-  name TEXT UNIQUE NOT NULL,
-  bird_type TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT 'birb',
+  bird_type TEXT NOT NULL DEFAULT 'parrot',
   good_bird BOOLEAN
 );
 

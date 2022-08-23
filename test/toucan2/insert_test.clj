@@ -7,7 +7,8 @@
    [toucan2.model :as model]
    [toucan2.query :as query]
    [toucan2.select :as select]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.tools.compile :as tools.compile])
   (:import
    (java.time LocalDateTime)))
 
@@ -212,3 +213,19 @@
               [::test/venues :id :name]
               [{:name "Grant & Green", :category "bar"}
                {:name "North Beach Cantina", :category "resturaunt"}]))))))
+
+(deftest empty-row-test
+  (testing "Should be able to insert an empty row."
+    (doseq [row-or-rows [{}
+                         [{}]]]
+      ;;; TODO -- what about multiple empty rows?? :shrug:
+      (testing (format "row-or-rows = %s" (pr-str row-or-rows))
+        (test/with-discarded-table-changes :birds
+          (is (= {:insert-into [:birds], ::insert/default-values true}
+                 (tools.compile/build
+                   (insert/insert! ::test/birds row-or-rows))))
+          (is (= ["INSERT INTO birds DEFAULT VALUES"]
+                 (tools.compile/compile
+                   (insert/insert! ::test/birds row-or-rows))))
+          (is (= 1
+                 (insert/insert! ::test/birds row-or-rows))))))))
