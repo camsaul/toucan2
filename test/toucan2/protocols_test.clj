@@ -9,3 +9,8 @@
          (protocols/original {})))
   (is (= nil
          (protocols/original nil))))
+
+(deftest dispatch-value-test
+  (testing "Should dispatch off of metadata"
+    (is (= ::system-properties
+           (protocols/dispatch-value (with-meta [1 2 3] {:type ::system-properties}))))))
