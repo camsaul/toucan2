@@ -21,10 +21,10 @@
 ;;; ==================================================================================================================
 
 (m/defmulti model-for-automagic-hydration
-  "The model that should be used to automagically hydrate the key `k` in instances of `source-model`.
+  "The model that should be used to automagically hydrate the key `k` in instances of `original-model`.
 
     (model-for-automagic-hydration :some-table :user) :-> :myapp.models/user"
-  {:arglists '([source-model k])}
+  {:arglists '([original-model k])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod model-for-automagic-hydration :default

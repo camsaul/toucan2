@@ -105,6 +105,7 @@
 (m/defmethod create-table-sql-file [:h2 :people]       [_db-type _table] "toucan2/test/people.h2.sql")
 (m/defmethod create-table-sql-file [:postgres :venues] [_db-type _table] "toucan2/test/venues.postgres.sql")
 (m/defmethod create-table-sql-file [:h2 :venues]       [_db-type _table] "toucan2/test/venues.h2.sql")
+(m/defmethod create-table-sql-file [:default :birds]   [_db-type _table] "toucan2/test/birds.sql")
 
 (derive ::people ::models)
 
@@ -117,6 +118,10 @@
 (m/defmethod model/table-name ::venues
   [_model]
   "venues")
+
+(m/defmethod model/table-name ::birds
+  [_model]
+  "birds")
 
 (defn- create-table-statements [db-type table-name]
   (let [filename (create-table-sql-file db-type table-name)
@@ -159,7 +164,8 @@
     (println "Set up" db-type "test DB")
     (with-open [conn (java.sql.DriverManager/getConnection (test-db-url db-type))]
       (doseq [table-name [:people
-                          :venues]]
+                          :venues
+                          :birds]]
         (create-table! db-type conn table-name)))
     (swap! initialized-test-dbs conj db-type)))
 

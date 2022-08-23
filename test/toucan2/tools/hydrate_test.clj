@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.connection :as conn]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
@@ -9,6 +10,8 @@
    [toucan2.tools.hydrate :as hydrate])
   (:import
    (java.time OffsetDateTime)))
+
+(use-fixtures :each test/do-db-types-fixture)
 
 (derive ::venues ::test/venues)
 
@@ -23,11 +26,11 @@
                 :out keyword}})
 
 (m/defmethod hydrate/model-for-automagic-hydration [:default ::user]
-  [_model _k]
+  [_original-model _k]
   :user)
 
 (m/defmethod hydrate/model-for-automagic-hydration [:default ::venue]
-  [_model _k]
+  [_original-model _k]
   ::venues.category-keyword)
 
 (deftest fk-keys-for-automagic-hydration-test
@@ -46,7 +49,7 @@
 ;; custom automagic hydration
 
 (m/defmethod hydrate/model-for-automagic-hydration [::hydrate-venue-with-people ::venue]
-  [_model _k]
+  [_original-model _k]
   ::people)
 
 (m/defmethod hydrate/fk-keys-for-automagic-hydration [::hydrate-venue-with-people :default :default]
@@ -326,7 +329,7 @@
   [:id :name])
 
 (m/defmethod hydrate/model-for-automagic-hydration [:default ::people]
-  [_model _k]
+  [_original-model _k]
   ::people.composite-pk)
 
 (m/defmethod hydrate/fk-keys-for-automagic-hydration [:default ::people :default]
@@ -380,3 +383,47 @@
                                     ::people)))
             (is (= 0
                    (call-count)))))))))
+
+(derive ::birds.boolean-pk ::test/birds)
+
+(m/defmethod model/primary-keys ::birds.boolean-pk
+  [_model]
+  [:good-bird])
+
+(m/defmethod hydrate/model-for-automagic-hydration [:default ::birb]
+  [_original-model _k]
+  ::birds.boolean-pk)
+
+(m/defmethod hydrate/fk-keys-for-automagic-hydration [:default ::birb ::birds.boolean-pk]
+  [_original-model _dest-key _hydrated-model]
+  [:good-bird?])
+
+(deftest automagic-batched-hydration-truthiness-test
+  (testing "Make sure automagic batched hydration compares things with some? (should work with false values)")
+  (conn/with-connection [_conn ::test/db]
+    (let [results                      [{:good-bird? true}
+                                        {:good-bird? false}
+                                        {:good-bird? nil}]
+          ;; which bird we get back is indeterminate since there are multiple matching birds; we will consider any of
+          ;; them to be the right answer.
+          good-birds                   #{{:id 1, :name "Reggae", :bird-type "toucan", :good-bird true}
+                                         {:id 2, :name "Lucky", :bird-type "pigeon", :good-bird true}
+                                         {:id 3, :name "Parroty", :bird-type "parakeet", :good-bird true}}
+          bad-birds                    #{{:id 4, :name "Green Friend", :bird-type "parakeet", :good-bird false}
+                                         {:id 5, :name "Parrot Hilton", :bird-type "parakeet", :good-bird false}}
+          [good-bird bad-bird no-bird] (hydrate/hydrate results ::birb)]
+      (testing "good bird"
+        (is (= #{:good-bird? ::birb}
+               (set (keys good-bird))))
+        (is (= true
+               (:good-bird? good-bird)))
+        (is (contains? good-birds (::birb good-bird))))
+      (testing "bad bird"
+        (is (= #{:good-bird? ::birb}
+               (set (keys bad-bird))))
+        (is (= false
+               (:good-bird? bad-bird)))
+        (is (contains? bad-birds (::birb bad-bird))))
+      (testing "don't hydrate nil keys"
+        (is (= {:good-bird? nil}
+               no-bird))))))
