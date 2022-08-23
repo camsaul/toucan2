@@ -31,8 +31,17 @@ jobs:
         key: deploy
     - name: Build Toucan 2
       run: clojure -T:build build
+    - name: Build toucan2-toucan1
+      run: clojure -T:build build
+      working-directory: toucan1
     - name: Deploy Toucan 2
       run: clojure -T:build deploy
+      env:
+        CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
+        CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}
+    - name: Deploy toucan2-toucan1
+      run: clojure -T:build deploy
+      working-directory: toucan1
       env:
         CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
         CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}

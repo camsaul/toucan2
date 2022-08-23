@@ -1,11 +1,10 @@
 (ns build
-  (:require [clojure.tools.build.api :as b]
+  (:require [clojure.string :as str]
             [org.corfield.build :as bb]))
 
 (def lib 'io.github.camsaul/toucan2)
 
-;;; if you want a version of MAJOR.MINOR.COMMITS:
-(def version (format "0.9.%s" (b/git-count-revs nil)))
+(def version (str/trim (slurp "VERSION.txt")))
 
 (def options
   {:lib lib, :version version})
