@@ -78,7 +78,9 @@
                 ;; exclude debug logging.
                 :exclude-call
                 [toucan2.util/do-with-debug-result
-                 toucan2.util/println-debug-lines]
+                 toucan2.util/println-debug
+                 toucan2.util/println-debug-lines
+                 toucan2.util/pprint-to-str]
 
                 :ns-regex
                 ["^toucan\\..*" "^toucan2\\..*"]}}
