@@ -5,7 +5,6 @@
    [toucan2.delete :as delete]
    [toucan2.insert :as insert]
    [toucan2.model :as model]
-   [toucan2.select :as select]
    [toucan2.util :as u]))
 
 (m/defmulti with-temp-defaults
@@ -26,39 +25,77 @@
     [model attributes f]
     (set-up-db!)
     f)
+  ```
+
+  `explicit-attributes` are the attributes specified in the `with-temp` form itself, any may be `nil`. The default
+  implementation merges the attributes from [[with-temp-defaults]] like
+
+  ```clj
+  (merge {} (with-temp-defaults model) explict-attributes)
   ```"
-  {:arglists '([model attributes f])}
+  {:arglists '([model explicit-attributes f])}
   u/dispatch-on-first-arg)
 
 (m/defmethod do-with-temp* :default
-  [model attributes f]
+  [model explicit-attributes f]
   (let [defaults          (with-temp-defaults model)
-        merged-attributes (merge {} defaults attributes)
-        [pk temp-object]  (u/with-debug-result ["Create temporary %s with attributes %s" model merged-attributes]
-                            (let [[pk] (try
-                                         (insert/insert-returning-pks! model merged-attributes)
-                                         (catch Throwable e
-                                           (throw (ex-info (format "Error inserting temp %s: %s" (u/safe-pr-str model) (ex-message e))
-                                                           {:model  model
-                                                            :attributes {:parameters attributes
-                                                                         :default    defaults
-                                                                         :merged     merged-attributes}}
-                                                           e))))]
-                              [pk (select/select-one model :toucan/pk pk)]))]
+        merged-attributes (merge {} defaults explicit-attributes)]
+    (binding [u/*error-context* (update u/*error-context*
+                                        ::with-temp
+                                        (fn [with-temp]
+                                          (conj with-temp {:model               model
+                                                           :explicit-attributes explicit-attributes
+                                                           :default-attributes  defaults
+                                                           :merged-attributes   merged-attributes})))]
+      (let [temp-object (u/with-debug-result ["Create temporary %s with attributes %s" model merged-attributes]
+                          (first (try
+                                   (insert/insert-returning-instances! model merged-attributes)
+                                   (catch Throwable e
+                                     (throw (ex-info (format "Error inserting temp %s: %s"
+                                                             (u/safe-pr-str model) (ex-message e))
+                                                     ;; just take the stuff we added to the error context above instead
+                                                     ;; of defining it all a second time.
+                                                     (merge {:context u/*error-context*}
+                                                            (last (::with-temp u/*error-context*)))
+                                                     e))))))]
 
-    (try
-      (t/testing (format "with temporary %s with attributes %s" (u/safe-pr-str model) (u/safe-pr-str merged-attributes))
-        (f temp-object))
-      (finally
-        (delete/delete! model :toucan/pk pk)))))
+        (try
+          (t/testing (format "with temporary %s with attributes %s" (u/safe-pr-str model) (u/safe-pr-str merged-attributes))
+            (f temp-object))
+          (finally
+            (delete/delete! model :toucan/pk ((model/select-pks-fn model) temp-object))))))))
 
 (defn do-with-temp [modelable attributes f]
   (model/with-model [model modelable]
     (do-with-temp* model attributes f)))
 
-(defmacro with-temp [[modelable temp-object-binding attributes & more] & body]
+(defmacro with-temp
+  "Define a temporary instance of a model and bind it to `temp-object-binding`. The object is inserted
+  using [[insert/insert-returning-instances!]] using the values from [[with-temp-defaults]] merged with `attributes`. At
+  the conclusion of `body`, the object is deleted. This is primarily intended for usage in tests, so this adds
+  a [[clojure.test/testing]] context around `body` as well.
+
+  Examples:
+
+  ```clj
+  ;;; use the with-temp-defaults for :models/bird
+  (with-temp [:models/bird bird]
+    (do-something bird))
+
+  ;;; use the with-temp-defaults for :models/bird merged with {:name \"Lucky Pigeon\"}
+  (with-temp [:models/bird bird {:name \"Lucky Pigeon\"}]
+    (do-something bird))
+
+  ;;; define multiple instances at the same time
+  (with-temp [:models/bird bird-1 {:name \"Parroty\"}
+              :models/bird bird-2 {:name \"Green Friend\", :best-friend-id (:id bird-1)}]
+    (do-something bird))
+  ```
+
+  If you want to implement custom behavior for a model other than default values, you can implement [[do-with-temp*]]."
+  [[modelable temp-object-binding attributes & more] & body]
   `(do-with-temp ~modelable ~attributes
-                 (fn [~temp-object-binding]
-                   ~(if (seq more)
-                      `(with-temp ~(vec more) ~@body)
-                      `(do ~@body)))))
+                 (^:once fn* [~temp-object-binding]
+                  ~(if (seq more)
+                     `(with-temp ~(vec more) ~@body)
+                     `(do ~@body)))))
