@@ -3,14 +3,14 @@
    [clojure.string :as str]
    [clojure.test :refer :all]
    [methodical.core :as m]
-   [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.operation :as op]
    [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.select :as select]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.tools.compile :as tools.compile])
   (:import
    (java.time OffsetDateTime)))
 
@@ -348,32 +348,6 @@
   (is (= false
          (select/exists? ::test/people :name "Cam Era"))))
 
-;; TODO
-
-#_(m/defmethod honeysql.compile/to-sql* [:default :people/custom-honeysql :id String]
-    [_ _ _ v _]
-    (assert (string? v) (format "V should be a string, got %s" (pr-str v)))
-    ["?::integer" v])
-
-#_(deftest custom-honeysql-test
-  (test/with-default-connection
-    (is (= ["SELECT id, name FROM people WHERE id = ?::integer" "1"]
-           (query/compiled
-             (select/select :people/custom-honeysql :id "1" {:select [:id :name]}))))
-    (testing "key-value condition"
-      (is (= [{:id 1, :name "Cam"}]
-             (select/select :people/custom-honeysql :id "1" {:select [:id :name]})))
-      (testing "Toucan-style [f & args] condition"
-        (is (= [{:id 1, :name "Cam"}]
-               (select/select :people/custom-honeysql :id [:in ["1"]] {:select [:id :name]})))))
-    (testing "as the PK"
-      (testing "(single value)"
-        (is (= [{:id 1, :name "Cam"}]
-               (select/select :people/custom-honeysql "1" {:select [:id :name]}))))
-      (testing "(vector of multiple values)"
-        (is (= [{:id 1, :name "Cam"}]
-               (select/select :people/custom-honeysql ["1"] {:select [:id :name]})))))))
-
 #_(derive ::people.custom-instance-type ::test/people)
 
 #_(m/defmethod instance/key-transform-fn* [:default ::people.custom-instance-type]
@@ -396,7 +370,7 @@
     (is (= (instance/instance ::test/people {:id 1})
            (select/select-one ::test/people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]})))
     (is (= ["SELECT p.id FROM people AS p WHERE p.id = ?" 1]
-           (execute/compile
+           (tools.compile/compile
              (select/select-one :people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]}))))))
 
 (deftest select-nil-test
@@ -410,7 +384,7 @@
         (is (= {:select [:*], :from [[:venues]], :where [:= :id nil]}
                (query/build ::select/select ::test/venues (assoc parsed-args :query query))))))
     (is (= ["SELECT * FROM venues WHERE id IS NULL"]
-           (execute/compile
+           (tools.compile/compile
              (select/select ::test/venues nil))))
     (is (= []
            (select/select ::test/venues nil)))

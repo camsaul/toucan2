@@ -3,11 +3,11 @@
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.delete :as delete]
-   [toucan2.execute :as execute]
    [toucan2.model :as model]
    [toucan2.query :as query]
    [toucan2.select :as select]
-   [toucan2.test :as test]))
+   [toucan2.test :as test]
+   [toucan2.tools.compile :as tools.compile]))
 
 (deftest parse-args-test
   (is (= {:queryable 1}
@@ -64,34 +64,6 @@
     (is (= 2
            (delete/delete! ::test/venues {:where [:> :id 1]})))))
 
-(derive ::venues.custom-honeysql ::test/venues)
-
-;; TODO
-#_(deftest custom-honeysql-test
-    (testing "Delete row by PK"
-      (test/with-discarded-table-changes :venues
-        (is (= ["DELETE FROM venues WHERE id = ?::integer" "1"]
-               (query/compile
-                (delete/delete! ::venues.custom-honeysql "1"))))
-        (is (= 1
-               (delete/delete! ::venues.custom-honeysql "1")))
-        (is (= []
-               (select/select ::test/venues 1)))
-        (is (= #{2}
-               (select/select-fn-set :id ::test/venues 2)))))
-    (testing "Delete row by key-value conditions"
-      (test/with-discarded-table-changes :venues
-        (is (= 1
-               (delete/delete! ::venues.custom-honeysql :id "1")))
-        (is (= []
-               (select/select ::test/venues :id 1))))
-      (testing "Toucan-style fn-args vector"
-        (test/with-discarded-table-changes :venues
-          (is (= 1
-                 (delete/delete! ::venues.custom-honeysql :id [:in ["1"]])))
-          (is (= []
-                 (select/select ::test/venues :id 1)))))))
-
 (deftest delete-nil-test
   (testing "(delete! model nil) should basically be the same as (delete! model :toucan/pk nil)"
     (let [parsed-args (query/parse-args ::delete/delete ::test/venues [nil])]
@@ -104,7 +76,7 @@
                 :where       [:= :id nil]}
                (query/build ::delete/delete ::test/venues (assoc parsed-args :query query))))
         (is (= ["DELETE FROM venues WHERE id IS NULL"]
-               (execute/compile
+               (tools.compile/compile
                  (delete/delete! ::test/venues nil))))))
     (test/with-discarded-table-changes :venues
       (is (= 0

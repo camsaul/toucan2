@@ -19,6 +19,7 @@
    [toucan2.tools.after-update]
    [toucan2.tools.before-insert]
    [toucan2.tools.before-update]
+   [toucan2.tools.compile]
    [toucan2.tools.helpers]
    [toucan2.tools.hydrate]
    [toucan2.tools.transformed]
@@ -41,6 +42,7 @@
   toucan2.tools.after-update/keep-me
   toucan2.tools.before-insert/keep-me
   toucan2.tools.before-update/keep-me
+  toucan2.tools.compile/keep-me
   toucan2.tools.helpers/keep-me
   toucan2.tools.hydrate/keep-me
   toucan2.tools.transformed/keep-me
@@ -63,7 +65,6 @@
   delete!]
 
  [toucan2.execute
-  compile
   query
   query-one
   reducible-query
@@ -96,6 +97,8 @@
   current
   model
   original]
+
+ #_[toucan2.query]
 
  [toucan2.save
   save!]
@@ -131,6 +134,10 @@
 
  [toucan2.tools.before-update
   define-before-update]
+
+ [toucan2.tools.compile
+  build
+  compile]
 
  #_[toucan2.tools.disallow]
 

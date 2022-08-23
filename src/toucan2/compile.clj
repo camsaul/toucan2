@@ -4,11 +4,15 @@
    [methodical.core :as m]
    [toucan2.util :as u]))
 
-;;; TODO -- is there any circumstance in the universe where it makes sense to have this be a `do-with` method and not
-;;; just have a `compile` multimethod instead?
 (m/defmulti do-with-compiled-query
   {:arglists '([model query f])}
   u/dispatch-on-first-two-args)
+
+(def ^:dynamic *with-compiled-query-fn*
+  "The function that should be invoked by [[with-compiled-query]]. By default, the multimethod [[do-with-compiled-query]],
+  but if you need to do some sort of crazy mocking you can swap this out with something else.
+  See [[toucan2.tools.compile/build]] for an example usage."
+  #'do-with-compiled-query)
 
 (m/defmethod do-with-compiled-query :around :default
   [model query f]
@@ -22,7 +26,7 @@
     (next-method model query f*)))
 
 (defmacro with-compiled-query [[query-binding [model query]] & body]
-  `(do-with-compiled-query
+  `(*with-compiled-query-fn*
     ~model
     ~query
     (^:once fn* [~query-binding] ~@body)))

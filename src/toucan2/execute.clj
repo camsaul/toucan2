@@ -1,6 +1,5 @@
 (ns toucan2.execute
   "Code for executing queries and statements, and reducing their results."
-  (:refer-clojure :exclude [compile])
   (:require
    [methodical.core :as m]
    [pretty.core :as pretty]
@@ -62,6 +61,13 @@
       (reduce-compiled-query-with-connection conn model compiled-query rf init))))
 
 (m/defmulti reduce-uncompiled-query
+  "Reduce an uncompiled `query` with `rf` and `init`.
+
+  The default implementation of this compiles the query with [[compile/with-compiled-query]] and then hands off
+  to [[reduce-compiled-query]], but you can write a custom implementation if you want to do something tricky like skip
+  compilation to return a query directly.
+
+  Dispatches off of `[model query]`."
   {:arglists '([connectable model query rf init])}
   (fn [_connectable model query _rf _init]
     [(protocols/dispatch-value model) (protocols/dispatch-value query)]))
@@ -70,6 +76,12 @@
   [connectable model query rf init]
   (compile/with-compiled-query [compiled-query [model query]]
     (reduce-compiled-query connectable model compiled-query rf init)))
+
+(m/defmethod reduce-uncompiled-query :around :default
+  [connectable model query rf init]
+  ;; preserve the first uncompiled query we see if this gets called recursively
+  (binding [u/*error-context* (merge {::uncompiled-query query} u/*error-context*)]
+    (next-method connectable model query rf init)))
 
 (defn- reduce-impl [connectable modelable queryable rf init]
   (model/with-model [model modelable]
@@ -113,32 +125,7 @@
 
 ;;; TODO -- `execute/compile` seems a little weird. Should this go somewhere else maybe?
 
-(m/defmethod conn/do-with-connection ::compile
-  [connectable f]
-  (f connectable))
 
-(m/defmethod reduce-compiled-query-with-connection [::compile :default :default]
-  [_connectable _model compiled-query rf init]
-  (if (instance? clojure.lang.ITransientCollection init)
-    (rf init {::query compiled-query})
-    [{::query compiled-query}]))
-
-;;; TODO -- this is a weird place to put this. `query/compile` or something would make more sense. Or maybe
-;;; `tools/compile`
-(defmacro compile
-  "Return the compiled query that would be executed by a form, rather than executing that form itself.
-
-  ```clj
-  (delete/delete :table :id 1)
-  =>
-  [\"DELETE FROM table WHERE ID = ?\" 1]
-  ```"
-  {:style/indent 0}
-  [& body]
-  `(binding [conn/*current-connectable* ::compile]
-     (let [query# (do ~@body)]
-       (or (::query query#)
-           (::query (realize/reduce-first query#))))))
 
 ;;;; [[with-call-count]]
 

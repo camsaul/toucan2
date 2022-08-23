@@ -2,12 +2,12 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
-   [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.tools.compile :as tools.compile]
    [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
@@ -139,7 +139,7 @@
                 :where  [:= :id nil]}
                (query/build ::update/update ::test/venues (assoc parsed-args :query query))))))
     (is (= ["UPDATE venues SET name = ? WHERE id IS NULL" "Taco Bell"]
-           (execute/compile
+           (tools.compile/compile
              (update/update! ::test/venues nil {:name "Taco Bell"}))))
     (test/with-discarded-table-changes :venues
       (is (= 0
