@@ -113,3 +113,20 @@
          (is (= :not-here
                 bird)
              "should never get here.")))))
+
+(deftest disallow-nil-model-test
+  (testing "Disallow nil models"
+    (is (thrown-with-msg?
+         AssertionError
+         #"Assert failed: toucan2.tools.with-temp/with-temp model cannot be nil"
+         (with-temp/with-temp []
+           (is (= :not-here
+                  :here)
+               "should never get here."))))
+    (is (thrown-with-msg?
+         AssertionError
+         #"Assert failed: toucan2.tools.with-temp/with-temp model cannot be nil"
+         (with-temp/with-temp [nil]
+           (is (= :not-here
+                  :here)
+               "should never get here."))))))

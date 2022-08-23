@@ -38,6 +38,7 @@
 
 (m/defmethod do-with-temp* :default
   [model explicit-attributes f]
+  (assert (some? model) (format "%s model cannot be nil." `with-temp))
   (let [defaults          (with-temp-defaults model)
         merged-attributes (merge {} defaults explicit-attributes)]
     (binding [u/*error-context* (update u/*error-context*
