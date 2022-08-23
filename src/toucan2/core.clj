@@ -1,4 +1,4 @@
-(ns toucan2.core
+(ns ^:no-doc toucan2.core
   "Convenience namespace exposing the most common parts of the library's public API for day-to-day usage (i.e., not
   implementing anything advanced)"
   (:refer-clojure :exclude [compile count instance?])
