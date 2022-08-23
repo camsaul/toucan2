@@ -34,6 +34,14 @@
     (is (= 7
            (select/count ::test/birds)))))
 
+(deftest no-binding-test
+  (testing "Should work with just a model, and no instance binding"
+    (with-temp/with-temp [::test/birds]
+      (is (= (instance/instance ::test/birds {:id 7, :name "birb", :bird-type "parrot", :good-bird nil})
+             (select/select-one ::test/birds :id 7)))
+      (is (= 7
+             (select/count ::test/birds))))))
+
 (deftest multiple-objects-test
   (testing "multiple objects, referencing one another"
     (with-temp/with-temp [::test/birds bird-1 nil

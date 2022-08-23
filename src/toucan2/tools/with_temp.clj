@@ -75,6 +75,11 @@
   the conclusion of `body`, the object is deleted. This is primarily intended for usage in tests, so this adds
   a [[clojure.test/testing]] context around `body` as well.
 
+  [[with-temp]] can create multiple objects in one form if you pass additional bindings.
+
+  `temp-object-binding` and `attributes` are optional, and default to `_` and `nil`, respectively. If you're creating
+  multiple objects at once these must be explicitly specified.
+
   Examples:
 
   ```clj
@@ -95,7 +100,7 @@
   If you want to implement custom behavior for a model other than default values, you can implement [[do-with-temp*]]."
   [[modelable temp-object-binding attributes & more] & body]
   `(do-with-temp ~modelable ~attributes
-                 (^:once fn* [~temp-object-binding]
+                 (^:once fn* [~(or temp-object-binding '_)]
                   ~(if (seq more)
                      `(with-temp ~(vec more) ~@body)
                      `(do ~@body)))))
