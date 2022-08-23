@@ -2,6 +2,7 @@
   (:require
    [methodical.core :as m]
    [next.jdbc :as jdbc]
+   [pretty.core :as pretty]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
@@ -126,3 +127,14 @@
   [[conn-binding connectable] & body]
   `(with-connection [conn# ~connectable]
      (do-with-transaction conn# (^:once fn* [~conn-binding] ~@body))))
+
+;;; wraps a `reducible` and makes sure it is reduced inside a transaction.
+(deftype ReduceInTransaction [connectable reducible]
+  clojure.lang.IReduceInit
+  (reduce [_this rf init]
+    (with-transaction [_conn connectable]
+      (reduce rf init reducible)))
+
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `->ReduceInTransaction connectable reducible)))

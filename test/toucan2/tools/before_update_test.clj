@@ -184,6 +184,8 @@
 ;;; this changes the category to `category-<id>` with the venue ID
 (derive ::venues.add-unique-category ::venues.capture-updates)
 
+(m/prefer-method! #'before-update/before-update ::venues.add-unique-category ::venues.before-update)
+
 (before-update/define-before-update ::venues.add-unique-category
   [venue]
   (assoc venue :category (format "category-%d" (:id venue))))
@@ -248,10 +250,65 @@
 ;;; TODO -- need a test that we do some number of update batches BETWEEN 1..n for n affected rows. e.g. we affect 3 rows
 ;;; with 2 sets of changes, should only do 2 updates.
 
+(derive ::venues.upper-case-name ::test/venues)
+
+(before-update/define-before-update ::venues.upper-case-name
+  [venue]
+  (update venue :name str/upper-case))
+
+(derive ::venues.upper-case-name.unique-category ::venues.upper-case-name)
+(derive ::venues.upper-case-name.unique-category ::venues.add-unique-category)
+
+(m/prefer-method! #'before-update/before-update ::venues.upper-case-name ::venues.before-update)
+(m/prefer-method! #'before-update/before-update ::venues.add-unique-category ::venues.upper-case-name)
+
+(deftest before-update-should-compose-test
+  (testing "Make sure define-before-update composes"
+    (test/with-discarded-table-changes :venues
+      (is (= 1
+             (update/update! ::venues.upper-case-name.unique-category :id 1
+                             {:updated-at (LocalDateTime/parse "2022-08-22T18:17:00")})))
+      (is (= {:id 1, :name "TEMPEST", :category "category-1"}
+             (select/select-one [::test/venues :id :name :category] 1))))))
+
+(derive ::venues.disallow-stores ::test/venues)
+
+(before-update/define-before-update ::venues.disallow-stores
+  [venue]
+  (assert (map? venue))
+  (assert (:category venue))
+  (cond-> venue
+    (= (:category venue) "store")
+    (assoc :category nil)))
+
+(derive ::venues.upper-case-name.no-stores ::venues.upper-case-name)
+(derive ::venues.upper-case-name.no-stores ::venues.disallow-stores)
+
+(m/prefer-method! #'before-update/before-update ::venues.upper-case-name ::venues.disallow-stores)
+
 (deftest before-update-transaction-test
   (testing "before-update should run in a transaction; an error during some part should cause all updates to be discarded"
-    ;; TODO
-    ))
+    (testing "Do something that will have to do one updates for each row"
+      (test/with-discarded-table-changes :venues
+        (is (= ::venues.upper-case-name
+               (:dispatch-value (meta (m/effective-method before-update/before-update ::venues.upper-case-name)))))
+        (is (= 3
+               (update/update! ::venues.upper-case-name {:updated-at (LocalDateTime/parse "2022-08-22T18:17:00")})))
+        (is (= [{:id 1, :name "TEMPEST"}
+                {:id 2, :name "HO'S TAVERN"}
+                {:id 3, :name "BEVMO"}]
+               (select/select [::venues.upper-case-name :id :name] {:order-by [[:id :asc]]})))))
+    (test/with-discarded-table-changes :venues
+      (is (thrown-with-msg?
+           Throwable
+           (case (test/current-db-type)
+             :postgres #"null value in column \"category\" of relation \"venues\" violates not-null constraint"
+             :h2       #"NULL not allowed for column \"CATEGORY\";")
+           (update/update! ::venues.upper-case-name.no-stores {:updated-at (LocalDateTime/parse "2022-08-22T18:17:00")})))
+      (is (= [{:id 1, :name "Tempest", :category "bar"}
+              {:id 2, :name "Ho's Tavern", :category "bar"}
+              {:id 3, :name "BevMo", :category "store"}]
+             (select/select [::venues.upper-case-name.no-stores :id :name :category] {:order-by [[:id :asc]]}))))))
 
 (derive ::venues.short-name ::test/venues)
 

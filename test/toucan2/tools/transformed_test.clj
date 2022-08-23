@@ -249,8 +249,7 @@
                                                              :category   :bar
                                                              :created-at (LocalDateTime/parse "2017-01-01T00:00")
                                                              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
-                   (binding [toucan2.util/*debug* false #_true] ; NOCOMMIT
-                     (insert! ::venues.id-is-string [{:name "Hi-Dive", category-key "bar"}]))))))))))
+                   (insert! ::venues.id-is-string [{:name "Hi-Dive", category-key "bar"}])))))))))
 
 (deftest delete!-test
   (testing "Delete row by PK"
