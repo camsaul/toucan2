@@ -19,7 +19,7 @@
 (p/defprotocol+ IWithModel
   :extend-via-metadata true
   "Protocol for something that has-a model that supports creating a copy with a different model."
-  (with-model [this new-model]
+  (^{:style/indent nil} with-model [this new-model]
     "Return a copy of `instance` with its model set to `new-model.`"))
 
 ;;; there are some default impls of [[with-model]] in [[toucan2.instance]]
@@ -29,13 +29,13 @@
   (original [instance]
             "Get the original version of `instance` as it appeared when it first came out of the DB.")
 
-  (with-original [instance new-original]
+  (^{:style/indent nil} with-original [instance new-original]
     "Return a copy of `instance` with its `original` map set to `new-original`.")
 
   (current [instance]
            "Return the underlying map representing the current state of an `instance`.")
 
-  (with-current [instance new-current]
+  (^{:style/indent nil} with-current [instance new-current]
     "Return a copy of `instance` with its underlying `current` map set to `new-current`.")
 
   (changes [instance]

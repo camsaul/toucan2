@@ -1,4 +1,30 @@
 (ns toucan2.tools.hydrate
+  "Implementation of Toucan's famous 'hydration' facilities. See [[hydrate]] for a high-level overview of hydration.
+
+  If you're digging in to the details, this is a flowchart of how hydration works:
+
+  ```
+                        hydrate <-------------+
+                          |                   |
+                      hydrate-forms           |
+                          | (for each form)   |
+                      hydrate-one-form        | (recursively)
+                          |                   |
+               keyword? --+-- sequence?       |
+                  |             |             |
+            hydrate-key   hydrate-key-seq ----+
+                  |
+         (for each strategy) <--------+
+          ::automagic-batched         |
+          ::multimethod-batched       |
+          ::multimethod-simple        | (try next strategy)
+                  |                   |
+         can-hydrate-with-strategy?   |
+                  |                   |
+           yes ---+--- no ------------+
+            |
+   hydrate-with-strategy
+  ```"
   (:require
    [camel-snake-kebab.core :as csk]
    [methodical.core :as m]
@@ -9,21 +35,68 @@
    [toucan2.util :as u]))
 
 (m/defmulti can-hydrate-with-strategy?
+  "Can we hydrate the key `k` in instances of `model` using a specific hydration `strategy`?
+
+  Normally you should never need to call this yourself. The only reason you would implement it is if you are
+  implementing a custom hydration strategy."
   {:arglists '([model strategy k])}
   u/dispatch-on-first-three-args)
 
 (m/defmulti hydrate-with-strategy
-  {:arglists '([model strategy k rows])}
-  (fn [_model strategy _k _rows]
+  "Hydrate the key `k` in `instances` of `model` using a specific hydration `strategy`.
+
+  Normally you should not call this yourself. The only reason you would implement this method is if you are implementing
+  a custom hydration strategy."
+  {:arglists '([model strategy k instances])}
+  (fn [_model strategy _k _instances]
     strategy))
 
 ;;;                                  Automagic Batched Hydration (via :table-keys)
 ;;; ==================================================================================================================
 
+;;; TODO -- should this get called with `instance` rather than the instance's model? Should we support multiple possible
+;;; models automagically hydrating the same key? For example an Emitter in Metabase can be a CardEmitter, that points to
+;;; a Card, or a DashboardEmitter, that points to a Dashboard -- would it be possible to hydrate the same key in a
+;;; sequence of mixed-type emitters?
 (m/defmulti model-for-automagic-hydration
   "The model that should be used to automagically hydrate the key `k` in instances of `original-model`.
 
-    (model-for-automagic-hydration :some-table :user) :-> :myapp.models/user"
+  ```clj
+  (model-for-automagic-hydration :some-table :user) :-> :myapp.models/user
+  ```
+
+  Dispatches off of the [[toucan2.protocols/model]] of the instance being hydrated and the key `k` that we are
+  attempting to hydrate. To hydrate the key `k` for *any* model, you can use `:default` in your `defmethod` dispatch
+  value. Example implementation:
+
+  ```clj
+   ;; when hydrating the :user key for *any* model, hydrate with instances of the model :models/user
+   ;;
+   ;; By default, this will look for values of :user-id in the instances being hydrated and then fetch the instances of
+   ;; :models/user with a matching :id
+   (m/defmethod hydrate/model-for-automagic-hydration [:default :user]
+     [_original-model _k]
+     :models/user)
+
+   ;; when hydrating the :user key for instances of :models/orders, hydrate with instances of :models/user
+   (m/defmethod hydrate/model-for-automagic-hydration [:models/orders :user]
+     [_original-model _k]
+     :models/user)
+  ```
+
+  Automagic hydration looks for the [[fk-keys-for-automagic-hydration]] in the instance being hydrated, and if they're
+  all non-`nil`, fetches instances of [[model-for-automagic-hydration]] with the
+  corresponding [[toucan2.model/primary-keys]]. Thus you might also want to implement
+
+  * [[fk-keys-for-automagic-hydration]] for the model whose instances hydrating and the key being hydrated
+    (e.g. `:models/orders` and `:user`)
+
+  * [[toucan2.model/primary-keys]] for the model you want to hydrate with (e.g. `:models/user`)
+
+  #### Tips
+
+  You probably don't want to write an implementation for `[<some-model> :default]` or `[:default :default]`, unless you
+  want every key that we attempt to hydrate to be hydrated by that method."
   {:arglists '([original-model k])}
   u/dispatch-on-first-two-args)
 
@@ -36,11 +109,52 @@
   (boolean (model-for-automagic-hydration model dest-key)))
 
 (m/defmulti fk-keys-for-automagic-hydration
+  "The keys in we should use when automagically hydrating the key `dest-key` in instances of `original-model` with
+  instances `hydrated-model`.
+
+  ```clj
+  ;; when hydrating :user in an order with a user, fetch the user based on the value of the :user-id key
+  ;;
+  ;; This means we take the value of :user-id from our order and then fetch the user with the matching primary key
+  ;; (by default, :id)
+  (fk-keys-for-automagic-hydration :models/orders :user :models/user) => [:user-id]
+  ```
+
+  The model that we are hydrating with (e.g. `:models/user`) is determined by [[model-for-automagic-hydration]].
+
+  By default [[fk-keys-for-automagic-hydration]] is just the key we're hydrating, with `-id` appended to it; e.g. if
+  we're hydrating `:user` the default FK key to use is `:user-id`. *If this convention is fine, you do not need to
+  implement this method.* If you want to do something that does not follow this convention, like hydrate a `:user` key
+  based on values of `:creator-id`, you should implement this method.
+
+  Example implementation:
+
+  ```clj
+  ;; hydrate orders :user key using values of :creator-id
+  (m/defmethod hydrate/fk-keys-for-automagic-hydration [:model/orders :user :default]
+    [_original-model _dest-key _hydrated-model]
+    [:creator-id])
+  ```
+
+  #### Tips
+
+  When implementing this method, you probably do not want to specialize on the `hydrated-model` (the third part of the
+  dispatch value) -- the model to use is normally determined by [[model-for-automagic-hydration]]. The only time you
+  might want to specialize on `hydrated-model` is you wanted to do something like
+
+  ```clj
+  ;; by default when we hydrate the :user key with a :models/user, use :creator-id as the source FK
+  (m/defmethod hydrate/fk-keys-for-automagic-hydration [:default :model/orders :user :models/user]
+    [_original-model _dest-key _hydrated-model]
+    [:creator-id])
+  ```"
   {:arglists '([original-model dest-key hydrated-model])}
   u/dispatch-on-first-three-args)
 
 (m/defmethod fk-keys-for-automagic-hydration :default
   [_original-model dest-key _hydrated-key]
+  ;; TODO -- this should probably use the key transform associated with the `original-model` -- if it's not using magic
+  ;; maps this wouldn't work
   [(csk/->kebab-case (keyword (str (name dest-key) "-id")))])
 
 (m/defmethod fk-keys-for-automagic-hydration :around :default
@@ -123,11 +237,32 @@
                       e)))))
 
 
-;;;                         Method-Based Batched Hydration (using impls of `batched-hydrate`)
+;;;                         Method-Based Batched Hydration (using impls of [[batched-hydrate]])
 ;;; ==================================================================================================================
 
 (m/defmulti batched-hydrate
-  {:arglists '([model k rows])}
+  "Hydrate the key `k` in one or more `instances` of `model`. Implement this method to support batched hydration for the
+  key `k`. Example implementation:
+
+  ```clj
+  ;; This method defines a batched hydration strategy for the :bird-type key for all models.
+  (m/defmethod hydrate/batched-hydrate [:default :is-bird?]
+    [_model _k rows]
+    ;; fetch a set of all the non-nil bird IDs in rows.
+    (let [bird-ids           (into #{} (comp (map :bird-id) (filter some?)) rows)
+          ;; if bird-ids is non-empty, fetch a map of bird ID => bird type
+          bird-id->bird-type (when (seq bird-ids)
+                               (select/select-pk->fn :bird-type :models/bird :id [:in bird-ids]))]
+      ;; for each row add a :bird-type key.
+      (for [row rows]
+        (assoc row :bird-type (get bird-id->bird-type (:bird-id row))))))
+  ```
+
+  Batched hydration implementations should try to be efficient, e.g. minimizing the number of database calls made rather
+  than doing one call per row. If you just want to hydrate each row independently, implement [[simple-hydrate]] instead.
+  If you are hydrating entire instances of some other model, consider setting up automagic batched hydration
+  using [[model-for-automagic-hydration]] and possibly [[fk-keys-for-automagic-hydration]]."
+  {:arglists '([model k instances])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod can-hydrate-with-strategy? [:default ::multimethod-batched :default]
@@ -135,15 +270,14 @@
   (boolean (m/effective-primary-method batched-hydrate (m/dispatch-value batched-hydrate model k))))
 
 (m/defmethod hydrate-with-strategy ::multimethod-batched
-  [model _strategy k rows]
-  (batched-hydrate model k rows))
+  [model _strategy k instances]
+  (batched-hydrate model k instances))
 
 
 ;;;                          Method-Based Simple Hydration (using impls of [[simple-hydrate]])
 ;;; ==================================================================================================================
 
-(declare simple-hydrate)
-
+;;; TODO -- better dox
 (m/defmulti simple-hydrate
   "Implementations should return a version of map `row` with the key `k` added."
   {:arglists '([model k row])}
@@ -168,7 +302,9 @@
 (defn- strategies []
   (keys (m/primary-methods hydrate-with-strategy)))
 
-(defn hydration-strategy [model k]
+(defn- hydration-strategy
+  "Determine the appropriate hydration strategy to hydrate the key `k` in instances of `model`."
+  [model k]
   (some
    (fn [strategy]
      (when (can-hydrate-with-strategy? model strategy k)
@@ -246,89 +382,82 @@
 ;;;                                                 Public Interface
 ;;; ==================================================================================================================
 
-;;                         hydrate <-------------+
-;;                           |                   |
-;;                       hydrate-forms           |
-;;                           | (for each form)   |
-;;                       hydrate-one-form        | (recursively)
-;;                           |                   |
-;;                keyword? --+-- sequence?       |
-;;                   |             |             |
-;;             hydrate-key   hydrate-key-seq ----+
-;;                   |
-;;          (for each strategy) <--------+
-;;           ::automagic-batched         |
-;;           ::multimethod-batched       |
-;;           ::multimethod-simple        | (try next strategy)
-;;                   |                   |
-;;          can-hydrate-with-strategy?   |
-;;                   |                   |
-;;            yes ---+--- no ------------+
-;;             |
-;;    hydrate-with-strategy
-
 
 (defn hydrate
   "Hydrate a single object or sequence of objects.
 
-  #### Automagic Batched Hydration (via [[toucan2.hydrate/model-for-automagic-hydration]])
+  #### Automagic Batched Hydration (via [[model-for-automagic-hydration]])
 
-  [[toucan2.hydrate/hydrate]] attempts to do a *batched hydration* where possible. If the key being hydrated is
-  defined as one of some table's [[toucan2.hydrate/model-for-automagic-hydration]], `hydrate` will do a batched
+  [[hydrate]] attempts to do a *batched hydration* where possible. If the key being hydrated is defined as one of some
+  table's [[model-for-automagic-hydration]], `hydrate` will do a batched
   [[toucan2.select/select]] if a corresponding key (by default, the same key suffixed by `-id`) is found in the
   objects being batch hydrated. The corresponding key can be customized by
-  implementing [[toucan2.hydrate/fk-keys-for-automagic-hydration]].
+  implementing [[fk-keys-for-automagic-hydration]].
 
-    (hydrate [{:user_id 100}, {:user_id 101}] :user)
+  ```clj
+  (hydrate [{:user_id 100}, {:user_id 101}] :user)
+  ```
 
   Since `:user` is a hydration key for `:models/User`, a single [[toucan2.select/select]] will used to fetch Users:
 
-    (db/select :models/User :id [:in #{100 101}])
+  ```clj
+  (db/select :models/User :id [:in #{100 101}])
+  ```
 
   The corresponding Users are then added under the key `:user`.
 
-  #### Function-Based Batched Hydration (via [[toucan2.hydrate/batched-hydrate]] methods)
+  #### Function-Based Batched Hydration (via [[batched-hydrate]] methods)
 
-  If the key can't be hydrated auto-magically with the appropriate [[toucan2.hydrate/model-for-automagic-hydration]],
-  [[toucan2.hydrate/hydrate]] will attempt to do batched hydration if it can find a matching method
-  for [[toucan2.hydrate/batched-hydrate]]. If a matching function is found, it is called with a collection of
+  If the key can't be hydrated auto-magically with the appropriate [[model-for-automagic-hydration]],
+  [[hydrate]] will attempt to do batched hydration if it can find a matching method
+  for [[batched-hydrate]]. If a matching function is found, it is called with a collection of
   objects, e.g.
 
-    (m/defmethod hydrate/batched-hydrate [:default :fields]
-      [_model _k rows]
-      (let [id->fields (get-some-fields rows)]
-        (for [row rows]
-          (assoc row :fields (get id->fields (:id row))))))
+  ```clj
+  (m/defmethod hydrate/batched-hydrate [:default :fields]
+    [_model _k rows]
+    (let [id->fields (get-some-fields rows)]
+      (for [row rows]
+        (assoc row :fields (get id->fields (:id row))))))
+  ```
 
-  #### Simple Hydration (via [[toucan2.hydrate/simple-hydrate]] methods)
+  #### Simple Hydration (via [[simple-hydrate]] methods)
 
-  If the key is *not* eligible for batched hydration, [[toucan2.hydrate/hydrate]] will look for a matching
-  [[toucan2.hydrate/simple-hydrate]] method. `simple-hydrate` is called with a single row.
+  If the key is *not* eligible for batched hydration, [[hydrate]] will look for a matching
+  [[simple-hydrate]] method. `simple-hydrate` is called with a single row.
 
-    (m/defmethod simple-hydrate [:default :dashboard]
-      [_model _k {:keys [dashboard-id], :as row}]
-      (assoc row :dashboard (select/select-one :models/Dashboard :toucan/pk dashboard-id)))
+  ```clj
+  (m/defmethod simple-hydrate [:default :dashboard]
+    [_model _k {:keys [dashboard-id], :as row}]
+    (assoc row :dashboard (select/select-one :models/Dashboard :toucan/pk dashboard-id)))
+  ```
 
   #### Hydrating Multiple Keys
 
   You can hydrate several keys at one time:
 
-    (hydrate {...} :a :b)
-      -> {:a 1, :b 2}
+  ```clj
+  (hydrate {...} :a :b)
+    -> {:a 1, :b 2}
+  ```
 
   #### Nested Hydration
 
   You can do recursive hydration by listing keys inside a vector:
 
-    (hydrate {...} [:a :b])
-      -> {:a {:b 1}}
+  ```clj
+  (hydrate {...} [:a :b])
+    -> {:a {:b 1}}
+  ```
 
   The first key in a vector will be hydrated normally, and any subsequent keys will be hydrated *inside* the
   corresponding values for that key.
 
-    (hydrate {...}
-             [:a [:b :c] :e])
-      -> {:a {:b {:c 1} :e 2}}"
+  ```clj
+  (hydrate {...}
+           [:a [:b :c] :e])
+    -> {:a {:b {:c 1} :e 2}}
+  ```"
   [results k & ks]
   (when results
     (if (sequential? results)

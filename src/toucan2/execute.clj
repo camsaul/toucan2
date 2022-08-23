@@ -76,7 +76,7 @@
     (query/with-query [query [model queryable]]
       (reduce-uncompiled-query connectable model query rf init))))
 
-(deftype ReducibleQuery [connectable modelable queryable]
+(deftype ^:no-doc ReducibleQuery [connectable modelable queryable]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (reduce-impl connectable modelable queryable rf init))
@@ -166,7 +166,7 @@
   `(do-with-call-counts (^:once fn* [~call-count-fn-binding] ~@body)))
 
 ;;; TODO -- this is kind of [[next.jdbc]] specific
-(deftype WithReturnKeys [reducible]
+(deftype ^:no-doc WithReturnKeys [reducible]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (binding [t2.jdbc.query/*options* (assoc t2.jdbc.query/*options* :return-keys true)]

@@ -64,7 +64,7 @@
   (u/with-debug-result [(list `before-delete model instance)]
     (next-method model instance)))
 
-(deftype ReducibleBeforeDelete [model parsed-args reducible-delete]
+(deftype ^:no-doc ReducibleBeforeDelete [model parsed-args reducible-delete]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (conn/with-transaction [_conn (model/deferred-current-connectable model)]

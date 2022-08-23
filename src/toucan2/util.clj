@@ -19,7 +19,7 @@
                     (when (pos? *debug-indent-level*)
                       (str *last-indentation-separator* \space)))))
 
-(defn println-debug-lines [s]
+(defn ^:no-doc println-debug-lines [s]
   (let [[first-line & more] (str/split-lines (str/trim s))]
     (when first-line
       (binding [*last-indentation-separator* "+-"]
@@ -29,7 +29,7 @@
       (print (indentation))
       (println line))))
 
-(defn println-debug* [& args]
+(defn ^:no-doc println-debug* [& args]
   (println-debug-lines (with-out-str (apply println args))))
 
 (def ^:private ^:dynamic *color*
@@ -63,7 +63,7 @@
     (fn [_printer x]
       [:text (str x)])))
 
-(defrecord Doc [forms])
+(deftype ^:no-doc Doc [forms])
 
 (defmethod print-handler Doc
   [_klass]
@@ -71,7 +71,7 @@
     (into [:group] (for [form forms]
                      (puget/format-doc printer form)))))
 
-(defrecord Text [s])
+(deftype ^:no-doc Text [s])
 
 (defmethod print-handler Text
   [_klass]
@@ -105,7 +105,7 @@
                       {:object x}
                       e)))))
 
-(defn pprint-to-str [x]
+(defn ^:no-doc pprint-to-str [x]
   (str/trim (with-out-str (pprint x))))
 
 (defn- interleave-all
@@ -123,7 +123,7 @@
         acc
         (recur acc x y)))))
 
-(defmacro format-doc
+(defmacro ^:no-doc format-doc
   "Convert `format-string` and `args` into something that can be pretty-printed by puget."
   [format-string & args]
   (let [->Text (fn [s]
@@ -131,7 +131,7 @@
         texts  (map ->Text (str/split format-string #"%s"))]
     `(pprint-to-str (->Doc ~(vec (interleave-all texts args))))))
 
-(defmacro println-debug
+(defmacro ^:no-doc println-debug
   [arg & more]
   `(when *debug*
      ~(if (vector? arg)
@@ -155,14 +155,14 @@
       (print line))
     (println)))
 
-(defn do-with-debug-result [message thunk]
+(defn ^:no-doc do-with-debug-result [message thunk]
   (println-debug message)
   (let [result (binding [*debug-indent-level* (inc *debug-indent-level*)]
                  (thunk))]
     (print-debug-result result)
     result))
 
-(defmacro with-debug-result [message & body]
+(defmacro ^:no-doc with-debug-result [message & body]
   (if (vector? message)
     `(with-debug-result ~(if (> (count message) 1)
                            `(format-doc ~(first message) ~@(rest message))
@@ -200,7 +200,7 @@
   (when-not (isa? child parent)
     (derive child parent)))
 
-(defprotocol SafePRStr
+(defprotocol ^:no-doc SafePRStr
   (^:private safe-printable [this]
     "Convert `this` to a safe representation for printing by [[safe-pr-str]]."))
 

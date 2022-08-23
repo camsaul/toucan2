@@ -54,7 +54,7 @@
 
 ;;;; reducible PKs
 
-(deftype AfterReduciblePKs [query-type model reducible-pks]
+(deftype ^:no-doc AfterReduciblePKs [query-type model reducible-pks]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (u/with-debug-result ["reducing %s %s for %s" `after query-type model]

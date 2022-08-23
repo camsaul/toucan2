@@ -83,7 +83,7 @@
               pretty/pretty)
             key-xform))))
 
-(deftype TransientMagicMap [^clojure.lang.ITransientMap m key-xform mta]
+(deftype ^:no-doc TransientMagicMap [^clojure.lang.ITransientMap m key-xform mta]
   clojure.lang.ITransientMap
   (conj [this [k v]]
     (.conj m [(key-xform k) v])

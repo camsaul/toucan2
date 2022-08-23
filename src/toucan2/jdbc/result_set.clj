@@ -2,7 +2,6 @@
   (:require
    [methodical.core :as m]
    [next.jdbc.result-set :as jdbc.rs]
-   [potemkin :as p]
    [pretty.core :as pretty]
    [toucan2.instance :as instance]
    [toucan2.jdbc.row :as row]
@@ -76,7 +75,7 @@
     (fn row-instance-thunk []
       (row-instance model #_key-xform col-name->thunk))))
 
-(p/deftype+ ReducibleResultSet [^Connection conn model ^ResultSet rset]
+(deftype ^:no-doc ReducibleResultSet [^Connection conn model ^ResultSet rset]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (try

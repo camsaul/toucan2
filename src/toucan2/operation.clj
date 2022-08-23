@@ -116,7 +116,7 @@
                        :queryable {}}]
       (reducible-returning-instances* :toucan2.select/select model parsed-args))))
 
-(deftype ReducibleReturningInstancesFromPKs [model columns reducible-returning-pks]
+(deftype ^:no-doc ReducibleReturningInstancesFromPKs [model columns reducible-returning-pks]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (when-let [row-pks (not-empty (realize/realize reducible-returning-pks))]

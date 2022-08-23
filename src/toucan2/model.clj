@@ -45,10 +45,18 @@
           (u/println-debug ["Using %s for model %s" `default-connectable model])
           (default-connectable model)))))
 
-(defrecord DeferredCurrentConnectable [model]
+(defrecord ^:no-doc DeferredCurrentConnectable [model]
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `deferred-current-connectable model)))
+    (list `deferred-current-connectable model))
+
+  protocols/IModel
+  (model [_this]
+    model)
+
+  protocols/IWithModel
+  (with-model [_this new-model]
+    (DeferredCurrentConnectable. new-model)))
 
 (m/defmethod conn/do-with-connection DeferredCurrentConnectable
   [{:keys [model]} f]

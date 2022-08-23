@@ -8,7 +8,7 @@
    [toucan2.query :as query]
    [toucan2.realize :as realize]))
 
-(defrecord IdentityQuery [rows]
+(defrecord ^:no-doc IdentityQuery [rows]
   pretty/PrettyPrintable
   (pretty [_this]
     (list `identity-query rows))
@@ -22,8 +22,19 @@
     (reduce rf init rows)))
 
 (defn identity-query
-  "A queryable that returns `rows` as-is without compiling anything or running anything against a database.
-  Good for mocking stuff."
+  "A queryable that returns `reducible-rows` as-is without compiling anything or running anything against a database.
+  Good for mocking stuff.
+
+  ```clj
+  (def parrot-query
+    (identity-query [{:id 1, :name \"Parroty\"}
+                     {:id 2, :name \"Green Friend\"}]))
+
+  (select/select ::parrot parrot-query)
+  =>
+  [(instance ::parrot {:id 1, :name \"Parroty\"})
+   (instance ::parrot {:id 2, :name \"Green Friend\"})]
+  ```"
   [reducible-rows]
   (->IdentityQuery reducible-rows))
 

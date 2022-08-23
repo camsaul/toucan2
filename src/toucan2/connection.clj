@@ -129,7 +129,7 @@
      (do-with-transaction conn# (^:once fn* [~conn-binding] ~@body))))
 
 ;;; wraps a `reducible` and makes sure it is reduced inside a transaction.
-(deftype ReduceInTransaction [connectable reducible]
+(deftype ^:no-doc ReduceInTransaction [connectable reducible]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
     (with-transaction [_conn connectable]

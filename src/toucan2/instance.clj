@@ -138,7 +138,7 @@
   (pretty [_this]
     (list `instance model m)))
 
-(deftype TransientInstance [model ^clojure.lang.ITransientMap m mta]
+(deftype ^:no-doc TransientInstance [model ^clojure.lang.ITransientMap m mta]
   clojure.lang.ITransientMap
   (conj [this v]
     (.conj m v)

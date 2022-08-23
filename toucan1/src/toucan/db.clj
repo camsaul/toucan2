@@ -15,6 +15,7 @@
    [toucan2.instance :as instance]
    [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.model :as model]
+   [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.update :as update]
@@ -134,7 +135,7 @@
   (compile/with-compiled-query [query [nil honeysql-form]]
     query))
 
-(deftype Toucan1ReducibleQuery [honeysql-form jdbc-options]
+(deftype ^:no-doc Toucan1ReducibleQuery [honeysql-form jdbc-options]
   clojure.lang.IReduceInit
   (reduce [this rf init]
     (u/with-debug-result ["reduce Toucan 1 reducible query %s" this]
@@ -242,10 +243,18 @@
 ;;; wraps a model to prevent `before-update` and stuff like that from happening.
 ;;;
 ;;; TODO -- maybe this belongs in the main part of Toucan 2.
-(defrecord SimpleModel [original-model]
+(defrecord ^:no-doc SimpleModel [original-model]
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `->SimpleModel original-model)))
+    (list `->SimpleModel original-model))
+
+  protocols/IModel
+  (model [_this]
+    original-model)
+
+  protocols/IWithModel
+  (with-model [_this new-model]
+    (SimpleModel. new-model)))
 
 (m/defmethod model/table-name SimpleModel
   [{:keys [original-model]}]
@@ -265,8 +274,8 @@
 
 (m/defmethod model/do-with-model SimpleModel
   [model f]
-  (binding [compile/*honeysql-options* (honeysql-options)])
-  (f model))
+  (binding [compile/*honeysql-options* (honeysql-options)]
+    (f model)))
 
 (defn simple-insert-many!
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead. Returns the ID of the "
