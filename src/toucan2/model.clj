@@ -89,7 +89,19 @@
   table)
 
 (m/defmulti primary-keys
-  "Return a sequence of the primary key columns names, as keywords, for a model."
+  "Return a sequence of the primary key columns names, as keywords, for a model. The default primary keys for a model are
+  `[:id]`; implement this method if your model has different primary keys.
+
+  ```clj
+  ;; tell Toucan that :model/bird has a composite primary key consisting of the columns :id and :name
+  (m/defmethod primary-keys :model/bird
+    [_model]
+    [:id :name])
+  ```
+
+  If an implementation returns a single keyword, the default `:around` method will automatically wrap it in a vector. It
+  also validates that the ultimate result is a sequence of keywords, so it is safe to assume that calls to this will
+  always return a sequence of keywords."
   {:arglists '([model])}
   u/dispatch-on-first-arg)
 
@@ -112,27 +124,21 @@
   [_model]
   [:id])
 
-(defn primary-keys-vec
-  "Get the primary keys for a `model` as a vector."
-  [model]
-  (let [pk-keys (primary-keys model)]
-    (if (sequential? pk-keys)
-      pk-keys
-      [pk-keys])))
-
 ;;; TODO -- rename to `primary-key-values-map`
 (defn primary-key-values
   "Return a map of primary key values for a Toucan 2 `instance`."
   ([instance]
    (primary-key-values (protocols/model instance) instance))
   ([model m]
-   (select-keys m (primary-keys-vec model))))
+   (select-keys m (primary-keys model))))
 
+;;; TODO -- consider renaming this to something better. What?
 (defn select-pks-fn
-  "Return a function to get the value(s) of the primary key(s) from a row. Used by [[toucan2.select/select-pks-reducible]]
-  and thus by [[toucan2.select/select-pks-set]], [[toucan2.select/select-pks-vec]], etc.
+  "Return a function to get the value(s) of the primary key(s) from a row, as a single value or vector of values. Used
+  by [[toucan2.select/select-pks-reducible]] and thus
+  by [[toucan2.select/select-pks-set]], [[toucan2.select/select-pks-vec]], etc.
 
-  The primary keys are determined by [[toucan2.model/primary-keys]]. By default this is simply the keyword `:id`."
+  The primary keys are determined by [[primary-keys]]. By default this is simply the keyword `:id`."
   [modelable]
   (with-model [model modelable]
     (let [pk-keys (primary-keys model)]

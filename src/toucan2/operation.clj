@@ -103,7 +103,7 @@
                         (if (sequential? pk)
                           pk
                           [pk]))
-          pk-keys     (model/primary-keys-vec model)
+          pk-keys     (model/primary-keys model)
           pk-maps     (for [pk-vec pk-vecs]
                         (zipmap pk-keys pk-vec))
           kv-args  (into

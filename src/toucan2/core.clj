@@ -87,7 +87,6 @@
   default-connectable
   primary-key-values
   primary-keys
-  primary-keys-vec
   select-pks-fn
   table-name
   with-model]

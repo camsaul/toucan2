@@ -6,6 +6,34 @@
    [toucan2.model :as model]
    [toucan2.test :as test]))
 
+(deftest primary-keys-test
+  (testing "default implementation"
+    (is (= [:id]
+           (model/primary-keys ::some-default-model)))))
+
+(m/defmethod model/primary-keys ::primary-keys.returns-bare-keyword
+  [_model]
+  :name)
+
+(m/defmethod model/primary-keys ::primary-keys.returns-vector
+  [_model]
+  [:name :id])
+
+(m/defmethod model/primary-keys ::primary-keys.returns-invalid
+  [_model]
+  [:name nil])
+
+(deftest primary-keys-wrap-results-test
+  (testing "primary-keys should wrap results in a vector if needed, and validate"
+    (is (= [:name]
+           (model/primary-keys ::primary-keys.returns-bare-keyword)))
+    (is (= [:name :id]
+           (model/primary-keys ::primary-keys.returns-vector)))
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Bad toucan2.model/primary-keys for model .* should return keyword or sequence of keywords, got .*"
+         (model/primary-keys ::primary-keys.returns-invalid)))))
+
 (deftest ^:parallel table-name-test
   (doseq [[model expected] {"ABC"    "ABC"
                             :abc     "abc"
