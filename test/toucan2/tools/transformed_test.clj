@@ -5,6 +5,7 @@
    [toucan2.delete :as delete]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
+   [toucan2.protocols :as protocols]
    [toucan2.save :as save]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -84,9 +85,9 @@
     (testing "Transformed version of the map should be considered the instance 'original'"
       (let [instance (select/select-one ::venues.transformed :toucan/pk 1 {:select [:id :name :category]})]
         (is (= {:id 1, :name "Tempest", :category :bar}
-               (instance/original instance)))
+               (protocols/original instance)))
         (is (= nil
-               (instance/changes instance)))))))
+               (protocols/changes instance)))))))
 
 (m/defmethod transformed/transforms ::unnormalized
   [_model]
@@ -120,9 +121,9 @@
         (when (instance/instance? m)
           (testing "original value"
             (is (= {:id "1"}
-                   (instance/original m2))))
-          (is (identical? (instance/current m2)
-                          (instance/original m2))))))))
+                   (protocols/original m2))))
+          (is (identical? (protocols/current m2)
+                          (protocols/original m2))))))))
 
 #_(derive ::venues.id-is-string-track-reads ::venues.id-is-string)
 

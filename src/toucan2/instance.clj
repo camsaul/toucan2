@@ -1,100 +1,57 @@
 (ns toucan2.instance
   (:refer-clojure :exclude [instance?])
   (:require
-   [camel-snake-kebab.internals.macros :as csk.macros]
    [clojure.data :as data]
    [methodical.core :as m]
    [potemkin :as p]
    [pretty.core :as pretty]
+   [toucan2.magic-map :as magic-map]
+   [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
-(csk.macros/defconversion "kebab-case" u/lower-case-en u/lower-case-en "-")
-
-;;; TODO -- give this a better name that accurately reflects the fact that it's doing magic
-(defn default-key-transform [k]
-  (when k
-    (if (and (clojure.core/instance? clojure.lang.Named k) (namespace k))
-      (keyword (->kebab-case (namespace k)) (->kebab-case (name k)))
-      (keyword (->kebab-case (name k))))))
-
-(def ^:dynamic *default-key-transform-fn* #'default-key-transform)
-
-(m/defmulti key-transform-fn
-  "Function to use to magically transform map keywords when building a new instance of `model`."
-  {:arglists '([model])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod key-transform-fn :default
-  [_model]
-  ;; TODO -- should this value come from a dynamic variable? You could always implement that behavior yourself if you
-  ;; wanted to.
-  *default-key-transform-fn*)
-
-(defn normalize-map [key-xform m]
-  {:pre [(ifn? key-xform) (map? m)]}
-  (into (empty m)
-        (map (fn [[k v]]
-               [(key-xform k) v]))
-        m))
-
-(p/defprotocol+ IInstance
-  (original [instance]
-    "Get the original version of `instance` as it appeared when it first came out of the DB.")
-
-  (with-original [instance new-original]
-    "Return a copy of `instance` with its `original` map set to `new-original`.")
-
-  (current [instance]
-    "Return the underlying map representing the current state of an `instance`.")
-
-  (with-current [instance new-current]
-    "Return a copy of `instance` with its underlying `current` map set to `new-current`.")
-
-  (changes [instance]
-    "Get a map with any changes made to `instance` since it came out of the DB. Only includes keys that have been
-    added or given different values; keys that were removed are not counted. Returns `nil` if there are no changes.")
-
-  ;;; TODO -- should this be its own protocol? It seems like things like reducible queries or whatever should be able to
-  ;;; implement an `IModel` protocol so you can get their model for whatever weird reason you might want to
-  (model [instance]
-    "Get the model associated with `instance`.")
-
-  (with-model [instance new-model]
-    "Return a copy of `instance` with its model set to `new-model.`"))
+(set! *warn-on-reflection* true)
 
 (defn instance?
-  "True if `x` is a Toucan2 instance, i.e. a `toucan2.instance.Instance` or some other class that satisfies
-  `toucan2.instance.IInstance`."
+  "True if `x` is a Toucan2 instance, i.e. a `toucan2.instance.Instance` or some other class that satisfies the correct
+  interfaces.
+
+  Toucan instances need to implement [[IModel]], [[IWithModel]], and [[IRecordChanges]]."
   [x]
-  (clojure.core/instance? toucan2.instance.IInstance x))
+  (every? #(clojure.core/instance? % x)
+          [toucan2.protocols.IModel
+           toucan2.protocols.IWithModel
+           toucan2.protocols.IRecordChanges]))
 
 (defn instance-of?
-  "True if `x` is a Toucan2 instance, and its [[model]] `isa?` `a-model`.
+  "True if `x` is a Toucan2 instance, and its [[protocols/model]] `isa?` `model`.
 
     (instance-of? ::bird (instance ::toucan {})) ; -> true
     (instance-of?  ::toucan (instance ::bird {})) ; -> false"
-  [a-model x]
+  [model x]
   (and (instance? x)
-       (isa? (model x) a-model)))
+       (isa? (protocols/model x) model)))
 
 (declare ->TransientInstance)
 
-(p/def-map-type Instance [mdl ^clojure.lang.IPersistentMap orig ^clojure.lang.IPersistentMap m key-xform mta]
+(p/def-map-type Instance [model
+                          ^clojure.lang.IPersistentMap orig
+                          ^clojure.lang.IPersistentMap m
+                          mta]
   (get [_ k default-value]
-    (get m (key-xform k) default-value))
+    (get m k default-value))
 
   (assoc [this k v]
-    (let [new-m (assoc m (key-xform k) v)]
+    (let [new-m (assoc m k v)]
       (if (identical? m new-m)
         this
-        (Instance. mdl orig new-m key-xform mta))))
+        (Instance. model orig new-m mta))))
 
   (dissoc [this k]
-    (let [new-m (dissoc m (key-xform k))]
+    (let [new-m (dissoc m k)]
       (if (identical? m new-m)
         this
-        (Instance. mdl orig new-m key-xform mta))))
+        (Instance. model orig new-m mta))))
 
   (keys [_this]
     (keys m))
@@ -105,33 +62,40 @@
   (with-meta [this new-meta]
     (if (identical? mta new-meta)
       this
-      (Instance. mdl orig m key-xform new-meta)))
+      (Instance. model orig m new-meta)))
 
   clojure.lang.IPersistentCollection
-  (equiv [_ x]
-    (if (instance? x)
-      ;; TODO -- not sure if two instances with different connectables should be considered different. I guess not
-      ;; because it makes them inconvenient to use in tests and stuff
-      ;;
-      ;; TODO -- should a instance be considered equal to a plain map with non-normalized keys? e.g.
-      ;;    (= (instance {:updated-at 100}) {:updated_at 100})
-      ;;
-      ;; I was leaning towards yes but I'm not sure how to make it work in both directions.
-      (and #_(= conn (x))
-           (= mdl (model x))
-           (= m   x))
-      (and (map? x)
-           (= m (normalize-map key-xform x)))))
+  (equiv [_this another]
+    (cond
+      (clojure.core/instance? toucan2.protocols.IModel another)
+      (and (= model (protocols/model another))
+           (= m another))
+
+      (map? another)
+      (= m another)
+
+      :else
+      false))
 
   java.util.Map
-  (containsKey [_ k]
-    (.containsKey m (key-xform k)))
+  (containsKey [_this k]
+    (.containsKey m k))
 
   clojure.lang.IEditableCollection
   (asTransient [_this]
-    (->TransientInstance mdl (transient m) key-xform mta))
+    (->TransientInstance model (transient m) mta))
 
-  IInstance
+  protocols/IModel
+  (protocols/model [_this]
+    model)
+
+  protocols/IWithModel
+  (with-model [this new-model]
+    (if (= model new-model)
+      this
+      (Instance. new-model orig m mta)))
+
+  protocols/IRecordChanges
   (original [_this]
     orig)
 
@@ -142,7 +106,7 @@
                            {}
                            new-original)]
         (assert (map? new-original))
-        (Instance. mdl new-original m key-xform mta))))
+        (Instance. model new-original m mta))))
 
   (current [_this]
     m)
@@ -154,132 +118,107 @@
                           {}
                           new-current)]
         (assert (map? new-current))
-        (Instance. mdl orig new-current key-xform mta))))
+        (Instance. model orig new-current mta))))
 
   (changes [_this]
     (not-empty (second (data/diff orig m))))
 
-  (model [_this]
-    mdl)
-
-  (with-model [this new-model]
-    (if (identical? mdl new-model)
-      this
-      (Instance. new-model orig m key-xform mta)))
-
-  u/DispatchValue
+  protocols/DispatchValue
   (dispatch-value [_this]
-    (u/dispatch-value mdl))
+    (protocols/dispatch-value model))
 
   realize/Realize
   (realize [_this]
     (if (identical? orig m)
       (let [m (realize/realize m)]
-        (Instance. mdl m m key-xform mta))
-      (Instance. mdl (realize/realize orig) (realize/realize m) key-xform mta)))
+        (Instance. model m m mta))
+      (Instance. model (realize/realize orig) (realize/realize m) mta)))
 
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `instance mdl m)))
+    (list `instance model m)))
 
-(deftype ^:private TransientInstance [mdl ^clojure.lang.ITransientMap m key-xform mta]
+(deftype TransientInstance [model ^clojure.lang.ITransientMap m mta]
   clojure.lang.ITransientMap
   (conj [this v]
     (.conj m v)
     this)
   (persistent [_this]
     (let [m (persistent! m)]
-      (Instance. mdl m m key-xform mta)))
+      (Instance. model m m mta)))
   (assoc [this k v]
-    (.assoc m (key-xform k) v)
+    (.assoc m k v)
     this)
   (without [this k]
-    (.without m (key-xform k))
+    (.without m k)
     this)
 
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `->TransientInstance mdl m key-xform mta)))
+    (list `->TransientInstance model m mta)))
+
+(m/defmulti key-transform-fn
+  "Function to use to magically transform map keywords when building a new instance of `model`."
+  {:arglists '([model])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod key-transform-fn :default
+  [_model]
+  magic-map/*key-transform-fn*)
+
+(m/defmulti empty-map
+  "Return an empty map that should be used as the basis for creating new instances of a model. You can provide a custom
+  implementation if you want to use something other than the default [[toucan2.magic-map]] implementation."
+  {:arglists '([model])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod empty-map :default
+  [model]
+  (magic-map/magic-map {} (key-transform-fn model)))
 
 (defn instance
-  (^toucan2.instance.Instance [a-model]
-   (instance a-model {}))
+  (^toucan2.instance.Instance [model]
+   (instance model (empty-map model)))
 
-  (^toucan2.instance.Instance [a-model m]
-   (let [key-xform     (key-transform-fn a-model)
-         m             (normalize-map key-xform m)]
-     (->Instance a-model m m key-xform (meta m))))
+  (^toucan2.instance.Instance [model m]
+   (let [m* (into (empty-map model) m)]
+     (->Instance model m* m* (meta m))))
 
-  (^toucan2.instance.Instance [a-model k v & more]
-   (let [m (into {} (partition-all 2) (list* k v more))]
-     (instance a-model m))))
+  (^toucan2.instance.Instance [model k v & more]
+   (let [m (into (empty-map model) (partition-all 2) (list* k v more))]
+     (instance model m))))
 
-(extend-protocol IInstance
+(extend-protocol protocols/IWithModel
   nil
-  (original [_this]
-    nil)
-  (current [_this]
-    nil)
-  (changes [_this]
-    nil)
-  (model [_this]
-    nil)
-  (with-model [_ new-model]
-    (instance new-model))
+  (with-model [_this model]
+    (instance model))
 
-  ;; TODO -- not sure what the correct behavior for objects should be... if I call (original 1) I think that should
-  ;; throw an Exception rather than returning nil, because that makes no sense.
-  ;;
-  Object
-  (model [_this]
-    nil)
-
-  ;; generally just treat a plain map like an instance with nil model/and original = nil,
-  ;; and no-op for anything that would require "upgrading" the map to an actual instance in such a way that if
-  ;;
-  ;;    (= plain-map instance)
-  ;;
-  ;; then
-  ;;
-  ;;    (= (f plain-map) (f instance))
   clojure.lang.IPersistentMap
-  (model [_this]
-    nil)
-  (with-model [m a-model]
-    (instance a-model m))
-  (original [_this]
-    nil)
-  (current [m]
-    m)
-  (with-current [_ new-current]
-    new-current)
-  (with-original [m _]
-    m)
-  (changes [_this]
-    nil))
+  (with-model [m model]
+    (instance model m)))
 
 (defn reset-original
   "Return a copy of `instance` with its `original` value set to its current value, discarding the previous original
   value. No-ops if `instance` is not a Toucan 2 instance."
   [instance]
   (if (instance? instance)
-    (with-original instance (current instance))
+    (protocols/with-original instance (protocols/current instance))
     instance))
 
-;; TODO -- should we have a revert-changes helper function as well?
+;;; TODO -- should we have a revert-changes helper function as well?
 
 (defn update-original
   "Applies `f` directly to the underlying `original` map of an `instance`. No-ops if `instance` is not an `Instance`."
   [instance f & args]
   (if (instance? instance)
-    (with-original instance (apply f (original instance) args))
+    (protocols/with-original instance (apply f (protocols/original instance) args))
     instance))
 
 (defn update-current
   "Applies `f` directly to the underlying `current` map of an `instance`; useful if you need to operate on it directly.
   Acts like regular `(apply f instance args)` if `instance` is not an `Instance`."
   [instance f & args]
-  (with-current instance (apply f (current instance) args)))
+  (protocols/with-current instance (apply f (protocols/current instance) args)))
 
 (defn update-original-and-current
   "Like `(apply f instance args)`, but affects both the `original` map and `current` map of `instance` rather than just
@@ -289,40 +228,8 @@
   once if `original` and `current` are currently the same object (i.e., the new `original` and `current` will also be
   the same object). If `current` and `original` are not the same object, `f` is applied twice."
   [instance f & args]
-  (if (identical? (original instance) (current instance))
+  (if (identical? (protocols/original instance) (protocols/current instance))
     (reset-original (apply update-current instance f args))
     (as-> instance instance
       (apply update-original instance f args)
       (apply update-current  instance f args))))
-
-#_(p/defrecord+ InstanceResultSetBuilder [mdl key-xform ^java.sql.ResultSet rset rsmeta cols]
-  jdbc.rset/RowBuilder
-  (->row [_this]
-    (->TransientInstance mdl (transient {}) key-xform nil))
-  (column-count [_this]
-    (count cols))
-  (with-column [this row i]
-    (jdbc.rset/with-column-value this row (nth cols (dec i))
-      (jdbc.rset/read-column-by-index (.getObject rset ^Integer i) rsmeta i)))
-  (with-column-value [_this row col v]
-    (assoc! row col v))
-  (row! [_this row]
-    (persistent! row))
-
-  ;; this is actually not used by [[next.jdbc/plan]] apparently
-  jdbc.rset/ResultSetBuilder
-  (->rs [_this]
-    (transient []))
-  (with-row [_this mrs row]
-    (conj! mrs row))
-  (rs! [_this mrs]
-    (persistent! mrs)))
-
-#_(defn instance-result-set-builder [a-model]
-  (let [key-xform (key-transform-fn a-model)]
-    (fn [^java.sql.ResultSet rset _opts]
-      (let [rsmeta (.getMetaData rset)
-            cols   (mapv (fn [^Integer i]
-                           (key-xform (.getColumnLabel rsmeta i)))
-                         (range 1 (inc (.getColumnCount rsmeta))))]
-        (->InstanceResultSetBuilder a-model key-xform rset rsmeta cols)))))

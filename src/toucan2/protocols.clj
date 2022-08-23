@@ -22,7 +22,7 @@
   (with-model [this new-model]
     "Return a copy of `instance` with its model set to `new-model.`"))
 
-;;; there are some default impls of [[with-model]] in [[toucan2.instance-2]]
+;;; there are some default impls of [[with-model]] in [[toucan2.instance]]
 
 (p/defprotocol+ IRecordChanges
   "Protocol for something that records the changes made to it, e.g. a Toucan instance."

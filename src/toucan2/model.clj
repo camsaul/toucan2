@@ -3,8 +3,8 @@
    [methodical.core :as m]
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
-   [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
 (m/defmulti do-with-model
@@ -116,7 +116,7 @@
 (defn primary-key-values
   "Return a map of primary key values for a Toucan 2 `instance`."
   ([instance]
-   (primary-key-values (instance/model instance) instance))
+   (primary-key-values (protocols/model instance) instance))
   ([model m]
    (select-keys m (primary-keys-vec model))))
 

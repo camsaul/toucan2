@@ -1,9 +1,9 @@
 (ns toucan2.tools.before-update
   (:require
    [methodical.core :as m]
-   [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.operation :as op]
+   [toucan2.protocols :as protocols]
    [toucan2.select :as select]
    [toucan2.update :as update]
    [toucan2.util :as u]))
@@ -22,7 +22,7 @@
    (fn [changes->pks row]
      (let [row     (merge row changes)
            row     (before-update model row)
-           changes (instance/changes row)]
+           changes (protocols/changes row)]
        (cond-> changes->pks
          (seq changes) (update changes (fn [pks]
                                          (conj (set pks) (model/primary-key-values model row)))))))

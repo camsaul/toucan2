@@ -6,6 +6,7 @@
    [pretty.core :as pretty]
    [toucan2.instance :as instance]
    [toucan2.jdbc.row :as row]
+   [toucan2.protocols :as protocols]
    [toucan2.util :as u])
   (:import
    (java.sql Connection ResultSet ResultSetMetaData Types)))
@@ -28,7 +29,7 @@
                         (.getColumnLabel rsmeta i)
                         (type-name col-type)
                         (.getColumnTypeName rsmeta i)])
-      [(u/dispatch-value conn) (u/dispatch-value model) col-type])))
+      [(protocols/dispatch-value conn) (protocols/dispatch-value model) col-type])))
 
 (m/defmethod read-column-thunk :default
   [_conn _model ^ResultSet rset _rsmeta ^Long i]
@@ -151,9 +152,9 @@
                                    (catch Throwable _
                                      nil))]
   (extend c3p0-connection-class
-    u/DispatchValue
+    protocols/DispatchValue
     {:dispatch-value (fn [^java.sql.Wrapper conn]
                        (try
-                         (u/dispatch-value (.unwrap conn java.sql.Connection))
+                         (protocols/dispatch-value (.unwrap conn java.sql.Connection))
                          (catch Throwable _
                            c3p0-connection-class)))}))

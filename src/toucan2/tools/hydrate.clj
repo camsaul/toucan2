@@ -2,8 +2,8 @@
   (:require
    [camel-snake-kebab.core :as csk]
    [methodical.core :as m]
-   [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.util :as u]))
@@ -335,5 +335,5 @@
       (if (empty? results)
         results
         (let [first-row (first results)]
-          (apply hydrate-forms (instance/model first-row) results k ks)))
-      (first (apply hydrate-forms (instance/model results) [results] k ks)))))
+          (apply hydrate-forms (protocols/model first-row) results k ks)))
+      (first (apply hydrate-forms (protocols/model results) [results] k ks)))))

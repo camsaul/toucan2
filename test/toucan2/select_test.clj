@@ -7,6 +7,7 @@
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.operation :as op]
+   [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test])
@@ -194,7 +195,7 @@
           (testing "select* :after should see Toucan 2 instances"
             (is (instance/instance? person)))
           (testing "instance table should be a ::people.no-timestamps"
-            (is (isa? (instance/model person) ::people.no-timestamps)))
+            (is (isa? (protocols/model person) ::people.no-timestamps)))
           (assoc person :after-select? true)))
    reducible-query))
 

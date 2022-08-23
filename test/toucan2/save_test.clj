@@ -3,6 +3,7 @@
    [clojure.test :refer :all]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
+   [toucan2.protocols :as protocols]
    [toucan2.save :as save]
    [toucan2.select :as select]
    [toucan2.test :as test])
@@ -13,7 +14,7 @@
   (test/with-discarded-table-changes :venues
     (let [venue (select/select-one ::test/venues 1)]
       (is (= nil
-             (instance/changes venue)))
+             (protocols/changes venue)))
       (testing "Should return updated instance, with value of 'original' reset to what was saved."
         (let [updated (save/save! (assoc venue :name "Hi-Dive"))]
           (is (= {:id         1
@@ -21,9 +22,9 @@
                   :category   "bar"
                   :created-at (LocalDateTime/parse "2017-01-01T00:00")}
                  (dissoc updated :updated-at)
-                 (dissoc (instance/original updated) :updated-at)))
+                 (dissoc (protocols/original updated) :updated-at)))
           (is (= nil
-                 (instance/changes updated)))))
+                 (protocols/changes updated)))))
       (is (= (instance/instance ::test/venues {:id         1
                                                :name       "Hi-Dive"
                                                :category   "bar"
@@ -61,7 +62,7 @@
     (let [venue (assoc (instance/instance ::test/venues {:id 1000})
                        :name "Wow")]
       (is (= {:name "Wow"}
-             (instance/changes venue)))
+             (protocols/changes venue)))
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo
            #"Unable to save object: :toucan2.test/venues with primary key \{:id 1000\} does not exist"
@@ -75,7 +76,7 @@
                            :name "Hi-Dive")]
           (is (instance/toucan2-instance? venue))
           (is (= {:name "Hi-Dive"}
-                 (instance/changes venue)))
+                 (protocols/changes venue)))
           (is (= ["UPDATE venues SET name = ?, id = ?::integer WHERE id = ?::integer" "Hi-Dive" "1" "1"]
                  (query/compiled (save/save! (assoc venue :id "1")))))
           (is (= {:id         "1"

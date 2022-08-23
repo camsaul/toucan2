@@ -11,6 +11,7 @@
    [toucan2.insert]
    [toucan2.instance]
    [toucan2.model]
+   [toucan2.protocols]
    [toucan2.save]
    [toucan2.select]
    [toucan2.tools.after-insert]
@@ -32,6 +33,7 @@
   toucan2.insert/keep-me
   toucan2.instance/keep-me
   toucan2.model/keep-me
+  toucan2.protocols/keep-me
   toucan2.save/keep-me
   toucan2.select/keep-me
   toucan2.tools.after-insert/keep-me
@@ -76,13 +78,9 @@
   reducible-insert-returning-pks]
 
  [toucan2.instance
-  changes
-  current
   instance
   instance-of?
-  instance?
-  model
-  original]
+  instance?]
 
  [toucan2.model
   default-connectable
@@ -92,6 +90,12 @@
   select-pks-fn
   table-name
   with-model]
+
+ [toucan2.protocols
+  changes
+  current
+  model
+  original]
 
  [toucan2.save
   save!]

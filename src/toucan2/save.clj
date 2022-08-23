@@ -3,26 +3,27 @@
    [methodical.core :as m]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.protocols :as protocols]
    [toucan2.update :as update]
    [toucan2.util :as u]))
 
 (m/defmulti save!
   {:arglists '([object])}
   (fn [object]
-    (u/dispatch-value (instance/model object))))
+    (protocols/dispatch-value (protocols/model object))))
 
 (m/defmethod save! :around :default
   [object]
   (try
-    (u/with-debug-result ["Save %s %s changes %s" (instance/model object) object (instance/changes object)]
+    (u/with-debug-result ["Save %s %s changes %s" (protocols/model object) object (protocols/changes object)]
       (next-method object))
     (catch Throwable e
       (throw (ex-info (format "Error saving %s: %s"
-                              (u/safe-pr-str (instance/model object))
+                              (u/safe-pr-str (protocols/model object))
                               (ex-message e))
-                      {:model  (instance/model object)
+                      {:model  (protocols/model object)
                        :object object
-                       :changes (instance/changes object)}
+                       :changes (protocols/changes object)}
                       e)))))
 
 (m/defmethod save! :default
@@ -31,9 +32,9 @@
           (format "Don't know how to save something that's not a Toucan instance. Got: ^%s %s"
                   (some-> object class .getCanonicalName)
                   (u/safe-pr-str object)))
-  (if-let [changes (not-empty (instance/changes object))]
-    (model/with-model [model (instance/model object)]
-      (let [pk-values     (select-keys object (model/primary-keys (instance/model object)))
+  (if-let [changes (not-empty (protocols/changes object))]
+    (model/with-model [model (protocols/model object)]
+      (let [pk-values     (select-keys object (model/primary-keys (protocols/model object)))
             rows-affected (update/update! model pk-values changes)]
         (when-not (pos? rows-affected)
           (throw (ex-info (format "Unable to save object: %s with primary key %s does not exist."

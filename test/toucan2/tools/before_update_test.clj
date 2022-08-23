@@ -5,6 +5,7 @@
    [methodical.core :as m]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
+   [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -23,7 +24,7 @@
 (before-update/define-before-update ::venues.before-update
   [venue]
   (is (instance/instance? venue))
-  (is (isa? (instance/model venue) ::venues.before-update))
+  (is (isa? (protocols/model venue) ::venues.before-update))
   (when *updated-venues*
     (swap! *updated-venues* conj venue))
   venue)
@@ -38,7 +39,7 @@
 
 (before-update/define-before-update ::venues.discard-category-change
   [venue]
-  (assoc venue :category (:category (instance/original venue))))
+  (assoc venue :category (:category (protocols/original venue))))
 
 (deftest before-update-test
   (testing "Updates returned by the before-update method should actually be applied"
@@ -86,10 +87,10 @@
                                                                :category   "bar"
                                                                :created-at (LocalDateTime/parse "2017-01-01T00:00")
                                                                :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
-                   (map instance/original @*updated-venues*))))
+                   (map protocols/original @*updated-venues*))))
           (testing "changes"
             (is (= [{:name "Kennedy's Irish Pub and Curry House"}]
-                   (map instance/changes @*updated-venues*)))))))))
+                   (map protocols/changes @*updated-venues*)))))))))
 
 (deftest before-update-non-pk-condition-test
   (testing "define-before-update should call its method with all objects that match update conditions"
@@ -116,7 +117,7 @@
           (testing "changes"
             (is (= [{:category "not-store"}
                     {:category "not-store"}]
-                   (map instance/changes @*updated-venues*)))))))))
+                   (map protocols/changes @*updated-venues*)))))))))
 
 (deftest before-update-pk-and-other-conditons-test
   (testing "define-before-update should call its method with all objects that match update conditions"
@@ -136,7 +137,7 @@
                    @*updated-venues*)))
           (testing "changes"
             (is (= [{:category "not-bar"}]
-                   (map instance/changes @*updated-venues*)))))))))
+                   (map protocols/changes @*updated-venues*)))))))))
 
 (deftest before-update-no-changes-test
   (testing "No changes passed to update!* itself -- should no-op"

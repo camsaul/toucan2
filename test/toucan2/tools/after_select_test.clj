@@ -4,6 +4,7 @@
    [clojure.test :refer :all]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
+   [toucan2.protocols :as protocols]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-select :as after-select]
@@ -31,7 +32,7 @@
                                :created-at (LocalDateTime/parse "2017-01-01T00:00")
                                :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
            instance))
-    (is (nil? (instance/changes instance)))))
+    (is (nil? (protocols/changes instance)))))
 
 (derive ::venues.short-name-with-transforms ::venues.short-name)
 

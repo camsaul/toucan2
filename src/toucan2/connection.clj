@@ -2,6 +2,7 @@
   (:require
    [methodical.core :as m]
    [next.jdbc :as jdbc]
+   [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -41,7 +42,7 @@
                           (some-> connectable class .getCanonicalName)
                           (u/safe-pr-str connectable)
                           `do-with-connection
-                          (u/dispatch-value connectable))
+                          (protocols/dispatch-value connectable))
                   {:connectable connectable})))
 
 ;;; method called if there is no current connection.

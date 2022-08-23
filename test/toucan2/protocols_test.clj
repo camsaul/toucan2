@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [toucan2.protocols :as protocols]))
 
-;;; there are more tests in [[toucan2.instance-2-test]]
+;;; there are more tests in [[toucan2.instance-test]]
 
 (deftest original-test
   (is (= nil

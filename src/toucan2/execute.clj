@@ -8,6 +8,7 @@
    [toucan2.connection :as conn]
    [toucan2.jdbc.query :as t2.jdbc.query]
    [toucan2.model :as model]
+   [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
@@ -50,7 +51,7 @@
 (m/defmulti reduce-compiled-query
   {:arglists '([connectable model compiled-query rf init])}
   (fn [_connectable model compiled-query _rf _init]
-    [(u/dispatch-value model) (u/dispatch-value compiled-query)]))
+    [(protocols/dispatch-value model) (protocols/dispatch-value compiled-query)]))
 
 (m/defmethod reduce-compiled-query :default
   [connectable model compiled-query rf init]
@@ -63,7 +64,7 @@
 (m/defmulti reduce-uncompiled-query
   {:arglists '([connectable model query rf init])}
   (fn [_connectable model query _rf _init]
-    [(u/dispatch-value model) (u/dispatch-value query)]))
+    [(protocols/dispatch-value model) (protocols/dispatch-value query)]))
 
 (m/defmethod reduce-uncompiled-query :default
   [connectable model query rf init]

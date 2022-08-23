@@ -4,6 +4,7 @@
    [honey.sql.helpers :as hsql.helpers]
    [methodical.core :as m]
    [toucan2.model :as model]
+   [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.util :as u]))
 
@@ -155,7 +156,7 @@
   builds a Honey SQL 2 map. Dispatches on `query-type`, `model`, and the `:query` in `parsed-args`."
   {:arglists '([query-type model {:keys [query], :as parsed-args}])}
   (fn [query-type model parsed-args]
-    (mapv u/dispatch-value [query-type
+    (mapv protocols/dispatch-value [query-type
                             model
                             (:query parsed-args)])))
 

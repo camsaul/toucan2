@@ -1,27 +1,14 @@
 (ns toucan2.instance-test
   (:require
-   [clojure.string :as str]
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.instance :as instance]
+   [toucan2.protocols :as protocols]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.util :as u])
   (:import
-   (java.time LocalDateTime)
-   (java.util Locale)))
-
-(deftest default-key-transform-turkish-test
-  (testing "Test that identifiers are correctly lower cased in Turkish locale"
-    (let [original-locale (Locale/getDefault)]
-      (try
-        (Locale/setDefault (Locale/forLanguageTag "tr"))
-        ;; if we used `clojure.string/lower-case`, `:ID` would be converted to `:ıd` in Turkish locale
-        (is (= :id
-               (instance/default-key-transform "ID")
-               (instance/default-key-transform :ID)))
-        (finally
-          (Locale/setDefault original-locale))))))
+   (java.time LocalDateTime)))
 
 (deftest instance-test
   (let [m (assoc (instance/instance :wow {:a 100}) :b 200)]
@@ -29,28 +16,28 @@
            m))
     (testing "original/changes"
       (is (= {:a 100}
-             (instance/original m)))
+             (protocols/original m)))
       (is (= {:b 200}
-             (instance/changes m)))
+             (protocols/changes m)))
       (is (= {:a 300, :b 200}
-             (instance/changes (assoc m :a 300)))))
+             (protocols/changes (assoc m :a 300)))))
     (testing "with-original"
-      (let [m2 (instance/with-original m {:a 200, :b 200})]
+      (let [m2 (protocols/with-original m {:a 200, :b 200})]
         (is (= {:a 100, :b 200}
                m2))
         (is (= {:a 200, :b 200}
-               (instance/original m2)))
+               (protocols/original m2)))
         (is (= {:a 100}
-               (instance/changes m2)))))
+               (protocols/changes m2)))))
     (testing "table/with-table"
       (is (= :wow
-             (instance/model m)))
+             (protocols/model m)))
       (is (= :ok
-             (instance/model (instance/with-model m :ok)))))
+             (protocols/model (protocols/with-model m :ok)))))
     (testing "current"
       (is (= {:a 100, :b 200}
-             (instance/current m)))
-      (is (not (instance/instance? (instance/current m)))))))
+             (protocols/current m)))
+      (is (not (instance/instance? (protocols/current m)))))))
 
 (deftest no-changes-return-this-test
   (testing "Operations that result in no changes to the underlying map should return instance as-is, rather than a new copy."
@@ -59,36 +46,36 @@
       (testing "assoc"
         (let [m2 (assoc m :a 100)]
           (is (identical? m m2))
-          (is (identical? (instance/current m2)
-                          (instance/original m2)))))
+          (is (identical? (protocols/current m2)
+                          (protocols/original m2)))))
       (testing "dissoc"
         (let [m2 (dissoc m :b)]
           (is (identical? m m2))
-          (is (identical? (instance/current m2)
-                          (instance/original m2)))))
+          (is (identical? (protocols/current m2)
+                          (protocols/original m2)))))
       (testing "with-meta"
         (let [m2 (with-meta m (meta m))]
           (is (identical? m m2))))
       (testing "with-original"
-        (let [m2 (instance/with-original m (instance/original m))]
+        (let [m2 (protocols/with-original m (protocols/original m))]
           (is (identical? m m2))))
       (testing "with-current"
-        (let [m2 (instance/with-current m (instance/current m))]
+        (let [m2 (protocols/with-current m (protocols/current m))]
           (is (identical? m m2))))
       (testing "with-model"
-        (let [m2 (instance/with-model m (instance/model m))]
+        (let [m2 (protocols/with-model m (protocols/model m))]
           (is (identical? m m2)))))))
 
 (deftest changes-test
   (is (= {:name "Hi-Dive"}
          (-> (instance/instance :venues {:id 1, :name "Tempest", :category "bar"})
              (assoc :name "Hi-Dive")
-             instance/changes)))
+             protocols/changes)))
   (testing "If there are no changes, `changes` should return `nil` for convenience."
     (is (= nil
            (-> (instance/instance :venues {:id 1, :name "Tempest", :category "bar"})
                (assoc :name "Tempest")
-               instance/changes)))))
+               protocols/changes)))))
 
 (deftest contains-key-test
   (is (= true
@@ -121,9 +108,9 @@
   (is (= {:a 1}
          (instance/instance ::MyModel {:a 1})))
   (is (= ::MyModel
-         (instance/model (instance/instance ::MyModel))))
+         (protocols/model (instance/instance ::MyModel))))
   (is (= ::MyModel
-         (instance/model (instance/instance ::MyModel {}))))
+         (protocols/model (instance/instance ::MyModel {}))))
   (let [m (instance/instance ::MyModel {:original? true})]
     (is (= {:original? false}
            (assoc m :original? false)))
@@ -137,15 +124,15 @@
            (.m ^toucan2.instance.Instance (assoc m :original? false))))
     (testing "fetching original value"
       (is (= {:original? true}
-             (instance/original (assoc m :original? false))))
+             (protocols/original (assoc m :original? false))))
       (is (= {}
              (dissoc m :original?)))
       (is (= {:original? true}
-             (instance/original (dissoc m :original?))))
+             (protocols/original (dissoc m :original?))))
       (is (= nil
-             (instance/original {})))
+             (protocols/original {})))
       (is (= nil
-             (instance/original nil))))))
+             (protocols/original nil))))))
 
 (deftest transient-test
   (let [m  (transient (instance/instance :wow {:a 100}))
@@ -158,42 +145,6 @@
            m'))))
 
 ;;;; Magic Map stuff.
-
-(deftest default-key-transform-test
-  (doseq [k-str  ["my-key" "my_key"]
-          k-str  [k-str (str/upper-case k-str)]
-          ns-str [nil "my-ns" "my_ns"]
-          ns-str (if ns-str
-                   [ns-str (str/upper-case ns-str)]
-                   [ns-str])
-          k      [k-str
-                  (keyword ns-str k-str)]
-          :let   [expected (cond
-                             (string? k) :my-key
-                             ns-str      :my-ns/my-key
-                             :else       :my-key)]]
-    (testing (format "%s -> %s" (pr-str k) (pr-str expected))
-      (is (= expected
-             (instance/default-key-transform k))))))
-
-(deftest default-key-transform-test-2
-  (are [k expected] (= expected
-                       (instance/default-key-transform k))
-    :my_col              :my-col
-    :MyCol               :my-col
-    :myCol               :my-col
-    :my-col              :my-col
-    :my_namespace/my_col :my-namespace/my-col
-    "my_col"             :my-col
-    'my_namespace/my_col :my-namespace/my-col))
-
-(deftest normalize-map-test
-  (testing "Should normalize keys"
-    (is (= {:abc 100, :d-ef 200}
-           (instance/normalize-map instance/default-key-transform {:ABC 100, "dEf" 200}))))
-  (testing "Should preserve metadata"
-    (is (= true
-           (:wow (meta (instance/normalize-map instance/default-key-transform (with-meta {} {:wow true}))))))))
 
 (deftest magic-create-test
   (let [m (instance/instance nil {:snake/snake_case 1, "SCREAMING_SNAKE_CASE" 2, :lisp-case 3, :ANGRY/LISP-CASE 4})]
@@ -246,11 +197,11 @@
     (is (= {}
            (instance/instance nil {})))))
 
-(m/defmethod instance/key-transform-fn :toucan2.instance-test.no-key-transform/venues
+(m/defmethod instance/key-transform-fn ::venues.no-key-transform
   [_model]
   identity)
 
-(derive :toucan2.instance-test.no-key-transform/venues ::test/venues)
+(derive ::venues.no-key-transform ::test/venues)
 
 (deftest no-key-xform-test
   (is (= (instance/instance ::test/venues {:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")})
@@ -260,12 +211,23 @@
                             :h2       [:ID :CREATED_AT]
                             :postgres [:id :created_at])]
       (is (= {id 1, created-at (LocalDateTime/parse "2017-01-01T00:00")}
-             (select/select-one :toucan2.instance-test.no-key-transform/venues {:select [:id :created-at]}))))))
+             (select/select-one ::venues.no-key-transform {:select [:id :created-at]}))))))
 
 (deftest pretty-print-test
   (testing "Should pretty-print"
-    (is (= "(toucan2.instance/instance :venues {:id 1})"
-           (pr-str (instance/instance :venues {:id 1}))))))
+    (testing "Normal output"
+      (is (= (pr-str '(toucan2.instance/instance :venues {:id 1}))
+             (pr-str (instance/instance :venues {:id 1})))))
+    (testing "output with debugging enabled"
+      (binding [u/*debug* true]
+        (is (= (pr-str (list
+                        'toucan2.instance/instance
+                        :venues
+                        (list
+                         'toucan2.magic-map/magic-map
+                         {:id 1}
+                         (symbol "#'toucan2.magic-map/kebab-case-xform"))))
+               (pr-str (instance/instance :venues {:id 1}))))))))
 
 (deftest reset-original-test
   (let [m  (assoc (instance/instance :wow {:a 100}) :b 200)
@@ -273,15 +235,15 @@
     (is (= {:a 100, :b 200}
            m2))
     (is (= {:a 100, :b 200}
-           (instance/original m2)))
+           (protocols/original m2)))
     (is (= nil
-           (instance/changes m2))))
+           (protocols/changes m2))))
   (testing "No-op for non-instances"
     (let [result (instance/reset-original {:a 1})]
       (is (= {:a 1}
              result))
       (is (= nil
-             (instance/original result)))
+             (protocols/original result)))
       (is (not (instance/instance? result))))))
 
 (deftest update-original-test
@@ -289,18 +251,18 @@
               (assoc :b 2)
               (instance/update-original assoc :c 3))]
     (is (= {:a 1, :c 3}
-           (instance/original m)))
+           (protocols/original m)))
     (is (= (instance/instance :x {:a 1, :b 2})
            m))
     ;; A key being present in original but not in 'current' does not constitute a change
     (is (= {:b 2}
-           (instance/changes m)))
+           (protocols/changes m)))
     (testing "No-op for non-instances"
       (let [result (instance/update-original {:a 1} assoc :c 3)]
         (is (= {:a 1}
                result))
         (is (= nil
-               (instance/original result)))
+               (protocols/original result)))
         (is (not (instance/instance? result)))))))
 
 (deftest update-original-and-current-test
@@ -308,37 +270,38 @@
               (assoc :b 2)
               (instance/update-original-and-current assoc :c 3))]
     (is (= {:a 1, :c 3}
-           (instance/original m)))
+           (protocols/original m)))
     (is (= (instance/instance :x {:a 1, :b 2, :c 3})
            m))
     ;; A key being present in original but not in 'current' does not constitute a change
     (is (= {:b 2}
-           (instance/changes m)))
+           (protocols/changes m)))
     (testing "Just act like regular 'apply' for non-instances"
       (let [result (instance/update-original-and-current {:a 1} assoc :c 3)]
         (is (= {:a 1, :c 3}
                result))
         (is (= nil
-               (instance/original result)))
+               (protocols/original result)))
         (is (not (instance/instance? result)))))
     (testing "If original and current were previously identical, they should be after update as well."
       (let [m (instance/instance :x {:a 1})]
-        (is (identical? (instance/original m)
-                        (instance/current m)))
+        (is (identical? (protocols/original m)
+                        (protocols/current m)))
         (let [m2 (instance/update-original-and-current m assoc :b 2)]
-          (is (= (instance/original m2)
-                 (instance/current m2)))
-          (is (identical? (instance/original m2)
-                          (instance/current m2))))))))
+          (is (= (protocols/original m2)
+                 (protocols/current m2)))
+          (is (identical? (protocols/original m2)
+                          (protocols/current m2))))))))
 
 (deftest dispatch-value-test
   (testing "Instance should implement dispatch-value"
     (is (= :wow
-           (u/dispatch-value (instance/instance :wow {}))))))
+           (protocols/dispatch-value (instance/instance :wow {}))))))
 
 (derive ::toucan ::bird)
 
 (deftest instance-of?-test
+  (is (instance/instance? (instance/instance ::toucan {})))
   (is (instance/instance-of? ::bird (instance/instance ::toucan {})))
   (are [x] (not (instance/instance-of? ::toucan x))
     (instance/instance ::bird {})
@@ -346,54 +309,36 @@
     {}
     (instance/instance ::shoe {})))
 
-;;; TODO -- not sure we want this or not. Seems like an unnecessary extra feature.
-#_(deftest type-metadata-test
-  (testing "Instances should get ^:type metadata when you create them, so you can dispatch with `type`."
-    (let [model (u/dispatch-on "my_table" ::my-type)]
-      (doseq [instance [(instance/instance model)
-                        (instance/instance model {})
-                        (instance/instance model {})
-                        (instance/instance model :x :y)]]
-        (is (= ::my-type
-               (:type (meta instance))
-               (type instance))))))
-  (testing "e2e test: make sure instances from something like select come back with ^:type metadata"
-    (let [instance (select/select-one [:test/postgres :venues] 1)]
-      (is (some? instance))
-      (is (= :venues
-             (:type (meta instance))
-             (type instance))))))
-
 (deftest no-nil-maps-test
   (testing "Shouldn't be able to make the maps in an instance nil"
     (let [m1 (instance/instance ::birbs {:a 1})]
       (is (= {:a 1}
-             (instance/original m1)
-             (instance/current m1)))
+             (protocols/original m1)
+             (protocols/current m1)))
       (testing "using"
         (testing "with-original"
-          (let [m2 (instance/with-original m1 nil)]
+          (let [m2 (protocols/with-original m1 nil)]
             (is (= {}
-                   (instance/original m2)))))
+                   (protocols/original m2)))))
         (testing "with-current"
-          (let [m2 (instance/with-current m1 nil)]
+          (let [m2 (protocols/with-current m1 nil)]
             (is (= {}
-                   (instance/current m2)))))))))
+                   (protocols/current m2)))))))))
 
 (deftest validate-new-maps-test
   (testing "Shouldn't be able to make the maps something invalid"
     (let [m1 (instance/instance ::birbs {:a 1})]
       (is (= {:a 1}
-             (instance/original m1)
-             (instance/current m1)))
+             (protocols/original m1)
+             (protocols/current m1)))
       (testing "using"
         (testing "with-original"
           (is (thrown-with-msg?
                java.lang.AssertionError
                #"Assert failed: \(map\? new-original\)"
-               (instance/with-original m1 1))))
+               (protocols/with-original m1 1))))
         (testing "with-current"
           (is (thrown-with-msg?
                java.lang.AssertionError
                #"Assert failed: \(map\? new-current\)"
-               (instance/with-current m1 1))))))))
+               (protocols/with-current m1 1))))))))
