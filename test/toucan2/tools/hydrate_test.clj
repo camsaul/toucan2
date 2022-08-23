@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.test :as test]
@@ -354,3 +355,28 @@
                            {:person-id 3, :person-name "Bird"}
                            {:persion-id nil, :person-name "Pam"}]
                           ::people))))
+
+(deftest automagic-batch-hydration-composite-pks-dont-fetch-nil-test
+  (testing "automagic batched hydration should not try to fetch objects when some or all FK keys are nil"
+    (testing "sanity check"
+      (execute/with-call-count [call-count]
+        (is (= {:person-id   1
+                :person-name "Cam"
+                ::people     {:id         1
+                              :name       "Cam"
+                              :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}}
+               (hydrate/hydrate (instance/instance nil {:person-id 1, :person-name "Cam"})
+                                ::people)))
+        (is (= 1
+               (call-count)))))
+    (testing "some or all keys are nil"
+      (doseq [m [{:person-id 1, :person-name nil}
+                 {:person-id nil, :person-name "Cam"}
+                 {:person-id nil, :person-name nil}]]
+        (testing (format "source map = %s" (pr-str m))
+          (execute/with-call-count [call-count]
+            (is (= m
+                   (hydrate/hydrate (instance/instance nil m)
+                                    ::people)))
+            (is (= 0
+                   (call-count)))))))))
