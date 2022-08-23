@@ -121,7 +121,7 @@ jobs:
           ~/.gitlibs
           ~/.deps.clj
         key: whitespace-linter
-    - run: clojure -X:dev:cloverage
+    - run: clojure -X:dev:test-h2:cloverage
       name: Run tests with Cloverage
     - name: Upload results to codecov.io
       uses: codecov/codecov-action@v3
