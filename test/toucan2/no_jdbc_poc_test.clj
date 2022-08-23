@@ -1,33 +1,34 @@
-(ns toucan2.no-jdbc-poc-test)
+(ns toucan2.no-jdbc-poc-test
+  (:require
+   [clojure.test :refer :all]
+   [methodical.core :as m]
+   [toucan2.execute :as execute]
+   [toucan2.query :as query]
+   [toucan2.select :as select]))
 
-;;; TODO
-
-#_(m/defmethod toucan2/default-connectable-for-tableable* ::system-properties
-    [_ _]
-    ::system-properties)
-
-#_(m/defmethod toucan2/queryable* [::system-properties :default :default]
-  [_ _ queryable _]
+(m/defmethod query/build [:default :default ::system-properties]
+  [_query-type _model {:keys [queryable]}]
   queryable)
 
-#_(m/defmethod toucan2/compile* [::system-properties :default :default]
-  [_ _ query _]
-  query)
+(m/defmethod execute/reduce-uncompiled-query [:default ::system-properties]
+  [_connectable _model ks rf init]
+  (assert (sequential? ks))
+  (assert (every? (some-fn keyword? string?) ks))
+  (reduce rf init [(into {} (for [k ks]
+                              [(keyword k) (System/getProperty (name k))]))]))
 
-#_(m/defmethod toucan2/reducible-query* [::system-properties :default :default]
-  [connectable tableable queryable options]
-  (let [ks (toucan2/compile connectable tableable queryable options)]
-    (assert (sequential? ks))
-    (assert (every? (some-fn keyword? string?) ks))
-    (into {} (for [k ks]
-               [(keyword k) (System/getProperty (name k))]))))
+(m/defmethod query/parse-args [::select/select ::system-properties]
+  [_query-type _model unparsed-args]
+  {:queryable (with-meta (vec unparsed-args) {:type ::system-properties})})
 
-#_(m/defmethod select/parse-select-args* [::system-properties :default]
-  [_ _ args _]
-  {:query (with-meta args {:type ::system-properties-query}), :options nil})
-
-#_(deftest select-test
-  (is (= {:user.language "en"}
-         (toucan2/select ::system-properties :user.language)))
+(deftest select-test
+  (is (= [{:user.language "en"}]
+         (select/select ::system-properties :user.language)))
+  (is (= [{:user.language "en", :line.separator "\n"}]
+         (select/select ::system-properties :user.language :line.separator)))
   (is (= {:user.language "en", :line.separator "\n"}
-         (toucan2/select ::system-properties :user.language :line.separator))))
+         (select/select-one ::system-properties :user.language :line.separator)))
+  (is (= #{"en"}
+         (select/select-fn-set :user.language ::system-properties :user.language :line.separator)))
+  (is (= "en"
+         (select/select-one-fn :user.language ::system-properties :user.language :line.separator))))

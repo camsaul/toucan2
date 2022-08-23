@@ -156,8 +156,8 @@
   {:arglists '([query-type model {:keys [query], :as parsed-args}])}
   (fn [query-type model parsed-args]
     (mapv protocols/dispatch-value [query-type
-                            model
-                            (:query parsed-args)])))
+                                    model
+                                    (:query parsed-args)])))
 
 (m/defmethod build :around :default
   [query-type model parsed-args]
