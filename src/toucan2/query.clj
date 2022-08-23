@@ -5,7 +5,6 @@
    [methodical.core :as m]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
-   [toucan2.query :as query]
    [toucan2.util :as u]))
 
 ;;; Query compilation pipeline is something like this

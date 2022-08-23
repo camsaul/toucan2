@@ -61,4 +61,24 @@
   ;;
   ;; clj -X:dev:test:test-postgres
   :test-postgres
-  {:jvm-opts ["-Dtest.dbs=postgres"]}}}
+  {:jvm-opts ["-Dtest.dbs=postgres"]}
+
+  ;; clj -X:dev:cloverage
+  :cloverage
+  {:extra-deps {cloverage/cloverage {:mvn/version "1.2.2"}}
+   :exec-fn    toucan2.cloverage-runner/run-project
+   :exec-args  {:codecov? true
+
+                :src-ns-path
+                ["src" "toucan1/src"]
+
+                :test-ns-path
+                ["test" "toucan1/test"]
+
+                ;; exclude debug logging.
+                :exclude-call
+                [toucan2.util/do-with-debug-result
+                 toucan2.util/println-debug-lines]
+
+                :ns-regex
+                ["^toucan\\..*" "^toucan2\\..*"]}}}}
