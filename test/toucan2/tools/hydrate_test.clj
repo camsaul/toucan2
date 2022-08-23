@@ -7,6 +7,7 @@
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.test :as test]
+   [toucan2.tools.helpers :as helpers]
    [toucan2.tools.hydrate :as hydrate])
   (:import
    (java.time OffsetDateTime)))
@@ -16,14 +17,12 @@
 (derive ::venues ::test/venues)
 
 (derive ::venues.category-keyword ::venues)
-;; TODO
-#_(derive ::venues.category-keyword :toucan2.tools.transformed/transformed)
 
 (derive ::people ::test/people)
 
-#_(helpers/deftransforms ::venues.category-keyword
-    {:category {:in  name
-                :out keyword}})
+(helpers/deftransforms ::venues.category-keyword
+  {:category {:in  name
+              :out keyword}})
 
 (m/defmethod hydrate/model-for-automagic-hydration [:default ::user]
   [_original-model _k]
@@ -60,19 +59,18 @@
   (letfn [(remove-venues-timestamps [rows]
             (for [result rows]
               (update result ::venue #(dissoc % :updated-at :created-at))))]
-    ;; TODO FIXME "bar" should come back as `:bar` once we reimplement transforms.
     (is (= [{:venue-id 1
-             ::venue   {:category "bar" #_:bar, :name "Tempest", :id 1}}
+             ::venue   {:category :bar, :name "Tempest", :id 1}}
             {:venue-id 2
-             ::venue   {:category "bar" #_:bar, :name "Ho's Tavern", :id 2}}]
+             ::venue   {:category :bar, :name "Ho's Tavern", :id 2}}]
            (remove-venues-timestamps
             (hydrate/hydrate [{:venue-id 1} {:venue-id 2}] ::venue))))
 
     (testing "dispatch off of model -- hydrate different Tables for different instances"
       (is (= [(instance/instance :a-place {:venue-id 1
-                                           ::venue   {:category "bar" #_:bar, :name "Tempest", :id 1}})
+                                           ::venue   {:category :bar, :name "Tempest", :id 1}})
               (instance/instance :a-place {:venue-id 2
-                                           ::venue   {:category "bar" #_:bar, :name "Ho's Tavern", :id 2}})]
+                                           ::venue   {:category :bar, :name "Ho's Tavern", :id 2}})]
              (remove-venues-timestamps
               (hydrate/hydrate [(instance/instance :a-place {:venue_id 1})
                                 (instance/instance :a-place {:venue-id 2})]
