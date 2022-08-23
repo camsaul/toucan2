@@ -17,7 +17,7 @@
          (before-insert model row))
        (catch Throwable e
          (throw (ex-info (format "Error in before-insert for %s: %s" (u/safe-pr-str model) (ex-message e))
-                         {:model model, :row row}
+                         {:context u/*error-context*, :model model, :row row}
                          e)))))
    rows))
 

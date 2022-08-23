@@ -47,7 +47,7 @@
     (vector? model)             (resolve-model (first model))
     (symbol? model)             (resolve-model-from-symbol model)
     :else                       (throw (ex-info (str "Invalid model: " (u/safe-pr-str model))
-                                                {:model model}))))
+                                                {:context u/*error-context*, :model model}))))
 
 (m/defmethod model/do-with-model clojure.lang.Symbol
   [symb f]

@@ -83,7 +83,7 @@
       nil)
     (catch Throwable e
       (throw (ex-info (format "Error transforming %s: %s" (u/safe-pr-str v) (ex-message e))
-                      {:v v, :transform xform}
+                      {:context u/*error-context*, :v v, :transform xform}
                       e)))))
 
 (defn transform-kv-args [kv-args transforms]
@@ -127,11 +127,11 @@
                                                    (u/safe-pr-str k)
                                                    (u/safe-pr-str v)
                                                    (ex-message e))
-                                           {:model model, :k k, :v v, :xform xform}
+                                           {:context u/*error-context*, :model model, :k k, :v v, :xform xform}
                                            e)))))]))))
     (catch Throwable e
       (throw (ex-info (format "Error calculating %s transforms for %s: %s" direction (u/safe-pr-str model) (ex-message e))
-                      {:model model, :direction direction}
+                      {:context u/*error-context*, :model model, :direction direction}
                       e)))))
 
 (defn in-transforms [model]
@@ -187,7 +187,7 @@
                               `apply-row-transform (u/safe-pr-str row))))))
          (catch Throwable e
            (throw (ex-info (format "Error transforming %s %s: %s" (u/safe-pr-str k) (u/safe-pr-str (get row k)) (ex-message e))
-                           {:k k, :v (get row k), :row row, :xform xform}
+                           {:context u/*error-context*, :k k, :v (get row k), :row row, :xform xform}
                            e))))))))
 
 (defn out-transforms [model]

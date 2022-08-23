@@ -247,7 +247,8 @@
                    (seq result)
                    (every? keyword? result))
       (throw (ex-info (format "fk-keys-for-automagic-hydration should return a non-empty sequence of keywords. Got: %s" (u/safe-pr-str result))
-                      {:original-model original-model
+                      {:context        u/*error-context*
+                       :original-model original-model
                        :dest-key       dest-key
                        :hydrated-model hydrated-model
                        :result         result})))
@@ -314,8 +315,9 @@
       (do-automagic-batched-hydration dest-key rows pk->fetched-instance))
     (catch Throwable e
       (throw (ex-info (format "Error doing automagic batched hydration: %s" (ex-message e))
-                      {:model model
-                       :dest-key  dest-key}
+                      {:context  u/*error-context*
+                       :model    model
+                       :dest-key dest-key}
                       e)))))
 
 
@@ -414,7 +416,7 @@
   (when-not (seq nested-keys)
     (throw (ex-info (str (format "Invalid hydration form: replace %s with %s. Vectors are for nested hydration." coll k)
                          " There's no need to use one when you only have a single key.")
-                    {:invalid-form coll})))
+                    {:context u/*error-context*, :invalid-form coll})))
   (let [results                     (hydrate results k)
         newly-hydrated-values       (map k results)
         recursively-hydrated-values (apply hydrate newly-hydrated-values nested-keys)]
@@ -453,7 +455,8 @@
         (hydrate-key-seq results k)
 
         :else
-        (throw (ex-info (format "Invalid hydration form: %s. Expected keyword or sequence." k) {:invalid-form k}))))))
+        (throw (ex-info (format "Invalid hydration form: %s. Expected keyword or sequence." k)
+                        {:context u/*error-context*, :invalid-form k}))))))
 
 (defn- hydrate-forms
   "Hydrate many hydration forms across a *sequence* of `results` by recursively calling `hydrate-one-form`."

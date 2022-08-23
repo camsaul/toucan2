@@ -23,7 +23,7 @@
       (next-method query-type model instance)
       (catch Throwable e
         (throw (ex-info (format "Error in %s %s for %s: %s" `after query-type (u/safe-pr-str model) (ex-message e))
-                        {:model model, :row instance}
+                        {:context u/*error-context*, :model model, :row instance}
                         e))))))
 
 (defn has-after-method? [query-type model]

@@ -21,8 +21,9 @@
       (throw (ex-info (format "Error saving %s: %s"
                               (u/safe-pr-str (protocols/model object))
                               (ex-message e))
-                      {:model  (protocols/model object)
-                       :object object
+                      {:context u/*error-context*
+                       :model   (protocols/model object)
+                       :object  object
                        :changes (protocols/changes object)}
                       e)))))
 
@@ -40,8 +41,9 @@
           (throw (ex-info (format "Unable to save object: %s with primary key %s does not exist."
                                   (u/safe-pr-str model)
                                   (u/safe-pr-str pk-values))
-                          {:object object
-                           :pk     pk-values})))
+                          {:context u/*error-context*
+                           :object  object
+                           :pk      pk-values})))
         (when (> rows-affected 1)
           (u/println-debug ["Warning: more than 1 row affected when saving %s with primary key %s"
                             model pk-values]))

@@ -20,7 +20,8 @@
                (^:once fn* [model]
                 (when-not (= model modelable)
                   (u/println-debug ["Resolved modelable %s => model %s" modelable model]))
-                (f model))))
+                (binding [u/*error-context* (assoc u/*error-context* ::model model)]
+                  (f model)))))
 
 (defmacro with-model [[model-binding modelable] & body]
   `(do-with-model ~modelable (^:once fn* [~model-binding] ~@body)))
@@ -77,7 +78,7 @@
   (if (instance? clojure.lang.Named model)
     ((m/effective-method table-name clojure.lang.Named) model)
     (throw (ex-info (format "Invalid model %s: don't know how to get its table name." (u/safe-pr-str model))
-                    {:model model}))))
+                    {:context u/*error-context*, :model model}))))
 
 (m/defmethod table-name clojure.lang.Named
   [model]
@@ -104,7 +105,7 @@
                               `primary-keys
                               (u/safe-pr-str model)
                               (u/safe-pr-str pk-or-pks))
-                      {:model model, :result pk-or-pks})))
+                      {:context u/*error-context*, :model model, :result pk-or-pks})))
     pks))
 
 (m/defmethod primary-keys :default

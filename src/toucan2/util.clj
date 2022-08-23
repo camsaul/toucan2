@@ -8,6 +8,9 @@
 
 (set! *warn-on-reflection* true)
 
+;;; TODO -- maybe we should use an ordered map here so keys will be kept in the order they were added.
+(def ^:dynamic *error-context* {})
+
 (def ^:dynamic *debug* false)
 
 (def ^:private ^:dynamic *debug-indent-level* 0)
@@ -102,7 +105,7 @@
     ((pretty-printer) x)
     (catch Throwable e
       (throw (ex-info (format "Error pretty printing %s: %s" (some-> x class .getCanonicalName) (ex-message e))
-                      {:object x}
+                      {:context *error-context*, :object x}
                       e)))))
 
 (defn ^:no-doc pprint-to-str [x]

@@ -51,7 +51,7 @@
               (let [pks (pks-fn row)]
                 (when (nil? pks)
                   (throw (ex-info (format "Error returning PKs: pks-fn returned nil for row %s" (u/safe-pr-str row))
-                                  {:row (realize/realize row), :pks-fn pks-fn})))
+                                  {:context u/*error-context*, :row (realize/realize row), :pks-fn pks-fn})))
                 pks))))
      (execute/->WithReturnKeys reducible-operation))))
 

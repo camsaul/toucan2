@@ -23,7 +23,11 @@
   [connectable f]
   (assert (fn? f))
   (next-method connectable (^:once fn* [conn]
-                            (binding [*current-connectable* conn]
+                            (binding [*current-connectable* conn
+                                      ;; add the dispatch value rather than the connection type itself to avoid leaking
+                                      ;; sensitive creds
+                                      u/*error-context*     (assoc u/*error-context*
+                                                                   ::connection-type (protocols/dispatch-value conn))]
                               (f conn)))))
 
 (defmacro with-connection
@@ -44,7 +48,7 @@
                           (u/safe-pr-str connectable)
                           `do-with-connection
                           (protocols/dispatch-value connectable))
-                  {:connectable connectable})))
+                  {:context u/*error-context*, :connectable connectable})))
 
 ;;; method called if there is no current connection.
 (m/defmethod do-with-connection :default
@@ -52,7 +56,7 @@
   (throw (ex-info (format "No default Toucan connection defined. You can define one by implementing %s for :default. You can also implement %s for a model."
                           `do-with-connection
                           'toucan2.model/default-connectable)
-                  {})))
+                  {:context u/*error-context*})))
 
 ;;; `nil` means use the current connection.
 ;;;

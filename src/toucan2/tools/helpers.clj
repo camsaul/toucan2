@@ -19,7 +19,7 @@
       (thunk)
       (catch Throwable e
         (throw (ex-info (format "Error in %s for %s: %s" `define-before-select (u/safe-pr-str model) (ex-message e))
-                        {:model model}
+                        {:context u/*error-context*, :model model}
                         e))))))
 
 (defmacro define-before-select

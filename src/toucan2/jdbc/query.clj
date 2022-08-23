@@ -20,7 +20,12 @@
     (u/println-debug ["Preparing JDBC query with next.jdbc options %s" opts])
     (with-open [stmt (jdbc/prepare conn sql-args opts)]
       (u/println-debug ["Executing statement with %s" (symbol (.getCanonicalName (class conn)))])
-      (let [result-set? (.execute stmt)]
+      (let [result-set? (try
+                          (.execute stmt)
+                          (catch Exception e
+                            (throw (ex-info (format "Error executing SQL: %s" (ex-message e))
+                                            {:context u/*error-context*, :sql-args sql-args}
+                                            e))))]
         (cond
           (:return-keys opts)
           (do

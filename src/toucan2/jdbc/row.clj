@@ -10,7 +10,7 @@
     (thunk)
     (catch Throwable e
       (throw (ex-info (format "Error realizing column %s: %s" (u/safe-pr-str k) (ex-message e))
-                      {:k k, :thunk thunk}
+                      {:context u/*error-context*, :k k, :thunk thunk}
                       e)))))
 
 ;; TODO -- instead of thunks, should these just be DELAYS????

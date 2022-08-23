@@ -38,7 +38,7 @@
   [query-type model {:keys [kv-args query changes], :as parsed-args}]
   (when (empty? changes)
     (throw (ex-info "Cannot build an update query with no changes."
-                    {:query-type query-type, :model model, :parsed-args parsed-args})))
+                    {:context u/*error-context*, :query-type query-type, :model model, :parsed-args parsed-args})))
   (let [parsed-args (assoc parsed-args
                            :kv-args (merge kv-args query)
                            :query   {:update [(keyword (model/table-name model))]

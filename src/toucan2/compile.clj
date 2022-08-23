@@ -16,13 +16,14 @@
 
 (m/defmethod do-with-compiled-query :around :default
   [model query f]
-  #_(u/println-debug ["compile %s query %s" model query])
   (let [f* (^:once fn* [compiled]
             (when (and u/*debug*
                        (not= query compiled))
               (u/with-debug-result ["compile %s query %s" model query]
                 compiled))
-            (f compiled))]
+            ;; preserve all the compiled queries if we do multiple recursive compiles.
+            (binding [u/*error-context* (update u/*error-context* ::compiled #(conj (vec %) compiled))]
+              (f compiled)))]
     (next-method model query f*)))
 
 (defmacro with-compiled-query [[query-binding [model query]] & body]
@@ -61,6 +62,12 @@
                    (hsql/format honeysql options)
                    (catch Throwable e
                      (throw (ex-info (format "Error building query: %s" (ex-message e))
-                                     {:model model, :honeysql honeysql, :options options}
+                                     {:context  u/*error-context*
+                                      :model    model
+                                      :honeysql honeysql
+                                      :options  options}
                                      e))))]
-    (do-with-compiled-query model sql-args f)))
+    (binding [u/*error-context* (assoc u/*error-context*
+                                       ::options options
+                                       ::honeysql honeysql)]
+      (do-with-compiled-query model sql-args f))))

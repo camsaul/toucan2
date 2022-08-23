@@ -94,7 +94,7 @@
             acc)))
       (catch Throwable e
         (throw (ex-info (format "Error reducing results: %s" (ex-message e))
-                        {:rf rf, :init init, :result-set rset}
+                        {:context u/*error-context*, :rf rf, :init init, :result-set rset}
                         e)))))
 
   pretty/PrettyPrintable

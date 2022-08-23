@@ -97,12 +97,13 @@
   (let [result (s/conform ::parsed-args parsed-args)]
     (when (s/invalid? result)
       (throw (ex-info (format "Invalid parsed args: %s" (s/explain-str ::parsed-args parsed-args))
-                      (s/explain-data ::parsed-args parsed-args))))))
+                      {:context u/*error-context*, :spec-error (s/explain-data ::parsed-args parsed-args)})))))
 
 (m/defmethod parse-args :around :default
   [query-type model unparsed-args]
   (doto (u/with-debug-result [(list `parse-args query-type model unparsed-args)]
-          (next-method query-type model unparsed-args))
+          (binding [u/*error-context* (assoc u/*error-context* ::unparsed-args unparsed-args)]
+            (next-method query-type model unparsed-args)))
     validate-parsed-args))
 
 (m/defmethod parse-args :default
@@ -114,7 +115,7 @@
                               (u/safe-pr-str query-type)
                               (u/safe-pr-str model)
                               (s/explain-str spec unparsed-args))
-                      (s/explain-data spec unparsed-args))))
+                      {:context u/*error-context*, :spec-error (s/explain-data spec unparsed-args)})))
     (if-not (map? parsed)
       parsed
       (cond-> parsed
@@ -142,6 +143,13 @@
                 query))
             (f query))]
     (f* queryable)))
+
+(m/defmethod do-with-query :around :default
+  [model queryable f]
+  (let [f* (^:once fn* [query]
+            (binding [u/*error-context* (assoc u/*error-context* ::resolved-query query)]
+              (f query)))]
+    (next-method model queryable f*)))
 
 (defmacro with-query [[query-binding [model queryable]] & body]
   `(do-with-query ~model ~queryable (^:once fn* [~query-binding] ~@body)))
@@ -174,11 +182,12 @@
                               (u/safe-pr-str query-type)
                               (u/safe-pr-str model)
                               (ex-message e))
-                      {:query-type     query-type
-                       :model          model
-                       :parsed-args    parsed-args
-                       :method         #'build
-                       :dispatch-value (m/dispatch-value build query-type model parsed-args)}
+                      (assoc u/*error-context*
+                             :query-type     query-type
+                             :model          model
+                             :parsed-args    parsed-args
+                             :method         #'build
+                             :dispatch-value (m/dispatch-value build query-type model parsed-args))
                       e)))))
 
 (m/defmethod build :default
@@ -187,7 +196,8 @@
                           (u/safe-pr-str parsed-args)
                           `build
                           (u/safe-pr-str (m/dispatch-value build query-type model parsed-args)))
-                  {:query-type     query-type
+                  {:context        u/*error-context*
+                   :query-type     query-type
                    :model          model
                    :parsed-args    parsed-args
                    :method         #'build
@@ -221,7 +231,8 @@
   [query-type model {sql-args :query, :keys [kv-args], :as parsed-args}]
   (when (seq kv-args)
     (throw (ex-info "key-value args are not supported for plain SQL queries."
-                    {:query-type     query-type
+                    {:context        u/*error-context*
+                     :query-type     query-type
                      :model          model
                      :parsed-args    parsed-args
                      :method         #'build
