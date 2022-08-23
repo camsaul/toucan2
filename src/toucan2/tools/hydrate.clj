@@ -1,5 +1,87 @@
 (ns toucan2.tools.hydrate
-  "Implementation of Toucan's famous 'hydration' facilities. See [[hydrate]] for a high-level overview of hydration.
+  "[[hydrate]] adds one or more keys to an instance or instances using various hydration strategies, usually using one of
+  the existing keys in those instances. A typical use case would be to take a sequence of `orders` and add `:user` keys
+  to them based on their values of the foreign key `:user-id`.
+
+  [[hydrate]] is how you *use* the hydration facilities; everything else in this namespace is only for extending
+  hydration to support your models.
+
+  Toucan 2 ships with several hydration strategies out of the box:
+
+  #### Automagic Batched Hydration (via [[model-for-automagic-hydration]])
+
+  [[hydrate]] attempts to do a *batched hydration* where possible. If the key being hydrated is defined as one of some
+  table's [[model-for-automagic-hydration]], `hydrate` will do a batched
+  [[toucan2.select/select]] if a corresponding key (by default, the same key suffixed by `-id`) is found in the
+  objects being batch hydrated. The corresponding key can be customized by
+  implementing [[fk-keys-for-automagic-hydration]].
+
+  ```clj
+  (hydrate [{:user_id 100}, {:user_id 101}] :user)
+  ```
+
+  Since `:user` is a hydration key for `:models/User`, a single [[toucan2.select/select]] will used to fetch Users:
+
+  ```clj
+  (db/select :models/User :id [:in #{100 101}])
+  ```
+
+  The corresponding Users are then added under the key `:user`.
+
+  #### Function-Based Batched Hydration (via [[batched-hydrate]] methods)
+
+  If the key can't be hydrated auto-magically with the appropriate [[model-for-automagic-hydration]],
+  [[hydrate]] will attempt to do batched hydration if it can find a matching method
+  for [[batched-hydrate]]. If a matching function is found, it is called with a collection of
+  objects, e.g.
+
+  ```clj
+  (m/defmethod hydrate/batched-hydrate [:default :fields]
+    [_model _k rows]
+    (let [id->fields (get-some-fields rows)]
+      (for [row rows]
+        (assoc row :fields (get id->fields (:id row))))))
+  ```
+
+  #### Simple Hydration (via [[simple-hydrate]] methods)
+
+  If the key is *not* eligible for batched hydration, [[hydrate]] will look for a matching
+  [[simple-hydrate]] method. `simple-hydrate` is called with a single row.
+
+  ```clj
+  (m/defmethod simple-hydrate [:default :dashboard]
+    [_model _k {:keys [dashboard-id], :as row}]
+    (assoc row :dashboard (select/select-one :models/Dashboard :toucan/pk dashboard-id)))
+  ```
+
+  #### Hydrating Multiple Keys
+
+  You can hydrate several keys at one time:
+
+  ```clj
+  (hydrate {...} :a :b)
+    -> {:a 1, :b 2}
+  ```
+
+  #### Nested Hydration
+
+  You can do recursive hydration by listing keys inside a vector:
+
+  ```clj
+  (hydrate {...} [:a :b])
+    -> {:a {:b 1}}
+  ```
+
+  The first key in a vector will be hydrated normally, and any subsequent keys will be hydrated *inside* the
+  corresponding values for that key.
+
+  ```clj
+  (hydrate {...}
+           [:a [:b :c] :e])
+    -> {:a {:b {:c 1} :e 2}}
+  ```
+
+  ### Flowchart
 
   If you're digging in to the details, this is a flowchart of how hydration works:
 
@@ -382,87 +464,26 @@
 ;;;                                                 Public Interface
 ;;; ==================================================================================================================
 
-
 (defn hydrate
-  "Hydrate a single object or sequence of objects.
+  "Hydrate the keys `ks` in a single instance or sequence of instances. See [[toucan2.tools.hydrate]] for more
+  information."
+  ;; no keys -- no-op
+  ([instance-or-instances]
+   instance-or-instances)
 
-  #### Automagic Batched Hydration (via [[model-for-automagic-hydration]])
+  ([instance-or-instances & ks]
+   (cond
+     (not instance-or-instances)
+     nil
 
-  [[hydrate]] attempts to do a *batched hydration* where possible. If the key being hydrated is defined as one of some
-  table's [[model-for-automagic-hydration]], `hydrate` will do a batched
-  [[toucan2.select/select]] if a corresponding key (by default, the same key suffixed by `-id`) is found in the
-  objects being batch hydrated. The corresponding key can be customized by
-  implementing [[fk-keys-for-automagic-hydration]].
+     (and (sequential? instance-or-instances)
+          (empty? instance-or-instances))
+     instance-or-instances
 
-  ```clj
-  (hydrate [{:user_id 100}, {:user_id 101}] :user)
-  ```
+     (sequential? instance-or-instances)
+     (let [first-row (first instance-or-instances)]
+       (apply hydrate-forms (protocols/model first-row) instance-or-instances ks))
 
-  Since `:user` is a hydration key for `:models/User`, a single [[toucan2.select/select]] will used to fetch Users:
-
-  ```clj
-  (db/select :models/User :id [:in #{100 101}])
-  ```
-
-  The corresponding Users are then added under the key `:user`.
-
-  #### Function-Based Batched Hydration (via [[batched-hydrate]] methods)
-
-  If the key can't be hydrated auto-magically with the appropriate [[model-for-automagic-hydration]],
-  [[hydrate]] will attempt to do batched hydration if it can find a matching method
-  for [[batched-hydrate]]. If a matching function is found, it is called with a collection of
-  objects, e.g.
-
-  ```clj
-  (m/defmethod hydrate/batched-hydrate [:default :fields]
-    [_model _k rows]
-    (let [id->fields (get-some-fields rows)]
-      (for [row rows]
-        (assoc row :fields (get id->fields (:id row))))))
-  ```
-
-  #### Simple Hydration (via [[simple-hydrate]] methods)
-
-  If the key is *not* eligible for batched hydration, [[hydrate]] will look for a matching
-  [[simple-hydrate]] method. `simple-hydrate` is called with a single row.
-
-  ```clj
-  (m/defmethod simple-hydrate [:default :dashboard]
-    [_model _k {:keys [dashboard-id], :as row}]
-    (assoc row :dashboard (select/select-one :models/Dashboard :toucan/pk dashboard-id)))
-  ```
-
-  #### Hydrating Multiple Keys
-
-  You can hydrate several keys at one time:
-
-  ```clj
-  (hydrate {...} :a :b)
-    -> {:a 1, :b 2}
-  ```
-
-  #### Nested Hydration
-
-  You can do recursive hydration by listing keys inside a vector:
-
-  ```clj
-  (hydrate {...} [:a :b])
-    -> {:a {:b 1}}
-  ```
-
-  The first key in a vector will be hydrated normally, and any subsequent keys will be hydrated *inside* the
-  corresponding values for that key.
-
-  ```clj
-  (hydrate {...}
-           [:a [:b :c] :e])
-    -> {:a {:b {:c 1} :e 2}}
-  ```"
-  [results k & ks]
-  (when results
-    (if (sequential? results)
-      (if (empty? results)
-        results
-        (let [first-row (first results)]
-          (apply hydrate-forms (protocols/model first-row) results k ks)))
-      (first (apply hydrate-forms (protocols/model results) [results] k ks)))))
+     ;; not sequential
+     :else
+     (first (apply hydrate-forms (protocols/model instance-or-instances) [instance-or-instances] ks)))))

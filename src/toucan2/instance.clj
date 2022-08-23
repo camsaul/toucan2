@@ -16,7 +16,7 @@
   "True if `x` is a Toucan2 instance, i.e. a `toucan2.instance.Instance` or some other class that satisfies the correct
   interfaces.
 
-  Toucan instances need to implement [[IModel]], [[IWithModel]], and [[IRecordChanges]]."
+  Toucan instances need to implement [[protocols/IModel]], [[protocols/IWithModel]], and [[protocols/IRecordChanges]]."
   [x]
   (every? #(clojure.core/instance? % x)
           [toucan2.protocols.IModel
@@ -26,8 +26,10 @@
 (defn instance-of?
   "True if `x` is a Toucan2 instance, and its [[protocols/model]] `isa?` `model`.
 
-    (instance-of? ::bird (instance ::toucan {})) ; -> true
-    (instance-of?  ::toucan (instance ::bird {})) ; -> false"
+  ```clj
+  (instance-of? ::bird (instance ::toucan {})) ; -> true
+  (instance-of?  ::toucan (instance ::bird {})) ; -> false
+  ```"
   [model x]
   (and (instance? x)
        (isa? (protocols/model x) model)))

@@ -30,7 +30,7 @@
 ;;; [[reduce-compiled-query-with-connection]]
 ;;; Execute and reduce the query with the open connection.
 
-(def ^:dynamic *call-count-thunk*
+(def ^:dynamic ^:private *call-count-thunk*
   "Thunk function to call every time a query is executed if [[with-call-count]] is in use."
   nil)
 
@@ -128,9 +128,11 @@
 (defmacro compile
   "Return the compiled query that would be executed by a form, rather than executing that form itself.
 
-    (delete/delete :table :id 1)
-    =>
-    [\"DELETE FROM table WHERE ID = ?\" 1]"
+  ```clj
+  (delete/delete :table :id 1)
+  =>
+  [\"DELETE FROM table WHERE ID = ?\" 1]
+  ```"
   {:style/indent 0}
   [& body]
   `(binding [conn/*current-connectable* ::compile]
@@ -140,7 +142,7 @@
 
 ;;;; [[with-call-count]]
 
-(defn do-with-call-counts
+(defn ^:no-doc do-with-call-counts
   "Impl for [[with-call-count]] macro; don't call this directly."
   [f]
   (let [call-count (atom 0)
@@ -155,13 +157,15 @@
   "Execute `body`, trackingthe number of database queries and statements executed. This number can be fetched at any
   time withing `body` by calling function bound to `call-count-fn-binding`:
 
-    (with-call-count [call-count]
-      (select ...)
-      (println \"CALLS:\" (call-count))
-      (insert! ...)
-      (println \"CALLS:\" (call-count)))
-    ;; -> CALLS: 1
-    ;; -> CALLS: 2"
+  ```clj
+  (with-call-count [call-count]
+    (select ...)
+    (println \"CALLS:\" (call-count))
+    (insert! ...)
+    (println \"CALLS:\" (call-count)))
+  ;; -> CALLS: 1
+  ;; -> CALLS: 2
+  ```"
   [[call-count-fn-binding] & body]
   `(do-with-call-counts (^:once fn* [~call-count-fn-binding] ~@body)))
 

@@ -30,7 +30,9 @@
 
 (defonce ^{:doc "Return a map of
 
-    {column-name {:in <fn>, :out <fn>}}
+  ```clj
+  {column-name {:in <fn>, :out <fn>}}
+  ```
 
   For a given `model`, all matching transforms are combined with `merge-with merge` in an indeterminate order, so don't
   try to specify multiple transforms for the same column in the same direction for a given model -- compose your

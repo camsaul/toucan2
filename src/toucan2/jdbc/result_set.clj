@@ -14,7 +14,9 @@
   "Map of `java.sql.Types` enum integers (e.g. `java.sql.Types/FLOAT`, whose value is `6`) to the string type name e.g.
   `FLOAT`.
 
-    (type-name java.sql.Types/FLOAT) -> (type-name 6) -> \"FLOAT\""
+  ```clj
+  (type-name java.sql.Types/FLOAT) -> (type-name 6) -> \"FLOAT\"
+  ```"
   (into {} (for [^java.lang.reflect.Field field (.getDeclaredFields Types)]
              [(.getLong field Types) (.getName field)])))
 
@@ -135,6 +137,7 @@
 
 ;;;; Postgres integration
 
+;;; TODO -- why is cljdoc picking this up?
 (when-let [pg-connection-class (try
                                  (Class/forName "org.postgresql.jdbc.PgConnection")
                                  (catch Throwable _

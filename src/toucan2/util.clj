@@ -207,7 +207,7 @@
 (defn- walk-safe-printable [x]
   (walk/postwalk safe-printable x))
 
-(defn safe-pr-str
+(defn ^:no-doc safe-pr-str
   "Like [[clojure.core/pr-str]], but does not evaluate reducibles or eductions, and
   handles [[pretty.core/PrettyPrintable]] things recursively."
   [x]

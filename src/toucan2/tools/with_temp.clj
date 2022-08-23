@@ -21,10 +21,12 @@
   particular model. But normally you would just implement [[with-temp-defaults]]. If you need to do special setup when
   using [[with-temp]], you can implement a `:before` method:
 
-    (m/defmethod do-with-temp* :before :default
-      [model attributes f]
-      (set-up-db!)
-      f)"
+  ```clj
+  (m/defmethod do-with-temp* :before :default
+    [model attributes f]
+    (set-up-db!)
+    f)
+  ```"
   {:arglists '([model attributes f])}
   u/dispatch-on-first-arg)
 

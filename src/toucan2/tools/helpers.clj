@@ -106,7 +106,9 @@
 (defmacro deftransforms
   "Define type transforms to use for a specific model. `transforms` should be a map of
 
-    {:column-name {:in <fn>, :out <fn>}}
+  ```clj
+  {:column-name {:in <fn>, :out <fn>}}
+  ```
 
   `:in` transforms are applied to values going over the wire to the database; these generally only applied to values
   passed at or near the top level to various functions; don't expect Toucan 2 to parse your SQL to find out which
@@ -120,18 +122,22 @@
 
   Example:
 
-    (deftransforms :models/user
-      {:type {:in name, :out keyword}})
+  ```clj
+  (deftransforms :models/user
+    {:type {:in name, :out keyword}})
+  ```
 
   You can also define transforms independently, and derive a model from them:
 
-    (deftransforms ::type-keyword
-      {:type {:in name, :out keyword}})
+  ```clj
+  (deftransforms ::type-keyword
+    {:type {:in name, :out keyword}})
 
-    (derive :models/user ::type-keyword)
-    (derive :models/user ::some-other-transform)
+  (derive :models/user ::type-keyword)
+  (derive :models/user ::some-other-transform)
+  ```
 
-  Don't derive a model from multiple `deftransforms` for the same key in the same direction.
+  Don't derive a model from multiple [[deftransforms]] for the same key in the same direction.
 
   When multiple transforms match a given model they are combined into a single map of transforms with `merge-with
   merge`. If multiple transforms match a given column in a given direction, only one of them will be used; you should
@@ -140,14 +146,18 @@
   Until upstream issue https://github.com/camsaul/methodical/issues/97 is resolved, you will have to specify which
   method should be applied first in cases of ambiguity using [[methodical.core/prefer-method!]]:
 
-    (m/prefer-method! transformed/transforms ::user-with-location ::user-with-password)
+  ```clj
+  (m/prefer-method! transformed/transforms ::user-with-location ::user-with-password)
+  ```
 
   If you want to override transforms completely for a model, and ignore transforms from ancestors of a model, you can
   create an `:around` method:
 
-    (defmethod toucan2.tools.transformed/transforms :around ::my-model
-      [_model]
-      {:field {:in name, :out keyword}})"
+  ```clj
+  (defmethod toucan2.tools.transformed/transforms :around ::my-model
+    [_model]
+    {:field {:in name, :out keyword}})
+  ```"
   {:style/indent 1}
   [model transforms]
   `(let [model# ~model]

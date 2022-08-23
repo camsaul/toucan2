@@ -1,4 +1,32 @@
 (ns toucan2.query
+  "
+  Query compilation pipeline is something like this:
+
+  ```
+  Call something like [[toucan2.select/select]] with `modelable` and `unparsed-args`
+  ↓
+  `modelable` is resolved to `model` with [[toucan2.model/with-model]]
+  ↓
+  [[parse-args]] is used to parse args into a `parsed-args` map
+  ↓
+  The `:queryable` key in parsed args is resolved and replaced with a `:query` by [[with-query]]
+  ↓
+  [[build]] takes the `:query` in the parsed args and combines the other parsed args into it to build a
+  compilable query. The default backend builds a Honey SQL 2 query map
+  ↓
+  some sort of reducible is returned.
+
+  <reducing the reducible>
+  ↓
+  [[toucan2.compile/with-compiled-query]] compiles the built query (e.g. Honey SQL 2) into something that can be
+  executed natively (e.g. a `sql-args` vector)
+  ↓
+  [[toucan2.connection/with-connection]] is used to get a connection from the current connectable, or the default
+  connectable for `model`, or the global default connectable
+  ↓
+  Compiled query is executed with connection
+  ```"
+
   (:require
    [clojure.spec.alpha :as s]
    [honey.sql.helpers :as hsql.helpers]
@@ -6,31 +34,6 @@
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
-
-;;; Query compilation pipeline is something like this
-;;;
-;;; Call something like [[toucan2.select/select]] with `modelable` and `unparsed-args`
-;;; ↓
-;;; `modelable` is resolved to `model` with [[toucan2.model/with-model]]
-;;; ↓
-;;; [[toucan2.query/parse-args]] is used to parse args into a `parsed-args` map
-;;; ↓
-;;; The `:queryable` key in parsed args is resolved and replaced with a `:query` by [[toucan2.query/with-query]]
-;;; ↓
-;;; [[toucan2.query/build]] takes the `:query` in the parsed args and combines the other parsed args into it to build a
-;;; compilable query. The default backend builds a Honey SQL 2 query map
-;;; ↓
-;;; some sort of reducible is returned.
-;;;
-;;; <reducing the reducible>
-;;; ↓
-;;; [[toucan2.compile/with-compiled-query]] compiles the built query (e.g. Honey SQL 2) into something that can be
-;;; executed natively (e.g. a `sql-args` vector)
-;;; ↓
-;;; [[toucan2.connection/with-connection]] is used to get a connection from the current connectable, or the default
-;;; connectable for `model`, or the global default connectable
-;;; ↓
-;;; Compiled query is executed with connection
 
 ;;;; [[parse-args]]
 
