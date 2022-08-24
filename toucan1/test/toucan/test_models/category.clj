@@ -11,12 +11,7 @@
    [methodical.core :as m]
    [toucan.db :as t1.db]
    [toucan.models :as t1.models]
-   [toucan2.test :as test]
-   [toucan2.tools.after-insert :as after-insert]
-   [toucan2.tools.after-update :as after-update]
-   [toucan2.tools.before-delete :as before-delete]
-   [toucan2.tools.before-insert :as before-insert]
-   [toucan2.tools.before-update :as before-update]))
+   [toucan2.test :as test]))
 
 (set! *warn-on-reflection* true)
 
@@ -31,9 +26,6 @@
  :lowercase-string
  :in  maybe-lowercase-string
  :out maybe-lowercase-string)
-
-(t1.models/deftypes Category
-  {:name :lowercase-string})
 
 (defn- assert-parent-category-exists [{:keys [parent-category-id], :as category}]
   (when parent-category-id
@@ -59,27 +51,14 @@
 (defn add-category-to-updated-queue! [{:keys [id]}]
   (swap! categories-recently-updated conj id))
 
-(before-insert/define-before-insert Category
-  [category]
-  (assert-parent-category-exists category)
-  category)
-
-(after-insert/define-after-insert Category
-  [category]
-  (add-category-to-moderation-queue! category)
-  category)
-
-(before-update/define-before-update Category
-  [category]
-  (assert-parent-category-exists category))
-
-(after-update/define-after-update Category
-  [category]
-  (add-category-to-updated-queue! category))
-
-(before-delete/define-before-delete Category
-  [category]
-  (delete-child-categories! category))
+(t1.models/define-methods-with-IModel-method-map
+ Category
+ {:types       (constantly {:name :lowercase-string})
+  :pre-insert  assert-parent-category-exists
+  :post-insert add-category-to-moderation-queue!
+  :pre-update  assert-parent-category-exists
+  :post-update add-category-to-updated-queue!
+  :pre-delete  delete-child-categories!})
 
 (m/defmethod test/create-table-sql-file [:postgres Category]
   [_db-type _table-name]

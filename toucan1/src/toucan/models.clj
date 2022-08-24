@@ -14,6 +14,9 @@
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
+   [toucan2.tools.after-insert :as after-insert]
+   [toucan2.tools.after-select :as after-select]
+   [toucan2.tools.after-update :as after-update]
    [toucan2.tools.before-delete :as before-delete]
    [toucan2.tools.before-insert :as before-insert]
    [toucan2.tools.before-select :as before-select]
@@ -264,6 +267,12 @@
     (model/with-model [model modelable]
       (first (model/primary-keys model)))))
 
+(defn define-primary-key [modelable pk]
+  (model/with-model [model modelable]
+    (m/defmethod model/primary-keys model
+      [_model]
+      [pk])))
+
 ;;; Toucan 1 has no `pre-select`
 
 (defn do-post-select
@@ -407,3 +416,72 @@
       (m/defmethod hydrate/model-for-automagic-hydration [:default k]
         [_original-model _k]
         model))))
+
+;;;; these let you use method maps passed to [[extend]] for the old `IModel` protocol to implement Toucan 2 multimethods.
+
+(defmulti ^:private define-method-with-IModel-method
+  {:arglists '([method-name model f])}
+  u/dispatch-on-first-arg)
+
+(defmethod define-method-with-IModel-method :default-fields
+  [_k model f]
+  (define-default-fields model
+    (f model)))
+
+(defmethod define-method-with-IModel-method :hydration-keys
+  [_k model f]
+  (define-hydration-keys model (f model)))
+
+(defmethod define-method-with-IModel-method :post-insert
+  [_k model f]
+  (after-insert/define-after-insert model
+    [row]
+    (f row)))
+
+(defmethod define-method-with-IModel-method :post-select
+  [_k model f]
+  (after-select/define-after-select model
+    [row]
+    (f row)))
+
+(defmethod define-method-with-IModel-method :post-update
+  [_k model f]
+  (after-update/define-after-update model
+    [row]
+    (f row)))
+
+(defmethod define-method-with-IModel-method :pre-delete
+  [_k model f]
+  (before-delete/define-before-delete model
+    [row]
+    (f row)))
+
+(defmethod define-method-with-IModel-method :pre-insert
+  [_k model f]
+  (before-insert/define-before-insert model
+    [row]
+    (f row)))
+
+(defmethod define-method-with-IModel-method :pre-update
+  [_k model f]
+  (before-update/define-before-update model
+    [row]
+    (f row)))
+
+(defmethod define-method-with-IModel-method :primary-key
+  [_k model f]
+  (define-primary-key model (f model)))
+
+(defmethod define-method-with-IModel-method :properties
+  [_k model f]
+  (defproperties model (f model)))
+
+(defmethod define-method-with-IModel-method :types
+  [_k model f]
+  (deftypes model (f model)))
+
+(defn define-methods-with-IModel-method-map
+  {:style/indent [:form]}
+  [model method-map]
+  (doseq [[k f] method-map]
+    (define-method-with-IModel-method k model f)))
