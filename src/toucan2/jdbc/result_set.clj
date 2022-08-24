@@ -1,14 +1,16 @@
 (ns toucan2.jdbc.result-set
   (:require
    [methodical.core :as m]
-   [next.jdbc.result-set :as jdbc.rs]
+   [next.jdbc.result-set :as next.jdbc.rs]
    [pretty.core :as pretty]
    [toucan2.instance :as instance]
-   [toucan2.jdbc.row :as row]
+   [toucan2.jdbc.row :as jdbc.row]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u])
   (:import
    (java.sql Connection ResultSet ResultSetMetaData Types)))
+
+(set! *warn-on-reflection* true)
 
 (def type-name
   "Map of `java.sql.Types` enum integers (e.g. `java.sql.Types/FLOAT`, whose value is `6`) to the string type name e.g.
@@ -52,7 +54,7 @@
   (range 1 (inc (.getColumnCount rsmeta))))
 
 (defn- row-instance [model #_key-xform col-name->thunk]
-  (let [row (row/row col-name->thunk)]
+  (let [row (jdbc.row/row col-name->thunk)]
     (u/with-debug-result ["Creating new instance of %s, which has key transform fn %s"
                           model
                           (instance/key-transform-fn model)]
@@ -72,7 +74,7 @@
                                                 read-thunk   (delay (read-column-thunk conn model rset rsmeta i))
                                                 result-thunk (fn []
                                                                (u/with-debug-result ["Realize column %s %s" i col-name]
-                                                                 (jdbc.rs/read-column-by-index (@read-thunk) rsmeta i)))]]
+                                                                 (next.jdbc.rs/read-column-by-index (@read-thunk) rsmeta i)))]]
                                    [col-name result-thunk]))]
     (fn row-instance-thunk []
       (row-instance model #_key-xform col-name->thunk))))

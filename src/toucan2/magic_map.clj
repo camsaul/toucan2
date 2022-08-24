@@ -103,13 +103,13 @@
     (list `->TransientMagicMap m key-xform mta)))
 
 (defn magic-map
-  ([]
+  (^toucan2.magic_map.MagicMap []
    (magic-map {}))
-  ([m]
+  (^toucan2.magic_map.MagicMap [m]
    (magic-map m *key-transform-fn*))
-  ([m key-xform]
+  (^toucan2.magic_map.MagicMap [m key-xform]
    (magic-map m key-xform (meta m)))
-  ([m key-xform metta]
+  (^toucan2.magic_map.MagicMap [m key-xform metta]
    {:pre [(ifn? key-xform)]}
    (->MagicMap (normalize-map key-xform m)
                key-xform

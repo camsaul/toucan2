@@ -1,6 +1,6 @@
 (ns toucan2.jdbc.row-test
   (:require [clojure.test :refer :all]
-            [toucan2.jdbc.row :as row]
+            [toucan2.jdbc.row :as jdbc.row]
             #_[toucan2.result-row :as result-row]))
 
 (deftest row-test
@@ -8,7 +8,7 @@
     (let [c-realized? (atom false)
           col->thunk  {:a (constantly 100)
                        :c (fn [] (reset! c-realized? true) nil)}
-          row         (row/row col->thunk)]
+          row         (jdbc.row/row col->thunk)]
       (is (= 100
              (:a row)))
       (is (= nil
@@ -28,7 +28,7 @@
     (let [calls      (atom 0)
           col->thunk {:id (fn []
                             (swap! calls inc))}
-          row        (row/row col->thunk)]
+          row        (jdbc.row/row col->thunk)]
       (is (= 1 (get row :id)))
       (is (= 1 (get row :id)))
       (is (= 1 (get row :id))))))

@@ -1,12 +1,14 @@
 (ns toucan2.realize
   (:require
-   [next.jdbc.result-set :as jdbc.rset]
+   [next.jdbc.result-set :as next.jdbc.rs]
    [potemkin :as p]
    [toucan2.util :as u])
   (:import
    (next.jdbc.result_set DatafiableRow)))
 
-(comment jdbc.rset/keep-me)
+(set! *warn-on-reflection* true)
+
+(comment next.jdbc.rs/keep-me)
 
 (p/defprotocol+ Realize
   (realize [x]
@@ -17,7 +19,7 @@
     (u/try-with-error-context ["realize IReduceInit" {::reducible this}]
       (into []
             (map (fn [row]
-                   (u/with-debug-result [(list `realize (some-> row class .getCanonicalName symbol) row)]
+                   (u/with-debug-result (list `realize (some-> row class .getCanonicalName symbol) row)
                      (u/try-with-error-context ["realize row" {::row row}]
                        (realize row)))))
             this))))
@@ -40,7 +42,7 @@
   ;; TODO -- actually pass the real Connection somehow.
   DatafiableRow
   (realize [this]
-    (jdbc.rset/datafiable-row this nil nil))
+    (next.jdbc.rs/datafiable-row this nil nil))
 
   nil
   (realize [_]

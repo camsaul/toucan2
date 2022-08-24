@@ -9,6 +9,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(set! *warn-on-reflection* true)
+
 (use-fixtures :each test/do-db-types-fixture)
 
 (def ^:private ^:dynamic *venues-awaiting-moderation* nil)

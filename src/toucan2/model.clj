@@ -1,5 +1,6 @@
 (ns toucan2.model
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
@@ -25,6 +26,12 @@
 
 (defmacro with-model [[model-binding modelable] & body]
   `(do-with-model ~modelable (^:once fn* [~model-binding] ~@body)))
+
+(s/fdef with-model
+  :args (s/cat :bindings (s/spec (s/cat :model-binding symbol? ; don't think it makes sense to destructure a model.
+                                        :modelable     some?)) ; I think modelable should always be required, and non-nil
+               :body     (s/+ any?))
+  :ret any?)
 
 (m/defmulti default-connectable
   "The default connectable that should be used when executing queries for `model` if

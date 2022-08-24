@@ -1,7 +1,8 @@
 (ns toucan2.connection
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
-   [next.jdbc :as jdbc]
+   [next.jdbc :as next.jdbc]
    [pretty.core :as pretty]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
@@ -38,7 +39,13 @@
   [[connection-binding connectable] & body]
   `(do-with-connection
     ~connectable
-    (^:once fn* [~connection-binding] ~@body)))
+    (^:once fn* [~(or connection-binding '_)] ~@body)))
+
+(s/fdef with-connection
+  :args (s/cat :bindings (s/spec (s/cat :connection-binding (s/? symbol?)
+                                        :connectable        (s/? any?)))
+               :body (s/+ any?))
+  :ret  any?)
 
 ;;; method if this is called with something we don't know how to handle or if no default connection is defined. This is
 ;;; separate from `:default` so if you implement `:default` you don't accidentally have that get called for unknown
@@ -83,7 +90,7 @@
 
 (m/defmethod do-with-connection clojure.lang.IPersistentMap
   [m f]
-  (do-with-connection (jdbc/get-datasource m) f))
+  (do-with-connection (next.jdbc/get-datasource m) f))
 
 ;;;; connection string support
 
@@ -118,21 +125,27 @@
 
 (m/defmethod do-with-transaction :around ::default
   [connection f]
-  (u/with-debug-result [(list `do-with-transaction (some-> connection class .getCanonicalName symbol))]
+  (u/with-debug-result (list `do-with-transaction (some-> connection class .getCanonicalName symbol))
     (next-method connection (^:once fn* [conn]
                              (binding [*current-connectable* conn]
                                (f conn))))))
 
 (m/defmethod do-with-transaction java.sql.Connection
   [^java.sql.Connection conn f]
-  (jdbc/with-transaction [t-conn conn]
+  (next.jdbc/with-transaction [t-conn conn]
     (f t-conn)))
 
 (defmacro with-transaction
   {:style/indent 1}
   [[conn-binding connectable] & body]
   `(with-connection [conn# ~connectable]
-     (do-with-transaction conn# (^:once fn* [~conn-binding] ~@body))))
+     (do-with-transaction conn# (^:once fn* [~(or conn-binding '_)] ~@body))))
+
+(s/fdef with-transaction
+  :args (s/cat :bindings (s/spec (s/cat :connection-binding (s/? symbol?)
+                                        :connectable        (s/? any?)))
+               :body (s/+ any?))
+  :ret  any?)
 
 ;;; wraps a `reducible` and makes sure it is reduced inside a transaction.
 (deftype ^:no-doc ReduceInTransaction [connectable reducible]

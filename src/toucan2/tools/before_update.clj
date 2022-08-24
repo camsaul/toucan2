@@ -1,5 +1,6 @@
 (ns toucan2.tools.before-update
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.connection :as conn]
    [toucan2.model :as model]
@@ -15,7 +16,7 @@
 
 (m/defmethod before-update :around :default
   [model row]
-  (u/with-debug-result [(list `before-update model row)]
+  (u/with-debug-result (list `before-update model row)
     (doto (next-method model row)
       ((fn [result]
          (assert (map? result) (format "%s for %s should return a map, got %s"
@@ -73,11 +74,17 @@
                   (next-method query-type model args-map)))
         new-args-maps)))))
 
-(defmacro define-before-update [model [row-binding] & body]
+(defmacro define-before-update [model [instance-binding] & body]
   `(let [model# ~model]
      (u/maybe-derive model# ::before-update)
      (m/defmethod before-update model#
-       [~'&model ~row-binding]
+       [~'&model ~instance-binding]
        (cond->> (do ~@body)
          ~'next-method
          (~'next-method ~'&model)))))
+
+(s/fdef define-before-update
+  :args (s/cat :model    some?
+               :bindings (s/spec (s/cat :instance :clojure.core.specs.alpha/binding-form))
+               :body     (s/+ any?))
+  :ret any?)

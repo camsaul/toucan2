@@ -7,7 +7,7 @@
    *  `post-insert`                 -- which adds IDs of newly created Categories to a \"moderation queue\";
    *  `pre-delete`                  -- which deletes child Categories when deleting a Category;"
   (:require
-   [clojure.string :as s]
+   [clojure.string :as str]
    [methodical.core :as m]
    [toucan.db :as db]
    [toucan.models :as models]
@@ -18,11 +18,13 @@
    [toucan2.tools.before-update :as before-update]
    [toucan2.tools.helpers :as helpers]))
 
+(set! *warn-on-reflection* true)
+
 (models/defmodel Category :t1_categories)
 
 (defn- maybe-lowercase-string [s]
   (when s
-    (s/lower-case s)))
+    (str/lower-case s)))
 
 ;; define a new custom type that will automatically lowercase strings coming into or out of the DB
 (def lowercase-string-xform

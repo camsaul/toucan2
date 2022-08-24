@@ -8,6 +8,8 @@
    [toucan2.query :as query]
    [toucan2.realize :as realize]))
 
+(set! *warn-on-reflection* true)
+
 (defrecord ^:no-doc IdentityQuery [rows]
   pretty/PrettyPrintable
   (pretty [_this]

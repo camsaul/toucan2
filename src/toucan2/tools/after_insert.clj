@@ -1,5 +1,6 @@
 (ns toucan2.tools.after-insert
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.insert :as insert]
    [toucan2.tools.after :as tools.after]
@@ -16,3 +17,9 @@
      (m/defmethod tools.after/after [::insert/insert model#]
        [~'&query-type ~'&model ~instance-binding]
        ~@body)))
+
+(s/fdef define-after-insert
+  :args (s/cat :model    some?
+               :bindings (s/spec (s/cat :instance :clojure.core.specs.alpha/binding-form))
+               :body     (s/+ any?))
+  :ret any?)

@@ -17,6 +17,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(set! *warn-on-reflection* true)
+
 (use-fixtures :each test/do-db-types-fixture)
 
 (derive ::venues.transformed ::test/venues)

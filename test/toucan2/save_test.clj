@@ -10,6 +10,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(set! *warn-on-reflection* true)
+
 (deftest save-test
   (test/with-discarded-table-changes :venues
     (let [venue (select/select-one ::test/venues 1)]

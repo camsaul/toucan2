@@ -13,6 +13,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(set! *warn-on-reflection* true)
+
 (after-select/define-after-select ::people [person]
   (assoc person ::after-select? true))
 

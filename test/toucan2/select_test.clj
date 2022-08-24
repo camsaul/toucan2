@@ -14,6 +14,8 @@
   (:import
    (java.time OffsetDateTime)))
 
+(set! *warn-on-reflection* true)
+
 (use-fixtures :each test/do-db-types-fixture)
 
 (derive ::people ::test/people)

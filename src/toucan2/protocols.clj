@@ -1,6 +1,8 @@
 (ns toucan2.protocols
   (:require [potemkin :as p]))
 
+(set! *warn-on-reflection* true)
+
 (p/defprotocol+ IModel
   :extend-via-metadata true
   "Protocol for something that is-a or has-a model."

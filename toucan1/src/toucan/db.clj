@@ -13,13 +13,15 @@
    [toucan2.execute :as execute]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
-   [toucan2.jdbc.query :as t2.jdbc.query]
+   [toucan2.jdbc.query :as jdbc.query]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.update :as update]
    [toucan2.util :as u]))
+
+(set! *warn-on-reflection* true)
 
 (comment models/keep-me)
 
@@ -97,7 +99,7 @@
 (defn set-default-jdbc-options!
   "DEPRECATED: Set [[toucan2.jdbc.query/global-options]] directly instead."
   [jdbc-options]
-  (swap! t2.jdbc.query/global-options jdbc-options))
+  (swap! jdbc.query/global-options jdbc-options))
 
 
 
@@ -139,7 +141,7 @@
   clojure.lang.IReduceInit
   (reduce [this rf init]
     (u/with-debug-result ["reduce Toucan 1 reducible query %s" this]
-      (binding [t2.jdbc.query/*options*    (merge t2.jdbc.query/*options* jdbc-options)
+      (binding [jdbc.query/*options*    (merge jdbc.query/*options* jdbc-options)
                 compile/*honeysql-options* (honeysql-options)]
         (reduce rf init (execute/reducible-query nil honeysql-form)))))
 
@@ -205,13 +207,13 @@
 (defn execute!
   "DEPRECATED: use [[toucan2.execute/query-one]] instead."
   [honeysql-form & {:as options}]
-  (binding [t2.jdbc.query/*options* (merge t2.jdbc.query/*options* options)]
+  (binding [jdbc.query/*options* (merge jdbc.query/*options* options)]
     (execute/query-one honeysql-form)))
 
 (defn update!
   "DEPRECATED: use [[toucan2.update/update!]] instead. The difference between this version and the Toucan 2 version is the
   key-value args are treated as conditions in Toucan 2; in Toucan 1 you generally would have had to
-  use [[update-where!]] to update something without using the primary key. In Toucan 2, changes "
+  use [[update-where!]] to update something without using the primary key."
   {:arglists '([modelable honeysql-form]
                                     [modelable pk changes-map]
                                     [modelable pk key-to-change new-value & more])}
@@ -278,7 +280,7 @@
     (f model)))
 
 (defn simple-insert-many!
-  "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead. Returns the ID of the "
+  "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead. Returns the IDs of the inserted rows."
   [modelable row-maps]
   (when (seq row-maps)
     (model/with-model [model modelable]

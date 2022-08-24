@@ -27,16 +27,19 @@
   4. [[reduce-compiled-query-with-connection]]
      1. Execute and reduce the query with the open connection."
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [pretty.core :as pretty]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
-   [toucan2.jdbc.query :as t2.jdbc.query]
+   [toucan2.jdbc.query :as jdbc.query]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
+
+(set! *warn-on-reflection* true)
 
 (def ^:dynamic ^:private *call-count-thunk*
   "Thunk function to call every time a query is executed if [[with-call-count]] is in use."
@@ -64,7 +67,7 @@
 
 (m/defmethod reduce-compiled-query-with-connection [java.sql.Connection :default clojure.lang.Sequential]
   [conn model sql-args rf init]
-  (t2.jdbc.query/reduce-jdbc-query conn model sql-args rf init))
+  (jdbc.query/reduce-jdbc-query conn model sql-args rf init))
 
 (m/defmulti reduce-compiled-query
   "Reduce a `compiled-query` with `rf` and `init`, presumably by obtaining a connection with `connectable`
@@ -222,11 +225,16 @@
   [[call-count-fn-binding] & body]
   `(do-with-call-counts (^:once fn* [~call-count-fn-binding] ~@body)))
 
+(s/fdef with-call-count
+  :args (s/cat :bindings (s/spec (s/cat :call-count-binding symbol?))
+               :body     (s/+ any?))
+  :ret any?)
+
 ;;; TODO -- this is kind of [[next.jdbc]] specific
 (deftype ^:no-doc WithReturnKeys [reducible]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (binding [t2.jdbc.query/*options* (assoc t2.jdbc.query/*options* :return-keys true)]
+    (binding [jdbc.query/*options* (assoc jdbc.query/*options* :return-keys true)]
       (reduce rf init reducible)))
 
   pretty/PrettyPrintable

@@ -5,6 +5,8 @@
    [pretty.core :as pretty]
    [toucan2.util :as u]))
 
+(set! *warn-on-reflection* true)
+
 (defmacro ^:private out-str-lines [& body]
   `(some-> (with-out-str ~@body)
            str/trim

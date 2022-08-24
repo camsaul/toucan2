@@ -20,12 +20,29 @@
         (is (= 6
                (select/count ::test/birds)))))))
 
+(deftest valid-syntax-test
+  (are [form] (seqable? (macroexpand-1 form))
+    `(with-temp/with-temp [model] :ok)
+    `(with-temp/with-temp [model ~'_] :ok)
+    `(with-temp/with-temp [model ~'instance {} model] :ok)
+    `(with-temp/with-temp [model {:keys [~'a]}] :ok)
+    `(with-temp/with-temp [model {:keys [~'a]} nil] :ok)
+    `(with-temp/with-temp [model {:keys [~'a]} {}] :ok)
+    `(with-temp/with-temp [model ~'instance {} model] :ok)
+    `(with-temp/with-temp [model ~'instance {} model ~'_] :ok)
+    `(with-temp/with-temp [model ~'instance {} model ~'instance] :ok)))
+
 (deftest no-attributes-test
   (with-temp/with-temp [::test/birds bird]
     (is (= (instance/instance ::test/birds {:id 7, :name "birb", :bird-type "parrot", :good-bird nil})
            bird))
     (is (= 7
            (select/count ::test/birds)))))
+
+(deftest destructuring-test
+  (with-temp/with-temp [::test/birds {bird-name :name}]
+    (is (= "birb"
+           bird-name))))
 
 (deftest explicit-attributes-test
   (with-temp/with-temp [::test/birds bird {:name "Green Enemy"}]
@@ -114,22 +131,27 @@
                 bird)
              "should never get here.")))))
 
-(deftest disallow-nil-model-test
+(deftest syntax-validation-test
   (testing "Disallow nil models"
-    (is (thrown-with-msg?
-         Throwable
-         #"Assert failed: toucan2.tools.with-temp/with-temp model cannot be nil"
-         (with-temp/with-temp []
-           (is (= :not-here
-                  :here)
-               "should never get here."))))
-    (is (thrown-with-msg?
-         Throwable
-         #"Assert failed: toucan2.tools.with-temp/with-temp model cannot be nil"
-         (with-temp/with-temp [nil]
-           (is (= :not-here
-                  :here)
-               "should never get here."))))))
+    (are [form] (thrown?
+                 clojure.lang.Compiler$CompilerException
+                 (macroexpand-1 form))
+      `(with-temp/with-temp [] :ok)
+      `(with-temp/with-temp [nil] :ok)
+      `(with-temp/with-temp [:model a {} nil] :ok))
+    (is (thrown?
+         clojure.lang.Compiler$CompilerException
+         (macroexpand-1 `(with-temp/with-temp [] :ok))))
+    (is (thrown?
+         clojure.lang.Compiler$CompilerException
+         (macroexpand-1 `(with-temp/with-temp [nil] :ok)))))
+  (testing "model binding must be a valid binding form"
+    (are [form] (thrown?
+                 clojure.lang.Compiler$CompilerException
+                 (macroexpand-1 form))
+      `(with-temp/with-temp [:model 100] :ok)
+      `(with-temp/with-temp [:model 100 nil] :ok)
+      `(with-temp/with-temp [:model a nil :model 200] :ok))))
 
 (deftest validate-attributes-test
   (is (thrown-with-msg?

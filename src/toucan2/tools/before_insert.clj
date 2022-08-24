@@ -1,5 +1,6 @@
 (ns toucan2.tools.before-insert
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.insert :as insert]
    [toucan2.operation :as op]
@@ -42,3 +43,9 @@
        [~'&model ~instance-binding]
        (cond->> (do ~@body)
          ~'next-method (~'next-method ~'&model)))))
+
+(s/fdef define-before-insert
+  :args (s/cat :model    some?
+               :bindings (s/spec (s/cat :instance :clojure.core.specs.alpha/binding-form))
+               :body     (s/+ any?))
+  :ret any?)

@@ -8,6 +8,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(set! *warn-on-reflection* true)
+
 (derive ::venues.after-insert ::test/venues)
 
 (def ^:private ^:dynamic *venues-awaiting-moderation* nil)

@@ -6,6 +6,8 @@
    [toucan2.test :as test]
    [toucan2.tools.helpers :as helpers]))
 
+(set! *warn-on-reflection* true)
+
 (models/defmodel Venue :t1_venues)
 
 (helpers/define-default-fields Venue

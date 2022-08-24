@@ -1,5 +1,6 @@
 (ns toucan2.compile
   (:require
+   [clojure.spec.alpha :as s]
    [honey.sql :as hsql]
    [methodical.core :as m]
    [toucan2.util :as u]))
@@ -8,17 +9,29 @@
   {:arglists '([model compiled-query f])}
   u/dispatch-on-first-two-args)
 
-(defmacro with-compiled-query [[query-binding [model query]] & body]
-  `(*with-compiled-query-fn*
-    ~model
-    ~query
-    (^:once fn* [~query-binding] ~@body)))
-
 (def ^:dynamic ^{:arglists '([model compiled-query f])} *with-compiled-query-fn*
   "The function that should be invoked by [[with-compiled-query]]. By default, the multimethod [[do-with-compiled-query]],
   but if you need to do some sort of crazy mocking you can swap this out with something else.
   See [[toucan2.tools.compile/build]] for an example usage."
   #'do-with-compiled-query)
+
+(defmacro with-compiled-query
+  {:arglists '([[query-binding [model query]] & body])}
+  [[query-binding [model query]] & body]
+  `(*with-compiled-query-fn*
+    ~model
+    ~query
+    ;; support destructing the compiled query.
+    (^:once fn* [query#]
+     (let [~query-binding query#]
+       ~@body))))
+
+(s/fdef with-compiled-query
+  :args (s/cat :bindings (s/spec (s/cat :query-binding   :clojure.core.specs.alpha/binding-form
+                                        :model-and-query (s/spec (s/cat :model any?
+                                                                        :query any?))))
+               :body (s/+ any?))
+  :ret any?)
 
 (m/defmethod do-with-compiled-query :around :default
   [model uncompiled f]

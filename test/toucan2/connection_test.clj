@@ -18,31 +18,60 @@
       (is (= expected
              (conn/connection-string-protocol s))))))
 
+(defn- test-current-connection-bound? []
+  (testing (format "current connectable should be bound. *current-connectable* = %s"
+                   (pr-str conn/*current-connectable*))
+    (is (instance? java.sql.Connection conn/*current-connectable*))))
+
+(defn- test-connection [conn]
+  (is (instance? java.sql.Connection conn))
+  (test-current-connection-bound?))
+
 (deftest with-connection-test
-  (letfn [(test-current-connection-bound? []
-            (testing (format "current connectable should be bound. *current-connectable* = %s"
-                             (pr-str conn/*current-connectable*))
-              (is (instance? java.sql.Connection conn/*current-connectable*))))
-          (test-connection [conn]
-            (is (instance? java.sql.Connection conn))
-            (test-current-connection-bound?))]
-    (testing "Connection from keyword"
-      (conn/with-connection [conn-from-keyword ::test/db]
-        (test-connection conn-from-keyword)
-        (testing "Connection from Connection"
-          (conn/with-connection [conn-from-conn conn-from-keyword]
-            (test-connection conn-from-conn)))))
-    (testing "nil connectable = current connection"
-      (testing "nil second arg"
+  (testing "Connection from keyword"
+    (conn/with-connection [conn-from-keyword ::test/db]
+      (test-connection conn-from-keyword)
+      (testing "Connection from Connection"
+        (conn/with-connection [conn-from-conn conn-from-keyword]
+          (test-connection conn-from-conn)))))
+  (testing "nil connectable = current connection"
+    (testing "nil second arg"
+      (binding [conn/*current-connectable* ::test/db]
+        (conn/with-connection [conn nil]
+          (test-connection conn)))
+      (testing "no second arg"
         (binding [conn/*current-connectable* ::test/db]
-          (conn/with-connection [conn nil]
+          (conn/with-connection [conn]
             (test-connection conn)))
-        (testing "no second arg"
+        (testing "no bindings"
           (binding [conn/*current-connectable* ::test/db]
-            (conn/with-connection [conn]
-              (test-connection conn))))))))
+            (conn/with-connection []
+              (is (instance? java.sql.Connection conn/*current-connectable*))
+              (test-connection conn/*current-connectable*))
+            (testing "nil instead of bindings vector"
+              (conn/with-connection nil
+                (is (instance? java.sql.Connection conn/*current-connectable*))
+                (test-connection conn/*current-connectable*)))))))))
 
 (deftest transaction-test
+  (testing "nil connectable = current connection"
+    (testing "nil second arg"
+      (binding [conn/*current-connectable* ::test/db]
+        (conn/with-transaction [conn nil]
+          (test-connection conn)))
+      (testing "no second arg"
+        (binding [conn/*current-connectable* ::test/db]
+          (conn/with-transaction [conn]
+            (test-connection conn)))
+        (testing "no bindings"
+          (binding [conn/*current-connectable* ::test/db]
+            (conn/with-transaction []
+              (is (instance? java.sql.Connection conn/*current-connectable*))
+              (test-connection conn/*current-connectable*))
+            (testing "nil instead of bindings vector"
+              (conn/with-transaction nil
+                (is (instance? java.sql.Connection conn/*current-connectable*))
+                (test-connection conn/*current-connectable*))))))))
   (test/do-db-types-fixture
    (fn []
      (test/with-discarded-table-changes :venues

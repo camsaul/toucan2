@@ -10,6 +10,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(set! *warn-on-reflection* true)
+
 (deftest instance-test
   (let [m (assoc (instance/instance :wow {:a 100}) :b 200)]
     (is (= {:a 100, :b 200}

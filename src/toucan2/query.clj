@@ -118,7 +118,7 @@
 (m/defmethod parse-args :around :default
   [query-type unparsed-args]
   (u/try-with-error-context ["parse args" {::query-type query-type, ::unparsed-args unparsed-args}]
-    (doto (u/with-debug-result [(list `parse-args query-type unparsed-args)]
+    (doto (u/with-debug-result (list `parse-args query-type unparsed-args)
             (next-method query-type unparsed-args))
       validate-parsed-args)))
 
@@ -172,8 +172,8 @@
   (do-with-resolved-query model {:select [:%count.*], :from [(keyword (model/table-name model))]} f))
 
 (def ^:dynamic ^{:arglists '([model queryable f])} *with-resolved-query-fn*
-  "The function that should be invoked by [[with-resolved-query]]. By default, the multimethod [[do-with-resolved-query]], but if you need
-  to do some sort of crazy mocking you can swap it out with something else."
+  "The function that should be invoked by [[with-resolved-query]]. By default, the multimethod [[do-with-resolved-query]],
+  but if you need to do some sort of crazy mocking you can swap it out with something else."
   #'do-with-resolved-query)
 
 (defmacro with-resolved-query
@@ -184,13 +184,19 @@
   (with-resolved-query [resolved-query [:model/user :some-named-query]]
     (build model :toucan2.select/select (assoc parsed-args :query resolved-query)))
   ```"
-  {:style/indent :defn, :arglists '([[query-binding [model queryable]] & body])}
-  [[query-binding model-queryable] & body]
-  (assert (vector? model-queryable) (format "bad %s args: expected pair of `[model queryable]`, got %s"
-                                            `with-resolved-query
-                                            (pr-str model-queryable)))
-  (let [[model queryable] model-queryable]
-    `(*with-resolved-query-fn* ~model ~queryable (^:once fn* [~query-binding] ~@body))))
+  {:style/indent :defn}
+  [[query-binding [model queryable]] & body]
+  `(*with-resolved-query-fn* ~model ~queryable (^:once fn* [query#]
+                                                ;; support destructing the query.
+                                                (let [~query-binding query#]
+                                                  ~@body))))
+
+(s/fdef with-resolved-query
+  :args (s/cat :bindings (s/spec (s/cat :query               :clojure.core.specs.alpha/binding-form
+                                        :modelable+queryable (s/spec (s/cat :model     any? ; I guess model can be `nil` here
+                                                                            :queryable any?))))
+               :body     (s/+ any?))
+  :ret any?)
 
 (m/defmethod do-with-resolved-query :default
   [_model queryable f]
@@ -236,7 +242,7 @@
   (u/try-with-error-context ["build query" {::query-type  query-type
                                             ::model       model
                                             ::parsed-args parsed-args}]
-    (u/with-debug-result [(list `build query-type model parsed-args)]
+    (u/with-debug-result (list `build query-type model parsed-args)
       (next-method query-type model parsed-args))))
 
 (m/defmethod build :default

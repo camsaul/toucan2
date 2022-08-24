@@ -7,6 +7,8 @@
   (:import
    (java.util Locale)))
 
+(set! *warn-on-reflection* true)
+
 (deftest kebab-case-xform-turkish-test
   (testing "Test that identifiers are correctly lower cased in Turkish locale"
     (let [original-locale (Locale/getDefault)]

@@ -6,6 +6,8 @@
    [toucan2.query :as query]
    [toucan2.select :as select]))
 
+(set! *warn-on-reflection* true)
+
 (m/defmethod query/build [:default ::system-properties :default]
   [_query-type _model {:keys [query]}]
   (let [query (if (sequential? query)

@@ -8,6 +8,8 @@
   (:import
    (java.time LocalDateTime)))
 
+(set! *warn-on-reflection* true)
+
 (deftest select-reducible-with-pks-test
   (is (= [(instance/instance ::test/venues {:id         1
                                             :name       "Tempest"

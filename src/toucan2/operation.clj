@@ -9,6 +9,8 @@
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
+(set! *warn-on-reflection* true)
+
 ;;;; things that return update count
 
 (m/defmulti reducible-update*

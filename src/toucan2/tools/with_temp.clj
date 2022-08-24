@@ -1,5 +1,6 @@
 (ns toucan2.tools.with-temp
   (:require
+   [clojure.spec.alpha :as s]
    [clojure.test :as t]
    [methodical.core :as m]
    [toucan2.delete :as delete]
@@ -91,7 +92,22 @@
   If you want to implement custom behavior for a model other than default values, you can implement [[do-with-temp*]]."
   [[modelable temp-object-binding attributes & more] & body]
   `(do-with-temp ~modelable ~attributes
-                 (^:once fn* [~(or temp-object-binding '_)]
-                  ~(if (seq more)
-                     `(with-temp ~(vec more) ~@body)
-                     `(do ~@body)))))
+                 (^:once fn* [temp-object#]
+                  (let [~(or temp-object-binding '_) temp-object#]
+                    ~(if (seq more)
+                       `(with-temp ~(vec more) ~@body)
+                       `(do ~@body))))))
+
+(s/fdef with-temp
+  :args (s/cat :bindings (s/spec (s/cat
+                                  :model+binding+attributes
+                                  (s/* (s/cat :model      some?
+                                              :binding    :clojure.core.specs.alpha/binding-form
+                                              :attributes any?))
+
+                                  :model+optional
+                                  (s/cat :model    some?
+                                         :optional (s/? (s/cat :binding    :clojure.core.specs.alpha/binding-form
+                                                               :attributes (s/? any?))))))
+               :body     (s/+ any?))
+  :ret  any?)

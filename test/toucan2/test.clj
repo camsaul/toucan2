@@ -1,6 +1,7 @@
 (ns toucan2.test
   (:require
    [clojure.java.io :as io]
+   [clojure.spec.alpha :as s]
    [clojure.string :as str]
    [clojure.test :refer :all]
    [methodical.core :as m]
@@ -188,6 +189,11 @@
   {:style/indent 1}
   [table-name & body]
   `(do-with-discarded-table-changes (current-db-type) ~table-name (^:once fn* [] ~@body)))
+
+(s/fdef with-discarded-table-changes
+  :args (s/cat :table-name (some-fn symbol? keyword?)
+               :body       (s/+ any?))
+  :ret  any?)
 
 (m/defmethod model/default-connectable ::models
   [_model]

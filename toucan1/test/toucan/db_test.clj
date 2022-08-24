@@ -19,6 +19,8 @@
   (:import
    (java.util Locale)))
 
+(set! *warn-on-reflection* true)
+
 (comment heroes/keep-me
          test-setup/keep-me)
 

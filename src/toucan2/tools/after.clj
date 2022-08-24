@@ -10,6 +10,8 @@
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
+(set! *warn-on-reflection* true)
+
 ;;; TODO -- Consider whether the various methods here should be `:after` methods rather than `:around`
 
 (m/defmulti after
@@ -18,7 +20,7 @@
 
 (m/defmethod after :around :default
   [query-type model instance]
-  (u/with-debug-result [(list `after query-type model instance)]
+  (u/with-debug-result (list `after query-type model instance)
     (u/try-with-error-context ["do after- transformations to result" {::query-type query-type, ::model model, ::row instance}]
       (next-method query-type model instance))))
 

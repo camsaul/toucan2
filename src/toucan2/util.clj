@@ -1,5 +1,6 @@
 (ns toucan2.util
   (:require
+   [clojure.spec.alpha :as s]
    [clojure.string :as str]
    [clojure.walk :as walk]
    [pretty.core :as pretty]
@@ -180,6 +181,13 @@
          (thunk#)
          (do-with-debug-result ~message thunk#)))))
 
+(s/fdef with-debug-result
+  :args (s/cat :message (s/alt :form               (complement vector?)
+                               :format-string+args (s/spec (s/cat :format-string string?
+                                                                  :args          (s/* any?))))
+               :body    (s/+ any?))
+  :ret  any?)
+
 (defn dispatch-on-first-arg
   "Dispatch on the first argument using [[dispatch-value]], and ignore all other args."
   [x & _]
@@ -240,28 +248,27 @@
 (defprotocol ^:private AddContext
   (^:no-doc add-context ^Throwable [^Throwable e additional-context]))
 
-(defn- add-context-to-ex-data [ex-data-map [msg & more]]
-  (let [additional-context (cons (str msg) more)]
-    (update ex-data-map
-            :toucan2/context-trace
-            #(conj (vec %) (walk/prewalk
-                            (fn [form]
-                              (cond
-                                (instance? pretty.core.PrettyPrintable form)
-                                (pretty/pretty form)
+(defn- add-context-to-ex-data [ex-data-map additional-context]
+  (update ex-data-map
+          :toucan2/context-trace
+          #(conj (vec %) (walk/prewalk
+                          (fn [form]
+                            (cond
+                              (instance? pretty.core.PrettyPrintable form)
+                              (pretty/pretty form)
 
-                                (instance? clojure.core.Eduction form)
-                                (list 'eduction
-                                      (.xform ^clojure.core.Eduction form)
-                                      (.coll ^clojure.core.Eduction form))
+                              (instance? clojure.core.Eduction form)
+                              (list 'eduction
+                                    (.xform ^clojure.core.Eduction form)
+                                    (.coll ^clojure.core.Eduction form))
 
-                                (and (instance? clojure.lang.IReduceInit form)
-                                     (not (coll? form)))
-                                (class form)
+                              (and (instance? clojure.lang.IReduceInit form)
+                                   (not (coll? form)))
+                              (class form)
 
-                                :else
-                                form))
-                            additional-context)))))
+                              :else
+                              form))
+                          additional-context))))
 
 (extend-protocol AddContext
   clojure.lang.ExceptionInfo
@@ -289,3 +296,11 @@
      ~@body
      (catch Throwable e#
        (throw (add-context e# ~additional-context)))))
+
+(s/fdef try-with-error-context
+  :args (s/cat :additional-context (s/alt :message+map (s/spec (s/cat :message string?
+                                                                      :map     map?))
+                                          ;; some sort of function call or something like that.
+                                          :form        seqable?)
+               :body               (s/+ any?))
+  :ret  any?)

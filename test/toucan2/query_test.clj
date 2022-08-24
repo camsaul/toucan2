@@ -39,10 +39,9 @@
              resolved-query)))
     (is @executed-body?))
   (testing "detect errors"
-    (is (thrown-with-msg?
-         Throwable
-         #"Assert failed: bad toucan2.query/with-resolved-query args: expected pair"
-         ((var-get #'query/with-resolved-query) nil nil '['resolved-query ::named-query])))))
+    (is (thrown?
+         clojure.lang.Compiler$CompilerException
+         (macroexpand-1 `(query/with-resolved-query ~'resolved-query ::named-query))))))
 
 (deftest build-test
   (is (= {:where [:= :a 1]}

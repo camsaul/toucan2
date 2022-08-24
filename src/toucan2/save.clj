@@ -7,6 +7,8 @@
    [toucan2.update :as update]
    [toucan2.util :as u]))
 
+(set! *warn-on-reflection* true)
+
 (m/defmulti save!
   {:arglists '([object])}
   (fn [object]

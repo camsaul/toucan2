@@ -1,5 +1,6 @@
 (ns toucan2.tools.helpers
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
@@ -10,6 +11,8 @@
    [toucan2.select :as select]
    [toucan2.tools.transformed :as transformed]
    [toucan2.util :as u]))
+
+(set! *warn-on-reflection* true)
 
 ;;;; [[define-before-select]]
 
@@ -31,6 +34,14 @@
        [~'&query-type ~'&model ~args-binding]
        (do-before-select ~'&model (^:once fn* [] ~@body)))))
 
+(s/fdef define-before-select
+  :args (s/cat :dispatch-value (s/alt :model             some?
+                                      :model+query-class (s/spec (s/cat :model       some?
+                                                                        :query-class some?)))
+               :bindings       (s/spec (s/cat :args :clojure.core.specs.alpha/binding-form))
+               :body           (s/+ any?))
+  :ret any?)
+
 
 ;;;; [[define-default-fields]]
 
@@ -50,6 +61,10 @@
      (u/maybe-derive model# ::default-fields)
      (m/defmethod default-fields model# [~'&model] ~@body)))
 
+(s/fdef define-default-fields
+  :args (s/cat :model some?
+               :body  (s/+ any?))
+  :ret any?)
 
 ;;;; [[define-before-delete]], [[define-after-delete]]
 
@@ -59,7 +74,7 @@
 
 (m/defmethod before-delete :around :default
   [model instance]
-  (u/with-debug-result [(list `before-delete model instance)]
+  (u/with-debug-result (list `before-delete model instance)
     (next-method model instance)))
 
 (deftype ^:no-doc ReducibleBeforeDelete [model parsed-args reducible-delete]
@@ -91,6 +106,12 @@
      (m/defmethod before-delete model#
        [~'&model ~instance-binding]
        ~@body)))
+
+(s/fdef define-before-delete
+  :args (s/cat :model    some?
+               :bindings (s/spec (s/cat :instance :clojure.core.specs.alpha/binding-form))
+               :body     (s/+ any?))
+  :ret any?)
 
 ;; TODO
 #_(defmacro define-after-delete {:style/indent :defn} [dispatch-value [a-binding] & body]
@@ -163,3 +184,8 @@
      (m/defmethod transformed/transforms model#
        [~'&model]
        ~transforms)))
+
+(s/fdef deftransforms
+  :args (s/cat :model      some?
+               :transforms any?)
+  :ret any?)
