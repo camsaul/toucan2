@@ -22,7 +22,9 @@
   :update (fn [obj]
             (assoc obj :updated-at (now))))
 
-(derive Venue ::timestamped?)
+#_(derive Venue ::timestamped?)
+
+(t1.models/defproperties Venue {::timestamped? true})
 
 (def keyword-transform
   {:in  (fn [k]

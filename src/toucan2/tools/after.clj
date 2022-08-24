@@ -55,16 +55,19 @@
 (deftype ^:no-doc AfterReduciblePKs [query-type model reducible-pks]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (u/with-debug-result ["reducing %s %s for %s" `after query-type model]
-      (let [affected-pks (realize/realize reducible-pks)]
-        (u/println-debug ["Doing %s %s for %s with PKs %s" `after query-type model affected-pks])
-        (reduce
-         rf
-         init
-         (after-reducible-instances
-          query-type
-          model
-          (op/select-reducible-with-pks model nil affected-pks))))))
+    (u/try-with-error-context ["Fetch rows with matching PKs to apply after transforms" {::query-type    query-type
+                                                                                         ::model         model
+                                                                                         ::reducible-pks reducible-pks}]
+      (u/with-debug-result ["reducing %s %s for %s" `after query-type model]
+        (let [affected-pks (realize/realize reducible-pks)]
+          (u/println-debug ["Doing %s %s for %s with PKs %s" `after query-type model affected-pks])
+          (reduce
+           rf
+           init
+           (after-reducible-instances
+            query-type
+            model
+            (op/select-reducible-with-pks model nil affected-pks)))))))
 
   pretty/PrettyPrintable
   (pretty [_this]

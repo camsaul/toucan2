@@ -125,7 +125,10 @@
 (defn- in-transforms [model]
   (wrapped-transforms model :in))
 
-(defn- apply-in-transforms
+;;; TODO -- this should be private, but it has to be public for now to implement the hack in
+;;; [[toucan.models/do-pre-update]]
+(defn apply-in-transforms
+  "Apply the [[in-transforms]] for a `model` to the `:kv-args` in `args`."
   [model {:keys [kv-args], :as args}]
   {:post [(map? %)]}
   (if-let [k->transform (not-empty (when (seq kv-args)
@@ -195,7 +198,8 @@
    identity
    k->transform))
 
-(defn- transform-result-rows-transducer
+;;; HACK this shouldn't be public but we need it for [[toucan.models/post-insert]] for now.
+(defn transform-result-rows-transducer
   "Return a transducer to transform rows of `model` using its [[out-transforms]]."
   [model]
   (if-let [k->transform (not-empty (out-transforms model))]
@@ -283,6 +287,11 @@
 
 ;;; `insert-returning-instances!` doesn't need any special transformations, because `select` will handle it -- see
 ;;; docstring for [[*already-transforming-insert-results*]]
+;;;
+;;; TODO -- this is busted if we are actually returning the instances directly e.g. with a special identity
+;;; implementation of [[op/reducible-returning-instances*]]
+;;;
+;;; TODO -- does this NEED to be an `:around` method?
 (m/defmethod op/reducible-returning-instances* :around [::insert/insert ::transformed]
   [query-type model reducible-results]
   (binding [*already-transforming-insert-results* true]
@@ -347,12 +356,12 @@
     {:field {:in name, :out keyword}})
   ```"
   {:style/indent 1}
-  [model direction->k->fn]
+  [model column->direction->fn]
   `(let [model# ~model]
      (u/maybe-derive model# ::transformed)
      (m/defmethod transforms model#
        [~'&model]
-       ~direction->k->fn)))
+       ~column->direction->fn)))
 
 (s/fdef deftransforms
   :args (s/cat :model      some?

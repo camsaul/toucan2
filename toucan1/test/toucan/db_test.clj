@@ -363,3 +363,8 @@
   (is (t1.db/exists? User, :first-name "Rasta", :last-name "Toucan"))
   (is (= false
          (t1.db/exists? User, :first-name "Kanye", :last-name "Nest"))))
+
+(deftest disable-db-logging-test
+  (testing "This is just a dummy test to make sure the var actually exists."
+    (is (= false
+           t1.db/*disable-db-logging*))))

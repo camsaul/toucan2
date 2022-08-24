@@ -16,8 +16,7 @@
    [toucan2.tools.after-update :as after-update]
    [toucan2.tools.before-delete :as before-delete]
    [toucan2.tools.before-insert :as before-insert]
-   [toucan2.tools.before-update :as before-update]
-   [toucan2.tools.transformed :as transformed]))
+   [toucan2.tools.before-update :as before-update]))
 
 (set! *warn-on-reflection* true)
 
@@ -27,13 +26,14 @@
   (when s
     (str/lower-case s)))
 
-;; define a new custom type that will automatically lowercase strings coming into or out of the DB
-(def lowercase-string-xform
-  {:in  maybe-lowercase-string
-   :out maybe-lowercase-string})
+;;; define a new custom type that will automatically lowercase strings coming into or out of the DB
+(t1.models/add-type!
+ :lowercase-string
+ :in  maybe-lowercase-string
+ :out maybe-lowercase-string)
 
-(transformed/deftransforms Category
-  {:name lowercase-string-xform})
+(t1.models/deftypes Category
+  {:name :lowercase-string})
 
 (defn- assert-parent-category-exists [{:keys [parent-category-id], :as category}]
   (when parent-category-id
