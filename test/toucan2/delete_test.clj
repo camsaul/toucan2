@@ -69,7 +69,7 @@
     (let [parsed-args (query/parse-args ::delete/delete ::test/venues [nil])]
       (is (= {:queryable nil}
              parsed-args))
-      (query/with-query [query [::test/venues (:queryable parsed-args)]]
+      (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
         (is (= nil
                query))
         (is (= {:delete-from [:venues]

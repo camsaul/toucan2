@@ -23,7 +23,7 @@
 
 (m/defmethod op/reducible-returning-instances* [::select :default]
   [query-type model parsed-args]
-  (query/with-query [query [model (:queryable parsed-args)]]
+  (query/with-resolved-query [query [model (:queryable parsed-args)]]
     (let [query (query/build query-type model (assoc parsed-args :query query))]
       (execute/reducible-query (model/deferred-current-connectable model)
                                model

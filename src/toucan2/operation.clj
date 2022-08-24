@@ -21,7 +21,7 @@
 
 (m/defmethod reducible* :default
   [query-type model parsed-args]
-  (query/with-query [query [model (:queryable parsed-args)]]
+  (query/with-resolved-query [query [model (:queryable parsed-args)]]
     (let [built-query (query/build query-type model (-> parsed-args
                                                         (assoc :query query)
                                                         (dissoc :queryable)))]

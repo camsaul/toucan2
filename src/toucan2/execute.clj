@@ -18,12 +18,12 @@
   Basic execution pipeline is something this
 
   1. [[reduce-impl]]
-     1. resolve `modelable` => `model` with [[model/with-model]]
-     2. resolve `queryable` => `query` with [[compile/with-query]]
+     1. resolve `modelable` => `model` with [[toucan2.model/with-model]]
+     2. resolve `queryable` => `query` with [[toucan2.query/with-resolved-query]]
   2. [[reduce-uncompiled-query]]
-     1. Compile `query` => `compile-query` with [[compile/with-compiled-query]]
+     1. Compile `query` => `compile-query` with [[toucan2.compile/with-compiled-query]]
   3. [[reduce-compiled-query]]
-     1. Open `conn` from `connectable` with [[conn/with-connection]]
+     1. Open `conn` from `connectable` with [[toucan2.connection/with-connection]]
   4. [[reduce-compiled-query-with-connection]]
      1. Execute and reduce the query with the open connection."
   (:require
@@ -115,7 +115,7 @@
 
 (defn- reduce-impl [connectable modelable queryable rf init]
   (model/with-model [model modelable]
-    (query/with-query [query [model queryable]]
+    (query/with-resolved-query [query [model queryable]]
       (reduce-uncompiled-query connectable model query rf init))))
 
 (deftype ^:no-doc ReducibleQuery [connectable modelable queryable]

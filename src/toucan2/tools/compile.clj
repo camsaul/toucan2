@@ -49,17 +49,17 @@
 
 ;;; TODO
 
-;; (defn ^:no-doc identity-with-query
+;; (defn ^:no-doc identity-with-resolved-query
 ;;   "Impl for the [[resolved]] macro. Don't use this directly."
 ;;   [model queryable f]
 ;;   (let [])
-;;   (query/do-with-query model queryable identity))
+;;   (query/do-with-resolved-query model queryable identity))
 ;;
 ;; (defmacro resolved
 ;;   "Return the resolved query and parsed args *before* building a query (e.g. before creating a Honey SQL query from the
 ;;   args passed to [[toucan2.select/select]] created by `body` without building a query, compiling it, or executing it."
 ;;   {:style/indent 0}
 ;;   [& body]
-;;   `(binding [query/*with-query-fn* identity-with-query]
+;;   `(binding [query/*with-resolved-query-fn* identity-with-resolved-query]
 ;;      (build
 ;;        ~@body)))

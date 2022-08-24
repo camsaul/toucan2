@@ -25,7 +25,7 @@
           (instance/instance ::parrot {:id 2, :name "Green Friend"})]
          (select/select ::parrot parrot-query))))
 
-(m/defmethod query/do-with-query [:default ::parrot-query]
+(m/defmethod query/do-with-resolved-query [:default ::parrot-query]
   [_model _queryable f]
   (f (identity-query/identity-query [{:id 1, :name "Parroty"}
                                      {:id 2, :name "Green Friend"}])))

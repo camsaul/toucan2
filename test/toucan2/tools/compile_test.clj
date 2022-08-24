@@ -54,7 +54,7 @@
 
 ;;; TODO
 
-;; (m/defmethod query/do-with-query [:default ::named-query]
+;; (m/defmethod query/do-with-resolved-query [:default ::named-query]
 ;;   [_model _queryable f]
 ;;   (f {:select [[:count.* :count]]}))
 

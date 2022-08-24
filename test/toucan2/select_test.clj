@@ -134,9 +134,9 @@
     (is (= [(instance/instance ::test/venues {:id 3, :name "BevMo"})]
            (select/select ::test/venues :id [:>= 3] {:select [:id :name], :order-by [[:id :asc]]})))))
 
-(m/defmethod query/do-with-query [:default ::count-query]
+(m/defmethod query/do-with-resolved-query [:default ::count-query]
   [model _queryable f]
-  (query/do-with-query model
+  (query/do-with-resolved-query model
                        {:select [[:%count.* :count]]
                         :from   [(keyword (model/table-name model))]}
                        f))
@@ -378,7 +378,7 @@
     (let [parsed-args (query/parse-args ::select/select ::test/venues [nil])]
       (is (= {:queryable nil}
              parsed-args))
-      (query/with-query [query [::test/venues (:queryable parsed-args)]]
+      (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
         (is (= nil
                query))
         (is (= {:select [:*], :from [[:venues]], :where [:= :id nil]}

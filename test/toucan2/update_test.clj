@@ -104,9 +104,9 @@
              (update/update! ::test/venues 1 {})
              (update/update! ::test/venues {}))))))
 
-(m/defmethod query/do-with-query [:default ::named-conditions]
+(m/defmethod query/do-with-resolved-query [:default ::named-conditions]
   [model _queryable f]
-  (query/do-with-query model {:id 1} f))
+  (query/do-with-resolved-query model {:id 1} f))
 
 (deftest named-conditions-test
   (test/with-discarded-table-changes :venues
@@ -131,7 +131,7 @@
     (let [parsed-args (query/parse-args ::update/update ::test/venues [nil {:name "Taco Bell"}])]
       (is (= {:kv-args {:toucan/pk nil}, :changes {:name "Taco Bell"}, :queryable {}}
              parsed-args))
-      (query/with-query [query [::test/venues (:queryable parsed-args)]]
+      (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
         (is (= {}
                query))
         (is (= {:update [:venues]
