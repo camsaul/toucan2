@@ -1,1 +1,1 @@
-0.10.1-alpha-SNAPSHOT
+0.10.1-alpha
