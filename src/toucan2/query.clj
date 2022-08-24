@@ -140,7 +140,9 @@
     (do-with-resolved-query model {:select [:%count.*], :from [(keyword (model/table-name model))]} f))
 
   (select :model/user ::my-count)
-  ```"
+  ```
+
+  Dispatches off of `[modelable queryable]`."
   {:arglists '([model queryable f])}
   u/dispatch-on-first-two-args)
 
@@ -162,9 +164,13 @@
   (with-resolved-query [resolved-query [:model/user :some-named-query]]
     (build model :toucan2.select/select (assoc parsed-args :query resolved-query)))
   ```"
-  {:style/indent :defn}
-  [[query-binding [model queryable]] & body]
-  `(*with-resolved-query-fn* ~model ~queryable (^:once fn* [~query-binding] ~@body)))
+  {:style/indent :defn, :arglists '([[query-binding [model queryable]] & body])}
+  [[query-binding model-queryable] & body]
+  (assert (vector? model-queryable) (format "bad %s args: expected pair of `[model queryable]`, got %s"
+                                            `with-resolved-query
+                                            (pr-str model-queryable)))
+  (let [[model queryable] model-queryable]
+    `(*with-resolved-query-fn* ~model ~queryable (^:once fn* [~query-binding] ~@body))))
 
 (m/defmethod do-with-resolved-query :default
   [_model queryable f]

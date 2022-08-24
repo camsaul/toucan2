@@ -137,9 +137,9 @@
 (m/defmethod query/do-with-resolved-query [:default ::count-query]
   [model _queryable f]
   (query/do-with-resolved-query model
-                       {:select [[:%count.* :count]]
-                        :from   [(keyword (model/table-name model))]}
-                       f))
+                                {:select [[:%count.* :count]]
+                                 :from   [(keyword (model/table-name model))]}
+                                f))
 
 (deftest named-query-test
   (testing "venues"
