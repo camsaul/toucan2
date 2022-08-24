@@ -36,6 +36,7 @@
 
 (m/defmethod default-connectable :default
   [_model]
+  ;; TODO -- or should this return `nil`, so we can fall thru to something else (presumably `:default` anyway)?
   :default)
 
 (defn- current-connectable [model]

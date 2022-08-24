@@ -34,7 +34,7 @@
        (or (::query query#)
            (::query (realize/reduce-first query#))))))
 
-(defn ^:no-doc identity-compile
+(defn ^:no-doc identity-with-compiled-query
   "Impl for the [[build]] macro. Don't use this directly."
   [_model query f]
   (f query))
@@ -43,6 +43,23 @@
   "Return the built query before compilation that would have been executed by `body` without compiling or executing it."
   {:style/indent 0}
   [& body]
-  `(binding [compile/*with-compiled-query-fn* identity-compile]
+  `(binding [compile/*with-compiled-query-fn* identity-with-compiled-query]
      (compile
        ~@body)))
+
+;;; TODO
+
+;; (defn ^:no-doc identity-with-query
+;;   "Impl for the [[resolved]] macro. Don't use this directly."
+;;   [model queryable f]
+;;   (let [])
+;;   (query/do-with-query model queryable identity))
+;;
+;; (defmacro resolved
+;;   "Return the resolved query and parsed args *before* building a query (e.g. before creating a Honey SQL query from the
+;;   args passed to [[toucan2.select/select]] created by `body` without building a query, compiling it, or executing it."
+;;   {:style/indent 0}
+;;   [& body]
+;;   `(binding [query/*with-query-fn* identity-with-query]
+;;      (build
+;;        ~@body)))

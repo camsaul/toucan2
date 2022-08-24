@@ -40,14 +40,26 @@
          (let [query (execute/reducible-query ::test/db "SELECT count(*) AS \"count\" FROM people;")]
            (into [] (map realize/realize) query))))
 
+  (testing "throw an error if there is no current connection and no default connection"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"No default Toucan connection defined"
+         (into []
+               (map #(select-keys % [:count]))
+               (execute/reducible-query "SELECT count(*) AS \"count\" FROM people;")))))
+
   (testing "with current connection"
     (binding [conn/*current-connectable* ::test/db]
       (is (= [{:count 4}]
              (into []
-                   ;; TODO -- not idea why Kondo is complaining about this
-                   #_{:clj-kondo/ignore [:unused-binding]}
                    (map #(select-keys % [:count]))
                    (execute/reducible-query "SELECT count(*) AS \"count\" FROM people;"))))))
+
+  (testing "with model default connection"
+    (is (= [{:count 4}]
+           (into []
+                 (map #(select-keys % [:count]))
+                 (execute/reducible-query nil ::test/venues "SELECT count(*) AS \"count\" FROM people;")))))
 
   (testing "eductions"
     (is (= [{:id 2, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}]

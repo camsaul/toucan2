@@ -1,6 +1,5 @@
 (ns toucan2.query
-  "
-  Query compilation pipeline is something like this:
+  "Query compilation pipeline is something like this:
 
   ```
   Call something like [[toucan2.select/select]] with `modelable` and `unparsed-args`
@@ -126,11 +125,46 @@
 ;;;; [[do-with-query]] and [[with-query]]
 
 (m/defmulti do-with-query
-  "Impls should resolve `queryable` to a query and call
+  "Impls should resolve `queryable` to an *unbuilt* query that can be built by [[build]] and call
 
-    (f query)"
+  ```clj
+  (f query)
+  ```
+
+  Example:
+
+  ```clj
+  ;; define a custom query ::my-count that you can then use with select and the like
+  (m/defmethod do-with-query [:default ::my-count]
+    [model _queryable f]
+    (do-with-query model {:select [:%count.*], :from [(keyword (model/table-name model))]} f))
+
+  (select :model/user ::my-count)
+  ```"
   {:arglists '([model queryable f])}
   u/dispatch-on-first-two-args)
+
+;; define a custom query `::my-count`
+(m/defmethod do-with-query [:default ::my-count]
+  [model _queryable f]
+  (do-with-query model {:select [:%count.*], :from [(keyword (model/table-name model))]} f))
+
+(def ^:dynamic ^{:arglists '([model queryable f])} *with-query-fn*
+  "The function that should be invoked by [[with-query]]. By default, the multimethod [[do-with-query]], but if you need
+  to do some sort of crazy mocking you can swap it out with something else."
+  #'do-with-query)
+
+(defmacro with-query
+  "Resolve a `queryable` to an *unbuilt* query and bind it to `query-binding`. After resolving the query the next step is
+  to build it into a compilable query using [[build]].
+
+  ``clj
+  (with-query [resolved-query [:model/user :some-named-query]]
+    (build model :toucan2.select/select (assoc parsed-args :query resolved-query)))
+  ```"
+  {:style/indent :defn}
+  [[query-binding [model queryable]] & body]
+  `(*with-query-fn* ~model ~queryable (^:once fn* [~query-binding] ~@body)))
 
 (m/defmethod do-with-query :default
   [_model queryable f]
@@ -150,9 +184,6 @@
             (binding [u/*error-context* (assoc u/*error-context* ::resolved-query query)]
               (f query)))]
     (next-method model queryable f*)))
-
-(defmacro with-query [[query-binding [model queryable]] & body]
-  `(do-with-query ~model ~queryable (^:once fn* [~query-binding] ~@body)))
 
 ;;;; [[build]]
 
@@ -182,12 +213,12 @@
                               (u/safe-pr-str query-type)
                               (u/safe-pr-str model)
                               (ex-message e))
-                      (assoc u/*error-context*
-                             :query-type     query-type
-                             :model          model
-                             :parsed-args    parsed-args
-                             :method         #'build
-                             :dispatch-value (m/dispatch-value build query-type model parsed-args))
+                      {:context        u/*error-context*
+                       :query-type     query-type
+                       :model          model
+                       :parsed-args    parsed-args
+                       :method         #'build
+                       :dispatch-value (m/dispatch-value build query-type model parsed-args)}
                       e)))))
 
 (m/defmethod build :default

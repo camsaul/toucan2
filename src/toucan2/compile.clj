@@ -5,10 +5,16 @@
    [toucan2.util :as u]))
 
 (m/defmulti do-with-compiled-query
-  {:arglists '([model query f])}
+  {:arglists '([model compiled-query f])}
   u/dispatch-on-first-two-args)
 
-(def ^:dynamic *with-compiled-query-fn*
+(defmacro with-compiled-query [[query-binding [model query]] & body]
+  `(*with-compiled-query-fn*
+    ~model
+    ~query
+    (^:once fn* [~query-binding] ~@body)))
+
+(def ^:dynamic ^{:arglists '([model compiled-query f])} *with-compiled-query-fn*
   "The function that should be invoked by [[with-compiled-query]]. By default, the multimethod [[do-with-compiled-query]],
   but if you need to do some sort of crazy mocking you can swap this out with something else.
   See [[toucan2.tools.compile/build]] for an example usage."
@@ -25,12 +31,6 @@
             (binding [u/*error-context* (update u/*error-context* ::compiled #(conj (vec %) compiled))]
               (f compiled)))]
     (next-method model query f*)))
-
-(defmacro with-compiled-query [[query-binding [model query]] & body]
-  `(*with-compiled-query-fn*
-    ~model
-    ~query
-    (^:once fn* [~query-binding] ~@body)))
 
 (m/defmethod do-with-compiled-query [:default String]
   [_model sql f]
