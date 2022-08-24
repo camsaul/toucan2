@@ -247,7 +247,7 @@
         row-xform (apply comp row-xforms)]
     (map row-xform rows)))
 
-(m/defmethod op/reducible* :before [::insert/insert ::transformed]
+(m/defmethod op/reducible-update* :before [::insert/insert ::transformed]
   [_query-type model parsed-args]
   (assert (isa? model ::transformed))
   (if-let [transforms (in-transforms model)]

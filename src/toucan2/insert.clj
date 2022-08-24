@@ -64,7 +64,7 @@
 
 ;;;; [[reducible-insert]] and [[insert!]]
 
-(m/defmethod op/reducible* [::insert :default]
+(m/defmethod op/reducible-update* [::insert :default]
   [query-type model {:keys [rows], :as parsed-args}]
   (if (empty? rows)
     (do
@@ -78,7 +78,7 @@
                [modelable k v & more]
                [modelable columns row-vectors])}
   [modelable & unparsed-args]
-  (op/reducible ::insert modelable unparsed-args))
+  (op/reducible-update ::insert modelable unparsed-args))
 
 (defn insert!
   "Returns number of rows inserted."

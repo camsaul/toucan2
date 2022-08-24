@@ -45,7 +45,7 @@
                                      :set    changes})]
     (next-method query-type model parsed-args)))
 
-(m/defmethod op/reducible* [::update :default]
+(m/defmethod op/reducible-update* [::update :default]
   [query-type model {:keys [changes], :as parsed-args}]
   (if (empty? changes)
     (do
@@ -56,7 +56,7 @@
 (defn reducible-update
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [modelable & unparsed-args]
-  (op/reducible* ::update modelable unparsed-args))
+  (op/reducible-update* ::update modelable unparsed-args))
 
 (defn update!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}

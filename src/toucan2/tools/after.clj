@@ -91,7 +91,7 @@
 
 ;;;; reducible update count
 
-(m/defmethod op/reducible* :around [::after ::after]
+(m/defmethod op/reducible-update* :around [::after ::after]
   [query-type model parsed-args]
   (cond
     (::doing-after? parsed-args)

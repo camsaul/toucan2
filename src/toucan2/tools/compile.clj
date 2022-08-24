@@ -63,3 +63,7 @@
 ;;   `(binding [query/*with-resolved-query-fn* identity-with-resolved-query]
 ;;      (build
 ;;        ~@body)))
+
+;; (defmacro parsed-args
+;;   [& body]
+;;   )

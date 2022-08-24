@@ -11,15 +11,17 @@
 
 ;;;; things that return update count
 
-;;; TODO -- give this a name that makes it's clear for 'write' operations, not read ones.
-(m/defmulti reducible*
+(m/defmulti reducible-update*
   "Return a reducible query based on `parsed-args`. This should return either an update count (number of rows updated) or
   a sequence of PK values for affected rows; which of these gets returned depends on [[toucan2.jdbc.query/options]] (for
-  the JDBC backend) or similar."
+  the JDBC backend) or similar.
+
+  This is \"update\" in the sense that it is something that updates the database and returns an update count -- it could
+  mean a SQL `UPDATE`, `INSERT`, or `DELETE`."
   {:arglists '([query-type model parsed-args])}
   u/dispatch-on-first-two-args)
 
-(m/defmethod reducible* :default
+(m/defmethod reducible-update* :default
   [query-type model parsed-args]
   (query/with-resolved-query [query [model (:queryable parsed-args)]]
     (let [built-query (query/build query-type model (-> parsed-args
@@ -27,14 +29,14 @@
                                                         (dissoc :queryable)))]
       (execute/reducible-query (model/deferred-current-connectable model) model built-query))))
 
-(defn reducible [query-type modelable unparsed-args]
+(defn reducible-update [query-type modelable unparsed-args]
   (model/with-model [model modelable]
     (let [parsed-args (query/parse-args query-type model unparsed-args)]
-      (reducible* query-type model parsed-args))))
+      (reducible-update* query-type model parsed-args))))
 
 (defn returning-update-count! [query-type modelable unparsed-args]
   (u/with-debug-result ["%s %s returning update count" query-type modelable]
-    (reduce (fnil + 0 0) 0 (reducible query-type modelable unparsed-args))))
+    (reduce (fnil + 0 0) 0 (reducible-update query-type modelable unparsed-args))))
 
 ;;;; things that return PKs
 
@@ -61,13 +63,13 @@
   column, or a vector of primary key values in the same order as [[toucan2.model/primary-keys]] for models with
   composite primary keys.
 
-  The default implementation combines [[reducible*]] with [[return-pks-eduction]]."
+  The default implementation combines [[reducible-update*]] with [[return-pks-eduction]]."
   {:arglists '([query-type model parsed-args])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod reducible-returning-pks* :default
   [query-type model parsed-args]
-  (return-pks-eduction model (reducible* query-type model parsed-args)))
+  (return-pks-eduction model (reducible-update* query-type model parsed-args)))
 
 (defn reducible-returning-pks
   "Helper wrapper for [[reducible-returning-pks*]] that also resolves `modelable` and parses `unparsed-args`."

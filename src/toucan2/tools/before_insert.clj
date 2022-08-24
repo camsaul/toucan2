@@ -21,7 +21,7 @@
                          e)))))
    rows))
 
-(m/defmethod op/reducible* :before [::insert/insert ::before-insert]
+(m/defmethod op/reducible-update* :before [::insert/insert ::before-insert]
   [_query-type model parsed-args]
   (assert (map? parsed-args))
   (u/with-debug-result ["Do before insert for %s" model]
@@ -33,7 +33,7 @@
 ;;;
 ;;; By marking `::before-insert` as preferred over `:toucan2.tools.transformed/transformed` it will be done first (see
 ;;; https://github.com/camsaul/methodical#before-methods)
-(m/prefer-method! #'op/reducible*
+(m/prefer-method! #'op/reducible-update*
                   [::insert/insert ::before-insert]
                   [::insert/insert :toucan2.tools.transformed/transformed])
 

@@ -54,7 +54,7 @@
               pk-map            pk-maps]
           (assoc parsed-args :changes changes, :kv-args pk-map))))))
 
-(m/defmethod op/reducible* :around [::update/update ::before-update]
+(m/defmethod op/reducible-update* :around [::update/update ::before-update]
   [query-type model {::keys [doing-before-update?], :keys [changes], :as parsed-args}]
   (cond
     doing-before-update?

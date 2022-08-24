@@ -80,7 +80,7 @@
   (pretty [_this]
     (list `->ReducibleBeforeDelete model parsed-args reducible-delete)))
 
-(m/defmethod op/reducible* :around [::delete/delete ::before-delete]
+(m/defmethod op/reducible-update* :around [::delete/delete ::before-delete]
   [query-type model parsed-args]
   (let [reducible-delete (next-method query-type model parsed-args)]
     (->ReducibleBeforeDelete model parsed-args reducible-delete)))
