@@ -5,8 +5,7 @@
    [clojure.walk :as walk]
    [pretty.core :as pretty]
    [puget.printer :as puget]
-   [toucan2.protocols :as protocols]
-   [toucan2.util :as u]))
+   [toucan2.protocols :as protocols]))
 
 ;;; TODO -- there is a lot of repeated code in here to make sure we don't accidentally realize and print `IReduceInit`,
 ;;; and at least 3 places we turn an `eduction` into the same pretty form. Maybe we should try to consolidate some of
