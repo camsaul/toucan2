@@ -7,6 +7,7 @@
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
    [toucan2.connection :as conn]
+   [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.test :as test])
   (:import
@@ -183,3 +184,9 @@
   (testing "Test (empty)"
     (is (= {}
            (empty (t1.db/select-one Venue :name "BevMo"))))))
+
+(deftest map->-test
+  (testing `t1.models/map->
+    (is (instance/instance-of? Venue (t1.models/map-> Venue {:name "BevMo"})))
+    (is (= (instance/instance Venue {:name "BevMo"})
+           (t1.models/map-> Venue {:name "BevMo"})))))

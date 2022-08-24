@@ -5,6 +5,7 @@
    [camel-snake-kebab.core :as csk]
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.select :as select]
    [toucan2.tools.before-insert :as before-insert]
@@ -132,3 +133,11 @@
          [~'_]
          ~(name table-name))
        (def ~(symbol model) ~model-keyword))))
+
+;;;; Other misc NONSENSE
+
+(defn map->
+  "Create an instance of a model from a map `m`. DEPRECATED: use [[toucan2.instance/instance]] instead."
+  [modelable m]
+  (model/with-model [model modelable]
+    (instance/instance model m)))
