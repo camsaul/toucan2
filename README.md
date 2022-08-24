@@ -5,7 +5,8 @@
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/camsaul?style=for-the-badge)](https://github.com/sponsors/camsaul)
 [![Get help on Slack](http://img.shields.io/badge/slack-clojurians%20%23toucan-4A154B?logo=slack&style=for-the-badge)](https://clojurians.slack.com/channels/toucan)
 
-<!-- [![cljdoc badge](https://cljdoc.org/badge/com.camsaul/toucan2)](https://cljdoc.org/d/com.camsaul/toucan2/CURRENT) -->
+[![cljdoc badge](https://cljdoc.org/badge/io.github.camsaul/toucan2)](https://cljdoc.org/d/io.github.camsaul/toucan2/CURRENT)
+
 <!-- [![Downloads](https://versions.deps.co/camsaul/toucan2/downloads.svg)](https://versions.deps.co/camsaul/toucan2) -->
 <!-- [![Dependencies Status](https://versions.deps.co/camsaul/toucan2/status.svg)](https://versions.deps.co/camsaul/toucan2) -->
 
