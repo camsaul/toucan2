@@ -9,8 +9,8 @@
   (:require
    [clojure.string :as str]
    [methodical.core :as m]
-   [toucan.db :as db]
-   [toucan.models :as models]
+   [toucan.db :as t1.db]
+   [toucan.models :as t1.models]
    [toucan2.test :as test]
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-update :as after-update]
@@ -20,7 +20,7 @@
 
 (set! *warn-on-reflection* true)
 
-(models/defmodel Category :t1_categories)
+(t1.models/defmodel Category :t1_categories)
 
 (defn- maybe-lowercase-string [s]
   (when s
@@ -36,12 +36,12 @@
 
 (defn- assert-parent-category-exists [{:keys [parent-category-id], :as category}]
   (when parent-category-id
-    (assert (db/exists? Category :id parent-category-id)
+    (assert (t1.db/exists? Category :id parent-category-id)
             (format "A category with ID %d does not exist." parent-category-id)))
   category)
 
 (defn- delete-child-categories! [{:keys [id]}]
-  (db/delete! Category :parent-category-id id))
+  (t1.db/delete! Category :parent-category-id id))
 
 (def categories-awaiting-moderation
   "A poor man's message queue of newly added Category IDs that are \"awating moderation\"."

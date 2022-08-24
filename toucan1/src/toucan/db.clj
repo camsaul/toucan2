@@ -6,7 +6,7 @@
    [methodical.core :as m]
    [potemkin :as p]
    [pretty.core :as pretty]
-   [toucan.models :as models]
+   [toucan.models :as t1.models]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
    [toucan2.delete :as delete]
@@ -23,10 +23,10 @@
 
 (set! *warn-on-reflection* true)
 
-(comment models/keep-me)
+(comment t1.models/keep-me)
 
 (p/import-vars
- [models resolve-model]
+ [t1.models resolve-model]
  [select select select-one count exists?])
 
 (def ^:dynamic *quoting-style*

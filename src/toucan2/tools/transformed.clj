@@ -17,7 +17,7 @@
 
 ;; combine the results of all matching methods into one map.
 (m.combo.operator/defoperator ::merge-transforms
-  [methods invoke]
+  [method-fns invoke]
   (transduce
    (map invoke)
    ;; for the time being keep the values from map returned by the more-specific method in preference to the ones
@@ -26,7 +26,7 @@
                  ;; TODO -- we should probably throw an error if one of the transforms is stomping on the other.
                  (merge-with merge m2 m1)))
    {}
-   methods))
+   method-fns))
 
 (defonce ^{:doc "Return a map of
 
@@ -81,20 +81,20 @@
     :else
     nil))
 
-(defn transform-kv-args [kv-args transforms]
-  {:pre [(seq transforms)]}
+(defn- transform-kv-args [kv-args k->transform]
+  {:pre [(map? k->transform) (seq k->transform)]}
   (into {} (for [[k v] kv-args]
-             [k (if-let [xform (get transforms k)]
+             [k (if-let [xform (get k->transform k)]
                   (transform-condition-value xform v)
                   v)])))
 
-(defn transform-pk [pk-vals model transforms]
+(defn- transform-pk [pk-vals model k->transform]
   (if-not (sequential? pk-vals)
-    (first (transform-pk [pk-vals] model transforms))
+    (first (transform-pk [pk-vals] model k->transform))
     (let [pk-keys (model/primary-keys model)]
       (mapv
        (fn [k v]
-         (if-let [xform (get transforms k)]
+         (if-let [xform (get k->transform k)]
            (xform v)
            v))
        pk-keys
@@ -105,16 +105,20 @@
   `try-catch` forms so we can meaningful error messages if they fail."
   [model direction]
   (u/try-with-error-context ["calculate transforms" {::model model, ::direction direction}]
-    (when-let [transforms (not-empty (transforms model))]
+    (when-let [k->direction->transform (not-empty (transforms model))]
       ;; make the transforms map an instance so we can get appropriate magic map behavior when looking for the
       ;; appropriate transform for a given key.
       (instance/instance
        model
-       (into {} (for [[k direction->xform] transforms
+       (into {} (for [[k direction->xform] k->direction->transform
                       :let                 [xform (get direction->xform direction)]
                       :when                xform]
                   [k (fn xform-fn [v]
-                       (u/try-with-error-context ["apply transform" {::transforms transforms, ::model model, ::k k, ::v v, ::xform xform}]
+                       (u/try-with-error-context ["apply transform" {::transforms k->direction->transform
+                                                                     ::model      model
+                                                                     ::k          k
+                                                                     ::v          v
+                                                                     ::xform      xform}]
                          (xform v)))]))))))
 
 (defn- in-transforms [model]
@@ -123,14 +127,14 @@
 (defn- apply-in-transforms
   [model {:keys [kv-args], :as args}]
   {:post [(map? %)]}
-  (if-let [transforms (not-empty (when (seq kv-args)
-                                   (in-transforms model)))]
-    (u/try-with-error-context ["apply in transforms" {::model model, ::transforms transforms, ::parsed-args args}]
+  (if-let [k->transform (not-empty (when (seq kv-args)
+                                     (in-transforms model)))]
+    (u/try-with-error-context ["apply in transforms" {::model model, ::transforms k->transform, ::parsed-args args}]
       (u/with-debug-result ["Apply transforms to kv-args %s" kv-args]
-        (u/println-debug [transforms])
+        (u/println-debug [k->transform])
         (cond-> args
-          (seq kv-args)                (update :kv-args transform-kv-args transforms)
-          (some? (:toucan/pk kv-args)) (update-in [:kv-args :toucan/pk] transform-pk model transforms))))
+          (seq kv-args)                (update :kv-args transform-kv-args k->transform)
+          (some? (:toucan/pk kv-args)) (update-in [:kv-args :toucan/pk] transform-pk model k->transform))))
     args))
 
 (m/defmethod query/build :before [::select/select ::transformed :default]
@@ -181,20 +185,20 @@
     (cond-> instance
       (contains? instance k) (apply-row-transform k xform))))
 
-(defn- row-transform-fn [transforms]
-  {:pre [(seq transforms)]}
+(defn- row-transform-fn [k->transform]
+  {:pre [(map? k->transform) (seq k->transform)]}
   (reduce
    (fn [f [k xform]]
      (comp (apply-row-transform-fn k xform)
       f))
    identity
-   transforms))
+   k->transform))
 
 (defn- transform-result-rows-transducer
   "Return a transducer to transform rows of `model` using its [[out-transforms]]."
   [model]
-  (if-let [transforms (not-empty (out-transforms model))]
-    (map (let [f (row-transform-fn transforms)]
+  (if-let [k->transform (not-empty (out-transforms model))]
+    (map (let [f (row-transform-fn k->transform)]
            (fn [row]
              (u/with-debug-result ["Transform %s row %s" model row]
                (u/try-with-error-context ["transform row" {::model model, ::row row}]
@@ -209,19 +213,19 @@
 
 (m/defmethod query/build :before [::update/update ::transformed :default]
   [_query-type model {:keys [query], :as args}]
-  (if-let [transforms (not-empty (in-transforms model))]
+  (if-let [k->transform (not-empty (in-transforms model))]
     (let [args (-> args
                    (update :kv-args merge query) ;; TODO -- wtf? I'm 99% sure this is wrong.
                    (dissoc :query))]
       (-> (apply-in-transforms model args)
-          (update :changes transform-kv-args transforms)))
+          (update :changes transform-kv-args k->transform)))
     args))
 
-(defn- transform-insert-rows [[first-row :as rows] transforms]
-  (assert (map? first-row))
+(defn- transform-insert-rows [[first-row :as rows] k->transform]
+  {:pre [(map? first-row) (map? k->transform)]}
   ;; all rows should have the same keys, so we just need to look at the keys in the first row
   (let [row-xforms (for [k     (keys first-row)
-                         :let  [xform (get transforms k)]
+                         :let  [xform (get k->transform k)]
                          :when xform]
                      (fn [row]
                        (update row k (fn [v]
@@ -234,13 +238,13 @@
 (m/defmethod op/reducible-update* :before [::insert/insert ::transformed]
   [query-type model parsed-args]
   (assert (isa? model ::transformed))
-  (if-let [transforms (in-transforms model)]
+  (if-let [k->transform (in-transforms model)]
     (u/try-with-error-context ["apply in transforms before inserting rows" {::query-type  query-type
                                                                             ::model       model
                                                                             ::parsed-args parsed-args
-                                                                            ::transforms  transforms}]
-      (u/with-debug-result ["Apply %s transforms to %s" transforms parsed-args]
-        (update parsed-args :rows transform-insert-rows transforms)))
+                                                                            ::transforms  k->transform}]
+      (u/with-debug-result ["Apply %s transforms to %s" k->transform parsed-args]
+        (update parsed-args :rows transform-insert-rows k->transform)))
     parsed-args))
 
 (def ^:dynamic ^:private *already-transforming-insert-results*

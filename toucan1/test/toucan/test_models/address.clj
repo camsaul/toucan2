@@ -1,10 +1,10 @@
 (ns toucan.test-models.address
   (:require
    [methodical.core :as m]
-   [toucan.models :as models]
+   [toucan.models :as t1.models]
    [toucan2.test :as test]))
 
-(models/defmodel Address :t1_address)
+(t1.models/defmodel Address :t1_address)
 
 (m/defmethod test/create-table-sql-file [:default Address]
   [_db-type _table-name]

@@ -71,10 +71,10 @@
                    (u/with-debug-result "C"
                      :cans)]))))))))
 
-(defrecord Reducible [realized?]
+(defrecord Reducible [is-realized?]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (reset! realized? true)
+    (reset! is-realized? true)
     (reduce rf init [])))
 
 (deftest pprint-test
@@ -90,12 +90,12 @@
                      pretty/PrettyPrintable
                      (pretty [_this]
                        (list 'reducible x))))]]
-        (let [realized? (atom false)
-              reducible (->Reducible realized?)
-              x         (f reducible)]
+        (let [is-realized? (atom false)
+              reducible    (->Reducible is-realized?)
+              x            (f reducible)]
           (testing (.getCanonicalName (class x))
             (is (string? (#'u/pprint-to-str x)))
-            (is (false? @realized?))))))))
+            (is (false? @is-realized?))))))))
 
 (deftest interleave-all-test
   (are [x y expected] (= expected

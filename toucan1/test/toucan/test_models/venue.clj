@@ -2,20 +2,20 @@
   "A model with `:types`, custom `:properties`, and `:default-fields`."
   (:require
    [methodical.core :as m]
-   [toucan.models :as models]
+   [toucan.models :as t1.models]
    [toucan2.test :as test]
    [toucan2.tools.helpers :as helpers]))
 
 (set! *warn-on-reflection* true)
 
-(models/defmodel Venue :t1_venues)
+(t1.models/defmodel Venue :t1_venues)
 
 (helpers/define-default-fields Venue
   [:id :name :category])
 
 (defn- now [] (java.time.LocalDateTime/now))
 
-(models/add-property! ::timestamped?
+(t1.models/add-property! ::timestamped?
   :insert (fn [obj]
             (assoc obj :created-at (now), :updated-at (now)))
   :update (fn [obj]

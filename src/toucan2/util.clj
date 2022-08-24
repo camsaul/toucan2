@@ -134,9 +134,9 @@
 (defmacro ^:no-doc format-doc
   "Convert `format-string` and `args` into something that can be pretty-printed by puget."
   [format-string & args]
-  (let [->Text (fn [s]
-                 (list `->Text (str/trimr s)))
-        texts  (map ->Text (str/split format-string #"%s"))]
+  (let [->Text* (fn [s]
+                  (list `->Text (str/trimr s)))
+        texts   (map ->Text* (str/split format-string #"%s"))]
     `(pprint-to-str (->Doc ~(vec (interleave-all texts args))))))
 
 (defmacro ^:no-doc println-debug

@@ -24,6 +24,9 @@
              next.jdbc                    next.jdbc
              next.jdbc.result-set         next.jdbc.rs
              potemkin                     p
+             toucan.db                    t1.db
+             toucan.models                t1.models
+             toucan.util.test             t1.u.test
              toucan2.compile              compile
              toucan2.connection           conn
              toucan2.delete               delete
@@ -67,24 +70,23 @@
              toucan.test-models.user
              toucan.test-models.venue]}
 
-  :unsorted-required-namespaces          {:level :warning}
-  :missing-else-branch                   {:level :warning}
+  :docstring-leading-trailing-whitespace {:level :warning}
+  :keyword-binding                       {:level :warning}
   :misplaced-docstring                   {:level :warning}
+  :missing-body-in-when                  {:level :warning}
+  :missing-else-branch                   {:level :warning}
   :namespace-name-mismatch               {:level :warning}
   :non-arg-vec-return-type-hint          {:level :warning}
-  :use                                   {:level :warning}
-  :redundant-fn-wrapper                  {:level :warning}
-  :missing-body-in-when                  {:level :warning}
-  ;; :missing-docstring                    {:level :warning}
-  ;; :docstring-no-summary                 {:level :warning}
-  :docstring-leading-trailing-whitespace {:level :warning}
   :reduce-without-init                   {:level :warning}
-  :used-underscored-binding              {:level :warning}
+  :redundant-fn-wrapper                  {:level :warning}
+  :shadowed-var                          {:level :warning}
   :single-key-in                         {:level :warning}
-  :keyword-binding                       {:level :warning}
+  :unsorted-required-namespaces          {:level :warning}
+  :use                                   {:level :warning}
+  :used-underscored-binding              {:level :warning}
   :warn-on-reflection                    {:level :warning}
-  ;; :main-without-gen-class               {:level :warning}
-  ;; :shadowed-var                         {:level :warning}
+  ;; :docstring-no-summary                 {:level :warning}
+  ;; :missing-docstring                    {:level :warning}
   }
 
  :lint-as

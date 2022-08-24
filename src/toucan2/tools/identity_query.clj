@@ -57,5 +57,5 @@
 
 ;;; allow using an identity query as an 'identity model'
 (m/defmethod op/reducible-returning-instances* [:toucan2.select/select IdentityQuery]
-  [_query-type identity-query _parsed-args]
-  identity-query)
+  [_query-type an-identity-query _parsed-args]
+  an-identity-query)

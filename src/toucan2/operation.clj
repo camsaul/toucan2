@@ -132,10 +132,10 @@
                        :queryable {}}]
       (reducible-returning-instances* ::return-instances-from-pks model parsed-args))))
 
-(deftype ^:no-doc ReducibleReturningInstancesFromPKs [model columns reducible-update-returning-pks]
+(deftype ^:no-doc ReducibleReturningInstancesFromPKs [model columns reducible-returning-pks]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (when-let [row-pks (not-empty (realize/realize reducible-update-returning-pks))]
+    (when-let [row-pks (not-empty (realize/realize reducible-returning-pks))]
       (u/try-with-error-context [(format "reduce %s" `ReducibleReturningInstancesFromPKs)
                                  {::model model, ::columns columns, ::row-pks row-pks}]
         (u/with-debug-result ["return instances for PKs %s" row-pks]
@@ -146,15 +146,15 @@
 
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `->ReducibleReturningInstancesFromPKs model columns reducible-update-returning-pks)))
+    (list `->ReducibleReturningInstancesFromPKs model columns reducible-returning-pks)))
 
 ;;; the default implementation is for things like `update!` or `insert!` and is built in terms of taking a reducible
 ;;; returning PKs and then selecting them with a subsequent query. This doesn't make sense for things like `select` that
 ;;; can return instances directly -- it needs its own implementation.
 (m/defmethod reducible-returning-instances* :default
   [query-type model {:keys [columns], :as parsed-args}]
-  (let [reducible-update-returning-pks (reducible-update-returning-pks* query-type model (dissoc parsed-args :columns))]
-    (->ReducibleReturningInstancesFromPKs model columns reducible-update-returning-pks)))
+  (let [reducible (reducible-update-returning-pks* query-type model (dissoc parsed-args :columns))]
+    (->ReducibleReturningInstancesFromPKs model columns reducible)))
 
 (defn reducible-returning-instances
   "Helper wrapper for [[reducible-returning-instances*]] that also resolves `model` and parses `unparsed-args`."

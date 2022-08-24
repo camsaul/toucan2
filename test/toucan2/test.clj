@@ -203,9 +203,9 @@
 
 (defn set-db-types!
   "Change the DB types to run tests against for the current REPL session."
-  [& db-types]
-  {:pre [(every? keyword? db-types) (seq db-types)]}
-  (reset! db-types* (set db-types)))
+  [& ks]
+  {:pre [(every? keyword? ks) (seq ks)]}
+  (reset! db-types* (set ks)))
 
 (derive ::convenience-connectable ::db)
 (derive :repl/h2                  ::convenience-connectable)

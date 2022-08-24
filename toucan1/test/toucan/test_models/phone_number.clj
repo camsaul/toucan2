@@ -3,12 +3,12 @@
   (:require
    [clojure.string :as str]
    [methodical.core :as m]
-   [toucan.models :as models]
+   [toucan.models :as t1.models]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.test :as test]))
 
-(models/defmodel PhoneNumber :t1_phone_numbers)
+(t1.models/defmodel PhoneNumber :t1_phone_numbers)
 
 (m/defmethod model/primary-keys PhoneNumber
   [_model]

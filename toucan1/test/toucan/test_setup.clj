@@ -6,8 +6,8 @@
    [clojure.test :refer :all]
    [honey.sql :as hsql]
    [methodical.core :as m]
-   [toucan.db :as db]
-   [toucan.models :as models]
+   [toucan.db :as t1.db]
+   [toucan.models :as t1.models]
    [toucan.test-models.address :refer [Address]]
    [toucan.test-models.category :refer [Category]]
    [toucan.test-models.phone-number :refer [PhoneNumber]]
@@ -18,7 +18,7 @@
    [toucan2.model :as model]
    [toucan2.test :as test]))
 
-(models/set-root-namespace! 'toucan.test-models)
+(t1.models/set-root-namespace! 'toucan.test-models)
 
 (defn- quote-for-current-db-type [quote-fn]
   (comp (fn [s]
@@ -34,7 +34,7 @@
 (defn do-with-default-quoting-style [thunk]
   (let [original-options @compile/global-honeysql-options]
     (try
-      (db/set-default-quoting-style! ::quote-for-current-db-type)
+      (t1.db/set-default-quoting-style! ::quote-for-current-db-type)
       (testing (format "With default quoting style = %s\n" ::quote-for-current-db-type)
         (thunk))
       (finally

@@ -3,6 +3,7 @@
    the `IModel` protocol and default implementations, which implement Toucan model functionality."
   (:require
    [camel-snake-kebab.core :as csk]
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.model :as model]
    [toucan2.select :as select]
@@ -60,7 +61,7 @@
 
 (defmacro add-property!
   {:style/indent 1}
-  [k & {:keys [insert update select]}]
+  [k & {:keys [insert select], update-fn :update}]
   (let [property-keyword (qualify-property-keyword k)]
     `(do
        ~(when insert
@@ -68,8 +69,8 @@
              (before-insert/define-before-insert ~property-keyword
                [instance#]
                (insert-fn# instance#))))
-       ~(when update
-          `(let [update-fn# ~update]
+       ~(when update-fn
+          `(let [update-fn# ~update-fn]
              (before-update/define-before-update ~property-keyword
                [instance#]
                (update-fn# instance#))))
@@ -78,6 +79,12 @@
              (helpers/define-before-select ~property-keyword
                [instance#]
                (select-fn# instance#)))))))
+
+(s/fdef add-property!
+  :args (s/cat :key keyword?
+               :fns (s/+ (s/cat :fn-type #{:select :insert :update}
+                                :fn       any?)))
+  :ret  any?)
 
 (defn primary-key
   "DEPRECATED: use [[toucan2.model/primary-keys]] instead."
