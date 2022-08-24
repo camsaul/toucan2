@@ -8,7 +8,7 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.before-insert :as before-insert]
-   [toucan2.tools.helpers :as helpers])
+   [toucan2.tools.transformed :as transformed])
   (:import
    (java.time LocalDateTime)))
 
@@ -46,7 +46,7 @@
 
 (derive ::venues.serialized-category ::test/venues)
 
-(helpers/deftransforms ::venues.serialized-category
+(transformed/deftransforms ::venues.serialized-category
   {:category {:in  pr-str
               :out edn/read-string}})
 

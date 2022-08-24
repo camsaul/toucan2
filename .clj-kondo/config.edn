@@ -20,6 +20,7 @@
              clojure.string               str
              clojure.walk                 walk
              honey.sql                    hsql
+             honey.sql.helpers            hsql.helpers
              methodical.core              m
              next.jdbc                    next.jdbc
              next.jdbc.result-set         next.jdbc.rs
@@ -48,11 +49,13 @@
              toucan2.tools.after-insert   after-insert
              toucan2.tools.after-select   after-select
              toucan2.tools.after-update   after-update
+             toucan2.tools.before-delete  before-delete
              toucan2.tools.before-insert  before-insert
+             toucan2.tools.before-select  before-select
              toucan2.tools.before-update  before-update
              toucan2.tools.compile        tools.compile
+             toucan2.tools.default-fields default-fields
              toucan2.tools.disallow       disallow
-             toucan2.tools.helpers        helpers
              toucan2.tools.hydrate        hydrate
              toucan2.tools.identity-query identity-query
              toucan2.tools.transformed    transformed
@@ -86,7 +89,7 @@
   :used-underscored-binding              {:level :warning}
   :warn-on-reflection                    {:level :warning}
   ;; :docstring-no-summary                 {:level :warning}
-  ;; :missing-docstring                    {:level :warning}
+  ;; :missing-docstring                     {:level :warning}
   }
 
  :lint-as

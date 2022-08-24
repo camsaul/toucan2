@@ -10,7 +10,6 @@
    [toucan2.save :as save]
    [toucan2.select :as select]
    [toucan2.test :as test]
-   [toucan2.tools.helpers :as helpers]
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.transformed :as transformed]
    [toucan2.update :as update])
@@ -305,10 +304,10 @@
 (derive ::venues-transform-in-only ::test/venues)
 (derive ::venues-transform-out-only ::test/venues)
 
-(helpers/deftransforms ::venues-transform-in-only
+(transformed/deftransforms ::venues-transform-in-only
   {:category {:in name}})
 
-(helpers/deftransforms ::venues-transform-out-only
+(transformed/deftransforms ::venues-transform-out-only
   {:category {:out keyword}})
 
 (deftest one-way-transforms-test
@@ -335,7 +334,7 @@
 
 (derive ::transformed-venues ::test/venues)
 
-(helpers/deftransforms ::transformed-venues
+(transformed/deftransforms ::transformed-venues
   {:id {:in  parse-int
         :out str}})
 
@@ -349,7 +348,7 @@
            :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
          (select/select-one ::transformed-venues :toucan/pk "1"))))
 
-(helpers/deftransforms ::transformed-venues-2
+(transformed/deftransforms ::transformed-venues-2
   {:category {:in name, :out keyword}})
 
 (derive ::venues.composed-deftransform ::test/venues)

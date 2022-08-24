@@ -14,9 +14,10 @@
    [toucan2.test :as test]
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-update :as after-update]
+   [toucan2.tools.before-delete :as before-delete]
    [toucan2.tools.before-insert :as before-insert]
    [toucan2.tools.before-update :as before-update]
-   [toucan2.tools.helpers :as helpers]))
+   [toucan2.tools.transformed :as transformed]))
 
 (set! *warn-on-reflection* true)
 
@@ -31,7 +32,7 @@
   {:in  maybe-lowercase-string
    :out maybe-lowercase-string})
 
-(helpers/deftransforms Category
+(transformed/deftransforms Category
   {:name lowercase-string-xform})
 
 (defn- assert-parent-category-exists [{:keys [parent-category-id], :as category}]
@@ -76,7 +77,7 @@
   [category]
   (add-category-to-updated-queue! category))
 
-(helpers/define-before-delete Category
+(before-delete/define-before-delete Category
   [category]
   (delete-child-categories! category))
 

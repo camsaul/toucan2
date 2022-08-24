@@ -4,13 +4,14 @@
    [methodical.core :as m]
    [toucan.models :as t1.models]
    [toucan2.test :as test]
-   [toucan2.tools.helpers :as helpers]))
+   [toucan2.tools.default-fields :as default-fields]
+   [toucan2.tools.transformed :as transformed]))
 
 (set! *warn-on-reflection* true)
 
 (t1.models/defmodel Venue :t1_venues)
 
-(helpers/define-default-fields Venue
+(default-fields/define-default-fields Venue
   [:id :name :category])
 
 (defn- now [] (java.time.LocalDateTime/now))
@@ -31,7 +32,7 @@
             :else              (name k)))
    :out keyword})
 
-(helpers/deftransforms Venue
+(transformed/deftransforms Venue
   {:category keyword-transform})
 
 (m/defmethod test/create-table-sql-file [:postgres Venue]

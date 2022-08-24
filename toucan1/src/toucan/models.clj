@@ -8,8 +8,8 @@
    [toucan2.model :as model]
    [toucan2.select :as select]
    [toucan2.tools.before-insert :as before-insert]
+   [toucan2.tools.before-select :as before-select]
    [toucan2.tools.before-update :as before-update]
-   [toucan2.tools.helpers :as helpers]
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.util :as u]))
 
@@ -76,7 +76,7 @@
                (update-fn# instance#))))
        ~(when select
           `(let [select-fn# ~select]
-             (helpers/define-before-select ~property-keyword
+             (before-select/define-before-select ~property-keyword
                [instance#]
                (select-fn# instance#)))))))
 

@@ -1,5 +1,6 @@
 (ns toucan2.tools.transformed
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [methodical.impl.combo.operator :as m.combo.operator]
    [toucan2.delete :as delete]
@@ -36,7 +37,7 @@
 
   For a given `model`, all matching transforms are combined with `merge-with merge` in an indeterminate order, so don't
   try to specify multiple transforms for the same column in the same direction for a given model -- compose your
-  transform functions instead if you want to do that. See [[toucan2.tools.helpers/deftransforms]] for more info."
+  transform functions instead if you want to do that. See [[toucan2.tools.transformed/deftransforms]] for more info."
            :arglists '([model])}
   transforms
   ;; TODO -- this has to be uncached for now because of https://github.com/camsaul/methodical/issues/98
@@ -286,3 +287,74 @@
   [query-type model reducible-results]
   (binding [*already-transforming-insert-results* true]
     (next-method query-type model reducible-results)))
+
+
+;;;; [[deftransforms]]
+
+(defmacro deftransforms
+  "Define type transforms to use for a specific model. `transforms` should be a map of
+
+  ```clj
+  {:column-name {:in <fn>, :out <fn>}}
+  ```
+
+  `:in` transforms are applied to values going over the wire to the database; these generally only applied to values
+  passed at or near the top level to various functions; don't expect Toucan 2 to parse your SQL to find out which
+  parameter corresponds to what in order to apply transforms or to apply transforms inside JOINS in hand-written
+  HoneySQL. That said, unless you're doing something weird your transforms should generally get applied.
+
+  `:out` transforms are applied to values coming out of the database; since nothing weird really happens there this is
+  done consistently.
+
+  Transform functions for either case are skipped for `nil` values.
+
+  Example:
+
+  ```clj
+  (deftransforms :models/user
+    {:type {:in name, :out keyword}})
+  ```
+
+  You can also define transforms independently, and derive a model from them:
+
+  ```clj
+  (deftransforms ::type-keyword
+    {:type {:in name, :out keyword}})
+
+  (derive :models/user ::type-keyword)
+  (derive :models/user ::some-other-transform)
+  ```
+
+  Don't derive a model from multiple [[deftransforms]] for the same key in the same direction.
+
+  When multiple transforms match a given model they are combined into a single map of transforms with `merge-with
+  merge`. If multiple transforms match a given column in a given direction, only one of them will be used; you should
+  assume which one is used is indeterminate. (This may be made an error, or at least a warning, in the future.)
+
+  Until upstream issue https://github.com/camsaul/methodical/issues/97 is resolved, you will have to specify which
+  method should be applied first in cases of ambiguity using [[methodical.core/prefer-method!]]:
+
+  ```clj
+  (m/prefer-method! transforms ::user-with-location ::user-with-password)
+  ```
+
+  If you want to override transforms completely for a model, and ignore transforms from ancestors of a model, you can
+  create an `:around` method:
+
+  ```clj
+  (defmethod toucan2.tools.transforms :around ::my-model
+    [_model]
+    {:field {:in name, :out keyword}})
+  ```"
+  {:style/indent 1}
+  [model direction->k->fn]
+  `(let [model# ~model]
+     (u/maybe-derive model# ::transformed)
+     (m/defmethod transforms model#
+       [~'&model]
+       ~direction->k->fn)))
+
+(s/fdef deftransforms
+  :args (s/cat :model      some?
+               :transforms any?)
+  :ret any?)

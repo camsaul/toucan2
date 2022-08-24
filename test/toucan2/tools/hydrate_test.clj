@@ -7,8 +7,8 @@
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.test :as test]
-   [toucan2.tools.helpers :as helpers]
-   [toucan2.tools.hydrate :as hydrate])
+   [toucan2.tools.hydrate :as hydrate]
+   [toucan2.tools.transformed :as transformed])
   (:import
    (java.time OffsetDateTime)))
 
@@ -22,7 +22,7 @@
 
 (derive ::people ::test/people)
 
-(helpers/deftransforms ::venues.category-keyword
+(transformed/deftransforms ::venues.category-keyword
   {:category {:in  name
               :out keyword}})
 

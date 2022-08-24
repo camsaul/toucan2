@@ -8,7 +8,7 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-select :as after-select]
-   [toucan2.tools.helpers :as helpers]
+   [toucan2.tools.transformed :as transformed]
    [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
@@ -38,7 +38,7 @@
 
 (derive ::venues.short-name-with-transforms ::venues.short-name)
 
-(helpers/deftransforms ::venues.short-name-with-transforms
+(transformed/deftransforms ::venues.short-name-with-transforms
   {:name {:in  identity
           :out identity}})
 

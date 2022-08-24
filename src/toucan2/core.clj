@@ -17,15 +17,18 @@
    [toucan2.tools.after-insert]
    [toucan2.tools.after-select]
    [toucan2.tools.after-update]
+   [toucan2.tools.before-delete]
    [toucan2.tools.before-insert]
+   [toucan2.tools.before-select]
    [toucan2.tools.before-update]
    [toucan2.tools.compile]
-   [toucan2.tools.helpers]
+   [toucan2.tools.default-fields]
    [toucan2.tools.hydrate]
    [toucan2.tools.transformed]
    [toucan2.update]
    [toucan2.util]))
 
+;;; this is so no one gets confused and things these namespaces are unused.
 (comment
   toucan2.compile/keep-me
   toucan2.connection/keep-me
@@ -40,10 +43,12 @@
   toucan2.tools.after-insert/keep-me
   toucan2.tools.after-select/keep-me
   toucan2.tools.after-update/keep-me
+  toucan2.tools.before-delete/keep-me
   toucan2.tools.before-insert/keep-me
+  toucan2.tools.before-select/keep-me
   toucan2.tools.before-update/keep-me
   toucan2.tools.compile/keep-me
-  toucan2.tools.helpers/keep-me
+  toucan2.tools.default-fields/keep-me
   toucan2.tools.hydrate/keep-me
   toucan2.tools.transformed/keep-me
   toucan2.update/keep-me
@@ -128,8 +133,14 @@
  [toucan2.tools.after-update
   define-after-update]
 
+ [toucan2.tools.before-delete
+  define-before-delete]
+
  [toucan2.tools.before-insert
   define-before-insert]
+
+ [toucan2.tools.before-select
+  define-before-select]
 
  [toucan2.tools.before-update
   define-before-update]
@@ -140,11 +151,8 @@
 
  #_[toucan2.tools.disallow]
 
- [toucan2.tools.helpers
-  define-before-delete
-  define-before-select
-  define-default-fields
-  deftransforms]
+ [toucan2.tools.default-fields
+  define-default-fields]
 
  [toucan2.tools.hydrate
   batched-hydrate
@@ -159,6 +167,7 @@
     with-temp]
 
  [toucan2.tools.transformed
+  deftransforms
   transforms]
 
  [toucan2.update
