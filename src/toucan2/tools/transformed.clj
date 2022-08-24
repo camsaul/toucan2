@@ -65,26 +65,21 @@
 ;;; avoids locking us in to HoneySQL too much
 
 (defn- transform-condition-value [xform v]
-  (try
-    (cond
-      (sequential? v)
-      (into [(first v)]
-            (map (fn xform* [v]
-                   (if (sequential? v)
-                     (mapv xform* v)
-                     (xform v))))
-            (rest v))
+  (cond
+    (sequential? v)
+    (into [(first v)]
+          (map (fn xform* [v]
+                 (if (sequential? v)
+                   (mapv xform* v)
+                   (xform v))))
+          (rest v))
 
-      ;; only apply xform if the value is non-nil.
-      (some? v)
-      (xform v)
+    ;; only apply xform if the value is non-nil.
+    (some? v)
+    (xform v)
 
-      :else
-      nil)
-    (catch Throwable e
-      (throw (ex-info (format "Error transforming %s: %s" (u/safe-pr-str v) (ex-message e))
-                      {:context u/*error-context*, :v v, :transform xform}
-                      e)))))
+    :else
+    nil))
 
 (defn transform-kv-args [kv-args transforms]
   {:pre [(seq transforms)]}
@@ -105,11 +100,11 @@
        pk-keys
        pk-vals))))
 
-(defn wrapped-transforms
+(defn- wrapped-transforms
   "Get the [[transforms]] functions for a model in a either the `:in` or `:out` direction; wrap the functions in
   `try-catch` forms so we can meaningful error messages if they fail."
   [model direction]
-  (try
+  (u/try-with-error-context ["calculate transforms" {::model model, ::direction direction}]
     (when-let [transforms (not-empty (transforms model))]
       ;; make the transforms map an instance so we can get appropriate magic map behavior when looking for the
       ;; appropriate transform for a given key.
@@ -119,7 +114,9 @@
                       :let                 [xform (get direction->xform direction)]
                       :when                xform]
                   [k (fn xform-fn [v]
-                       (try
+                       (u/try-with-error-context ["apply transform" {::transforms transforms, ::model model, ::k k, ::v v, ::xform xform}]
+                         (xform v))
+                       #_(try
                          (xform v)
                          (catch Throwable e
                            (throw (ex-info (format "Error transforming %s %s value %s: %s"
@@ -128,35 +125,35 @@
                                                    (u/safe-pr-str v)
                                                    (ex-message e))
                                            {:context u/*error-context*, :model model, :k k, :v v, :xform xform}
-                                           e)))))]))))
-    (catch Throwable e
-      (throw (ex-info (format "Error calculating %s transforms for %s: %s" direction (u/safe-pr-str model) (ex-message e))
-                      {:context u/*error-context*, :model model, :direction direction}
-                      e)))))
+                                           e)))))]))))))
 
-(defn in-transforms [model]
+(defn- in-transforms [model]
   (wrapped-transforms model :in))
 
-(defn apply-in-transforms
+(defn- apply-in-transforms
   [model {:keys [kv-args], :as args}]
+  {:post [(map? %)]}
   (if-let [transforms (not-empty (when (seq kv-args)
                                    (in-transforms model)))]
-    (u/with-debug-result ["Apply transforms to kv-args %s" kv-args]
-      (u/println-debug [transforms])
-      (cond-> args
-        (seq kv-args)                (update :kv-args transform-kv-args transforms)
-        (some? (:toucan/pk kv-args)) (update-in [:kv-args :toucan/pk] transform-pk model transforms)))
+    (u/try-with-error-context ["apply in transforms" {::model model, ::transforms transforms, ::parsed-args args}]
+      (u/with-debug-result ["Apply transforms to kv-args %s" kv-args]
+        (u/println-debug [transforms])
+        (cond-> args
+          (seq kv-args)                (update :kv-args transform-kv-args transforms)
+          (some? (:toucan/pk kv-args)) (update-in [:kv-args :toucan/pk] transform-pk model transforms))))
     args))
 
-(m/defmethod query/parse-args :after [::select/select ::transformed]
-  [_query-type model args]
-  (apply-in-transforms model args))
+(m/defmethod query/build :before [::select/select ::transformed :default]
+  [query-type model parsed-args]
+  (if (isa? query-type ::op/return-instances-from-pks)
+    parsed-args
+    (apply-in-transforms model parsed-args)))
 
-(m/defmethod query/parse-args :after [::delete/delete ::transformed]
-  [_query-type model args]
-  (apply-in-transforms model args))
+(m/defmethod query/build :before [::delete/delete ::transformed :default]
+  [_query-type model parsed-args]
+  (apply-in-transforms model parsed-args))
 
-(defn apply-row-transform [instance k xform]
+(defn- apply-row-transform [instance k xform]
   ;; The "Special Optimizations" below *should* be the default case, but if some other aux methods are in place or
   ;; custom impls it might not be; things should still work normally either way.
   ;;
@@ -179,18 +176,14 @@
                                                         (comp xform thunk))))
          (update row k xform))
      (u/with-debug-result ["Transform %s %s" k (get row k)]
-       (try
+       (u/try-with-error-context ["transform row" {::k k, ::xform xform, ::row row}]
          (doto (update row k xform)
            ((fn [row]
               (assert (map? row)
                       (format "%s: expected row transform function to return a map, got %s"
-                              `apply-row-transform (u/safe-pr-str row))))))
-         (catch Throwable e
-           (throw (ex-info (format "Error transforming %s %s: %s" (u/safe-pr-str k) (u/safe-pr-str (get row k)) (ex-message e))
-                           {:context u/*error-context*, :k k, :v (get row k), :row row, :xform xform}
-                           e))))))))
+                              `apply-row-transform (u/safe-pr-str row)))))))))))
 
-(defn out-transforms [model]
+(defn- out-transforms [model]
   (wrapped-transforms model :out))
 
 (defn- apply-row-transform-fn [k xform]
@@ -198,7 +191,7 @@
     (cond-> instance
       (contains? instance k) (apply-row-transform k xform))))
 
-(defn row-transform-fn [transforms]
+(defn- row-transform-fn [transforms]
   {:pre [(seq transforms)]}
   (reduce
    (fn [f [k xform]]
@@ -207,14 +200,15 @@
    identity
    transforms))
 
-(defn transform-result-rows-transducer
+(defn- transform-result-rows-transducer
   "Return a transducer to transform rows of `model` using its [[out-transforms]]."
   [model]
   (if-let [transforms (not-empty (out-transforms model))]
     (map (let [f (row-transform-fn transforms)]
            (fn [row]
              (u/with-debug-result ["Transform %s row %s" model row]
-               (f row)))))
+               (u/try-with-error-context ["transform row" {::model model, ::row row}]
+                 (f row))))))
     identity))
 
 (m/defmethod op/reducible-returning-instances* :after [:toucan2.select/select ::transformed]
@@ -226,45 +220,49 @@
 (m/defmethod query/build :before [::update/update ::transformed :default]
   [_query-type model {:keys [query], :as args}]
   (if-let [transforms (not-empty (in-transforms model))]
-    (u/with-debug-result ["Apply %s transforms to %s" transforms args]
-      (let [args (-> args
-                     (update :kv-args merge query)
-                     (dissoc :query))]
-        (-> (apply-in-transforms model args)
-            (update :changes transform-kv-args transforms))))
+    (let [args (-> args
+                   (update :kv-args merge query) ;; TODO -- wtf? I'm 99% sure this is wrong.
+                   (dissoc :query))]
+      (-> (apply-in-transforms model args)
+          (update :changes transform-kv-args transforms)))
     args))
 
-(defn transform-insert-rows [[first-row :as rows] transforms]
+(defn- transform-insert-rows [[first-row :as rows] transforms]
+  (assert (map? first-row))
   ;; all rows should have the same keys, so we just need to look at the keys in the first row
-  (let [row-xforms (for [k (keys first-row)
-                         :let [xform (get transforms k)]
+  (let [row-xforms (for [k     (keys first-row)
+                         :let  [xform (get transforms k)]
                          :when xform]
                      (fn [row]
                        (update row k (fn [v]
                                        (if (some? v)
                                          (xform v)
                                          v)))))
-        row-xform (apply comp row-xforms)]
+        row-xform  (apply comp row-xforms)]
     (map row-xform rows)))
 
 (m/defmethod op/reducible-update* :before [::insert/insert ::transformed]
-  [_query-type model parsed-args]
+  [query-type model parsed-args]
   (assert (isa? model ::transformed))
   (if-let [transforms (in-transforms model)]
-    (u/with-debug-result ["Apply %s transforms to %s" transforms parsed-args]
-      (update parsed-args :rows transform-insert-rows transforms))
+    (u/try-with-error-context ["apply in transforms before inserting rows" {::query-type  query-type
+                                                                            ::model       model
+                                                                            ::parsed-args parsed-args
+                                                                            ::transforms  transforms}]
+      (u/with-debug-result ["Apply %s transforms to %s" transforms parsed-args]
+        (update parsed-args :rows transform-insert-rows transforms)))
     parsed-args))
 
 (def ^:dynamic ^:private *already-transforming-insert-results*
-  "This is used to tell the [[op/reducible-returning-pks*]] method for handling insert transforms not to do anything if it
-  is getting called inside a [[op/reducible-returning-instances*]] call. If we're inside
+  "This is used to tell the [[op/reducible-update-returning-pks*]] method for handling insert transforms not to do
+  anything if it is getting called inside a [[op/reducible-returning-instances*]] call. If we're inside
   a [[op/reducible-returning-instances*]] call it means we need to use the PK columns to fetch results from the DB and
-  we should use them as-is; the transform handler for `::select/select` will transform the instances the correct way. If
-  we are *not* inside a call to [[op/reducible-returning-instances*]], it means we are expected to return just the PKs;
-  those should be transformed."
+  we should use them as-is; the [[out-transforms]] for `::select/select` will transform the instances the correct way.
+  If we are *not* inside a call to [[op/reducible-returning-instances*]], it means we are expected to return just the
+  PKs; those should be transformed."
   false)
 
-(m/defmethod op/reducible-returning-pks* :after [::insert/insert ::transformed]
+(m/defmethod op/reducible-update-returning-pks* :after [::insert/insert ::transformed]
   [_query-type model reducible-results]
   (if *already-transforming-insert-results*
     reducible-results
@@ -278,8 +276,8 @@
                                   [pk-or-pks])))))
        ;; 2. transform the PK results using the model's [[out-transforms]]
        (transform-result-rows-transducer model)
-       ;; 3. Now flatten the maps of PK key -> value back into plain PK values or vectors of plain PK values (if the model
-       ;; has a composite primary key)
+       ;; 3. Now flatten the maps of PK key -> value back into plain PK values or vectors of plain PK values (if the
+       ;; model has a composite primary key)
        (map (let [f (if (= (count pk-keys) 1)
                       (first pk-keys)
                       (juxt pk-keys))]
@@ -288,6 +286,8 @@
                   (f row)))))
        reducible-results))))
 
+;;; `insert-returning-instances!` doesn't need any special transformations, because `select` will handle it -- see
+;;; docstring for [[*already-transforming-insert-results*]]
 (m/defmethod op/reducible-returning-instances* :around [::insert/insert ::transformed]
   [query-type model reducible-results]
   (binding [*already-transforming-insert-results* true]

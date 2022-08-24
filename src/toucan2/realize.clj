@@ -14,11 +14,13 @@
 
 (defn- realize-IReduceInit [this]
   (u/with-debug-result ["%s %s" `realize (symbol (.getCanonicalName (class this))) #_this]
-    (into []
-          (map (fn [row]
-                 (u/with-debug-result [(list `realize (some-> row class .getCanonicalName symbol) row)]
-                   (realize row))))
-          this)))
+    (u/try-with-error-context ["realize IReduceInit" {::reducible this}]
+      (into []
+            (map (fn [row]
+                   (u/with-debug-result [(list `realize (some-> row class .getCanonicalName symbol) row)]
+                     (u/try-with-error-context ["realize row" {::row row}]
+                       (realize row)))))
+            this))))
 
 (extend-protocol Realize
   Object

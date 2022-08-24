@@ -11,28 +11,30 @@
    [toucan2.util :as u]))
 
 (s/def ::default-args
-  (s/alt :single-row-map    map?
-         :multiple-row-maps (s/coll-of map?)
-         :kv-pairs          (s/* (s/cat
-                                  :k keyword?
-                                  :v any?))
-         :columns-rows      (s/cat :columns (s/coll-of keyword?)
-                                   :rows    (s/coll-of vector?))))
+  (s/cat
+   :modelable ::query/default-args.modelable
+   :rows      (s/alt :single-row-map    map?
+                     :multiple-row-maps (s/coll-of map?)
+                     :kv-pairs          ::query/default-args.kv-args
+                     :columns-rows      (s/cat :columns (s/coll-of keyword?)
+                                               :rows    (s/coll-of vector?)))))
 
-(m/defmethod query/args-spec [::insert :default]
-  [_query-type _model]
+(m/defmethod query/args-spec ::insert
+  [_query-type]
   ::default-args)
 
-(m/defmethod query/parse-args [::insert :default]
-  [query-type model unparsed-args]
-  (let [[rows-type x] (next-method query-type model unparsed-args)]
-    {:rows (condp = rows-type
-             :single-row-map    [x]
-             :multiple-row-maps x
-             :kv-pairs          [(into {} (map (juxt :k :v)) x)]
-             :columns-rows      (let [{:keys [columns rows]} x]
-                                  (mapv (partial zipmap columns)
-                                        rows)))}))
+(m/defmethod query/parse-args ::insert
+  [query-type unparsed-args]
+  (-> (next-method query-type unparsed-args)
+      (select-keys [:modelable :columns :rows])
+      (update :rows (fn [[rows-type x]]
+                      (condp = rows-type
+                        :single-row-map    [x]
+                        :multiple-row-maps x
+                        :kv-pairs          [(into {} (map (juxt :k :v)) x)]
+                        :columns-rows      (let [{:keys [columns rows]} x]
+                                             (mapv (partial zipmap columns)
+                                                   rows)))))))
 
 ;;; Support
 ;;;
@@ -77,23 +79,23 @@
   {:arglists '([modelable row-or-rows]
                [modelable k v & more]
                [modelable columns row-vectors])}
-  [modelable & unparsed-args]
-  (op/reducible-update ::insert modelable unparsed-args))
+  [& unparsed-args]
+  (op/reducible-update ::insert unparsed-args))
 
 (defn insert!
   "Returns number of rows inserted."
   {:arglists '([modelable row-or-rows]
                [modelable k v & more]
                [modelable columns row-vectors])}
-  [modelable & unparsed-args]
-  (op/returning-update-count! ::insert modelable unparsed-args))
+  [& unparsed-args]
+  (op/returning-update-count! ::insert unparsed-args))
 
 (defn reducible-insert-returning-pks
   {:arglists '([modelable row-or-rows]
                [modelable k v & more]
                [modelable columns row-vectors])}
-  [modelable & unparsed-args]
-  (op/reducible-returning-pks ::insert modelable unparsed-args))
+  [& unparsed-args]
+  (op/reducible-update-returning-pks ::insert unparsed-args))
 
 (defn insert-returning-pks!
   "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
@@ -104,8 +106,8 @@
   {:arglists '([modelable row-or-rows]
                [modelable k v & more]
                [modelable columns row-vectors])}
-  [modelable & unparsed-args]
-  (op/returning-pks! ::insert modelable unparsed-args))
+  [& unparsed-args]
+  (op/update-returning-pks! ::insert unparsed-args))
 
 (defn reducible-insert-returning-instances
   {:arglists '([modelable row-or-rows]
@@ -114,8 +116,8 @@
                [[modelable & columns-to-return] row-or-rows]
                [[modelable & columns-to-return] k v & more]
                [[modelable & columns-to-return] columns row-vectors])}
-  [modelable-columns & unparsed-args]
-  (op/reducible-returning-instances ::insert modelable-columns unparsed-args))
+  [& unparsed-args]
+  (op/reducible-returning-instances ::insert unparsed-args))
 
 (defn insert-returning-instances!
   "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
@@ -129,5 +131,5 @@
                [[modelable & columns-to-return] row-or-rows]
                [[modelable & columns-to-return] k v & more]
                [[modelable & columns-to-return] columns row-vectors])}
-  [modelable-columns & unparsed-args]
-  (op/returning-instances! ::insert modelable-columns unparsed-args))
+  [& unparsed-args]
+  (op/returning-instances ::insert unparsed-args))

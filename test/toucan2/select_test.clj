@@ -19,23 +19,23 @@
 (derive ::people ::test/people)
 
 (deftest ^:parallel parse-args-test
-  (doseq [[args expected] {[1]
-                           {:queryable 1}
+  (doseq [[args expected] {[:model 1]
+                           {:modelable :model, :queryable 1}
 
-                           [:id 1]
-                           {:kv-args {:id 1}, :queryable {}}
+                           [:model :id 1]
+                           {:modelable :model, :kv-args {:id 1}, :queryable {}}
 
-                           [{:where [:= :id 1]}]
-                           {:queryable {:where [:= :id 1]}}
+                           [:model {:where [:= :id 1]}]
+                           {:modelable :model, :queryable {:where [:= :id 1]}}
 
-                           [:name "Cam" {:where [:= :id 1]}]
-                           {:kv-args {:name "Cam"}, :queryable {:where [:= :id 1]}}
+                           [:model :name "Cam" {:where [:= :id 1]}]
+                           {:modelable :model, :kv-args {:name "Cam"}, :queryable {:where [:= :id 1]}}
 
-                           [::my-query]
-                           {:queryable ::my-query}}]
-    (testing `(query/parse-args ::select/select :default ~args)
+                           [:model ::my-query]
+                           {:modelable :model, :queryable ::my-query}}]
+    (testing `(query/parse-args ::select/select ~args)
       (is (= expected
-             (query/parse-args ::select/select :default args))))))
+             (query/parse-args ::select/select args))))))
 
 (deftest ^:parallel default-build-query-test
   (is (= {:select [:*]
@@ -375,8 +375,8 @@
 
 (deftest select-nil-test
   (testing "(select model nil) should basically be the same as (select model :toucan/pk nil)"
-    (let [parsed-args (query/parse-args ::select/select ::test/venues [nil])]
-      (is (= {:queryable nil}
+    (let [parsed-args (query/parse-args ::select/select [::test/venues nil])]
+      (is (= {:modelable ::test/venues, :queryable nil}
              parsed-args))
       (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
         (is (= nil

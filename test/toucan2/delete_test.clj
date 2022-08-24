@@ -10,8 +10,8 @@
    [toucan2.tools.compile :as tools.compile]))
 
 (deftest parse-args-test
-  (is (= {:queryable 1}
-         (query/parse-args ::delete nil [1]))))
+  (is (= {:modelable :model, :queryable 1}
+         (query/parse-args ::delete [:model 1]))))
 
 (deftest row-by-pk-test
   (test/with-discarded-table-changes :venues
@@ -66,8 +66,8 @@
 
 (deftest delete-nil-test
   (testing "(delete! model nil) should basically be the same as (delete! model :toucan/pk nil)"
-    (let [parsed-args (query/parse-args ::delete/delete ::test/venues [nil])]
-      (is (= {:queryable nil}
+    (let [parsed-args (query/parse-args ::delete/delete [::test/venues nil])]
+      (is (= {:modelable ::test/venues, :queryable nil}
              parsed-args))
       (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
         (is (= nil

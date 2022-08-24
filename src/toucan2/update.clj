@@ -9,27 +9,26 @@
    [toucan2.util :as u]))
 
 ;;; this is basically the same as the args for `select` and `delete` but the difference is that it has an additional
-;;; optional arg, `:pk`, as the first arg, and one additional optional arg, the `changes` map at the end
+;;; optional arg, `:pk`, as the second arg, and one additional optional arg, the `changes` map at the end
 (s/def ::default-args
   (s/cat
+   :modelable ::query/default-args.modelable
    :pk        (s/? (complement (some-fn keyword? map?)))
    ;; these are treated as CONDITIONS
-   :kv-args   (s/* (s/cat
-                    :k keyword?
-                    :v any?))
+   :kv-args   ::query/default-args.kv-args
    ;; by default, assuming this resolves to a map query, is treated as a map of conditions.
-   :queryable (s/? any?)
+   :queryable ::query/default-args.queryable
    ;; TODO -- we should introduce some sort of `do-with-update-changes` method so it's possible to use named update maps
    ;; here.
    :changes map?))
 
-(m/defmethod query/args-spec [::update :default]
-  [_query-type _model]
+(m/defmethod query/args-spec ::update
+  [_query-type]
   ::default-args)
 
-(m/defmethod query/parse-args [::update :default]
-  [query-type model unparsed-args]
-  (let [parsed (next-method query-type model unparsed-args)]
+(m/defmethod query/parse-args ::update
+  [query-type unparsed-args]
+  (let [parsed (next-method query-type unparsed-args)]
     (cond-> parsed
       (contains? parsed :pk) (-> (dissoc :pk)
                                  (update :kv-args assoc :toucan/pk (:pk parsed))))))
@@ -60,17 +59,17 @@
 
 (defn update!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
-  [modelable & unparsed-args]
-  (op/returning-update-count! ::update modelable unparsed-args))
+  [& unparsed-args]
+  (op/returning-update-count! ::update unparsed-args))
 
 (defn reducible-update-returning-pks
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
-  [modelable & unparsed-args]
-  (op/reducible-returning-pks* ::update modelable unparsed-args))
+  [& unparsed-args]
+  (op/reducible-update-returning-pks ::update unparsed-args))
 
 (defn update-returning-pks!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
-  [modelable & unparsed-args]
-  (op/returning-pks! ::update modelable unparsed-args))
+  [& unparsed-args]
+  (op/update-returning-pks! ::update unparsed-args))
 
 ;;; TODO -- add `update-returning-instances!`, similar to [[toucan2.update/insert-returning-instances!]]

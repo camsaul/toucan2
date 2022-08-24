@@ -15,20 +15,20 @@
 (use-fixtures :each test/do-db-types-fixture)
 
 (deftest parse-update-args-test
-  (is (= {:changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
-         (query/parse-args ::update/update nil [1 {:a 1}])))
-  (is (= {:changes {:a 1}, :kv-args {:toucan/pk nil}, :queryable {}}
-         (query/parse-args ::update/update nil [nil {:a 1}])))
-  (is (= {:kv-args {:id 1}, :changes {:a 1}, :queryable {}}
-         (query/parse-args ::update/update nil [:id 1 {:a 1}])))
+  (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
+         (query/parse-args ::update/update [:model 1 {:a 1}])))
+  (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk nil}, :queryable {}}
+         (query/parse-args ::update/update [:model nil {:a 1}])))
+  (is (= {:modelable :model, :kv-args {:id 1}, :changes {:a 1}, :queryable {}}
+         (query/parse-args ::update/update [:model :id 1 {:a 1}])))
   (testing "composite PK"
-    (is (= {:changes {:a 1}, :kv-args {:toucan/pk [1 2]}, :queryable {}}
-           (query/parse-args ::update/update nil [[1 2] {:a 1}]))))
+    (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk [1 2]}, :queryable {}}
+           (query/parse-args ::update/update [:model [1 2] {:a 1}]))))
   (testing "key-value conditions"
-    (is (= {:kv-args {:name "Cam", :toucan/pk 1}, :changes {:a 1}, :queryable {}}
-           (query/parse-args ::update/update nil [1 :name "Cam" {:a 1}]))))
-  (is (= {:changes {:name "Hi-Dive"}, :queryable {:id 1}}
-         (query/parse-args ::update/update nil [{:id 1} {:name "Hi-Dive"}]))))
+    (is (= {:modelable :model, :kv-args {:name "Cam", :toucan/pk 1}, :changes {:a 1}, :queryable {}}
+           (query/parse-args ::update/update [:model 1 :name "Cam" {:a 1}]))))
+  (is (= {:modelable :model, :changes {:name "Hi-Dive"}, :queryable {:id 1}}
+         (query/parse-args ::update/update [:model {:id 1} {:name "Hi-Dive"}]))))
 
 (deftest build-test
   (is (= {:update [:venues]
@@ -128,15 +128,18 @@
 
 (deftest update-nil-test
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
-    (let [parsed-args (query/parse-args ::update/update ::test/venues [nil {:name "Taco Bell"}])]
-      (is (= {:kv-args {:toucan/pk nil}, :changes {:name "Taco Bell"}, :queryable {}}
+    (let [parsed-args (query/parse-args ::update/update [::test/venues nil {:name "Taco Bell"}])]
+      (is (= {:modelable ::test/venues
+              :kv-args   {:toucan/pk nil}
+              :changes   {:name "Taco Bell"}
+              :queryable {}}
              parsed-args))
       (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
         (is (= {}
                query))
-        (is (= {:update [:venues]
-                :set    {:name "Taco Bell"}
-                :where  [:= :id nil]}
+        (is (= {:update    [:venues]
+                :set       {:name "Taco Bell"}
+                :where     [:= :id nil]}
                (query/build ::update/update ::test/venues (assoc parsed-args :query query))))))
     (is (= ["UPDATE venues SET name = ? WHERE id IS NULL" "Taco Bell"]
            (tools.compile/compile

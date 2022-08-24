@@ -32,19 +32,19 @@
 (defn reducible-select
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
-  [modelable-columns & unparsed-args]
-  (op/reducible-returning-instances ::select modelable-columns unparsed-args))
+  [& unparsed-args]
+  (op/reducible-returning-instances ::select unparsed-args))
 
 (defn select
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
-  [modelable-columns & unparsed-args]
-  (op/returning-instances! ::select modelable-columns unparsed-args))
+  [& unparsed-args]
+  (op/returning-instances ::select unparsed-args))
 
 (defn select-one {:arglists '([modelable & kv-args? query?]
                               [[modelable & columns] & kv-args? query?])}
-  [modelable-columns & unparsed-args]
-  (realize/reduce-first (apply reducible-select modelable-columns unparsed-args)))
+  [& unparsed-args]
+  (realize/reduce-first (apply reducible-select unparsed-args)))
 
 (defn select-fn-reducible
   {:arglists '([f modelable & kv-args? query?])}

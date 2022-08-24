@@ -334,11 +334,11 @@
       (testing "using"
         (testing "with-original"
           (is (thrown-with-msg?
-               java.lang.AssertionError
+               Throwable
                #"Assert failed: \(map\? new-original\)"
                (protocols/with-original m1 1))))
         (testing "with-current"
           (is (thrown-with-msg?
-               java.lang.AssertionError
+               Throwable
                #"Assert failed: \(map\? new-current\)"
                (protocols/with-current m1 1))))))))

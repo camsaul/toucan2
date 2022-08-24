@@ -10,13 +10,12 @@
 
 (use-fixtures :each test/do-db-types-fixture)
 
-
 (derive ::venues.no-select ::test/venues)
 (derive ::venues.no-select ::disallow/select)
 
 (deftest disallow-select-test
   (is (thrown-with-msg?
-       UnsupportedOperationException
+       Exception
        #"You cannot select :toucan2.tools.disallow-test/venues.no-select"
        (select/select ::venues.no-select))))
 
@@ -25,7 +24,7 @@
 
 (deftest disallow-delete-test
   (is (thrown-with-msg?
-       UnsupportedOperationException
+       Exception
        #"You cannot delete instances of :toucan2.tools.disallow-test/venues.no-delete"
        (delete/delete! ::venues.no-delete))))
 
@@ -34,7 +33,7 @@
 
 (deftest disallow-insert-test
   (is (thrown-with-msg?
-       UnsupportedOperationException
+       Exception
        #"You cannot create new instances of :toucan2.tools.disallow-test/venues.no-insert"
        (insert/insert! ::venues.no-insert {:a 1, :b 2}))))
 
@@ -43,6 +42,6 @@
 
 (deftest disallow-update-test
   (is (thrown-with-msg?
-       UnsupportedOperationException
+       Exception
        #"You cannot update a :toucan2.tools.disallow-test/venues.no-update after it has been created"
        (update/update! ::venues.no-update 1 {:a 1, :b 2}))))

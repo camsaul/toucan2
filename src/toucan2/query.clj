@@ -36,37 +36,46 @@
 
 ;;;; [[parse-args]]
 
-;;; TODO -- not 100% sure this should dispatch off of model -- seems dangerous and error-prone to let people totally
-;;; change up the syntax for something like [[toucan2.select/select]] for one specific model. If you want weird syntax
-;;; then write a wrapper function like we do in the `toucan2-toucan1` compatibility layer
 (m/defmulti args-spec
   "[[clojure.spec.alpha]] spec that should be used to parse unparsed args for `query-type` by the default implementation
   of [[parse-args]]."
-  {:arglists '([query-type model])}
-  u/dispatch-on-first-two-args)
+  {:arglists '([query-type])}
+  u/dispatch-on-first-arg)
+
+(s/def ::default-args.modelable
+  (s/or
+   :modelable         (complement sequential?)
+   :modelable-columns (s/cat :modelable some? ; can't have a nil model.
+                             :columns   (s/* keyword?))))
+
+(s/def ::default-args.kv-args
+  (s/* (s/cat
+        :k keyword?
+        :v any?)))
+
+(s/def ::default-args.queryable
+  (s/? any?))
 
 (s/def ::default-args
   (s/cat
-   :kv-args (s/* (s/cat
-                  :k keyword?
-                  :v any?))
-   :queryable  (s/? any?)))
+   :modelable ::default-args.modelable
+   :kv-args   ::default-args.kv-args
+   :queryable ::default-args.queryable))
 
 (m/defmethod args-spec :default
-  [_query-type _model]
+  [_query-type]
   ::default-args)
 
-;;; TODO -- as with [[args-spec]] I don't know if having this dispatch off of model as well is a good idea. If it
-;;; doesn't dispatch off of model then we can actually include `modelable` itself in the spec and handle
-;;; `modelable-columns` as well here instead of separately.
 (m/defmulti parse-args
-  "`parse-args` takes a sequence of unparsed args passed to something like [[toucan2.select/select]] (excluding the
-  `modelable` arg, which has to be resolved to a `model` first in order for this to be able to dispatch), and parses
-  them into a parsed args map. The default implementation uses [[clojure.spec.alpha]] to parse the args according to
-  the [[args-spec]] for `query-type` and `model`.
+  "`parse-args` takes a sequence of unparsed args passed to something like [[toucan2.select/select]] and parses them into
+  a parsed args map. The default implementation uses [[clojure.spec.alpha]] to parse the args according to
+  the [[args-spec]] for `query-type`.
 
   These keys are commonly returned by several of the different implementations `parse-args`, and other tooling is
   build to leverage them:
+
+  * `:modelable` -- usually the first of the `unparsed-args`, this is the thing that should get resolved to a model
+     with [[toucan2.model/with-model]].
 
   * `:queryable` -- something that can be resolved to a query with [[with-resolved-query]], for example a map or integer or
     'named query' keyword. The resolved query is ultimately combined with other parsed args and built into something like
@@ -77,10 +86,16 @@
     customize the behavior for specific keywords to do other things -- `:toucan/pk` is one such example.
 
   * `:columns` -- for things that return instances, `:columns` is a sequence of columns to return. These are commonly
-    specified by wrapping the modelable in a `[modelable & columns]` vector."
-  {:arglists '([query-type model unparsed-args]
-               [query-type model unparsed-args])}
-  u/dispatch-on-first-two-args)
+    specified by wrapping the modelable in a `[modelable & columns]` vector.
+
+  Dispatches off of `query-type`."
+  {:arglists '([query-type unparsed-args])}
+  u/dispatch-on-first-arg)
+
+;;;; the stuff below validates parsed args in the `:default` `:around` method.
+
+(s/def :toucan2.query.parsed-args/modelable
+  some?)
 
 (s/def :toucan2.query.parsed-args/kv-args
   (some-fn nil? map?))
@@ -89,38 +104,44 @@
   (some-fn nil? sequential?))
 
 (s/def ::parsed-args
-  (s/keys :opt-un [:toucan2.query.parsed-args/kv-args
+  (s/keys :req-un [:toucan2.query.parsed-args/modelable]
+          :opt-un [:toucan2.query.parsed-args/kv-args
                    :toucan2.query.parsed-args/columns]))
 
 (defn validate-parsed-args [parsed-args]
-  (let [result (s/conform ::parsed-args parsed-args)]
-    (when (s/invalid? result)
-      (throw (ex-info (format "Invalid parsed args: %s" (s/explain-str ::parsed-args parsed-args))
-                      {:context u/*error-context*, :spec-error (s/explain-data ::parsed-args parsed-args)})))))
+  (u/try-with-error-context ["validate parsed args" {::parsed-args parsed-args}]
+    (let [result (s/conform ::parsed-args parsed-args)]
+      (when (s/invalid? result)
+        (throw (ex-info (format "Invalid parsed args: %s" (s/explain-str ::parsed-args parsed-args))
+                        (s/explain-data ::parsed-args parsed-args)))))))
 
 (m/defmethod parse-args :around :default
-  [query-type model unparsed-args]
-  (doto (u/with-debug-result [(list `parse-args query-type model unparsed-args)]
-          (binding [u/*error-context* (assoc u/*error-context* ::unparsed-args unparsed-args)]
-            (next-method query-type model unparsed-args)))
-    validate-parsed-args))
+  [query-type unparsed-args]
+  (u/try-with-error-context [`parse-args {::query-type query-type, ::unparsed-args unparsed-args}]
+    (doto (u/with-debug-result [(list `parse-args query-type unparsed-args)]
+            (binding [u/*error-context* (assoc u/*error-context* ::unparsed-args unparsed-args)]
+              (next-method query-type unparsed-args)))
+      validate-parsed-args)))
+
+;;;; default method
 
 (m/defmethod parse-args :default
-  [query-type model unparsed-args]
-  (let [spec   (args-spec query-type model)
+  [query-type unparsed-args]
+  (let [spec   (args-spec query-type)
         parsed (s/conform spec unparsed-args)]
     (when (s/invalid? parsed)
-      (throw (ex-info (format "Don't know how to interpret %s args for model %s: %s"
+      (throw (ex-info (format "Don't know how to interpret %s args: %s"
                               (u/safe-pr-str query-type)
-                              (u/safe-pr-str model)
                               (s/explain-str spec unparsed-args))
                       {:context u/*error-context*, :spec-error (s/explain-data spec unparsed-args)})))
-    (if-not (map? parsed)
-      parsed
-      (cond-> parsed
-        (not (contains? parsed :queryable)) (assoc :queryable {})
-        (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
-                                                               (into {} (map (juxt :k :v)) kv-args)))))))
+    (cond-> parsed
+      (:modelable parsed)                 (merge (let [[modelable-type x] (:modelable parsed)]
+                                                   (case modelable-type
+                                                     :modelable         {:modelable x}
+                                                     :modelable-columns x)))
+      (not (contains? parsed :queryable)) (assoc :queryable {})
+      (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
+                                                             (into {} (map (juxt :k :v)) kv-args))))))
 
 ;;;; [[do-with-resolved-query]] and [[with-resolved-query]]
 
@@ -188,7 +209,8 @@
   [model queryable f]
   (let [f* (^:once fn* [query]
             (binding [u/*error-context* (assoc u/*error-context* ::resolved-query query)]
-              (f query)))]
+              (u/try-with-error-context ["with resolved query" {::model model, ::queryable queryable, ::resolved-query query}]
+                (f query))))]
     (next-method model queryable f*)))
 
 ;;;; [[build]]
@@ -200,7 +222,9 @@
 (m/defmulti build
   "`build` takes the parsed args returned by [[parse]] and builds them into a query that can be compiled
   by [[toucan2.compile/with-compiled-query]]. For the default implementations, `build` takes the parsed arguments and
-  builds a Honey SQL 2 map. Dispatches on `query-type`, `model`, and the `:query` in `parsed-args`."
+  builds a Honey SQL 2 map.
+
+  Dispatches on `[query-type model query]`."
   {:arglists '([query-type model {:keys [query], :as parsed-args}])}
   (fn [query-type model parsed-args]
     (mapv protocols/dispatch-value [query-type
@@ -211,21 +235,26 @@
   [query-type model parsed-args]
   (assert (map? parsed-args)
           (format "%s expects map parsed-args, got %s." `build (u/safe-pr-str parsed-args)))
-  (try
+  (u/try-with-error-context [`build {::query-type  query-type
+                                     ::model       model
+                                     ::parsed-args parsed-args}]
     (u/with-debug-result [(list `build query-type model parsed-args)]
-      (next-method query-type model parsed-args))
-    (catch Throwable e
-      (throw (ex-info (format "Error building %s query for model %s: %s"
-                              (u/safe-pr-str query-type)
-                              (u/safe-pr-str model)
-                              (ex-message e))
-                      {:context        u/*error-context*
-                       :query-type     query-type
-                       :model          model
-                       :parsed-args    parsed-args
-                       :method         #'build
-                       :dispatch-value (m/dispatch-value build query-type model parsed-args)}
-                      e)))))
+      (next-method query-type model parsed-args)))
+  #_(try
+      (u/with-debug-result [(list `build query-type model parsed-args)]
+        (next-method query-type model parsed-args))
+      (catch Throwable e
+        (throw (ex-info (format "Error building %s query for model %s: %s"
+                                (u/safe-pr-str query-type)
+                                (u/safe-pr-str model)
+                                (ex-message e))
+                        {:context        u/*error-context*
+                         :query-type     query-type
+                         :model          model
+                         :parsed-args    parsed-args
+                         :method         #'build
+                         :dispatch-value (m/dispatch-value build query-type model parsed-args)}
+                        e)))))
 
 (m/defmethod build :default
   [query-type model parsed-args]

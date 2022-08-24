@@ -6,6 +6,7 @@
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.protocols :as protocols]
+   [toucan2.query :as query]
    [toucan2.save :as save]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -114,7 +115,7 @@
                                   (instance/with-original row)
                                   (instance/with-current row))])))]
     (testing message
-      (let [m2 (transformed/apply-row-transform m :id str)]
+      (let [m2 (#'transformed/apply-row-transform m :id str)]
         (testing "current value"
           (is (= {:id "1"}
                  m2)))
@@ -252,6 +253,10 @@
                    (insert! ::venues.id-is-string [{:name "Hi-Dive", category-key "bar"}])))))))))
 
 (deftest delete!-test
+  (testing `query/build
+    (is (= {:delete-from [:venues]
+            :where       [:= :category "bar"]}
+           (query/build ::delete/delete ::venues.transformed {:kv-args {:category :bar}}))))
   (testing "Delete row by PK"
     (test/with-discarded-table-changes :venues
       (is (= 1

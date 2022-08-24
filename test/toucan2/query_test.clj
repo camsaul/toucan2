@@ -5,6 +5,17 @@
    [toucan2.model :as model]
    [toucan2.query :as query]))
 
+(deftest default-parse-args-test
+  (are [args expected] (= expected
+                          (query/parse-args :default args))
+    [:model]               {:modelable :model, :queryable {}}
+    [:model {}]            {:modelable :model, :queryable {}}
+    [:model nil]           {:modelable :model, :queryable nil}
+    [[:model] {}]          {:modelable :model, :queryable {}}
+    [[:model :a :b :c] {}] {:modelable :model, :columns [:a :b :c], :queryable {}}
+    [:model :k :v]         {:modelable :model, :kv-args {:k :v}, :queryable {}}
+    [:model :k :v {}]      {:modelable :model, :kv-args {:k :v}, :queryable {}}))
+
 (deftest ^:parallel condition->honeysql-where-clause-test
   (doseq [[[k v] expected] {[:id :id]           [:= :id :id]
                             [1 :id]             [:= 1 :id]
@@ -29,7 +40,7 @@
     (is @executed-body?))
   (testing "detect errors"
     (is (thrown-with-msg?
-         AssertionError
+         Throwable
          #"Assert failed: bad toucan2.query/with-resolved-query args: expected pair"
          ((var-get #'query/with-resolved-query) nil nil '['resolved-query ::named-query])))))
 

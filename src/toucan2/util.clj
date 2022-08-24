@@ -66,7 +66,7 @@
     (fn [_printer x]
       [:text (str x)])))
 
-(deftype ^:no-doc Doc [forms])
+(defrecord ^:no-doc Doc [forms])
 
 (defmethod print-handler Doc
   [_klass]
@@ -74,7 +74,7 @@
     (into [:group] (for [form forms]
                      (puget/format-doc printer form)))))
 
-(deftype ^:no-doc Text [s])
+(defrecord ^:no-doc Text [s])
 
 (defmethod print-handler Text
   [_klass]
@@ -232,3 +232,50 @@
   clojure.core.Eduction
   (safe-printable [^clojure.core.Eduction ed]
     (walk-safe-printable (list 'eduction (.xform ed) (.coll ed)))))
+
+(defprotocol ^:private AddContext
+  (^:no-doc add-context ^Throwable [^Throwable e additional-context]))
+
+(defn- add-context-to-ex-data [ex-data-m additional-context]
+  (-> ex-data-m
+      #_(update :toucan2/old-context merge *error-context*)
+      (update :toucan2/context-trace #(conj (vec %) (walk/prewalk
+                                                     (fn [form]
+                                                       (cond
+                                                         (instance? pretty.core.PrettyPrintable form)
+                                                         (pretty/pretty form)
+
+                                                         (instance? clojure.core.Eduction form)
+                                                         (list 'eduction
+                                                               (.xform ^clojure.core.Eduction form)
+                                                               (.coll ^clojure.core.Eduction form))
+
+                                                         (and (instance? clojure.lang.IReduceInit form)
+                                                              (not (coll? form)))
+                                                         (class form)
+
+                                                         :else form))
+                                                     additional-context)))))
+
+(extend-protocol AddContext
+  clojure.lang.ExceptionInfo
+  (add-context [^Throwable e additional-context]
+    (doto ^Throwable (ex-info (ex-message e)
+                              (add-context-to-ex-data (ex-data e) additional-context)
+                              (ex-cause e))
+      (.setStackTrace (.getStackTrace e))))
+
+  Throwable
+  (add-context [^Throwable e additional-context]
+    (doto ^Throwable (ex-info (ex-message e)
+                              (add-context-to-ex-data {} additional-context)
+                              e)
+      (.setStackTrace (.getStackTrace e)))))
+
+(defmacro try-with-error-context
+  {:style/indent :defn}
+  [additional-context & body]
+  `(try
+     ~@body
+     (catch Throwable e#
+       (throw (add-context e# ~additional-context)))))

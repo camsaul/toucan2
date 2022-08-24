@@ -72,7 +72,7 @@
   (pretty [_this]
     (list `->AfterReduciblePKs query-type model reducible-pks)))
 
-(m/defmethod op/reducible-returning-pks* :around [::after ::after]
+(m/defmethod op/reducible-update-returning-pks* :around [::after ::after]
   [query-type model parsed-args]
   (cond
     (::doing-after? parsed-args)

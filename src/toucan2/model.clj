@@ -21,7 +21,8 @@
                 (when-not (= model modelable)
                   (u/println-debug ["Resolved modelable %s => model %s" modelable model]))
                 (binding [u/*error-context* (assoc u/*error-context* ::model model)]
-                  (f model)))))
+                  (u/try-with-error-context ["with resolved model" {::modelable modelable, ::model model}]
+                    (f model))))))
 
 (defmacro with-model [[model-binding modelable] & body]
   `(do-with-model ~modelable (^:once fn* [~model-binding] ~@body)))

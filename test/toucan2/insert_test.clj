@@ -18,24 +18,26 @@
 
 (deftest parse-args-test
   (testing "single map row"
-    (is (= {:rows [{:row 1}]}
-           (query/parse-args ::insert/insert nil [{:row 1}]))))
+    (is (= {:modelable :model, :rows [{:row 1}]}
+           (query/parse-args ::insert/insert [:model {:row 1}]))))
   (testing "multiple map rows"
-    (is (= {:rows [{:row 1} {:row 2}]}
-           (query/parse-args ::insert/insert nil [[{:row 1} {:row 2}]]))))
+    (is (= {:modelable :model, :rows [{:row 1} {:row 2}]}
+           (query/parse-args ::insert/insert [:model [{:row 1} {:row 2}]]))))
   (testing "kv args"
-    (is (= {:rows [{:a 1, :b 2, :c 3}]}
-           (query/parse-args ::insert/insert nil [:a 1, :b 2, :c 3])))
+    (is (= {:modelable :model, :rows [{:a 1, :b 2, :c 3}]}
+           (query/parse-args ::insert/insert [:model :a 1, :b 2, :c 3])))
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
-         #"Don't know how to interpret :toucan2.insert/insert args for model nil:"
-         (query/parse-args ::insert/insert nil [:a 1, :b 2, :c]))))
+         #"Don't know how to interpret :toucan2.insert/insert args:"
+         (query/parse-args ::insert/insert [:model :a 1, :b 2, :c]))))
   (testing "columns + vector rows"
-    (is (= {:rows [{:a 1, :b 2, :c 3} {:a 4, :b 5, :c 6}]}
-           (query/parse-args ::insert/insert nil [[:a :b :c] [[1 2 3] [4 5 6]]])))
-    (is (= {:rows [{:name "The Ramp", :category "bar"}
-                   {:name "Louie's", :category "bar"}]}
-           (query/parse-args ::insert/insert nil [[:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]])))))
+    (is (= {:modelable :model
+            :rows      [{:a 1, :b 2, :c 3} {:a 4, :b 5, :c 6}]}
+           (query/parse-args ::insert/insert [:model [:a :b :c] [[1 2 3] [4 5 6]]])))
+    (is (= {:modelable :model
+            :rows      [{:name "The Ramp", :category "bar"}
+                        {:name "Louie's", :category "bar"}]}
+           (query/parse-args ::insert/insert [:model [:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]])))))
 
 (deftest build-query-test
   (doseq [rows-fn [list vector]

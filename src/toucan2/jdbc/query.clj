@@ -18,31 +18,27 @@
 (defn reduce-jdbc-query [^java.sql.Connection conn model sql-args rf init]
   (let [opts (options)]
     (u/println-debug ["Preparing JDBC query with next.jdbc options %s" opts])
-    (with-open [stmt (jdbc/prepare conn sql-args opts)]
-      (u/println-debug ["Executing statement with %s" (symbol (.getCanonicalName (class conn)))])
-      (let [result-set? (try
-                          (.execute stmt)
-                          (catch Exception e
-                            (throw (ex-info (format "Error executing SQL: %s" (ex-message e))
-                                            {:context u/*error-context*, :sql-args sql-args}
-                                            e))))]
-        (cond
-          (:return-keys opts)
-          (do
-            (u/println-debug ["Query was executed with %s; returning generated keys" :return-keys])
-            (with-open [rset (.getGeneratedKeys stmt)]
-              (reduce rf init (t2.jdbc.rs/reducible-result-set conn model rset))))
+    (u/try-with-error-context ["execute SQL" {::sql-args sql-args}]
+      (with-open [stmt (jdbc/prepare conn sql-args opts)]
+        (u/println-debug ["Executing statement with %s" (symbol (.getCanonicalName (class conn)))])
+        (let [result-set? (.execute stmt)]
+          (cond
+            (:return-keys opts)
+            (do
+              (u/println-debug ["Query was executed with %s; returning generated keys" :return-keys])
+              (with-open [rset (.getGeneratedKeys stmt)]
+                (reduce rf init (t2.jdbc.rs/reducible-result-set conn model rset))))
 
-          result-set?
-          (with-open [rset (.getResultSet stmt)]
-            (reduce rf init (t2.jdbc.rs/reducible-result-set conn model rset)))
+            result-set?
+            (with-open [rset (.getResultSet stmt)]
+              (reduce rf init (t2.jdbc.rs/reducible-result-set conn model rset)))
 
-          :else
-          (do
-            (u/println-debug "Query did not return a ResultSet; nothing to reduce. Returning update count.")
-            (reduce rf init [(.getUpdateCount stmt)])
-            #_init
-            #_(reduce rf init nil)))))))
+            :else
+            (do
+              (u/println-debug "Query did not return a ResultSet; nothing to reduce. Returning update count.")
+              (reduce rf init [(.getUpdateCount stmt)])
+              #_init
+              #_(reduce rf init nil))))))))
 
 ;; (defn execute-jdbc-query! [^java.sql.Connection conn sql-args]
 ;;   (let [opts (options)]

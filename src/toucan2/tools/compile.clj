@@ -39,6 +39,8 @@
   [_model query f]
   (f query))
 
+;;; TODO -- this should actually be overriding the function used once a query is BUILT, because who's to say we actually
+;;; are going to pass the built query to the compilation step?
 (defmacro build
   "Return the built query before compilation that would have been executed by `body` without compiling or executing it."
   {:style/indent 0}

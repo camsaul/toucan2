@@ -15,11 +15,11 @@
 
 (defn reducible-delete
   {:arglists '([modelable & conditions? query?])}
-  [modelable & unparsed-args]
-  (op/reducible-update* ::delete modelable unparsed-args))
+  [& unparsed-args]
+  (op/reducible-update ::delete unparsed-args))
 
 (defn delete!
   "Returns number of rows deleted."
   {:arglists '([modelable & conditions? query?])}
-  [modelable & unparsed-args]
-  (op/returning-update-count! ::delete modelable unparsed-args))
+  [& unparsed-args]
+  (op/returning-update-count! ::delete unparsed-args))

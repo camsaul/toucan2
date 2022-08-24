@@ -117,14 +117,14 @@
 (deftest disallow-nil-model-test
   (testing "Disallow nil models"
     (is (thrown-with-msg?
-         AssertionError
+         Throwable
          #"Assert failed: toucan2.tools.with-temp/with-temp model cannot be nil"
          (with-temp/with-temp []
            (is (= :not-here
                   :here)
                "should never get here."))))
     (is (thrown-with-msg?
-         AssertionError
+         Throwable
          #"Assert failed: toucan2.tools.with-temp/with-temp model cannot be nil"
          (with-temp/with-temp [nil]
            (is (= :not-here
@@ -133,7 +133,7 @@
 
 (deftest validate-attributes-test
   (is (thrown-with-msg?
-       AssertionError
+       Throwable
        #"Assert failed: attributes passed to toucan2.tools.with-temp/with-temp must be a map"
        (with-temp/with-temp [::test/venues _ 123]
          (is (= :not-here
