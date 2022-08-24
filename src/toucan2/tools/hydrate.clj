@@ -247,8 +247,7 @@
                    (seq result)
                    (every? keyword? result))
       (throw (ex-info (format "fk-keys-for-automagic-hydration should return a non-empty sequence of keywords. Got: %s" (u/safe-pr-str result))
-                      {:context        u/*error-context*
-                       :original-model original-model
+                      {:original-model original-model
                        :dest-key       dest-key
                        :hydrated-model hydrated-model
                        :result         result})))
@@ -304,7 +303,7 @@
 
 (m/defmethod hydrate-with-strategy ::automagic-batched
   [model _strategy dest-key rows]
-  (try
+  (u/try-with-error-context ["automagic batched hydration" {::model model, ::dest-key dest-key}]
     (let [hydrating-model      (model-for-automagic-hydration model dest-key)
           _                    (u/println-debug ["Hydrating %s key %s with rows from %s" (or model "map") dest-key hydrating-model])
           fk-keys              (fk-keys-for-automagic-hydration model dest-key hydrating-model)
@@ -312,13 +311,7 @@
           rows                 (automagic-batched-hydration-add-fks dest-key rows fk-keys)
           pk->fetched-instance (automagic-batched-hydration-fetch-pk->instance hydrating-model rows)]
       (u/println-debug ["Fetched %d rows of %s" (count pk->fetched-instance) hydrating-model])
-      (do-automagic-batched-hydration dest-key rows pk->fetched-instance))
-    (catch Throwable e
-      (throw (ex-info (format "Error doing automagic batched hydration: %s" (ex-message e))
-                      {:context  u/*error-context*
-                       :model    model
-                       :dest-key dest-key}
-                      e)))))
+      (do-automagic-batched-hydration dest-key rows pk->fetched-instance))))
 
 
 ;;;                         Method-Based Batched Hydration (using impls of [[batched-hydrate]])
@@ -416,7 +409,7 @@
   (when-not (seq nested-keys)
     (throw (ex-info (str (format "Invalid hydration form: replace %s with %s. Vectors are for nested hydration." coll k)
                          " There's no need to use one when you only have a single key.")
-                    {:context u/*error-context*, :invalid-form coll})))
+                    {:invalid-form coll})))
   (let [results                     (hydrate results k)
         newly-hydrated-values       (map k results)
         recursively-hydrated-values (apply hydrate newly-hydrated-values nested-keys)]
@@ -456,7 +449,7 @@
 
         :else
         (throw (ex-info (format "Invalid hydration form: %s. Expected keyword or sequence." k)
-                        {:context u/*error-context*, :invalid-form k}))))))
+                        {:invalid-form k}))))))
 
 (defn- hydrate-forms
   "Hydrate many hydration forms across a *sequence* of `results` by recursively calling `hydrate-one-form`."

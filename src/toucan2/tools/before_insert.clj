@@ -9,16 +9,12 @@
   {:arglists '([model row])}
   u/dispatch-on-first-arg)
 
-(defn do-before-insert-to-rows [rows model]
+(defn- do-before-insert-to-rows [rows model]
   (mapv
    (fn [row]
-     (try
+     (u/try-with-error-context [`before-insert {::model model, ::row row}]
        (u/with-debug-result ["Do before-insert to %s" row]
-         (before-insert model row))
-       (catch Throwable e
-         (throw (ex-info (format "Error in before-insert for %s: %s" (u/safe-pr-str model) (ex-message e))
-                         {:context u/*error-context*, :model model, :row row}
-                         e)))))
+         (before-insert model row))))
    rows))
 
 (m/defmethod op/reducible-update* :before [::insert/insert ::before-insert]

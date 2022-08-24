@@ -43,24 +43,12 @@
     (assert (map? explicit-attributes) (format "attributes passed to %s must be a map." `with-temp)))
   (let [defaults          (with-temp-defaults model)
         merged-attributes (merge {} defaults explicit-attributes)]
-    (binding [u/*error-context* (update u/*error-context*
-                                        ::with-temp
-                                        (fn [with-temp]
-                                          (conj with-temp {:model               model
-                                                           :explicit-attributes explicit-attributes
-                                                           :default-attributes  defaults
-                                                           :merged-attributes   merged-attributes})))]
+    (u/try-with-error-context ["with temp" {::model               model
+                                            ::explicit-attributes explicit-attributes
+                                            ::default-attributes  defaults
+                                            ::merged-attributes   merged-attributes}]
       (let [temp-object (u/with-debug-result ["Create temporary %s with attributes %s" model merged-attributes]
-                          (first (try
-                                   (insert/insert-returning-instances! model merged-attributes)
-                                   (catch Throwable e
-                                     (throw (ex-info (format "Error inserting temp %s: %s"
-                                                             (u/safe-pr-str model) (ex-message e))
-                                                     ;; just take the stuff we added to the error context above instead
-                                                     ;; of defining it all a second time.
-                                                     (merge {:context u/*error-context*}
-                                                            (last (::with-temp u/*error-context*)))
-                                                     e))))))]
+                          (first (insert/insert-returning-instances! model merged-attributes)))]
 
         (try
           (t/testing (format "with temporary %s with attributes %s" (u/safe-pr-str model) (u/safe-pr-str merged-attributes))

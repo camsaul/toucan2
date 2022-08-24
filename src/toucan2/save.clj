@@ -14,18 +14,11 @@
 
 (m/defmethod save! :around :default
   [object]
-  (try
+  (u/try-with-error-context ["save changes" {::model   (protocols/model object)
+                                             ::object  object
+                                             ::changes (protocols/changes object)}]
     (u/with-debug-result ["Save %s %s changes %s" (protocols/model object) object (protocols/changes object)]
-      (next-method object))
-    (catch Throwable e
-      (throw (ex-info (format "Error saving %s: %s"
-                              (u/safe-pr-str (protocols/model object))
-                              (ex-message e))
-                      {:context u/*error-context*
-                       :model   (protocols/model object)
-                       :object  object
-                       :changes (protocols/changes object)}
-                      e)))))
+      (next-method object))))
 
 (m/defmethod save! :default
   [object]
@@ -41,9 +34,8 @@
           (throw (ex-info (format "Unable to save object: %s with primary key %s does not exist."
                                   (u/safe-pr-str model)
                                   (u/safe-pr-str pk-values))
-                          {:context u/*error-context*
-                           :object  object
-                           :pk      pk-values})))
+                          {:object object
+                           :pk     pk-values})))
         (when (> rows-affected 1)
           (u/println-debug ["Warning: more than 1 row affected when saving %s with primary key %s"
                             model pk-values]))

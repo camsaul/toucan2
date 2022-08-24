@@ -19,12 +19,8 @@
 (m/defmethod after :around :default
   [query-type model instance]
   (u/with-debug-result [(list `after query-type model instance)]
-    (try
-      (next-method query-type model instance)
-      (catch Throwable e
-        (throw (ex-info (format "Error in %s %s for %s: %s" `after query-type (u/safe-pr-str model) (ex-message e))
-                        {:context u/*error-context*, :model model, :row instance}
-                        e))))))
+    (u/try-with-error-context ["do after- transformations to result" {::query-type query-type, ::model model, ::row instance}]
+      (next-method query-type model instance))))
 
 (defn has-after-method? [query-type model]
   (not= (m/default-primary-method after)

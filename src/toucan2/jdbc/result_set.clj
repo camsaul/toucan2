@@ -80,7 +80,7 @@
 (deftype ^:no-doc ReducibleResultSet [^Connection conn model ^ResultSet rset]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (try
+    (u/try-with-error-context [(format "reduce %s" `ReducibleResultSet) {::model model, ::rf rf, ::init init}]
       (let [thunk (row-thunk conn model rset)]
         (loop [acc init]
           (cond
@@ -91,11 +91,7 @@
             (recur (rf acc (thunk)))
 
             :else
-            acc)))
-      (catch Throwable e
-        (throw (ex-info (format "Error reducing results: %s" (ex-message e))
-                        {:context u/*error-context*, :rf rf, :init init, :result-set rset}
-                        e)))))
+            acc)))))
 
   pretty/PrettyPrintable
   (pretty [_this]

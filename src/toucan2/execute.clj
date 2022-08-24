@@ -109,8 +109,7 @@
 
 (m/defmethod reduce-uncompiled-query :around :default
   [connectable model query rf init]
-  ;; preserve the first uncompiled query we see if this gets called recursively
-  (binding [u/*error-context* (merge {::uncompiled-query query} u/*error-context*)]
+  (u/try-with-error-context ["reduce uncompiled query" {::uncompiled-query query}]
     (next-method connectable model query rf init)))
 
 (defn- reduce-impl [connectable modelable queryable rf init]

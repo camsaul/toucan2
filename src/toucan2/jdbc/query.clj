@@ -18,7 +18,7 @@
 (defn reduce-jdbc-query [^java.sql.Connection conn model sql-args rf init]
   (let [opts (options)]
     (u/println-debug ["Preparing JDBC query with next.jdbc options %s" opts])
-    (u/try-with-error-context ["execute SQL" {::sql-args sql-args}]
+    (u/try-with-error-context [(format "execute SQL with %s" (.getCanonicalName (class conn))) {::sql-args sql-args}]
       (with-open [stmt (jdbc/prepare conn sql-args opts)]
         (u/println-debug ["Executing statement with %s" (symbol (.getCanonicalName (class conn)))])
         (let [result-set? (.execute stmt)]

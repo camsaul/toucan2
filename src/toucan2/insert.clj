@@ -51,7 +51,7 @@
   [query-type model {:keys [rows], :as parsed-args}]
   (when (empty? rows)
     (throw (ex-info "Cannot build insert query with empty :values"
-                    {:context u/*error-context*, :query-type query-type, :model model, :args parsed-args})))
+                    {:query-type query-type, :model model, :args parsed-args})))
   (merge
    {:insert-into [(keyword (model/table-name model))]}
    ;; if `rows` is just a single empty row then insert it with

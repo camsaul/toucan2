@@ -117,10 +117,9 @@
 
 (m/defmethod parse-args :around :default
   [query-type unparsed-args]
-  (u/try-with-error-context [`parse-args {::query-type query-type, ::unparsed-args unparsed-args}]
+  (u/try-with-error-context ["parse args" {::query-type query-type, ::unparsed-args unparsed-args}]
     (doto (u/with-debug-result [(list `parse-args query-type unparsed-args)]
-            (binding [u/*error-context* (assoc u/*error-context* ::unparsed-args unparsed-args)]
-              (next-method query-type unparsed-args)))
+            (next-method query-type unparsed-args))
       validate-parsed-args)))
 
 ;;;; default method
@@ -133,7 +132,7 @@
       (throw (ex-info (format "Don't know how to interpret %s args: %s"
                               (u/safe-pr-str query-type)
                               (s/explain-str spec unparsed-args))
-                      {:context u/*error-context*, :spec-error (s/explain-data spec unparsed-args)})))
+                      (s/explain-data spec unparsed-args))))
     (cond-> parsed
       (:modelable parsed)                 (merge (let [[modelable-type x] (:modelable parsed)]
                                                    (case modelable-type
@@ -208,9 +207,8 @@
 (m/defmethod do-with-resolved-query :around :default
   [model queryable f]
   (let [f* (^:once fn* [query]
-            (binding [u/*error-context* (assoc u/*error-context* ::resolved-query query)]
-              (u/try-with-error-context ["with resolved query" {::model model, ::queryable queryable, ::resolved-query query}]
-                (f query))))]
+            (u/try-with-error-context ["with resolved query" {::model model, ::queryable queryable, ::resolved-query query}]
+              (f query)))]
     (next-method model queryable f*)))
 
 ;;;; [[build]]
@@ -235,26 +233,11 @@
   [query-type model parsed-args]
   (assert (map? parsed-args)
           (format "%s expects map parsed-args, got %s." `build (u/safe-pr-str parsed-args)))
-  (u/try-with-error-context [`build {::query-type  query-type
-                                     ::model       model
-                                     ::parsed-args parsed-args}]
+  (u/try-with-error-context ["build query" {::query-type  query-type
+                                            ::model       model
+                                            ::parsed-args parsed-args}]
     (u/with-debug-result [(list `build query-type model parsed-args)]
-      (next-method query-type model parsed-args)))
-  #_(try
-      (u/with-debug-result [(list `build query-type model parsed-args)]
-        (next-method query-type model parsed-args))
-      (catch Throwable e
-        (throw (ex-info (format "Error building %s query for model %s: %s"
-                                (u/safe-pr-str query-type)
-                                (u/safe-pr-str model)
-                                (ex-message e))
-                        {:context        u/*error-context*
-                         :query-type     query-type
-                         :model          model
-                         :parsed-args    parsed-args
-                         :method         #'build
-                         :dispatch-value (m/dispatch-value build query-type model parsed-args)}
-                        e)))))
+      (next-method query-type model parsed-args))))
 
 (m/defmethod build :default
   [query-type model parsed-args]
@@ -262,8 +245,7 @@
                           (u/safe-pr-str parsed-args)
                           `build
                           (u/safe-pr-str (m/dispatch-value build query-type model parsed-args)))
-                  {:context        u/*error-context*
-                   :query-type     query-type
+                  {:query-type     query-type
                    :model          model
                    :parsed-args    parsed-args
                    :method         #'build
@@ -297,8 +279,7 @@
   [query-type model {sql-args :query, :keys [kv-args], :as parsed-args}]
   (when (seq kv-args)
     (throw (ex-info "key-value args are not supported for plain SQL queries."
-                    {:context        u/*error-context*
-                     :query-type     query-type
+                    {:query-type     query-type
                      :model          model
                      :parsed-args    parsed-args
                      :method         #'build

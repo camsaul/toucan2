@@ -115,17 +115,7 @@
                       :when                xform]
                   [k (fn xform-fn [v]
                        (u/try-with-error-context ["apply transform" {::transforms transforms, ::model model, ::k k, ::v v, ::xform xform}]
-                         (xform v))
-                       #_(try
-                         (xform v)
-                         (catch Throwable e
-                           (throw (ex-info (format "Error transforming %s %s value %s: %s"
-                                                   (u/safe-pr-str model)
-                                                   (u/safe-pr-str k)
-                                                   (u/safe-pr-str v)
-                                                   (ex-message e))
-                                           {:context u/*error-context*, :model model, :k k, :v v, :xform xform}
-                                           e)))))]))))))
+                         (xform v)))]))))))
 
 (defn- in-transforms [model]
   (wrapped-transforms model :in))

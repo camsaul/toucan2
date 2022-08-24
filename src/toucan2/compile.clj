@@ -21,16 +21,16 @@
   #'do-with-compiled-query)
 
 (m/defmethod do-with-compiled-query :around :default
-  [model query f]
+  [model uncompiled f]
   (let [f* (^:once fn* [compiled]
             (when (and u/*debug*
-                       (not= query compiled))
-              (u/with-debug-result ["compile %s query %s" model query]
+                       (not= uncompiled compiled))
+              (u/with-debug-result ["compile %s query %s" model uncompiled]
                 compiled))
-            ;; preserve all the compiled queries if we do multiple recursive compiles.
-            (binding [u/*error-context* (update u/*error-context* ::compiled #(conj (vec %) compiled))]
+            (u/try-with-error-context (when (not= uncompiled compiled)
+                                        ["with compiled query" {::compiled compiled}])
               (f compiled)))]
-    (next-method model query f*)))
+    (next-method model uncompiled f*)))
 
 (m/defmethod do-with-compiled-query [:default String]
   [_model sql f]
@@ -58,16 +58,6 @@
   (let [options  (merge @global-honeysql-options
                         *honeysql-options*)
         _        (u/println-debug ["Compiling Honey SQL 2 with options %s" options])
-        sql-args (try
-                   (hsql/format honeysql options)
-                   (catch Throwable e
-                     (throw (ex-info (format "Error building query: %s" (ex-message e))
-                                     {:context  u/*error-context*
-                                      :model    model
-                                      :honeysql honeysql
-                                      :options  options}
-                                     e))))]
-    (binding [u/*error-context* (assoc u/*error-context*
-                                       ::options options
-                                       ::honeysql honeysql)]
-      (do-with-compiled-query model sql-args f))))
+        sql-args (u/try-with-error-context ["compile Honey SQL query" {::honeysql honeysql, ::options options}]
+                   (hsql/format honeysql options))]
+    (do-with-compiled-query model sql-args f)))

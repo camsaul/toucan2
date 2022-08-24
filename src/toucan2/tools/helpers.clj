@@ -13,14 +13,12 @@
 
 ;;;; [[define-before-select]]
 
-(defn do-before-select [model thunk]
-  (u/with-debug-result ["%s %s" `define-before-select model]
-    (try
-      (thunk)
-      (catch Throwable e
-        (throw (ex-info (format "Error in %s for %s: %s" `define-before-select (u/safe-pr-str model) (ex-message e))
-                        {:context u/*error-context*, :model model}
-                        e))))))
+(defn ^:no-doc do-before-select
+  "Impl for [[define-before-select]]. Don't call this directly."
+  [model thunk]
+  (u/try-with-error-context ["before select" {::model model}]
+    (u/with-debug-result ["%s %s" `define-before-select model]
+      (thunk))))
 
 (defmacro define-before-select
   {:style/indent :defn, :arglists '([model [args-binding] & body]

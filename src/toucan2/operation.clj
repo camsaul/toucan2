@@ -35,7 +35,7 @@
       (reducible-update* query-type model (dissoc parsed-args :modelable)))))
 
 (defn returning-update-count! [query-type unparsed-args]
-  (u/try-with-error-context [`returning-update-count! {::query-type query-type, ::unparsed-args unparsed-args}]
+  (u/try-with-error-context ["execute update returning count" {::query-type query-type, ::unparsed-args unparsed-args}]
     (u/with-debug-result ["%s returning update count" query-type]
       (reduce (fnil + 0 0) 0 (reducible-update query-type unparsed-args)))))
 
@@ -56,7 +56,7 @@
                 (let [pks (pks-fn row)]
                   (when (nil? pks)
                     (throw (ex-info (format "Error returning PKs: pks-fn returned nil for row %s" (u/safe-pr-str row))
-                                    {:context u/*error-context*, :row (realize/realize row), :pks-fn pks-fn})))
+                                    {:row (realize/realize row), :pks-fn pks-fn})))
                   pks)))))
      (execute/->WithReturnKeys reducible-operation))))
 
@@ -84,7 +84,7 @@
 (defn update-returning-pks!
   "Helper wrapper for [[reducible-update-returning-pks]] that also fully realizes the results."
   [query-type unparsed-args]
-  (u/try-with-error-context [`update-returning-pks! {::query-type query-type, ::unparsed-args unparsed-args}]
+  (u/try-with-error-context ["execute update returning PKs" {::query-type query-type, ::unparsed-args unparsed-args}]
     (u/with-debug-result ["%s returning PKs" query-type]
       (realize/realize (reducible-update-returning-pks query-type unparsed-args)))))
 
@@ -165,6 +165,6 @@
 (defn returning-instances
   "Helper wrapper for [[reducible-returning-instances]] that also fully realizes the reducible it returns."
   [query-type unparsed-args]
-  (u/try-with-error-context [`returning-instances {::query-type query-type, ::unparsed-args unparsed-args}]
+  (u/try-with-error-context ["execute query returning instances" {::query-type query-type, ::unparsed-args unparsed-args}]
     (u/with-debug-result ["%s returning instances" query-type]
       (realize/realize (reducible-returning-instances query-type unparsed-args)))))

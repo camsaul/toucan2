@@ -22,13 +22,15 @@
 (m/defmethod do-with-connection :around ::default
   [connectable f]
   (assert (fn? f))
-  (next-method connectable (^:once fn* [conn]
-                            (binding [*current-connectable* conn
-                                      ;; add the dispatch value rather than the connection type itself to avoid leaking
-                                      ;; sensitive creds
-                                      u/*error-context*     (assoc u/*error-context*
-                                                                   ::connection-type (protocols/dispatch-value conn))]
-                              (f conn)))))
+  ;; add the connection class and connectable dispatch value rather than the connection type itself to avoid leaking
+  ;; sensitive creds
+  (u/try-with-error-context ["resolve connection" {::connectable (if (instance? pretty.core.PrettyPrintable connectable)
+                                                                   (pretty/pretty connectable)
+                                                                   (protocols/dispatch-value connectable))}]
+    bound-fn*
+    (next-method connectable (^:once fn* [conn]
+                              (binding [*current-connectable* conn]
+                                (f conn))))))
 
 (defmacro with-connection
   {:arglists '([[connection-binding connectable] & body]
@@ -48,7 +50,7 @@
                           (u/safe-pr-str connectable)
                           `do-with-connection
                           (protocols/dispatch-value connectable))
-                  {:context u/*error-context*, :connectable connectable})))
+                  {:connectable connectable})))
 
 ;;; method called if there is no current connection.
 (m/defmethod do-with-connection :default
@@ -56,7 +58,7 @@
   (throw (ex-info (format "No default Toucan connection defined. You can define one by implementing %s for :default. You can also implement %s for a model."
                           `do-with-connection
                           'toucan2.model/default-connectable)
-                  {:context u/*error-context*})))
+                  {})))
 
 ;;; `nil` means use the current connection.
 ;;;

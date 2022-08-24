@@ -6,12 +6,8 @@
             [toucan2.util :as u]))
 
 (defn- realize-column-with-thunk [k thunk]
-  (try
-    (thunk)
-    (catch Throwable e
-      (throw (ex-info (format "Error realizing column %s: %s" (u/safe-pr-str k) (ex-message e))
-                      {:context u/*error-context*, :k k, :thunk thunk}
-                      e)))))
+  (u/try-with-error-context ["realize column with thunk" {::k k, ::thunk thunk}]
+    (thunk)))
 
 ;; TODO -- instead of thunks, should these just be DELAYS????
 (p/def-map-type Row [col-name->thunk mta]

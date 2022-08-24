@@ -4,14 +4,18 @@
    [clojure.walk :as walk]
    [pretty.core :as pretty]
    [puget.printer :as puget]
-   [toucan2.protocols :as protocols]))
+   [toucan2.protocols :as protocols]
+   [toucan2.util :as u]))
+
+;;; TODO -- there is a lot of repeated code in here to make sure we don't accidentally realize and print `IReduceInit`,
+;;; and at least 3 places we turn an `eduction` into the same pretty form. Maybe we should try to consolidate some of
+;;; that logic.
 
 (set! *warn-on-reflection* true)
 
-;;; TODO -- maybe we should use an ordered map here so keys will be kept in the order they were added.
-(def ^:dynamic *error-context* {})
-
-(def ^:dynamic *debug* false)
+(def ^:dynamic *debug*
+  "Whether to print debug messages. Bind this to truthy enable detailed debugging."
+  false)
 
 (def ^:private ^:dynamic *debug-indent-level* 0)
 
@@ -105,7 +109,7 @@
     ((pretty-printer) x)
     (catch Throwable e
       (throw (ex-info (format "Error pretty printing %s: %s" (some-> x class .getCanonicalName) (ex-message e))
-                      {:context *error-context*, :object x}
+                      {:object x}
                       e)))))
 
 (defn ^:no-doc pprint-to-str [x]
@@ -236,41 +240,47 @@
 (defprotocol ^:private AddContext
   (^:no-doc add-context ^Throwable [^Throwable e additional-context]))
 
-(defn- add-context-to-ex-data [ex-data-m additional-context]
-  (-> ex-data-m
-      #_(update :toucan2/old-context merge *error-context*)
-      (update :toucan2/context-trace #(conj (vec %) (walk/prewalk
-                                                     (fn [form]
-                                                       (cond
-                                                         (instance? pretty.core.PrettyPrintable form)
-                                                         (pretty/pretty form)
+(defn- add-context-to-ex-data [ex-data-map [msg & more]]
+  (let [additional-context (cons (str msg) more)]
+    (update ex-data-map
+            :toucan2/context-trace
+            #(conj (vec %) (walk/prewalk
+                            (fn [form]
+                              (cond
+                                (instance? pretty.core.PrettyPrintable form)
+                                (pretty/pretty form)
 
-                                                         (instance? clojure.core.Eduction form)
-                                                         (list 'eduction
-                                                               (.xform ^clojure.core.Eduction form)
-                                                               (.coll ^clojure.core.Eduction form))
+                                (instance? clojure.core.Eduction form)
+                                (list 'eduction
+                                      (.xform ^clojure.core.Eduction form)
+                                      (.coll ^clojure.core.Eduction form))
 
-                                                         (and (instance? clojure.lang.IReduceInit form)
-                                                              (not (coll? form)))
-                                                         (class form)
+                                (and (instance? clojure.lang.IReduceInit form)
+                                     (not (coll? form)))
+                                (class form)
 
-                                                         :else form))
-                                                     additional-context)))))
+                                :else
+                                form))
+                            additional-context)))))
 
 (extend-protocol AddContext
   clojure.lang.ExceptionInfo
   (add-context [^Throwable e additional-context]
-    (doto ^Throwable (ex-info (ex-message e)
-                              (add-context-to-ex-data (ex-data e) additional-context)
-                              (ex-cause e))
-      (.setStackTrace (.getStackTrace e))))
+    (if (empty? additional-context)
+      e
+      (doto ^Throwable (ex-info (ex-message e)
+                                (add-context-to-ex-data (ex-data e) additional-context)
+                                (ex-cause e))
+        (.setStackTrace (.getStackTrace e)))))
 
   Throwable
   (add-context [^Throwable e additional-context]
-    (doto ^Throwable (ex-info (ex-message e)
-                              (add-context-to-ex-data {} additional-context)
-                              e)
-      (.setStackTrace (.getStackTrace e)))))
+    (if (empty? additional-context)
+      e
+      (doto ^Throwable (ex-info (ex-message e)
+                                (add-context-to-ex-data {} additional-context)
+                                e)
+        (.setStackTrace (.getStackTrace e))))))
 
 (defmacro try-with-error-context
   {:style/indent :defn}
