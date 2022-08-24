@@ -29,6 +29,12 @@
   []
   @-root-namespace)
 
+(def ^:dynamic ^:deprecated *disable-db-logging*
+  "DEPRECATED: Toucan 2 does not currently have 'DB logging' to enable or disable, and even if it did, it's unlikely that
+  we would have a with a dynamic var for toggling it. Instead. we'll probably use [[clojure.tools.logging]]. This is
+  here mostly to minimize the number of changes you need to make to existing code. Binding it has no effect whatsoever."
+  false)
+
 (defn- model-symb->ns [symb]
   (symbol (str (root-namespace) \. (csk/->kebab-case (name symb)))))
 
