@@ -298,33 +298,76 @@
   {:arglists '([model query k v])}
   u/dispatch-on-first-three-args)
 
-(defn condition->honeysql-where-clause [k v]
+(defn condition->honeysql-where-clause
+  "Something sequential like `:id [:> 5]` becomes `[:> :id 5]`. Other stuff like `:id 5` just becomes `[:= :id 5]`."
+  [k v]
+  ;; don't think there's any situtation where `nil` on the LHS is on purpose and not a bug.
+  {:pre [(some? v)]}
   (if (sequential? v)
     (vec (list* (first v) k (rest v)))
     [:= k v]))
 
 (m/defmethod apply-kv-arg [:default clojure.lang.IPersistentMap :default]
   [_model honeysql k v]
-  (update honeysql :where (fn [existing-where]
-                            (:where (hsql.helpers/where existing-where
-                                                        (condition->honeysql-where-clause k v))))))
+  (u/with-debug-result ["apply kv-arg %s %s" k v]
+    (update honeysql :where (fn [existing-where]
+                              (:where (hsql.helpers/where existing-where
+                                                          (condition->honeysql-where-clause k v)))))))
+
+(comment
+  ;; with a composite PK like
+  [:id :name]
+  ;; we need to be able to handle either
+  [:in [["BevMo" 4] ["BevLess" 5]]]
+  ;; or
+  [:between ["BevMo" 4] ["BevLess" 5]])
+
+(defn- toucan-pk-composite-values** [pk-columns tuple]
+  {:pre [(= (count pk-columns) (count tuple))]}
+  (map-indexed (fn [i col]
+                 {:col col, :v (nth tuple i)})
+               pk-columns))
+
+(defn- toucan-pk-nested-composite-values [pk-columns tuples]
+  (->> (mapcat (fn [tuple]
+                 (toucan-pk-composite-values** pk-columns tuple))
+               tuples)
+       (group-by :col)
+       (map (fn [[col ms]]
+              {:col col, :v (mapv :v ms)}))))
+
+(defn- toucan-pk-composite-values* [pk-columns tuple]
+  (if (some sequential? tuple)
+    (toucan-pk-nested-composite-values pk-columns tuple)
+    (toucan-pk-composite-values** pk-columns tuple)))
+
+(defn- toucan-pk-fn-values [pk-columns fn-name tuples]
+  (->> (mapcat (fn [tuple]
+                 (toucan-pk-composite-values* pk-columns tuple))
+               tuples)
+       (group-by :col)
+       (map (fn [[col ms]]
+              {:col col, :v (into [fn-name] (map :v) ms)}))))
+
+(defn- toucan-pk-composite-values [pk-columns tuple]
+  {:pre [(sequential? tuple)], :post [(sequential? %) (every? map? %) (every? :col %)]}
+  (if (keyword? (first tuple))
+    (toucan-pk-fn-values pk-columns (first tuple) (rest tuple))
+    (toucan-pk-composite-values* pk-columns tuple)))
 
 (m/defmethod apply-kv-arg [:default clojure.lang.IPersistentMap :toucan/pk]
   [model honeysql _k v]
-  (let [pk-columns (model/primary-keys model)
-        v          (if (sequential? v)
-                     v
-                     [v])]
-    (assert (= (count pk-columns)
-               (count v))
-            (format "Expected %s primary key values for %s, got %d values %s"
-                    (count pk-columns) (u/safe-pr-str pk-columns)
-                    (count v) (u/safe-pr-str v)))
-    (reduce
-     (fn [honeysql [k v]]
-       (apply-kv-arg model honeysql k v))
-     honeysql
-     (zipmap pk-columns v))))
+  ;; `fn-name` here would be if you passed something like `:toucan/pk [:in 1 2]` -- the fn name would be `:in` -- and we
+  ;; pass that to [[condition->honeysql-where-clause]]
+  (let [pk-columns (model/primary-keys model)]
+    (u/with-debug-result ["apply :toucan/pk %s for primary keys" v]
+      (if (= (count pk-columns) 1)
+        (apply-kv-arg model honeysql (first pk-columns) v)
+        (reduce
+         (fn [honeysql {:keys [col v]}]
+           (apply-kv-arg model honeysql col v))
+         honeysql
+         (toucan-pk-composite-values pk-columns v))))))
 
 (defn apply-kv-args [model query kv-args]
   (reduce
