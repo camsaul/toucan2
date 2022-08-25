@@ -3,6 +3,7 @@
    [clojure.java.io :as io]
    [clojure.spec.alpha :as s]
    [clojure.string :as str]
+   [clojure.template :as clojure.template]
    [clojure.test :refer :all]
    [methodical.core :as m]
    [pjstadig.humane-test-output :as humane-test-output]
@@ -13,6 +14,21 @@
 (set! *warn-on-reflection* true)
 
 (humane-test-output/activate!)
+
+;; replace [[clojure.test/are]] with a version that includes the actual form being tested as `testing` context. It's a
+;; lot easier to debug that way. It expands things exactly the same way tho (using [[clojure.template]]) so there is
+;; zero difference for anything but the test output.
+
+(defmacro are+ [bindings assertion & args]
+  {:pre [(every? symbol? bindings)]}
+  (let [tuples (partition-all (count bindings) args)]
+    `(do
+       ~@(for [tuple tuples]
+           (let [spliced (clojure.template/apply-template bindings assertion tuple)]
+             `(testing '~spliced
+                (is ~spliced)))))))
+
+(alter-var-root #'clojure.test/are (constantly @#'are+))
 
 ;;;; test [[db-types]] and tooling
 
