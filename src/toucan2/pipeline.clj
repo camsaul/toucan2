@@ -301,10 +301,18 @@
     (transduce-compiled-query-with-connection rf conn query-type model compiled-query)))
 
 ;;; For DML stuff we will run the whole thing in a transaction if we're not already in one.
-(m/defmethod transduce-compiled-query* [:default :toucan.statement-type/DML]
+;;;
+;;; Not 100% sure this is necessary since we would probably already be in one if we needed to be because stuff like
+;;; [[toucan2.tools.before-delete]] have to put us in one much earlier.
+(m/defmethod transduce-compiled-query* [#_query-type     :toucan.statement-type/DML
+                                        #_model          :default
+                                        #_compiled-query :default]
   [rf query-type model compiled-query]
   (conn/with-transaction [conn (current-connectable model) {:nested-transaction-rule :ignore}]
-    (transduce-compiled-query-with-connection rf conn query-type model compiled-query)))
+    (println "<IN TRANSACTION>")        ; NOCOMMIT
+    (doto (transduce-compiled-query-with-connection rf conn query-type model compiled-query)
+      (println "<NOT IN TRANSACTION>")
+      )))
 
 ;;;; reducible versions
 

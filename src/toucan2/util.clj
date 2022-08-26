@@ -138,7 +138,7 @@
         texts   (map ->Text* (str/split format-string #"%s"))]
     `(pprint-to-str (->Doc ~(vec (interleave-all texts args))))))
 
-(defmacro ^:no-doc ^:deprecated println-debug
+(defmacro ^:no-doc println-debug
   [arg & more]
   `(when *debug*
      ~(if (vector? arg)
@@ -148,7 +148,7 @@
                               ~@more)
         `(println-debug* ~arg ~@more))))
 
-(defn- ^:deprecated print-debug-result [result]
+(defn- print-debug-result [result]
   (print (indentation))
   (print "↳ ")
 
@@ -169,7 +169,7 @@
     (print-debug-result result)
     result))
 
-(defmacro ^:no-doc ^:deprecated with-debug-result [message & body]
+(defmacro ^:no-doc with-debug-result [message & body]
   (if (vector? message)
     `(with-debug-result ~(if (> (count message) 1)
                            `(format-doc ~(first message) ~@(rest message))
@@ -230,7 +230,7 @@
   (walk/postwalk safe-printable x))
 
 ;;; TODO -- not sure if this is still needed, now that we're not using reducibles everywhere.
-(defn ^:no-doc ^:deprecated safe-pr-str
+(defn ^:no-doc safe-pr-str
   "Like [[clojure.core/pr-str]], but does not evaluate reducibles or eductions, and
   handles [[pretty.core/PrettyPrintable]] things recursively."
   [x]

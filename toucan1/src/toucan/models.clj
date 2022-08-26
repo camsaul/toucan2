@@ -333,14 +333,15 @@
   [modelable changes-map]
   {:pre [(map? changes-map)]}
   ;; mega HACK
-  (model/with-model [model modelable]
-    (as-> changes-map changes-map
-      ;; make sure a method exists before calling it so it doesn't error
-      (cond->> changes-map
-        (m/applicable-primary-method before-update/before-update model)
-        (before-update/before-update model))
-      ;; apply the transformed changes.
-      (:kv-args (transformed/apply-in-transforms model {:kv-args changes-map})))))
+  ;; FIXME
+  #_(model/with-model [model modelable]
+      (as-> changes-map changes-map
+        ;; make sure a method exists before calling it so it doesn't error
+        (cond->> changes-map
+          (m/applicable-primary-method before-update/before-update model)
+          (before-update/before-update model))
+        ;; apply the transformed changes.
+        (:kv-args (transformed/apply-in-transforms model {:kv-args changes-map})))))
 
 (defn pre-update
   "Do [[toucan2.tools.before-update]] stuff for an `instance`."
@@ -375,15 +376,16 @@
   "Do [[toucan2.tools.before-delete]] stuff for an `instance`."
   [instance]
   {:pre [(instance/instance? instance)]}
-  (let [model (protocols/model instance)]
-    ;; mega HACK
-    (as-> instance instance
-      ;; make sure a method exists before calling it so it doesn't error
-      (cond->> instance
-        (m/applicable-primary-method before-delete/before-delete model)
-        (before-delete/before-delete model))
-      ;; apply the transformed changes.
-      (:kv-args (transformed/apply-in-transforms model {:kv-args instance})))))
+  ;; FIXME
+  #_(let [model (protocols/model instance)]
+      ;; mega HACK
+      (as-> instance instance
+        ;; make sure a method exists before calling it so it doesn't error
+        (cond->> instance
+          (m/applicable-primary-method before-delete/before-delete model)
+          (before-delete/before-delete model))
+        ;; apply the transformed changes.
+        (:kv-args (transformed/apply-in-transforms model {:kv-args instance})))))
 
 (defn hydration-keys
   "Get the keys that automagically hydrate to a model.
