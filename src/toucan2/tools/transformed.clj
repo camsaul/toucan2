@@ -1,5 +1,6 @@
 (ns toucan2.tools.transformed
   (:require
+   [better-cond.core :as b]
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [methodical.impl.combo.operator :as m.combo.operator]
@@ -8,11 +9,6 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.util :as u]))
-
-;; NOCOMMIT
-(clojure.tools.trace/untrace-ns* *ns*)
-(clojure.tools.trace/untrace-var* #'pipeline/transduce-with-model*)
-(clojure.tools.trace/untrace-var* #'query/apply-kv-arg)
 
 ;;; HACK Once https://github.com/camsaul/methodical/issues/96 is fixed we can remove this.
 (alter-meta! #'m.combo.operator/combine-methods-with-operator assoc :private false)
@@ -114,14 +110,12 @@
 ;;; is a CONDITION (goes in a WHERE clause) but I guess if we're intercepting the bottom-level calls to
 ;;; [[query/apply-kv-arg]] at that point it IS a condition. We need to verify this tho and test it with some sort of
 ;;; thing like the custom `::limit` thing
-(defrecord ^:no-doc SecretMapType [])
-
-;;; NOCOMMIT
-;; (require 'clojure.tools.trace)
-;; (clojure.tools.trace/untrace-var* #'query/apply-kv-arg)
+;;;
+;;; TODO This name is WACK
+(defrecord ^:no-doc RecordTypeForInterceptingApplyKVArgCalls [])
 
 (m/defmethod query/apply-kv-arg [#_model :default
-                                 #_query SecretMapType
+                                 #_query RecordTypeForInterceptingApplyKVArgCalls
                                  #_k     :default]
   [model _query k v]
   (let [v (if-let [xform (get (in-transforms model) k)]
@@ -135,13 +129,14 @@
                                  #_query :default
                                  #_k     :default]
   [model query k v]
-  (if (or (instance? SecretMapType query)
+  (if (or (instance? RecordTypeForInterceptingApplyKVArgCalls query)
           *already-transformed*
           (nil? v))
     (next-method model query k v)
-    (let [[k v] (query/apply-kv-arg model (->SecretMapType) k v)]
+    (let [[k v*] (query/apply-kv-arg model (->RecordTypeForInterceptingApplyKVArgCalls) k v)]
+      (printf "Intercepted apply-kv-arg %s %s => %s\n" k (u/safe-pr-str v) (u/safe-pr-str v*))
       (binding [*already-transformed* true]
-        (next-method model query k v)))))
+        (next-method model query k v*)))))
 
 ;; (clojure.tools.trace/trace-var* #'query/apply-kv-arg)
 ;; (clojure.tools.trace/untrace-var* #'transform-condition-value)
@@ -209,25 +204,36 @@
   [rf query-type model parsed-args]
   ;; don't try to transform stuff when we're doing SELECT directly with PKs (e.g. to fake INSERT returning instances),
   ;; we're not doing transforms on the way out so we don't need to do them on the way in
-  (println "query-type:" query-type)    ; NOCOMMIT
-  (println (isa? query-type ::pipeline/select.instances-from-pks))
   (if (isa? query-type ::pipeline/select.instances-from-pks)
     (binding [*already-transformed* true]
       (next-method rf query-type model parsed-args))
     (let [rf* ((transform-result-rows-transducer model) rf)]
       (next-method rf* query-type model parsed-args))))
 
-;; (m/defmethod query/build :before [:toucan.query-type/update.* ::transformed.model :default]
-;;   [_query-type model {:keys [query], :as args}]
-;;   args
-;;   #_(if-let [k->transform (not-empty (in-transforms model))]
-;;     (let [args (-> args
-;;                    (update :kv-args merge query) ;; TODO -- wtf? I'm 99% sure this is wrong.
-;;                    (dissoc :query))]
-;;       (-> (apply-in-transforms model args)
-;;           (update :changes transform-kv-args k->transform)))
-;;     args))
+(defn- transform-update-changes [m k->transform]
+  {:pre [(map? k->transform) (seq k->transform)]}
+  (into {} (for [[k v] m]
+             [k (when (some? v)
+                  (if-let [xform (get k->transform k)]
+                    (xform v)
+                    v))])))
 
+(m/defmethod query/build :before [#_query-type :toucan.query-type/update.*
+                                  #_model      ::transformed.model
+                                  #_query      :default]
+  [_query-type model {:keys [changes], :as parsed-args}]
+  (b/cond
+    (not (map? changes))
+    parsed-args
+
+    :let [k->transform (not-empty (in-transforms model))]
+
+    (not k->transform)
+    parsed-args
+
+    (update parsed-args :changes transform-update-changes k->transform)))
+
+;;; TODO -- this shares a lot of code with [[transform-update-changes]]
 (defn- transform-insert-rows [[first-row :as rows] k->transform]
   {:pre [(map? first-row) (map? k->transform)]}
   ;; all rows should have the same keys, so we just need to look at the keys in the first row
@@ -352,7 +358,3 @@
   :args (s/cat :model      some?
                :transforms any?)
   :ret any?)
-
-;; (clojure.tools.trace/trace-var* #'pipeline/transduce-with-model*)
-;; (clojure.tools.trace/trace-ns* *ns*) ; NOCOMMIT
-;; (clojure.tools.trace/trace-var* #'query/apply-kv-arg)
