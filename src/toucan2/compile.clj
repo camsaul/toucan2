@@ -6,7 +6,7 @@
    [toucan2.util :as u]))
 
 (m/defmulti do-with-compiled-query
-  {:arglists '([model compiled-query f])}
+  {:arglists '([model₁ compiled-query₂ f])}
   u/dispatch-on-first-two-args)
 
 (def ^:dynamic ^{:arglists '([model compiled-query f])} *with-compiled-query-fn*
@@ -15,12 +15,13 @@
   See [[toucan2.tools.compile/build]] for an example usage."
   #'do-with-compiled-query)
 
+;;; TODO -- should this dispatch off of query type as well?
 (defmacro with-compiled-query
-  {:arglists '([[query-binding [model query]] & body])}
-  [[query-binding [model query]] & body]
+  {:arglists '([[query-binding [model built-query]] & body])}
+  [[query-binding [model built-query]] & body]
   `(*with-compiled-query-fn*
     ~model
-    ~query
+    ~built-query
     ;; support destructing the compiled query.
     (^:once fn* [query#]
      (let [~query-binding query#]

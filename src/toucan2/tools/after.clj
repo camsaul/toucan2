@@ -1,110 +1,65 @@
 (ns toucan2.tools.after
-  "Shared low-level implementation for doing transformations to the results of different operations defined
-  with [[toucan2.operation]]."
+  "Common code shared by various `after-` methods. Since the `after` methods operate over instances, we need to upgrade
+  `result-type/pks` and `result-type/update-count` queries to `result-type/instances`, run them with the 'upgraded'
+  result type, run our after stuff on each row, and then return the original results."
   (:require
    [methodical.core :as m]
-   [pretty.core :as pretty]
-   [toucan2.instance :as instance]
    [toucan2.model :as model]
-   [toucan2.operation :as op]
-   [toucan2.realize :as realize]
+   [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
 
-(set! *warn-on-reflection* true)
+(m/defmulti each-row-fn
+  "Should return a function with the signature
 
-;;; TODO -- Consider whether the various methods here should be `:after` methods rather than `:around`
+  ```clj
+  (f instance)
+  ```
 
-(m/defmulti after
-  {:arglists '([query-type model instance])}
+  This function is only done for side-effects for query types that return update counts or PKs."
+  {:arglists '([query-type₁ model₂])}
   u/dispatch-on-first-two-args)
 
-(m/defmethod after :around :default
-  [query-type model instance]
-  (u/with-debug-result (list `after query-type model instance)
-    (u/try-with-error-context ["do after- transformations to result" {::query-type query-type, ::model model, ::row instance}]
-      (next-method query-type model instance))))
+(m/defmulti ^:no-doc result-type-rf
+  {:arglists '([original-query-type₁ model rf])}
+  u/dispatch-on-first-arg)
 
-(defn has-after-method? [query-type model]
-  (not= (m/default-primary-method after)
-        (m/effective-primary-method after (m/dispatch-value after query-type model))))
+(m/defmethod result-type-rf :toucan.result-type/update-count
+  [_original-query-type _model rf]
+  ((map (constantly 1))
+   rf))
 
-;;;; reducible instances
+(m/defmethod result-type-rf :toucan.result-type/pks
+  [_original-query-type model rf]
+  (let [pks-fn (model/select-pks-fn model)]
+    ((map (fn [row]
+            (assert (map? row))
+            (pks-fn row)))
+     rf)))
 
-(defn after-reducible-instances [query-type model reducible-instances]
-  (eduction
-   (map (fn [row]
-          (or (some-> (after query-type model row) instance/reset-original)
-              row)))
-   reducible-instances))
+(m/defmethod result-type-rf :toucan.result-type/instances
+  [original-query-type model rf]
+  (let [row-fn (each-row-fn original-query-type model)
+        row-fn (fn [row]
+                 (u/try-with-error-context ["Apply after row fn" {::query-type original-query-type, ::model model}]
+                   (u/with-debug-result ["Apply after %s for %s" original-query-type model]
+                     (let [result (row-fn row)]
+                       ;; if the row fn didn't return something (not generally necessary for something like
+                       ;; `after-update` which is always done for side effects) then return the original row. We still
+                       ;; need it for stuff like getting the PKs back out.
+                       (if (some? result)
+                         result
+                         row)))))]
+    ((map row-fn) rf)))
 
-(m/defmethod op/reducible-returning-instances* :around [::after ::after]
-  [query-type model parsed-args]
-  (cond
-    (::doing-after? parsed-args)
-    (next-method query-type model parsed-args)
-
-    (not (has-after-method? query-type model))
-    (next-method query-type model parsed-args)
-
-    :else
-    (let [parsed-args (assoc parsed-args ::doing-after? true)]
-      (after-reducible-instances query-type model (next-method query-type model parsed-args)))))
-
-;;;; reducible PKs
-
-(deftype ^:no-doc AfterReduciblePKs [query-type model reducible-pks]
-  clojure.lang.IReduceInit
-  (reduce [_this rf init]
-    (u/try-with-error-context ["Fetch rows with matching PKs to apply after transforms" {::query-type    query-type
-                                                                                         ::model         model
-                                                                                         ::reducible-pks reducible-pks}]
-      (u/with-debug-result ["reducing %s %s for %s" `after query-type model]
-        (let [affected-pks (realize/realize reducible-pks)]
-          (u/println-debug ["Doing %s %s for %s with PKs %s" `after query-type model affected-pks])
-          (reduce
-           rf
-           init
-           (after-reducible-instances
-            query-type
-            model
-            (op/select-reducible-with-pks model nil affected-pks)))))))
-
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `->AfterReduciblePKs query-type model reducible-pks)))
-
-(m/defmethod op/reducible-update-returning-pks* :around [::after ::after]
-  [query-type model parsed-args]
-  (cond
-    (::doing-after? parsed-args)
-    (next-method query-type model parsed-args)
-
-    (not (has-after-method? query-type model))
-    (next-method query-type model parsed-args)
-
-    :else
-    (let [parsed-args   (assoc parsed-args ::doing-after? true)
-          reducible-pks (next-method query-type model parsed-args)]
-      (assert (instance? clojure.lang.IReduceInit reducible-pks))
-      (eduction
-       (map (model/select-pks-fn model))
-       (->AfterReduciblePKs query-type model reducible-pks)))))
-
-;;;; reducible update count
-
-(m/defmethod op/reducible-update* :around [::after ::after]
-  [query-type model parsed-args]
-  (cond
-    (::doing-after? parsed-args)
-    (next-method query-type model parsed-args)
-
-    (not (has-after-method? query-type model))
-    (next-method query-type model parsed-args)
-
-    :else
-    (let [parsed-args     (assoc parsed-args ::doing-after? true)
-          reducible-count (next-method query-type model parsed-args)
-          reducible-pks   (op/return-pks-eduction model reducible-count)]
-      (eduction
-       (map (constantly 1))
-       (->AfterReduciblePKs query-type model reducible-pks)))))
+(m/defmethod pipeline/transduce-compiled-query* [#_query-type     ::query-type
+                                                 #_model          ::model
+                                                 #_compiled-query :default]
+  [rf query-type model sql-args]
+  (let [upgraded-type (pipeline/similar-query-type-returning query-type :toucan.result-type/instances)
+        _             (assert upgraded-type (format "Don't know how to upgrade a %s query to one returning instances"
+                                                    query-type))
+        rf*           (result-type-rf query-type model rf)
+        m             (if (= query-type upgraded-type)
+                        next-method
+                        pipeline/transduce-compiled-query)]
+    (m rf* upgraded-type model sql-args)))

@@ -10,7 +10,6 @@
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
-   [toucan2.operation :as op]
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
@@ -306,22 +305,24 @@
 
 (derive ::post-insert ::insert/insert)
 
-(m/defmethod op/reducible-returning-instances* [::post-insert :default]
-  [_query-type _model parsed-args]
-  (:instances parsed-args))
+;; (m/defmethod op/reducible-returning-instances* [::post-insert :default]
+;;   [_query-type _model parsed-args]
+;;   (:instances parsed-args))
 
-(defn post-insert
-  "Do [[toucan2.tools.before-update]] stuff for an `instance`."
-  [instance]
-  {:pre [(instance/instance? instance)]}
-  (let [model (protocols/model instance)]
-    (realize/reduce-first
-     (eduction
-      ;; HACK -- we shouldn't need to look into [[transformed]] internals, but it's broken so we have to.
-      (transformed/transform-result-rows-transducer model)
-      (op/reducible-returning-instances* ::post-insert
-                                         model
-                                         {:instances [instance]})))))
+(defn post-insert [instance] instance)
+
+;; (defn post-insert
+;;   "Do [[toucan2.tools.before-update]] stuff for an `instance`."
+;;   [instance]
+;;   {:pre [(instance/instance? instance)]}
+;;   (let [model (protocols/model instance)]
+;;     (realize/reduce-first
+;;      (eduction
+;;       ;; HACK -- we shouldn't need to look into [[transformed]] internals, but it's broken so we have to.
+;;       (transformed/transform-result-rows-transducer model)
+;;       (op/reducible-returning-instances* ::post-insert
+;;                                          model
+;;                                          {:instances [instance]})))))
 
 ;;; TODO -- this is an extremely wack way to implement this, because it only applies changes from
 ;;; [[toucan2.tools.before-update]] and [[toucan2.tools.transformed]]. Maybe that's ok because that is all that was used
@@ -349,22 +350,26 @@
 
 (derive ::post-update ::update/update)
 
-(m/defmethod op/reducible-returning-instances* [::post-update :default]
-  [_query-type _model parsed-args]
-  (:instances parsed-args))
+;; (m/defmethod op/reducible-returning-instances* [::post-update :default]
+;;   [_query-type _model parsed-args]
+;;   (:instances parsed-args))
 
 (defn post-update
-  "Do [[toucan2.tools.after-update]] stuff for an `instance`."
   [instance]
-  {:pre [(instance/instance? instance)]}
-  (let [model (protocols/model instance)]
-    (realize/reduce-first
-     (eduction
-      ;; HACK -- we shouldn't need to look into [[transformed]] internals, but it's broken so we have to.
-      (transformed/transform-result-rows-transducer model)
-      (op/reducible-returning-instances* ::post-update
-                                         model
-                                         {:instances [instance]})))))
+  instance)
+
+;; (defn post-update
+;;   "Do [[toucan2.tools.after-update]] stuff for an `instance`."
+;;   [instance]
+;;   {:pre [(instance/instance? instance)]}
+;;   (let [model (protocols/model instance)]
+;;     (realize/reduce-first
+;;      (eduction
+;;       ;; HACK -- we shouldn't need to look into [[transformed]] internals, but it's broken so we have to.
+;;       (transformed/transform-result-rows-transducer model)
+;;       (op/reducible-returning-instances* ::post-update
+;;                                          model
+;;                                          {:instances [instance]})))))
 
 (defn pre-delete
   "Do [[toucan2.tools.before-delete]] stuff for an `instance`."

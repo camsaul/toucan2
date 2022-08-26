@@ -2,11 +2,9 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
-   [pretty.core :as pretty]
    [toucan2.connection :as conn]
-   [toucan2.delete :as delete]
    [toucan2.model :as model]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -20,26 +18,23 @@
   (u/with-debug-result (list `before-delete model instance)
     (next-method model instance)))
 
-(deftype ^:no-doc ReducibleBeforeDelete [model parsed-args reducible-delete]
-  clojure.lang.IReduceInit
-  (reduce [_this rf init]
-    (conn/with-transaction [_conn (model/deferred-current-connectable model)]
-      (transduce
-       (map (fn [row]
-              (before-delete model row)))
-       (constantly nil)
-       nil
-       (op/reducible-returning-instances* :toucan2.select/select model parsed-args))
-      (reduce rf init reducible-delete)))
-
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `->ReducibleBeforeDelete model parsed-args reducible-delete)))
-
-(m/defmethod op/reducible-update* :around [::delete/delete ::before-delete]
-  [query-type model parsed-args]
-  (let [reducible-delete (next-method query-type model parsed-args)]
-    (->ReducibleBeforeDelete model parsed-args reducible-delete)))
+(m/defmethod pipeline/transduce-with-model* :before [:toucan.query-type/delete.* ::before-delete]
+  [_rf _query-type model parsed-args]
+  ;; TODO -- probably doesn't need to be done HERE -- maybe pipeline should be handling this instead.
+  (;; conn/with-transaction [_conn (or conn/*current-connectable*
+   ;;                                  (model/default-connectable model))]
+   do
+   ;; NOCOMMIT
+   ;; select and transduce the matching rows and run their [[before-delete]] methods
+   (pipeline/transduce-with-model
+    ((map (fn [row]
+            (before-delete model row)))
+     (constantly nil))
+    :toucan.query-type/select.instances
+    model
+    parsed-args)
+    ;; cool, now we can proceed
+    parsed-args))
 
 (defmacro define-before-delete
   {:style/indent :defn}

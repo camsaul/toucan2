@@ -2,11 +2,11 @@
   (:require
    [methodical.core :as m]
    [pretty.core :as pretty]
-   [toucan2.execute :as execute]
    [toucan2.instance :as instance]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
-   [toucan2.realize :as realize]))
+   [toucan2.realize :as realize]
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
@@ -21,7 +21,8 @@
 
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (reduce rf init rows)))
+    (u/with-debug-result ["reduce IdentityQuery rows"]
+      (reduce rf init rows))))
 
 (defn identity-query
   "A queryable that returns `reducible-rows` as-is without compiling anything or running anything against a database.
@@ -40,22 +41,29 @@
   [reducible-rows]
   (->IdentityQuery reducible-rows))
 
-(m/defmethod execute/reduce-uncompiled-query [:default IdentityQuery]
-  [_connectable model {:keys [rows]} rf init]
-  (transduce
-   (map (if model
-          (fn [row]
-            (instance/instance model row))
-          identity))
-   (completing rf)
-   init
-   rows))
+(m/defmethod pipeline/transduce-built-query* [:toucan.result-type/instances :default IdentityQuery]
+  [rf _query-type model {:keys [rows], :as _query}]
+  (u/with-debug-result ["transduce IdentityQuery rows %s" rows]
+    (transduce (if model
+                 (map (fn [result-row]
+                        (instance/instance model result-row)))
+                 identity)
+               rf
+               rows)))
 
-(m/defmethod query/build [:toucan2.select/select :default IdentityQuery]
+(m/defmethod query/build [:toucan.query-type/select.instances :default IdentityQuery]
+  [_query-type _model {:keys [query], :as _args}]
+  query)
+
+(m/defmethod query/build [:default :default IdentityQuery]
+  [_query-type _model {:keys [query], :as _args}]
+  query)
+
+(m/defmethod query/build [:default IdentityQuery :default]
   [_query-type _model {:keys [query], :as _args}]
   query)
 
 ;;; allow using an identity query as an 'identity model'
-(m/defmethod op/reducible-returning-instances* [:toucan2.select/select IdentityQuery]
-  [_query-type an-identity-query _parsed-args]
-  an-identity-query)
+(m/defmethod pipeline/transduce-with-model* [:default IdentityQuery]
+  [rf _query-type model _parsed-args]
+  (transduce identity rf model))

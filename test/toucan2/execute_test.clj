@@ -2,10 +2,11 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
-   [toucan2.compile :as compile]
    [toucan2.connection :as conn]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
+   [toucan2.pipeline :as pipeline]
+   [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.test :as test])
   (:import
@@ -84,7 +85,7 @@
       (is (= expected
              (execute/query ::test/db {:select [:id :created_at], :from [:venues], :order-by [[:id :asc]]}))))))
 
-(m/defmethod compile/do-with-compiled-query [:default ::named-query]
+(m/defmethod query/do-with-resolved-query [:default ::named-query]
   [_model _query f]
   (f ["SELECT count(*) AS \"count\" FROM people;"]))
 
@@ -135,31 +136,30 @@
 ;;; as HoneySQL. There is currently no way to define custom compilation behavior on the basis of the connectable. Not
 ;;; sure how this would actually work tho without realizing the connection *first*; that causes its own problems because
 ;;; it breaks [[toucan2.tools.identity-execute/identity-query]]
-
-(m/defmethod execute/reduce-compiled-query-with-connection [::connectable.not-even-jdbc :default clojure.lang.Sequential]
-  [_conn _model [{k :key}] rf init]
-  (reduce rf init [{k 1} {k 2} {k 3}]))
+(m/defmethod pipeline/transduce-compiled-query-with-connection*
+  [::connectable.not-even-jdbc :default :default clojure.lang.Sequential]
+  [rf _conn _query-type _model [{k :key}, :as _compiled-query]]
+  (reduce rf (rf) [{k 1} {k 2} {k 3}]))
 
 (deftest wow-dont-even-need-to-use-jdbc-test
   (is (= [{:a 1} {:a 2} {:a 3}]
          (execute/query ::connectable.not-even-jdbc [{:key :a}]))))
 
-(m/defmethod execute/reduce-uncompiled-query [::model.not-even-jdbc :default]
-  [connectable model query rf init]
-  (execute/reduce-compiled-query connectable model query rf init))
+(m/defmethod pipeline/transduce-with-model* [:default ::model.not-even-jdbc]
+  [rf query-type model {:keys [queryable], :as _parsed-args}]
+  (pipeline/transduce-compiled-query rf query-type model queryable))
 
 ;;; here's how you can have custom compilation behavior. At this point in time it requires specifying a model as well
 ;;; since connection isn't realized until after the query compilation stage.
 
-(m/defmethod execute/reduce-compiled-query-with-connection [::connectable.not-even-jdbc ::model.not-even-jdbc clojure.lang.IPersistentMap]
-  [_conn _model {k :key} rf init]
-  (reduce rf init [{k 4} {k 5} {k 6}]))
+(m/defmethod pipeline/transduce-compiled-query-with-connection*
+  [::connectable.not-even-jdbc :default ::model.not-even-jdbc clojure.lang.IPersistentMap]
+  [rf _conn _query-type _model {k :key, :as _compiled-query}]
+  (reduce rf (rf) [{k 4} {k 5} {k 6}]))
 
 (deftest wow-dont-even-need-to-use-jdbc-custom-model-test
   (is (= [{:a 4} {:a 5} {:a 6}]
-         (execute/query ::connectable.not-even-jdbc ::model.not-even-jdbc {:key :a})
-         ;; TODO -- should be able to test `select` with this as well
-         )))
+         (execute/query ::connectable.not-even-jdbc ::model.not-even-jdbc {:key :a}))))
 
 (deftest execute!-test
   (try

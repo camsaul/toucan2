@@ -183,8 +183,22 @@
    (instance model (empty-map model)))
 
   (^toucan2.instance.Instance [model m]
-   (let [m* (into (empty-map model) m)]
-     (->Instance model m* m* (meta m))))
+   {:pre [((some-fn map? nil?) m)]}
+   (cond
+     ;; optimization: if `m` is already an instance with `model` return it as-is.
+     (and (instance? m)
+          (= (protocols/model m) model))
+     m
+
+     ;; DISABLED FOR NOW BECAUSE MAYBE THE OTHER MODEL HAS A DIFFERENT UNDERLYING EMPTY MAP OR KEY TRANSFORM
+     ;;
+     ;; ;; optimization 2: if `m` is an instance of something else use [[protocols/with-model]]
+     ;; (instance? m)
+     ;; (protocols/with-model m model)
+
+     :else
+     (let [m* (into (empty-map model) m)]
+       (->Instance model m* m* (meta m)))))
 
   (^toucan2.instance.Instance [model k v & more]
    (let [m (into (empty-map model) (partition-all 2) (list* k v more))]

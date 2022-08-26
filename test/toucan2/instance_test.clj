@@ -344,3 +344,8 @@
                Throwable
                #"Assert failed: \(map\? new-current\)"
                (protocols/with-current m1 1))))))))
+
+(deftest dont-create-new-map-if-model-is-same-test
+  (let [m1 (instance/instance ::birbs {:a 1})
+        m2 (instance/instance ::birbs m1)]
+    (is (identical? m1 m2))))

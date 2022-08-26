@@ -10,12 +10,16 @@
 
 (set! *warn-on-reflection* true)
 
+(use-fixtures :each test/do-db-types-fixture)
+
 (derive ::venues.after-insert ::test/venues)
 
 (def ^:private ^:dynamic *venues-awaiting-moderation* nil)
 
 (after-insert/define-after-insert ::venues.after-insert
   [venue]
+  ;; make sure this is treated as a REAL function tail.
+  {:pre [(map? venue)], :post [(:awaiting-moderation? %)]}
   (when *venues-awaiting-moderation*
     (swap! *venues-awaiting-moderation* conj venue))
   (assoc venue :awaiting-moderation? true))

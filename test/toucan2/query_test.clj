@@ -18,16 +18,16 @@
     [:model :k :v {}]      {:modelable :model, :kv-args {:k :v}, :queryable {}}))
 
 (deftest ^:parallel condition->honeysql-where-clause-test
-  (doseq [[[k v] expected] {[:id :id]           [:= :id :id]
-                            [1 :id]             [:= 1 :id]
-                            [:id 1]             [:= :id 1]
-                            [:a 1]              [:= :a 1]
-                            [:id [:> 1]]        [:> :id 1]
-                            [:a [:between 1 2]] [:between :a 1 2]
-                            [:id [:in 1 2]]     [:in :id [1 2]]}]
-    (testing (pr-str `(query/condition->honeysql-where-clause ~k ~v))
-      (is (= expected
-             (query/condition->honeysql-where-clause k v))))))
+  (are [k v expected] (= expected
+                         (query/condition->honeysql-where-clause k v))
+    :id :id            [:= :id :id]
+    1   :id            [:= 1 :id]
+    :id 1              [:= :id 1]
+    :a  1              [:= :a 1]
+    :id [:> 1]         [:> :id 1]
+    :a  [:between 1 2] [:between :a 1 2]
+    :id [:in [1 2]]    [:in :id [1 2]]
+    :id nil            [:= :id nil]))
 
 (m/defmethod query/do-with-resolved-query [:default ::named-query]
   [_model _queryable f]

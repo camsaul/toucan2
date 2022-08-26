@@ -19,33 +19,33 @@
 (deftest parse-args-test
   (testing "single map row"
     (is (= {:modelable :model, :rows [{:row 1}]}
-           (query/parse-args ::insert/insert [:model {:row 1}]))))
+           (query/parse-args :toucan.query-type/insert.* [:model {:row 1}]))))
   (testing "multiple map rows"
     (is (= {:modelable :model, :rows [{:row 1} {:row 2}]}
-           (query/parse-args ::insert/insert [:model [{:row 1} {:row 2}]]))))
+           (query/parse-args :toucan.query-type/insert.* [:model [{:row 1} {:row 2}]]))))
   (testing "kv args"
     (is (= {:modelable :model, :rows [{:a 1, :b 2, :c 3}]}
-           (query/parse-args ::insert/insert [:model :a 1, :b 2, :c 3])))
+           (query/parse-args :toucan.query-type/insert.* [:model :a 1, :b 2, :c 3])))
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
-         #"Don't know how to interpret :toucan2.insert/insert args:"
-         (query/parse-args ::insert/insert [:model :a 1, :b 2, :c]))))
+         #"Don't know how to interpret :toucan.query-type/insert\.\* args:"
+         (query/parse-args :toucan.query-type/insert.* [:model :a 1, :b 2, :c]))))
   (testing "columns + vector rows"
     (is (= {:modelable :model
             :rows      [{:a 1, :b 2, :c 3} {:a 4, :b 5, :c 6}]}
-           (query/parse-args ::insert/insert [:model [:a :b :c] [[1 2 3] [4 5 6]]])))
+           (query/parse-args :toucan.query-type/insert.* [:model [:a :b :c] [[1 2 3] [4 5 6]]])))
     (is (= {:modelable :model
             :rows      [{:name "The Ramp", :category "bar"}
                         {:name "Louie's", :category "bar"}]}
-           (query/parse-args ::insert/insert [:model [:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]])))))
+           (query/parse-args :toucan.query-type/insert.* [:model [:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]])))))
 
 (deftest build-query-test
   (doseq [rows-fn [list vector]
           :let    [rows (rows-fn {:name "Grant & Green", :category "bar"})]]
-    (testing (pr-str (list `query/build ::insert/insert ::test/venues rows))
+    (testing (pr-str (list `query/build :toucan.query-type/insert.* ::test/venues rows))
       (is (= {:insert-into [:venues]
               :values      [{:name "Grant & Green", :category "bar"}]}
-             (query/build ::insert/insert ::test/venues {:rows rows}))))))
+             (query/build :toucan.query-type/insert.* ::test/venues {:rows rows}))))))
 
 ;;; TODO -- a bit of a misnomer now.
 (defn- do-both-types-of-insert [f]
@@ -141,39 +141,6 @@
     (test/with-discarded-table-changes :venues
       (is (= [[4 "Grant & Green"]]
              (insert/insert-returning-pks! ::venues.composite-pk {:name "Grant & Green", :category "bar"}))))))
-
-;;; TODO
-
-;; (deftest insert!-custom-honeysql-test
-;;   (test/with-default-connection
-;;     (testing "single map row"
-;;       (test/with-discarded-table-changes :venues
-;;         (is (= 1
-;;                (insert/insert! ::venues.custom-honeysql {:id "4", :name "Hi-Dive", :category "bar"})))
-;;         (is (= {:id 4, :name "Hi-Dive"}
-;;                (select/select-one ::test/venues :id 4 {:select [:id :name]})))))
-;;     (testing "multiple map rows"
-;;       (test/with-discarded-table-changes :venues
-;;         (is (= 1
-;;                (insert/insert! ::venues.custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))
-;;         (is (= {:id 4, :name "Hi-Dive"}
-;;                (select/select-one ::test/venues :id 4 {:select [:id :name]})))))
-;;     (testing "kv args"
-;;       (test/with-discarded-table-changes :venues
-;;         (is (= 1
-;;                (insert/insert! ::venues.custom-honeysql :id "4", :name "Hi-Dive", :category "bar")))
-;;         (is (= {:id 4, :name "Hi-Dive"}
-;;                (select/select-one ::test/venues :id 4 {:select [:id :name]})))))
-;;     (testing "columns + vector rows"
-;;       (test/with-discarded-table-changes :venues
-;;         (is (= 1
-;;                (insert/insert! ::venues.custom-honeysql [:id :name :category] [["4" "Hi-Dive" "bar"]])))
-;;         (is (= {:id 4, :name "Hi-Dive"}
-;;                (select/select-one ::test/venues :id 4 {:select [:id :name]})))))
-;;     (testing "returning-keys"
-;;       (test/with-discarded-table-changes :venues
-;;         (is (= [4]
-;;                (insert/insert-returning-pks! ::venues.custom-honeysql [{:id "4", :name "Hi-Dive", :category "bar"}])))))))
 
 (deftest insert!-no-changes-no-op-test
   (test/with-discarded-table-changes :venues

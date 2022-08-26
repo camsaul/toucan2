@@ -163,7 +163,7 @@
   ```
 
   Dispatches off of `[modelable queryable]`."
-  {:arglists '([model queryable f])}
+  {:arglists '([model₁ queryable₂ f])}
   u/dispatch-on-first-two-args)
 
 ;; define a custom query `::my-count`
@@ -213,7 +213,8 @@
 (m/defmethod do-with-resolved-query :around :default
   [model queryable f]
   (let [f* (^:once fn* [query]
-            (u/try-with-error-context ["with resolved query" {::model model, ::queryable queryable, ::resolved-query query}]
+            (u/try-with-error-context (when (not= queryable query)
+                                        ["with resolved query" {::model model, ::queryable queryable, ::resolved-query query}])
               (f query)))]
     (next-method model queryable f*)))
 
@@ -229,7 +230,7 @@
   builds a Honey SQL 2 map.
 
   Dispatches on `[query-type model query]`."
-  {:arglists '([query-type model {:keys [query], :as parsed-args}])}
+  {:arglists '([query-type₁ model₂ {:keys [query₃], :as parsed-args}])}
   (fn [query-type model parsed-args]
     (mapv protocols/dispatch-value [query-type
                                     model
@@ -242,7 +243,7 @@
   (u/try-with-error-context ["build query" {::query-type  query-type
                                             ::model       model
                                             ::parsed-args parsed-args}]
-    (u/with-debug-result (list `build query-type model parsed-args)
+    (u/with-debug-result ["%s %s %s with parsed args %s" `build query-type model parsed-args]
       (next-method query-type model parsed-args))))
 
 (m/defmethod build :default
@@ -292,6 +293,19 @@
                      :dispatch-value (m/dispatch-value build query-type model parsed-args)})))
   sql-args)
 
+(defmacro with-built-query [[built-query-binding [query-type model parsed-args resolved-query]] & body]
+  `(let [~built-query-binding (build ~query-type ~model (assoc ~parsed-args :query ~resolved-query))]
+     ~@body))
+
+(s/fdef with-built-query
+  :args (s/cat :bindings (s/spec (s/cat :lhs :clojure.core.specs.alpha/binding-form
+                                        :rhs (s/spec (s/cat :query-type     any?
+                                                            :model          any?
+                                                            :parsed-args    any?
+                                                            :resolved-query any?))))
+               :body     (s/+ any?))
+  :ret any?)
+
 ;;;; Default [[build]] impl for maps; applying key-value args.
 
 (m/defmulti apply-kv-arg
@@ -307,7 +321,7 @@
   "Something sequential like `:id [:> 5]` becomes `[:> :id 5]`. Other stuff like `:id 5` just becomes `[:= :id 5]`."
   [k v]
   ;; don't think there's any situtation where `nil` on the LHS is on purpose and not a bug.
-  {:pre [(some? v)]}
+  {:pre [(some? k)]}
   (if (sequential? v)
     (fn-condition->honeysql-where-clause k v)
     [:= k v]))

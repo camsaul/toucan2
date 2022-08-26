@@ -2,8 +2,6 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
-   [pretty.core :as pretty]
-   [toucan2.connection :as conn]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
@@ -46,37 +44,6 @@
   [_model]
   ;; TODO -- or should this return `nil`, so we can fall thru to something else (presumably `:default` anyway)?
   :default)
-
-(defn- current-connectable [model]
-  (u/with-debug-result ["Realizing deferred current connectable for model %s." model]
-    (u/println-debug ["%s is %s" `conn/*current-connectable* conn/*current-connectable*])
-    (or conn/*current-connectable*
-        (do
-          (u/println-debug ["Using %s for model %s" `default-connectable model])
-          (default-connectable model)))))
-
-(defrecord ^:no-doc DeferredCurrentConnectable [model]
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `deferred-current-connectable model))
-
-  protocols/IModel
-  (model [_this]
-    model)
-
-  protocols/IWithModel
-  (with-model [_this new-model]
-    (DeferredCurrentConnectable. new-model)))
-
-(m/defmethod conn/do-with-connection DeferredCurrentConnectable
-  [{:keys [model]} f]
-  (let [connectable (current-connectable model)]
-    (assert (not (instance? DeferredCurrentConnectable connectable))
-            (format "%s returned another %s" `current-connectable `DeferredCurrentConnectable))
-    (conn/do-with-connection connectable f)))
-
-(defn deferred-current-connectable [model]
-  (->DeferredCurrentConnectable model))
 
 (m/defmulti table-name
   {:arglists '([model])}

@@ -18,19 +18,19 @@
 
 (deftest parse-update-args-test
   (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
-         (query/parse-args ::update/update [:model 1 {:a 1}])))
+         (query/parse-args :toucan.query-type/update.* [:model 1 {:a 1}])))
   (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk nil}, :queryable {}}
-         (query/parse-args ::update/update [:model nil {:a 1}])))
+         (query/parse-args :toucan.query-type/update.* [:model nil {:a 1}])))
   (is (= {:modelable :model, :kv-args {:id 1}, :changes {:a 1}, :queryable {}}
-         (query/parse-args ::update/update [:model :id 1 {:a 1}])))
+         (query/parse-args :toucan.query-type/update.* [:model :id 1 {:a 1}])))
   (testing "composite PK"
     (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk [1 2]}, :queryable {}}
-           (query/parse-args ::update/update [:model [1 2] {:a 1}]))))
+           (query/parse-args :toucan.query-type/update.* [:model [1 2] {:a 1}]))))
   (testing "key-value conditions"
     (is (= {:modelable :model, :kv-args {:name "Cam", :toucan/pk 1}, :changes {:a 1}, :queryable {}}
-           (query/parse-args ::update/update [:model 1 :name "Cam" {:a 1}]))))
+           (query/parse-args :toucan.query-type/update.* [:model 1 :name "Cam" {:a 1}]))))
   (is (= {:modelable :model, :changes {:name "Hi-Dive"}, :queryable {:id 1}}
-         (query/parse-args ::update/update [:model {:id 1} {:name "Hi-Dive"}]))))
+         (query/parse-args :toucan.query-type/update.* [:model {:id 1} {:name "Hi-Dive"}]))))
 
 (deftest build-test
   (is (= {:update [:venues]
@@ -38,9 +38,11 @@
           :where  [:and
                    [:= :name "Tempest"]
                    [:= :id 1]]}
-         (query/build ::update/update ::test/venues {:changes {:name "Hi-Dive"}
-                                                     :query   {:id 1}
-                                                     :kv-args {:name "Tempest"}}))))
+         (query/build :toucan.query-type/update.*
+                      ::test/venues
+                      {:changes {:name "Hi-Dive"}
+                       :query   {:id 1}
+                       :kv-args {:name "Tempest"}}))))
 
 (deftest pk-and-map-conditions-test
   (test/with-discarded-table-changes :venues
@@ -68,36 +70,6 @@
   (test/with-discarded-table-changes :venues
     (is (= 1
            (update/update! ::venues.composite-pk [1 "Tempest"] {:name "Hi-Dive"})))))
-
-;; (m/defmethod honeysql.compile/to-sql* [:default ::venues.custom-honeysql :id String]
-;;   [_ _ _ v _]
-;;   (assert (string? v) (format "V should be a string, got %s" (u/safe-pr-str v)))
-;;   ["?::integer" v])
-
-;; (derive ::venues.custom-honeysql-composite-pk ::venues.composite-pk)
-;; (derive ::venues.custom-honeysql-composite-pk ::venues.custom-honeysql)
-
-;; (deftest update!-custom-honeysql-test
-;;   (testing "custom HoneySQL for PK"
-;;     (test/with-discarded-table-changes :venues
-;;       (is (= 1
-;;              (update/update! ::venues.custom-honeysql "1" {:name "Hi-Dive"})))
-;;       (is (= (instance/instance ::venues.custom-honeysql {:id 1, :name "Hi-Dive"})
-;;              (select/select-one ::venues.custom-honeysql "1" {:select [:id :name]}))))
-;;     (testing "composite PK"
-;;       (test/with-discarded-table-changes :venues
-;;         (is (= 1
-;;                (update/update! ::venues.custom-honeysql-composite-pk ["1" "Tempest"] {:name "Hi-Dive"}))))))
-;;   (testing "custom HoneySQL for key-value conditions"
-;;     (test/with-discarded-table-changes :venues
-;;       (is (= 1
-;;              (update/update! ::venues.custom-honeysql :id "1" {:name "Hi-Dive"})))))
-;;   (testing "custom HoneySQL for changes"
-;;     (test/with-discarded-table-changes :venues
-;;       (is (= 1
-;;              (update/update! ::venues.custom-honeysql :id "1" {:id "100"})))
-;;       (is (= (instance/instance ::venues.custom-honeysql {:id 100, :name "Tempest"})
-;;              (select/select-one ::venues.custom-honeysql "100" {:select [:id :name]}))))))
 
 (deftest update!-no-changes-no-op-test
   (testing "If there are no changes, update! should no-op and return zero"
@@ -130,7 +102,7 @@
 
 (deftest update-nil-test
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
-    (let [parsed-args (query/parse-args ::update/update [::test/venues nil {:name "Taco Bell"}])]
+    (let [parsed-args (query/parse-args :toucan.query-type/update.* [::test/venues nil {:name "Taco Bell"}])]
       (is (= {:modelable ::test/venues
               :kv-args   {:toucan/pk nil}
               :changes   {:name "Taco Bell"}
@@ -142,7 +114,7 @@
         (is (= {:update    [:venues]
                 :set       {:name "Taco Bell"}
                 :where     [:= :id nil]}
-               (query/build ::update/update ::test/venues (assoc parsed-args :query query))))))
+               (query/build :toucan.query-type/update.* ::test/venues (assoc parsed-args :query query))))))
     (is (= ["UPDATE venues SET name = ? WHERE id IS NULL" "Taco Bell"]
            (tools.compile/compile
              (update/update! ::test/venues nil {:name "Taco Bell"}))))

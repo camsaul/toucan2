@@ -6,7 +6,7 @@
    [methodical.core :as m]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.util :as u]))
 
@@ -19,11 +19,11 @@
                      :columns-rows      (s/cat :columns (s/coll-of keyword?)
                                                :rows    (s/coll-of vector?)))))
 
-(m/defmethod query/args-spec ::insert
+(m/defmethod query/args-spec :toucan.query-type/insert.*
   [_query-type]
   ::default-args)
 
-(m/defmethod query/parse-args ::insert
+(m/defmethod query/parse-args :toucan.query-type/insert.*
   [query-type unparsed-args]
   (-> (next-method query-type unparsed-args)
       (select-keys [:modelable :columns :rows])
@@ -47,7 +47,7 @@
    ["DEFAULT VALUES"])
  nil)
 
-(m/defmethod query/build [::insert :default :default]
+(m/defmethod query/build [:toucan.query-type/insert.* :default :default]
   [query-type model {:keys [rows], :as parsed-args}]
   (when (empty? rows)
     (throw (ex-info "Cannot build insert query with empty :values"
@@ -66,21 +66,22 @@
 
 ;;;; [[reducible-insert]] and [[insert!]]
 
-(m/defmethod op/reducible-update* [::insert :default]
-  [query-type model {:keys [rows], :as parsed-args}]
+(m/defmethod pipeline/transduce-resolved-query* [:toucan.query-type/insert.* :default]
+  [rf query-type model {:keys [rows], :as parsed-args} resolved-query]
   (if (empty? rows)
     (do
-      (u/println-debug "No rows to insert.")
-      nil)
+      (u/println-debug "Query has no changes, skipping update")
+      ;; TODO -- not sure this is the right thing to do
+      (rf (rf)))
     (u/with-debug-result ["Inserting %s rows into %s" (count rows) model]
-      (next-method query-type model parsed-args))))
+      (next-method rf query-type model parsed-args resolved-query))))
 
 (defn reducible-insert
   {:arglists '([modelable row-or-rows]
                [modelable k v & more]
                [modelable columns row-vectors])}
   [& unparsed-args]
-  (op/reducible-update ::insert unparsed-args))
+  (pipeline/reducible-unparsed :toucan.query-type/insert.update-count unparsed-args))
 
 (defn insert!
   "Returns number of rows inserted."
@@ -88,14 +89,14 @@
                [modelable k v & more]
                [modelable columns row-vectors])}
   [& unparsed-args]
-  (op/returning-update-count! ::insert unparsed-args))
+  (pipeline/transduce-unparsed :toucan.query-type/insert.update-count unparsed-args))
 
 (defn reducible-insert-returning-pks
   {:arglists '([modelable row-or-rows]
                [modelable k v & more]
                [modelable columns row-vectors])}
   [& unparsed-args]
-  (op/reducible-update-returning-pks ::insert unparsed-args))
+  (pipeline/reducible-unparsed :toucan.query-type/insert.pks unparsed-args))
 
 (defn insert-returning-pks!
   "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
@@ -107,7 +108,7 @@
                [modelable k v & more]
                [modelable columns row-vectors])}
   [& unparsed-args]
-  (op/update-returning-pks! ::insert unparsed-args))
+  (pipeline/transduce-unparsed :toucan.query-type/insert.pks unparsed-args))
 
 (defn reducible-insert-returning-instances
   {:arglists '([modelable row-or-rows]
@@ -117,7 +118,7 @@
                [[modelable & columns-to-return] k v & more]
                [[modelable & columns-to-return] columns row-vectors])}
   [& unparsed-args]
-  (op/reducible-returning-instances ::insert unparsed-args))
+  (pipeline/reducible-unparsed :toucan.query-type/insert.instances unparsed-args))
 
 (defn insert-returning-instances!
   "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
@@ -132,4 +133,4 @@
                [[modelable & columns-to-return] k v & more]
                [[modelable & columns-to-return] columns row-vectors])}
   [& unparsed-args]
-  (op/returning-instances ::insert unparsed-args))
+  (pipeline/transduce-unparsed :toucan.query-type/insert.instances unparsed-args))

@@ -21,7 +21,7 @@
 (use-fixtures :each test/do-db-types-fixture)
 
 (derive ::venues.transformed ::test/venues)
-(derive ::venues.transformed ::transformed/transformed)
+(derive ::venues.transformed ::transformed/transformed.model)
 
 (m/defmethod transformed/transforms ::venues.transformed
   [_model]
@@ -257,7 +257,7 @@
   (testing `query/build
     (is (= {:delete-from [:venues]
             :where       [:= :category "bar"]}
-           (query/build ::delete/delete ::venues.transformed {:kv-args {:category :bar}}))))
+           (query/build :toucan.query-type/delete.update-count ::venues.transformed {:kv-args {:category :bar}}))))
   (testing "Delete row by PK"
     (test/with-discarded-table-changes :venues
       (is (= 1

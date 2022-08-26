@@ -177,7 +177,7 @@
 
 (derive ::venues.capture-updates ::venues.before-update)
 
-(m/defmethod query/build [::update/update ::venues.capture-updates :default]
+(m/defmethod query/build [:toucan.query-type/update.* ::venues.capture-updates :default]
   [query-type model parsed-args]
   (when *venues-update-queries*
     (swap! *venues-update-queries* conj parsed-args))

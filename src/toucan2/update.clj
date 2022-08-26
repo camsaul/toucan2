@@ -4,7 +4,7 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.model :as model]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.util :as u]))
 
@@ -22,18 +22,18 @@
    ;; here.
    :changes map?))
 
-(m/defmethod query/args-spec ::update
+(m/defmethod query/args-spec :toucan.query-type/update.*
   [_query-type]
   ::default-args)
 
-(m/defmethod query/parse-args ::update
+(m/defmethod query/parse-args :toucan.query-type/update.*
   [query-type unparsed-args]
   (let [parsed (next-method query-type unparsed-args)]
     (cond-> parsed
       (contains? parsed :pk) (-> (dissoc :pk)
                                  (update :kv-args assoc :toucan/pk (:pk parsed))))))
 
-(m/defmethod query/build [::update :default clojure.lang.IPersistentMap]
+(m/defmethod query/build [:toucan.query-type/update.* :default clojure.lang.IPersistentMap]
   [query-type model {:keys [kv-args query changes], :as parsed-args}]
   (when (empty? changes)
     (throw (ex-info "Cannot build an update query with no changes."
@@ -44,32 +44,33 @@
                                      :set    changes})]
     (next-method query-type model parsed-args)))
 
-(m/defmethod op/reducible-update* [::update :default]
-  [query-type model {:keys [changes], :as parsed-args}]
+(m/defmethod pipeline/transduce-resolved-query* [:toucan.query-type/update.* :default]
+  [rf query-type model {:keys [changes], :as parsed-args} resolved-query]
   (if (empty? changes)
     (do
       (u/println-debug "Query has no changes, skipping update")
-      nil)
-    (next-method query-type model parsed-args)))
+      ;; TODO -- not sure this is the right thing to do
+      (rf (rf)))
+    (next-method rf query-type model parsed-args resolved-query)))
 
 (defn reducible-update
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
-  [modelable & unparsed-args]
-  (op/reducible-update* ::update modelable unparsed-args))
+  [& unparsed-args]
+  (pipeline/reducible-unparsed :toucan.query-type/update.update-count unparsed-args))
 
 (defn update!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [& unparsed-args]
-  (op/returning-update-count! ::update unparsed-args))
+  (pipeline/transduce-unparsed :toucan.query-type/update.update-count unparsed-args))
 
 (defn reducible-update-returning-pks
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [& unparsed-args]
-  (op/reducible-update-returning-pks ::update unparsed-args))
+  (pipeline/reducible-unparsed :toucan.query-type/update.pks unparsed-args))
 
 (defn update-returning-pks!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [& unparsed-args]
-  (op/update-returning-pks! ::update unparsed-args))
+  (pipeline/transduce-unparsed :toucan.query-type/update.pks unparsed-args))
 
 ;;; TODO -- add `update-returning-instances!`, similar to [[toucan2.update/insert-returning-instances!]]

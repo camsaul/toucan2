@@ -138,7 +138,7 @@
         texts   (map ->Text* (str/split format-string #"%s"))]
     `(pprint-to-str (->Doc ~(vec (interleave-all texts args))))))
 
-(defmacro ^:no-doc println-debug
+(defmacro ^:no-doc ^:deprecated println-debug
   [arg & more]
   `(when *debug*
      ~(if (vector? arg)
@@ -148,7 +148,7 @@
                               ~@more)
         `(println-debug* ~arg ~@more))))
 
-(defn- print-debug-result [result]
+(defn- ^:deprecated print-debug-result [result]
   (print (indentation))
   (print "↳ ")
 
@@ -169,7 +169,7 @@
     (print-debug-result result)
     result))
 
-(defmacro ^:no-doc with-debug-result [message & body]
+(defmacro ^:no-doc ^:deprecated with-debug-result [message & body]
   (if (vector? message)
     `(with-debug-result ~(if (> (count message) 1)
                            `(format-doc ~(first message) ~@(rest message))
@@ -201,6 +201,14 @@
   "Dispatch on the three arguments using [[protocols/dispatch-value]], and ignore all other args."
   [x y z & _]
   [(protocols/dispatch-value x) (protocols/dispatch-value y) (protocols/dispatch-value z)])
+
+(defn dispatch-on-first-four-args
+  "Dispatch on the three arguments using [[protocols/dispatch-value]], and ignore all other args."
+  [a b c d & _]
+  [(protocols/dispatch-value a)
+   (protocols/dispatch-value b)
+   (protocols/dispatch-value c)
+   (protocols/dispatch-value d)])
 
 (defn lower-case-en
   "Locale-agnostic version of [[clojure.string/lower-case]]. `clojure.string/lower-case` uses the default locale in

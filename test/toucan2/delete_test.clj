@@ -66,7 +66,7 @@
 
 (deftest delete-nil-test
   (testing "(delete! model nil) should basically be the same as (delete! model :toucan/pk nil)"
-    (let [parsed-args (query/parse-args ::delete/delete [::test/venues nil])]
+    (let [parsed-args (query/parse-args :toucan.query-type/delete.update-count [::test/venues nil])]
       (is (= {:modelable ::test/venues, :queryable nil}
              parsed-args))
       (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
@@ -74,7 +74,7 @@
                query))
         (is (= {:delete-from [:venues]
                 :where       [:= :id nil]}
-               (query/build ::delete/delete ::test/venues (assoc parsed-args :query query))))
+               (query/build :toucan.query-type/delete.update-count ::test/venues (assoc parsed-args :query query))))
         (is (= ["DELETE FROM venues WHERE id IS NULL"]
                (tools.compile/compile
                  (delete/delete! ::test/venues nil))))))

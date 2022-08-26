@@ -4,10 +4,8 @@
    [methodical.core :as m]
    [toucan2.connection :as conn]
    [toucan2.model :as model]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
-   [toucan2.select :as select]
-   [toucan2.update :as update]
    [toucan2.util :as u]))
 
 (m/defmulti before-update
@@ -24,10 +22,14 @@
                                        model
                                        (u/safe-pr-str result))))))))
 
-(defn- changes->affected-pk-maps [model reducible-matching-rows changes]
-  {:pre [(map? changes)], :post [(or (map? %) (println %))]}
-  (reduce
-   (fn [changes->pks row]
+(defn- changes->affected-pk-maps-rf [model changes]
+  {:pre [(map? changes)]}
+  (fn
+    ([] {})
+    ([m]
+     (assert (map? m) (format "changes->affected-pk-maps-rf should have returned a map, got %s" (u/safe-pr-str m)))
+     m)
+    ([changes->pks row]
      (assert (map? changes->pks))
      (assert (map? row) (format "%s expected a map row, got %s" `changes->affected-pk-maps (u/safe-pr-str row)))
      (let [row     (merge row changes)
@@ -35,9 +37,7 @@
            changes (protocols/changes row)]
        (cond-> changes->pks
          (seq changes) (update changes (fn [pks]
-                                         (conj (set pks) (model/primary-key-values model row)))))))
-   {}
-   reducible-matching-rows))
+                                         (conj (set pks) (model/primary-key-values model row)))))))))
 
 ;;; TODO -- this is sort of problematic since it breaks [[toucan2.tools.compile]]
 (defn- apply-before-update-to-matching-rows
@@ -46,10 +46,12 @@
   [model {:keys [changes], :as parsed-args}]
   (u/try-with-error-context ["apply before-update to matching rows" {::model model, ::changes changes}]
     (u/with-debug-result ["%s for %s" `apply-before-update-to-matching-rows model]
-      (when-let [changes->pk-maps (not-empty (changes->affected-pk-maps
-                                              model
-                                              (op/reducible-returning-instances* ::select/select model parsed-args)
-                                              changes))]
+      (when-let [changes->pk-maps (not-empty (let [rf (changes->affected-pk-maps-rf model changes)]
+                                               (pipeline/transduce-with-model
+                                                rf
+                                                :toucan.query-type/select.instances
+                                                model
+                                                parsed-args)))]
         (u/println-debug ["changes->pk-maps = %s" changes->pk-maps])
         (if (= (count changes->pk-maps) 1)
           ;; every row has the same exact changes: we only need to perform a single update, using the original conditions.
@@ -59,23 +61,25 @@
                 pk-map            pk-maps]
             (assoc parsed-args :changes changes, :kv-args pk-map)))))))
 
-(m/defmethod op/reducible-update* :around [::update/update ::before-update]
-  [query-type model {::keys [doing-before-update?], :keys [changes], :as parsed-args}]
+(m/defmethod pipeline/transduce-with-model* :around [:toucan.query-type/update.* ::before-update]
+  [rf query-type model {::keys [doing-before-update?], :keys [changes], :as parsed-args}]
   (cond
     doing-before-update?
-    (next-method query-type model parsed-args)
+    (next-method rf query-type model parsed-args)
 
     (empty? changes)
-    (next-method query-type model parsed-args)
+    (next-method rf query-type model parsed-args)
 
     :else
     (let [new-args-maps (apply-before-update-to-matching-rows model (assoc parsed-args ::doing-before-update? true))]
       (u/println-debug ["Doing recursive updates with new args maps %s" new-args-maps])
-      (conn/->ReduceInTransaction
-       (model/deferred-current-connectable model)
-       (eduction
-        (mapcat (fn [args-map]
-                  (next-method query-type model args-map)))
+      (;; conn/with-transaction [_conn (or conn/*current-connectable*
+       ;;                                  (model/default-connectable model))]
+       identity ; NOCOMMIT
+       (transduce
+        (map #_mapcat (fn [args-map]
+                        (next-method rf query-type model args-map)))
+        rf
         new-args-maps)))))
 
 (defmacro define-before-update [model [instance-binding] & body]
