@@ -295,8 +295,13 @@
 ;;;; Default [[build]] impl for maps; applying key-value args.
 
 (m/defmulti apply-kv-arg
-  {:arglists '([model query k v])}
+  {:arglists '([model₁ query₂ k₃ v])}
   u/dispatch-on-first-three-args)
+
+(defn- fn-condition->honeysql-where-clause
+  [k [f & args]]
+  {:pre [(keyword? f) (seq args)]}
+  (into [f k] args))
 
 (defn condition->honeysql-where-clause
   "Something sequential like `:id [:> 5]` becomes `[:> :id 5]`. Other stuff like `:id 5` just becomes `[:= :id 5]`."
@@ -304,7 +309,7 @@
   ;; don't think there's any situtation where `nil` on the LHS is on purpose and not a bug.
   {:pre [(some? v)]}
   (if (sequential? v)
-    (vec (list* (first v) k (rest v)))
+    (fn-condition->honeysql-where-clause k v)
     [:= k v]))
 
 (m/defmethod apply-kv-arg [:default clojure.lang.IPersistentMap :default]
@@ -355,6 +360,22 @@
     (toucan-pk-fn-values pk-columns (first tuple) (rest tuple))
     (toucan-pk-composite-values* pk-columns tuple)))
 
+(defn- apply-non-composite-toucan-pk [model honeysql pk-column v]
+  ;; unwrap the value if we got something like `:toucan/pk [1]`
+  (let [v (if (and (sequential? v)
+                   (not (keyword? (first v)))
+                   (= (count v) 1))
+            (first v)
+            v)]
+    (apply-kv-arg model honeysql pk-column v)))
+
+(defn- apply-composite-toucan-pk [model honeysql pk-columns v]
+  (reduce
+   (fn [honeysql {:keys [col v]}]
+     (apply-kv-arg model honeysql col v))
+   honeysql
+   (toucan-pk-composite-values pk-columns v)))
+
 (m/defmethod apply-kv-arg [:default clojure.lang.IPersistentMap :toucan/pk]
   [model honeysql _k v]
   ;; `fn-name` here would be if you passed something like `:toucan/pk [:in 1 2]` -- the fn name would be `:in` -- and we
@@ -362,12 +383,8 @@
   (let [pk-columns (model/primary-keys model)]
     (u/with-debug-result ["apply :toucan/pk %s for primary keys" v]
       (if (= (count pk-columns) 1)
-        (apply-kv-arg model honeysql (first pk-columns) v)
-        (reduce
-         (fn [honeysql {:keys [col v]}]
-           (apply-kv-arg model honeysql col v))
-         honeysql
-         (toucan-pk-composite-values pk-columns v))))))
+        (apply-non-composite-toucan-pk model honeysql (first pk-columns) v)
+        (apply-composite-toucan-pk model honeysql pk-columns v)))))
 
 (defn apply-kv-args [model query kv-args]
   (reduce

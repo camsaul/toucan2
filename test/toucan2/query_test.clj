@@ -86,10 +86,11 @@
     (are [model arg expected] (= {:select [:*]
                                   :from   [[:venues]]
                                   :where  expected}
-                                 (query/build :toucan2.query.type/select.returning-instances
+                                 (query/build :toucan.query-type/select.instances
                                               model
                                               {:kv-args {:toucan/pk arg}, :query {}}))
       ::test/venues        4                                    [:= :id 4]
+      ::test/venues        [4]                                  [:= :id 4]
       ::test/venues        [:> 4]                               [:> :id 4]
       ::test/venues        [:in [4]]                            [:in :id [4]]
       ::test/venues        [:in [4 5]]                          [:in :id [4 5]]
