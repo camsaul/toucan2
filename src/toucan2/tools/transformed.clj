@@ -35,7 +35,7 @@
   For a given `model`, all matching transforms are combined with `merge-with merge` in an indeterminate order, so don't
   try to specify multiple transforms for the same column in the same direction for a given model -- compose your
   transform functions instead if you want to do that. See [[toucan2.tools.transformed/deftransforms]] for more info."
-           :arglists '([model])}
+           :arglists '([model₁])}
   transforms
   ;; TODO -- this has to be uncached for now because of https://github.com/camsaul/methodical/issues/98
   (m/uncached-multifn
@@ -81,7 +81,8 @@
 
 (defn- wrapped-transforms
   "Get the [[transforms]] functions for a model in a either the `:in` or `:out` direction; wrap the functions in
-  `try-catch` forms so we can meaningful error messages if they fail."
+  `try-catch` forms so we can meaningful error messages if they fail, and so that the transform is skipped for `nil`
+  values."
   [model direction]
   (u/try-with-error-context ["calculate transforms" {::model model, ::direction direction}]
     (when-let [k->direction->transform (not-empty (transforms model))]
@@ -93,12 +94,14 @@
                       :let                 [xform (get direction->xform direction)]
                       :when                xform]
                   [k (fn xform-fn [v]
-                       (u/try-with-error-context ["apply transform" {::transforms k->direction->transform
-                                                                     ::model      model
-                                                                     ::k          k
-                                                                     ::v          v
-                                                                     ::xform      xform}]
-                         (xform v)))]))))))
+                       (if-not (some? v)
+                         v
+                         (u/try-with-error-context ["apply transform" {::transforms k->direction->transform
+                                                                       ::model      model
+                                                                       ::k          k
+                                                                       ::v          v
+                                                                       ::xform      xform}]
+                           (xform v))))]))))))
 
 (defn- in-transforms [model]
   (wrapped-transforms model :in))
@@ -138,10 +141,9 @@
       (binding [*already-transformed* true]
         (next-method model query k v*)))))
 
-;; (clojure.tools.trace/trace-var* #'query/apply-kv-arg)
-;; (clojure.tools.trace/untrace-var* #'transform-condition-value)
+;;;; after select (or other things returning instances)
 
-(defn- apply-row-transform [instance k xform]
+(defn- apply-result-row-transform [instance k xform]
   ;; The "Special Optimizations" below *should* be the default case, but if some other aux methods are in place or
   ;; custom impls it might not be; things should still work normally either way.
   ;;
@@ -151,7 +153,7 @@
    instance
    (fn [row]
      (assert (map? row)
-             (format "%s expected map rows, got %s" `apply-row-transform (u/safe-pr-str row)))
+             (format "%s expected map rows, got %s" `apply-result-row-transform (u/safe-pr-str row)))
      ;; Special Optimization 2: if the underlying original/current maps of `instance` are instances of `IRow` (which
      ;; themselves have underlying key->value thunks) we can compose the thunk itself rather than immediately
      ;; realizing and transforming the value. This means transforms don't get applied to values that are never
@@ -164,43 +166,59 @@
                                                         (comp xform thunk))))
          (update row k xform))
      (u/with-debug-result ["Transform %s %s" k (get row k)]
-       (u/try-with-error-context ["transform row" {::k k, ::xform xform, ::row row}]
+       (u/try-with-error-context ["Transform result column" {::k k, ::xform xform, ::row row}]
          (doto (update row k xform)
            ((fn [row]
               (assert (map? row)
                       (format "%s: expected row transform function to return a map, got %s"
-                              `apply-row-transform (u/safe-pr-str row)))))))))))
+                              `apply-result-row-transform (u/safe-pr-str row)))))))))))
 
 (defn- out-transforms [model]
   (wrapped-transforms model :out))
 
-(defn- apply-row-transform-fn [k xform]
+(defn- apply-result-row-transform-fn
+  "Given a `column` and a transform function `xform`, return a function with the signature
+
+  ```clj
+  (f row)
+  ```
+
+  that will apply that transform to that column if the row contains that column."
+  [column xform]
   (fn [instance]
     (cond-> instance
-      (contains? instance k) (apply-row-transform k xform))))
+      (contains? instance column) (apply-result-row-transform column xform))))
 
-(defn- row-transform-fn [k->transform]
+(defn- result-row-transform-fn
+  "Given a map of column key -> transform function, return a function with the signature
+
+  ```clj
+  (f row)
+  ```
+
+  That can be called on each instance returned in the results."
+  [k->transform]
   {:pre [(map? k->transform) (seq k->transform)]}
   (reduce
    (fn [f [k xform]]
-     (comp (apply-row-transform-fn k xform)
+     (comp (apply-result-row-transform-fn k xform)
       f))
    identity
    k->transform))
 
-;;; HACK this shouldn't be public but we need it for [[toucan.models/post-insert]] for now.
-(defn transform-result-rows-transducer
+(defn- transform-result-rows-transducer
   "Return a transducer to transform rows of `model` using its [[out-transforms]]."
   [model]
   (if-let [k->transform (not-empty (out-transforms model))]
-    (map (let [f (row-transform-fn k->transform)]
+    (map (let [f (result-row-transform-fn k->transform)]
            (fn [row]
              (u/with-debug-result ["Transform %s row %s" model row]
-               (u/try-with-error-context ["transform row" {::model model, ::row row}]
+               (u/try-with-error-context ["transform result row" {::model model, ::row row}]
                  (f row))))))
     identity))
 
-(m/defmethod pipeline/transduce-with-model* [:toucan.query-type/select.instances ::transformed.model]
+(m/defmethod pipeline/transduce-with-model* [#_query-type :toucan.result-type/instances
+                                             #_model      ::transformed.model]
   [rf query-type model parsed-args]
   ;; don't try to transform stuff when we're doing SELECT directly with PKs (e.g. to fake INSERT returning instances),
   ;; we're not doing transforms on the way out so we don't need to do them on the way in
@@ -209,6 +227,8 @@
       (next-method rf query-type model parsed-args))
     (let [rf* ((transform-result-rows-transducer model) rf)]
       (next-method rf* query-type model parsed-args))))
+
+;;;; before update
 
 (defn- transform-update-changes [m k->transform]
   {:pre [(map? k->transform) (seq k->transform)]}
@@ -233,6 +253,8 @@
 
     (update parsed-args :changes transform-update-changes k->transform)))
 
+;;;; before insert
+
 ;;; TODO -- this shares a lot of code with [[transform-update-changes]]
 (defn- transform-insert-rows [[first-row :as rows] k->transform]
   {:pre [(map? first-row) (map? k->transform)]}
@@ -248,19 +270,33 @@
         row-xform  (apply comp row-xforms)]
     (map row-xform rows)))
 
-(m/defmethod pipeline/transduce-with-model* :before [:toucan.query-type/insert.* ::transformed.model]
+(m/defmethod pipeline/transduce-with-model* :before [#_query-type :toucan.query-type/insert.*
+                                                     #_model      ::transformed.model]
   [_rf query-type model parsed-args]
   (assert (isa? model ::transformed.model))
-  (if-let [k->transform (in-transforms model)]
+  (b/cond
+    (::already-transformed? parsed-args)
+    parsed-args
+
+    :let [k->transform (in-transforms model)]
+
+    (empty? k->transform)
+    parsed-args
+
+    :else
     (u/try-with-error-context ["apply in transforms before inserting rows" {::query-type  query-type
                                                                             ::model       model
                                                                             ::parsed-args parsed-args
                                                                             ::transforms  k->transform}]
       (u/with-debug-result ["Apply %s transforms to %s" k->transform parsed-args]
-        (update parsed-args :rows transform-insert-rows k->transform)))
-    parsed-args))
+        (-> parsed-args
+            (update :rows transform-insert-rows k->transform)
+            (assoc ::already-transformed? true))))))
 
-(m/defmethod pipeline/transduce-with-model* [:toucan.query-type/insert.pks ::transformed.model]
+;;;; after insert
+
+(m/defmethod pipeline/transduce-with-model* [#_query-type :toucan.query-type/insert.pks
+                                             #_model      ::transformed.model]
   [rf query-type model parsed-args]
   (let [pk-keys (model/primary-keys model)
         rf*     ((comp
@@ -281,11 +317,6 @@
                            (u/with-debug-result "convert PKs map back to flat PKs"
                              (f row))))))
                  rf)]
-    (next-method rf* query-type model parsed-args)))
-
-(m/defmethod pipeline/transduce-with-model* [:toucan.query-type/insert.instances ::transformed.model]
-  [rf query-type model parsed-args]
-  (let [rf* ((transform-result-rows-transducer model) rf)]
     (next-method rf* query-type model parsed-args)))
 
 

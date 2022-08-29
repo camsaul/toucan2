@@ -5,6 +5,7 @@
    [toucan2.delete :as delete]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
+   [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.save :as save]
@@ -25,8 +26,14 @@
 
 (m/defmethod transformed/transforms ::venues.category-keyword
   [_model]
-  {:category {:in  name
-              :out keyword}})
+  {:category {:in  (fn [k]
+                     (testing "Category [in] should still be a keyword (not transformed yet)"
+                       (is (keyword? k)))
+                     (name k))
+              :out (fn [s]
+                     (testing "Category [out] should still be a string (not transformed yet)"
+                       (is (string? s)))
+                     (keyword s))}})
 
 (derive ::venues.string-id-and-category-keyword ::venues.category-keyword)
 
@@ -89,7 +96,17 @@
         (is (= {:id 1, :name "Tempest", :category :bar}
                (protocols/original instance)))
         (is (= nil
-               (protocols/changes instance)))))))
+               (protocols/changes instance))))))
+  (testing "composed transforms"
+    (is (= (instance/instance
+            ::venues.string-id-and-category-keyword
+            {:id         "1"
+             :name       "Tempest"
+             :category   :bar
+             :created-at (LocalDateTime/parse "2017-01-01T00:00")
+             :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+           (select/select-one ::venues.string-id-and-category-keyword :toucan/pk "1")
+           (select/select-one ::venues.string-id-and-category-keyword {:order-by [[:id :asc]]})))))
 
 (m/defmethod transformed/transforms ::unnormalized
   [_model]
@@ -116,7 +133,7 @@
                                   (instance/with-original row)
                                   (instance/with-current row))])))]
     (testing message
-      (let [m2 (#'transformed/apply-row-transform m :id str)]
+      (let [m2 (#'transformed/apply-result-row-transform m :id str)]
         (testing "current value"
           (is (= {:id "1"}
                  m2)))
@@ -253,7 +270,26 @@
                                                              :category   :bar
                                                              :created-at (LocalDateTime/parse "2017-01-01T00:00")
                                                              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
-                   (insert! ::venues.string-id-and-category-keyword [{:name "Hi-Dive", category-key "bar"}])))))))))
+                   (insert! ::venues.string-id-and-category-keyword [{:name "Hi-Dive", category-key :bar}])))))))))
+
+(deftest transform-insert-returning-results-without-select-test
+  (testing "insert-returning-instances results should be transformed if they come directly from the DB (not via select)"
+    (test/with-discarded-table-changes :venues
+      (binding [pipeline/*transduce-resolved-query* (fn [rf _query-type _model {:keys [rows]} _resolved-query]
+                                                      {:pre [(seq? rows)]}
+                                                      (transduce identity rf (map (fn [row]
+                                                                                    (update row :category name))
+                                                                                  rows)))]
+        (is (= (instance/instance ::venues.category-keyword
+                                  {:name "BevLess", :category :bar})
+               (pipeline/transduce-with-model*
+                (completing conj first)
+                :toucan.query-type/insert.instances
+                ::venues.category-keyword
+                {:rows [{:name "BevLess", :category :bar}]}))))
+      (testing "sanity check: should not have inserted a row."
+        (is (= 3
+               (select/count ::test/venues)))))))
 
 (deftest delete!-test
   (testing `query/build
@@ -283,7 +319,7 @@
                  (select/select ::venues.category-keyword category-key :bar))))))))
 
 (deftest no-npes-test
-  (testing "Don't apply transforms to values that are nil (avoid NPEs)"
+  (testing "Don't apply transforms to values that are nil (avoid NPEs)\n"
     (testing "in"
       (testing "insert rows"
         (test/with-discarded-table-changes :venues
@@ -297,7 +333,7 @@
       (testing "conditions"
         (is (= nil
                (select/select-one ::venues.category-keyword :category nil)))))
-    (testing "out"
+    (testing "out\n"
       (let [instance (select/select-one ::venues.category-keyword (identity-query/identity-query
                                                                    [{:id 1, :name "No Category", :category nil}]))]
         (is (= {:id 1, :name "No Category", :category nil}

@@ -9,7 +9,9 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-select :as after-select]
-   [toucan2.tools.identity-query :as identity-query]))
+   [toucan2.tools.identity-query :as identity-query]
+   [toucan2.tools.transformed :as transformed]
+   [toucan2.insert :as insert]))
 
 (deftest query-test
   (is (= [[1 2]
@@ -78,3 +80,10 @@
              results))
       (testing "Return plain rows, not instances"
         (is (not (instance/instance? (first results))))))))
+
+;;; FIXME
+#_(deftest insert-test
+    (testing "Can we use identity-query with insert?"
+      (let [query (identity-query/identity-query [{:a 1}])]
+        (is (= :wow
+               (insert/insert-returning-instances! nil query))))))

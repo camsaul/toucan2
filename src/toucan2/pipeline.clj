@@ -90,37 +90,152 @@
     (apply f args)))
 
 (m/defmulti transduce-unparsed*
+  "The first step in the query execution pipeline. Called with the unparsed args as passed to something
+  like [[toucan2.select/select]], before parsing the args.
+
+  ```
+  Entrypoint e.g. select/select
+  ↓
+  transduce-unparsed*           ← you are here
+  ↓
+  toucan2.query/parse-args
+  ↓
+  transduce-parsed-args*
+  ```
+
+  The default implementation parses the args with [[toucan2.query/parse-args]] and then
+  calls [[transduce-parsed-args*]]."
   {:arglists '([rf query-type₁ unparsed])}
   (dispatch-ignore-rf u/dispatch-on-first-arg))
 
 (m/defmulti transduce-parsed-args*
+  "The second step in the query execution pipeline. Called with args as parsed by [[toucan2.query/parse-args]].
+
+  ```
+  transduce-unparsed*
+  ↓
+  toucan2.query/parse-args
+  ↓
+  transduce-parsed-args* ← you are here
+  ↓
+  toucan2.model/with-model
+  ↓
+  transduce-with-model*
+  ```
+
+  The default implementation resolves the `:modelable` in `parsed-args` with [[toucan2.model/with-model]] and then
+  calls [[transduce-with-model*]]."
   {:arglists '([rf query-type₁ parsed-args])}
   (dispatch-ignore-rf u/dispatch-on-first-arg))
 
 (m/defmulti transduce-with-model*
+  "The third step in the query execution pipeline. This is the first step that dispatches off of resolved model.
+
+  ```
+  transduce-parsed-args*
+  ↓
+  toucan2.model/with-model
+  ↓
+  transduce-with-model* ← you are here
+  ↓
+  toucan2.query/with-resolved-query
+  ↓
+  transduce-resolved-query*
+  ```
+
+  The default implementation resolves the queryable with [[toucan2.query/with-resolved-query]] and then
+  calls [[transduce-resolved-query*]]."
   {:arglists '([rf query-type₁ model₂ parsed-args])}
   (dispatch-ignore-rf u/dispatch-on-first-two-args))
 
+;;; TODO -- not entirely clear why this doesn't dispatch off of the resolved query as well.
 (m/defmulti transduce-resolved-query*
+  "The fourth step in the query execution pipeline. Called with a resolved query immediately before 'building' it.
+
+  ```
+  transduce-with-model*
+  ↓
+  toucan2.query/with-resolved-query
+  ↓
+  transduce-resolved-query* ← you are here
+  ↓
+  toucan2.query/with-built-query
+  ↓
+  transduce-built-query*
+  ```
+
+  The default implementation builds the resolved query with [[toucan2.query/with-built-query]] and then
+  calls [[transduce-built-query*]]."
   {:arglists '([rf query-type₁ model₂ parsed-args resolved-query])}
   (dispatch-ignore-rf u/dispatch-on-first-two-args))
 
-;; should this dispatch on the built query or not?
 (m/defmulti transduce-built-query*
+  "The fifth step in the query execution pipeline. Called with a query that is ready to be compiled, e.g. a fully-formed
+  Honey SQL form.
+
+  ```
+  transduce-resolved-query*
+  ↓
+  toucan2.query/with-built-query
+  ↓
+  transduce-built-query* ← you are here
+  ↓
+  toucan2.compile/with-compiled-query
+  ↓
+  transduce-compiled-query*
+  ```
+
+  The default implementation compiles the query with [[toucan2.compile/with-compiled-query]] and then
+  calls [[transduce-compiled-query*]]."
   {:arglists '([rf query-type₁ model₂ built-query₃])}
   (dispatch-ignore-rf u/dispatch-on-first-three-args))
 
 (m/defmulti transduce-compiled-query*
+  "The sixth step in the query execution pipeline. Called with a compiled query that is ready to be executed natively, for
+  example a `[sql & args]` vector, immediately before opening a connection.
+
+  ```
+  transduce-built-query*
+  ↓
+  toucan2.compile/with-compiled-query
+  ↓
+  transduce-compiled-query* ← you are here
+  ↓
+  toucan2.connection/with-connection
+  ↓
+  transduce-compiled-query-with-connection*
+  ```
+
+  The default implementation opens a connection (or uses the current connection)
+  using [[toucan2.connection/with-connection]] and then calls [[transduce-compiled-query-with-connection*]]."
   {:arglists '([rf query-type₁ model₂ compiled-query₃])}
   (dispatch-ignore-rf u/dispatch-on-first-three-args))
 
 (m/defmulti transduce-compiled-query-with-connection*
-  {:arglists '([rf conn₁ query-type₂ model₃ compiled-query₄])}
-  (dispatch-ignore-rf u/dispatch-on-first-four-args))
+  "The seventh and final step in the query execution pipeline. Called with a fully compiled query that can be executed
+  natively, and an open connection for executing it.
+
+  ```
+  transduce-compiled-query*
+  ↓
+  toucan2.connection/with-connection
+  ↓
+  transduce-compiled-query-with-connection* ← you are here
+  ↓
+  execute query
+  ↓
+  transduce results
+  ```
+
+  Implementations should execute the query and transduce the results using `rf`. Implementations are database-specific,
+  which is why this method dispatches off of connection type (e.g. `java.sql.Connection`). The default JDBC backend
+  executes the query and reduces results with [[toucan2.jdbc.query/reduce-jdbc-query]]."
+  {:arglists '([rf conn₁ query-type₂ model₃ compiled-query])}
+  (dispatch-ignore-rf u/dispatch-on-first-three-args))
 
 ;;;; fn versions.
 
-;;; TODO -- how much are these really used or needed?
+;;; TODO -- how much are these really used or needed? Can we just make all the multimethods here dynamic instead?
 
 (def ^:dynamic ^{:arglists '([rf query-type unparsed])}
   *transduce-unparsed*
@@ -427,10 +542,9 @@
 
 ;;;; default JDBC impls. Not convinced they belong here.
 
-(m/defmethod transduce-compiled-query-with-connection* [#_connection     java.sql.Connection
-                                                        #_query-type     :default
-                                                        #_model          :default
-                                                        #_compiled-query clojure.lang.Sequential]
+(m/defmethod transduce-compiled-query-with-connection* [#_connection java.sql.Connection
+                                                        #_query-type :default
+                                                        #_model      :default]
   [rf conn query-type model sql-args]
   (increment-call-count!)
   ;; `:return-keys` is passed in this way instead of binding a dynamic var because we don't want any additional queries
@@ -443,10 +557,9 @@
 ;;; To get Databases to return the generated primary keys rather than the update count for SELECT/UPDATE/DELETE we need
 ;;; to set the `next.jdbc` option `:return-keys true`
 
-(m/defmethod transduce-compiled-query-with-connection* [#_connection     java.sql.Connection
-                                                        #_query-type     :toucan.result-type/pks
-                                                        #_model          :default
-                                                        #_compiled-query clojure.lang.Sequential]
+(m/defmethod transduce-compiled-query-with-connection* [#_connection java.sql.Connection
+                                                        #_query-type :toucan.result-type/pks
+                                                        #_model      :default]
   [rf conn query-type model sql-args]
   (let [rf* ((map (model/select-pks-fn model))
              rf)]
@@ -479,10 +592,9 @@
                        :queryable {}}]
       (transduce-with-model rf ::select.instances-from-pks model parsed-args))))
 
-(m/defmethod transduce-compiled-query-with-connection* [#_connection     java.sql.Connection
-                                                        #_query-type     :toucan.result-type/instances
-                                                        #_model          :default
-                                                        #_compiled-query :default]
+(m/defmethod transduce-compiled-query-with-connection* [#_connection java.sql.Connection
+                                                        #_query-type :toucan.result-type/instances
+                                                        #_model      :default]
   [rf conn query-type model sql-args]
   ;; for non-DML stuff (ie `SELECT`) JDBC can actually return instances with zero special magic, so we can just let the
   ;; next method do it's thing. Presumably if we end up here with something that is neither DML or DQL, but maybe

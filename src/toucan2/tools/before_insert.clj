@@ -27,9 +27,9 @@
 ;;;
 ;;; By marking `::before-insert` as preferred over `:toucan2.tools.transformed/transformed` it will be done first (see
 ;;; https://github.com/camsaul/methodical#before-methods)
-;; (m/prefer-method! #'op/reducible-update*
-;;                   [::insert/insert ::before-insert]
-;;                   [::insert/insert :toucan2.tools.transformed/transformed])
+(m/prefer-method! #'pipeline/transduce-with-model*
+                  [:toucan.query-type/insert.* ::before-insert]
+                  [:toucan.query-type/insert.* :toucan2.tools.transformed/transformed])
 
 (defmacro define-before-insert
   {:style/indent :defn}
