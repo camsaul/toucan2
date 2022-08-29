@@ -67,7 +67,8 @@
 ;;; [[*honeysql-options*]] inside of [[toucan2.model/with-model]] if they need to do something special? I'm leaning
 ;;; towards the latter.
 
-(m/defmethod do-with-compiled-query [:default clojure.lang.IPersistentMap]
+(m/defmethod do-with-compiled-query [#_model          :default
+                                     #_compiled-query clojure.lang.IPersistentMap]
   [model honeysql f]
   (let [options  (merge @global-honeysql-options
                         *honeysql-options*)

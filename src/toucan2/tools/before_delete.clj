@@ -2,9 +2,10 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.connection :as conn]
+   [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
-   [toucan2.util :as u]
-   [toucan2.connection :as conn]))
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
@@ -17,16 +18,13 @@
   (u/with-debug-result (list `before-delete model instance)
     (next-method model instance)))
 
-;;; TODO -- this should probably be `with-resolved-query`
+;;; TODO -- this should probably be done in `with-resolved-query` ?
 (m/defmethod pipeline/transduce-with-model* :before [:toucan.query-type/delete.* ::before-delete]
   [_rf _query-type model parsed-args]
-  ;; TODO -- probably doesn't need to be done HERE -- maybe pipeline should be handling this instead. (Could it tho?
-  ;; transaction stuff is default methods is done much later the pipeline.)
   (conn/with-transaction [_conn
                           (or conn/*current-connectable*
                               (model/default-connectable model))
                           {:nested-transaction-rule :ignore}]
-    ;; NOCOMMIT
     ;; select and transduce the matching rows and run their [[before-delete]] methods
     (pipeline/transduce-with-model
      ((map (fn [row]

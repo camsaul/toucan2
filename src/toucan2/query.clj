@@ -259,7 +259,9 @@
                    :dispatch-value (m/dispatch-value build query-type model parsed-args)})))
 
 ;;; Something like (select my-model nil) should basically mean SELECT * FROM my_model WHERE id IS NULL
-(m/defmethod build [:default :default nil]
+(m/defmethod build [#_query-type :default
+                    #_model      :default
+                    #_query      nil]
   [query-type model parsed-args]
   (let [parsed-args (cond-> (assoc parsed-args :query {})
                       ;; if `:query` is present but equal to `nil`, treat that as if the pk value IS NULL
@@ -267,22 +269,30 @@
                       (update :kv-args assoc :toucan/pk nil))]
     (build query-type model parsed-args)))
 
-(m/defmethod build [:default :default Integer]
+(m/defmethod build [#_query-type :default
+                    #_model      :default
+                    #_query      Integer]
   [query-type model parsed-args]
   (build query-type model (update parsed-args :query long)))
 
-(m/defmethod build [:default :default Long]
+(m/defmethod build [#_query-type :default
+                    #_model      :default
+                    #_query      Long]
   [query-type model {pk :query, :as parsed-args}]
   (build query-type model (-> parsed-args
                               (assoc :query {})
                               (update :kv-args assoc :toucan/pk pk))))
 
-(m/defmethod build [:default :default String]
+(m/defmethod build [#_query-type :default
+                    #_model      :default
+                    #_query      String]
   [query-type model parsed-args]
   (build query-type model (update parsed-args :query (fn [sql]
                                                        [sql]))))
 
-(m/defmethod build [:default :default clojure.lang.Sequential]
+(m/defmethod build [#_query-type :default
+                    #_model      :default
+                    #_query      clojure.lang.Sequential]
   [query-type model {sql-args :query, :keys [kv-args], :as parsed-args}]
   (when (seq kv-args)
     (throw (ex-info "key-value args are not supported for plain SQL queries."
@@ -299,7 +309,7 @@
 
 (s/fdef with-built-query
   :args (s/cat :bindings (s/spec (s/cat :lhs :clojure.core.specs.alpha/binding-form
-                                        :rhs (s/spec (s/cat :query-type     any?
+                                        :rhs (s/spec (s/cat :query-type     some?
                                                             :model          any?
                                                             :parsed-args    any?
                                                             :resolved-query any?))))

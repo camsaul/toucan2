@@ -41,7 +41,9 @@
   [reducible-rows]
   (->IdentityQuery reducible-rows))
 
-(m/defmethod pipeline/transduce-built-query* [:toucan.result-type/instances :default IdentityQuery]
+(m/defmethod pipeline/transduce-built-query* [#_query-type :default #_:toucan.result-type/instances
+                                              #_model      :default
+                                              #_query      IdentityQuery]
   [rf _query-type model {:keys [rows], :as _query}]
   (u/with-debug-result ["transduce IdentityQuery rows %s" rows]
     (transduce (if model
@@ -51,19 +53,23 @@
                rf
                rows)))
 
-(m/defmethod query/build [:toucan.query-type/select.instances :default IdentityQuery]
+;;; this is an around method so we can intercept anything else that might normally be considered a more specific method
+;;; when it dispatches off of more-specific values of `query-type`
+(m/defmethod query/build :around [#_query-type :default
+                                  #_model      :default
+                                  #_query      IdentityQuery]
   [_query-type _model {:keys [query], :as _args}]
   query)
 
-(m/defmethod query/build [:default :default IdentityQuery]
-  [_query-type _model {:keys [query], :as _args}]
-  query)
-
-(m/defmethod query/build [:default IdentityQuery :default]
+;;; TODO -- not sure we need this method since we should be bypassing it with the method below
+(m/defmethod query/build [#_query-type :default
+                          #_model      IdentityQuery
+                          #_query      :default]
   [_query-type _model {:keys [query], :as _args}]
   query)
 
 ;;; allow using an identity query as an 'identity model'
-(m/defmethod pipeline/transduce-with-model* [:default IdentityQuery]
+(m/defmethod pipeline/transduce-with-model* [#_query-type :default
+                                             #_model      IdentityQuery]
   [rf _query-type model _parsed-args]
   (transduce identity rf model))

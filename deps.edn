@@ -58,6 +58,12 @@
   :test-h2
   {:jvm-opts ["-Dtest.dbs=h2"]}
 
+  ;; only run tests against the Toucan 2 'core'
+  ;;
+  ;; clj -X:dev:test:test-core
+  :test-core
+  {:exec-args {:dirs ["test"]}}
+
   ;; run tests only against Postgres.
   ;;
   ;; clj -X:dev:test:test-postgres

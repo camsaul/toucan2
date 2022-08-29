@@ -8,7 +8,9 @@
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
-(m/defmethod query/build [:toucan.query-type/select.* :default clojure.lang.IPersistentMap]
+(m/defmethod query/build [#_query-type :toucan.query-type/select.*
+                          #_model      :default
+                          #_query      clojure.lang.IPersistentMap]
   [query-type model {:keys [columns], :as parsed-args}]
   (let [parsed-args (-> parsed-args
                         (update :query (fn [query]

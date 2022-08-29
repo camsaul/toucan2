@@ -120,6 +120,8 @@
 
 ;;;; fn versions.
 
+;;; TODO -- how much are these really used or needed?
+
 (def ^:dynamic ^{:arglists '([rf query-type unparsed])}
   *transduce-unparsed*
   #'toucan2.pipeline/transduce-unparsed*)
@@ -210,7 +212,9 @@
   [rf query-type model parsed-args resolved-query]
   {:pre [(ifn? rf) (isa? query-type :toucan.result-type/*) (map? parsed-args)]}
   (u/println-debug ["transduce resolved query %s" resolved-query])
-  (u/try-with-error-context ["with resolved query" {:resolved-query resolved-query, :parsed-args parsed-args}]
+  (u/try-with-error-context ["with resolved query" {:query-type     query-type
+                                                    :resolved-query resolved-query
+                                                    :parsed-args    parsed-args}]
     (*transduce-resolved-query* rf query-type model parsed-args resolved-query)))
 
 (defn transduce-built-query
@@ -309,10 +313,7 @@
                                         #_compiled-query :default]
   [rf query-type model compiled-query]
   (conn/with-transaction [conn (current-connectable model) {:nested-transaction-rule :ignore}]
-    (println "<IN TRANSACTION>")        ; NOCOMMIT
-    (doto (transduce-compiled-query-with-connection rf conn query-type model compiled-query)
-      (println "<NOT IN TRANSACTION>")
-      )))
+    (transduce-compiled-query-with-connection rf conn query-type model compiled-query)))
 
 ;;;; reducible versions
 
@@ -470,16 +471,13 @@
   ;; PKs should actually come back as maps because that's how they come out by default and we haven't had the chance to
   ;; convert them to vectors in the reducing function yet
   #_(assert (every? map? pk-maps) (format "Bad PK maps: %s" (u/safe-pr-str pk-maps)))
-  (println "pks:" pks) ; NOCOMMIT
   (if (empty? pks #_pk-maps)
     []
-    (let [#_kv-args     #_(into {}
-                                (map (fn [col]
-                                       [col [:in (mapv col pk-maps)]]))
-                                (model/primary-keys model))
-          _ (println "(pr-str pks):" (pr-str pks)) ; NOCOMMIT
-          kv-args {:toucan/pk [:in pks]}
-          _ (println "kv-args:" kv-args) ; NOCOMMIT
+    (let [#_kv-args   #_ (into {}
+                               (map (fn [col]
+                                      [col [:in (mapv col pk-maps)]]))
+                               (model/primary-keys model))
+          kv-args     {:toucan/pk [:in pks]}
           parsed-args {:columns   columns
                        :kv-args   kv-args
                        :queryable {}}]

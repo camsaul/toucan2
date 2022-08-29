@@ -3,7 +3,6 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.query :as query]
-   [toucan2.select :as select]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -22,7 +21,7 @@
   (let [[model query-class] (if (vector? dispatch-value)
                               dispatch-value
                               [dispatch-value clojure.lang.IPersistentMap])]
-    `(m/defmethod query/build :before [::select/select ~model ~query-class]
+    `(m/defmethod query/build :before [:toucan.query-type/select.* ~model ~query-class]
        [~'&query-type ~'&model ~args-binding]
        (do-before-select ~'&model (^:once fn* [] ~@body)))))
 

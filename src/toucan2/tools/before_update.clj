@@ -73,14 +73,15 @@
     :else
     (let [new-args-maps (apply-before-update-to-matching-rows model (assoc parsed-args ::doing-before-update? true))]
       (u/println-debug ["Doing recursive updates with new args maps %s" new-args-maps])
-      (;; conn/with-transaction [_conn (or conn/*current-connectable*
-       ;;                                  (model/default-connectable model))]
-       identity ; NOCOMMIT
-       (transduce
-        (map #_mapcat (fn [args-map]
-                        (next-method rf query-type model args-map)))
-        rf
-        new-args-maps)))))
+      (conn/with-transaction [_conn
+                              (or conn/*current-connectable*
+                                  (model/default-connectable model))
+                              {:nested-transaction-rule :ignore}]
+        (transduce
+         (map (fn [args-map]
+                (next-method rf query-type model args-map)))
+         rf
+         new-args-maps)))))
 
 (defmacro define-before-update [model [instance-binding] & body]
   `(let [model# ~model]

@@ -134,7 +134,7 @@
           (nil? v))
     (next-method model query k v)
     (let [[k v*] (query/apply-kv-arg model (->RecordTypeForInterceptingApplyKVArgCalls) k v)]
-      (printf "Intercepted apply-kv-arg %s %s => %s\n" k (u/safe-pr-str v) (u/safe-pr-str v*))
+      #_(printf "Intercepted apply-kv-arg %s %s => %s\n" k (u/safe-pr-str v) (u/safe-pr-str v*))
       (binding [*already-transformed* true]
         (next-method model query k v*)))))
 

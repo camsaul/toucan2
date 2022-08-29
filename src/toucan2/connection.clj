@@ -147,14 +147,8 @@
         options        (dissoc options :nested-transaction-rule)]
     (u/with-debug-result ["do with transaction (nested rule: %s) with options %s" nested-tx-rule options]
       (binding [next.jdbc.transaction/*nested-tx* nested-tx-rule]
-        (println "TRANSACTION RULE =>" nested-tx-rule) ; NOCOMMIT
         (next.jdbc/with-transaction [t-conn conn options]
-          (try
-            (f t-conn)
-            ;; NOCOMMIT
-            (catch Throwable e
-              "ROLL BACK TRANSACTION"
-              (throw e))))))))
+          (f t-conn))))))
 
 (defmacro with-transaction
   "Gets a connection with [[with-connection]], and executes `body` within that transaction.

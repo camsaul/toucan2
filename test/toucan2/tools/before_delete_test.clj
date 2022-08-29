@@ -52,11 +52,9 @@
 
 (before-delete/define-before-delete ::venues.before-delete-exception.clojure-land
   [venue]
-  (println "<IN BEFORE DELETE> (Clojure)") ; NOCOMMIT
   (when *before-delete-calls*
     (swap! *before-delete-calls* conj ::venues.before-delete-exception.clojure-land))
   (update/update! ::test/venues (:id venue) {:updated-at (LocalDateTime/parse "2022-08-16T14:22:00")})
-  (println "<NOT IN BEFORE DELETE (Clojure)") ; NOCOMMIT
   (when (= (:category venue) "store")
     (throw (ex-info "Don't delete a store!" {:venue venue}))))
 

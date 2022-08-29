@@ -11,7 +11,6 @@
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
-   [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-select :as after-select]
@@ -330,7 +329,7 @@
 ;;; do this
 (defn do-pre-update
   "Do [[toucan2.tools.before-update]] stuff for a `changes-map` using the methods for `modelable`."
-  [modelable changes-map]
+  [_modelable changes-map]
   {:pre [(map? changes-map)]}
   ;; mega HACK
   ;; FIXME
