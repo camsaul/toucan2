@@ -64,6 +64,12 @@
   :test-core
   {:exec-args {:dirs ["test"]}}
 
+  ;; only run tests against `toucan2-toucan1`
+  ;;
+  ;; clj -X:dev:test:test-toucan1
+  :test-toucan1
+  {:exec-args {:dirs ["toucan1/test"]}}
+
   ;; run tests only against Postgres.
   ;;
   ;; clj -X:dev:test:test-postgres

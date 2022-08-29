@@ -467,17 +467,13 @@
 ;; (s/def ::pks (s/nilable (s/coll-of ::pk)))
 
 (defn- transduce-instances-from-pks
-  [rf model columns pks #_pk-maps]
-  ;; PKs should actually come back as maps because that's how they come out by default and we haven't had the chance to
-  ;; convert them to vectors in the reducing function yet
-  #_(assert (every? map? pk-maps) (format "Bad PK maps: %s" (u/safe-pr-str pk-maps)))
-  (if (empty? pks #_pk-maps)
+  [rf model columns pks]
+  ;; make sure [[toucan2.select]] is loaded so we get the impls for `:toucan.query-type/select.instances`
+  (locking clojure.lang.RT/REQUIRE_LOCK
+    (require 'toucan2.select))
+  (if (empty? pks)
     []
-    (let [#_kv-args   #_ (into {}
-                               (map (fn [col]
-                                      [col [:in (mapv col pk-maps)]]))
-                               (model/primary-keys model))
-          kv-args     {:toucan/pk [:in pks]}
+    (let [kv-args     {:toucan/pk [:in pks]}
           parsed-args {:columns   columns
                        :kv-args   kv-args
                        :queryable {}}]

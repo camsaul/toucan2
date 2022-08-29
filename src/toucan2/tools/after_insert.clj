@@ -13,10 +13,15 @@
   `(letfn [(after-fn# [~'&query-type ~'&model ~instance-binding]
              ~@body)]
      (u/maybe-derive ~model ::tools.after/model)
-     (m/defmethod tools.after/each-row-fn [:toucan.query-type/insert.* ~model]
+     (m/defmethod tools.after/each-row-fn [#_query-type :toucan.query-type/insert.*
+                                           #_model      ~model]
        [query-type# model#]
-       ;; TODO -- should this look for NEXT METHOD so it can COMPOSE!
-       (partial after-fn# query-type# model#))))
+       (let [f#      (partial after-fn# query-type# model#)
+             next-f# (when ~'next-method
+                       (~'next-method query-type# model#))]
+         (if next-f#
+           (comp next-f# f#)
+           f#)))))
 
 (s/fdef define-after-insert
   :args (s/cat :model    some?

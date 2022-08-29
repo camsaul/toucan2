@@ -8,6 +8,8 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
 
+(set! *warn-on-reflection* true)
+
 (m/defmulti each-row-fn
   "Should return a function with the signature
 
@@ -18,6 +20,15 @@
   This function is only done for side-effects for query types that return update counts or PKs."
   {:arglists '([query-type₁ model₂])}
   u/dispatch-on-first-two-args)
+
+(m/defmethod each-row-fn :after :default
+  [query-type f]
+  (assert (fn? f)
+          (format "Expected each-row-fn for query type %s to return a function, got ^%s %s"
+                  (u/safe-pr-str query-type)
+                  (some-> f class .getCanonicalName)
+                  (u/safe-pr-str f)))
+  f)
 
 (m/defmulti ^:no-doc result-type-rf
   {:arglists '([original-query-type₁ model rf])}
