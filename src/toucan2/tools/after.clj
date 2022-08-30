@@ -3,6 +3,7 @@
   `result-type/pks` and `result-type/update-count` queries to `result-type/instances`, run them with the 'upgraded'
   result type, run our after stuff on each row, and then return the original results."
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -74,3 +75,33 @@
                         next-method
                         pipeline/transduce-compiled-query)]
     (m rf* upgraded-type model sql-args)))
+
+(defn ^:no-doc ^{:style/indent [:form]} define-after-impl
+  [next-method query-type model row-fn]
+  (let [f      (fn [row]
+                 (or (row-fn row)
+                     row))
+        next-f (when next-method
+                 (next-method query-type model))]
+    (if next-f
+      (comp next-f f)
+      f)))
+
+(defmacro define-after
+  [query-type model [instance-binding] & body]
+  `(do
+     (u/maybe-derive ~model ::model)
+     (m/defmethod each-row-fn [~query-type ~model]
+       [~'&query-type ~'&model]
+       (define-after-impl ~'next-method
+                          ~'&query-type
+                          ~'&model
+                          (fn [~instance-binding]
+                            ~@body)))))
+
+(s/fdef define-after*
+  :args (s/cat :query-type #(isa? % :toucan.query-type/*)
+               :model      some?
+               :bindings   (s/spec (s/cat :instance :clojure.core.specs.alpha/binding-form))
+               :body       (s/+ any?))
+  :ret any?)

@@ -16,12 +16,12 @@
 
 (derive ::venues.before-delete ::test/venues)
 
-(def ^:dynamic ^:private *deleted-venues*)
+(def ^:dynamic ^:private *deleted-venues* nil)
 
 (before-delete/define-before-delete ::venues.before-delete
   [venue]
   (when *deleted-venues*
-    (swap! *deleted-venues* conj venue))
+    (swap! *deleted-venues* conj (dissoc venue :created-at :updated-at)))
   nil)
 
 (deftest before-delete-test
@@ -35,15 +35,11 @@
       (is (= [(instance/instance ::venues.before-delete
                                  {:id         1
                                   :name       "Tempest"
-                                  :category   "bar"
-                                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                  :category   "bar"})
               (instance/instance ::venues.before-delete
                                  {:id         2
                                   :name       "Ho's Tavern"
-                                  :category   "bar"
-                                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                  :category   "bar"})]
              @*deleted-venues*)))))
 
 (derive ::venues.before-delete-exception.clojure-land ::test/venues)
@@ -102,3 +98,32 @@
                                           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
                      (select/select [model :id :name :updated-at]
                                     {:order-by [[:id :asc]]}))))))))))
+
+(derive ::venues.before-delete.composed ::venues.before-delete)
+
+(def ^:dynamic ^:private *deleted-venues-2* nil)
+
+(before-delete/define-before-delete ::venues.before-delete.composed
+  [venue]
+  (when *deleted-venues-2*
+    (swap! *deleted-venues-2* conj (dissoc venue :created-at :updated-at)))
+  nil)
+
+(deftest compose-test
+  (test/with-discarded-table-changes :venues
+    (binding [*deleted-venues*   (atom [])
+              *deleted-venues-2* (atom [])]
+      (is (= 2
+             (delete/delete! ::venues.before-delete.composed :category "bar")))
+      (doseq [varr [#'*deleted-venues*
+                    #'*deleted-venues-2*]]
+        (testing varr
+          (is (= [(instance/instance ::venues.before-delete.composed
+                                     {:id       1
+                                      :name     "Tempest"
+                                      :category "bar"})
+                  (instance/instance ::venues.before-delete.composed
+                                     {:id       2
+                                      :name     "Ho's Tavern"
+                                      :category "bar"})]
+                 @@varr)))))))

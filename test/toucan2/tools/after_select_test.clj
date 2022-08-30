@@ -76,3 +76,15 @@
       (test/with-discarded-table-changes :venues
         (is (= [3]
                (update/update-returning-pks! model 3 {:name "BevLess"})))))))
+
+(derive ::venues.short-name.composed ::venues.short-name)
+
+(after-select/define-after-select ::venues.short-name.composed
+  [venue]
+  (assoc venue :composed? true))
+
+(deftest compose-test
+  (testing "after-select should compose"
+    (is (= [(instance/instance ::venues.short-name.composed
+                               {:id 1, :name "Tempest", :short-name "Temp", :composed? true})]
+           (select/select [::venues.short-name.composed :id :name] {:order-by [[:id :asc]], :limit 1})))))
