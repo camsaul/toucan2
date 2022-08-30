@@ -23,4 +23,4 @@
   "Returns number of rows deleted."
   {:arglists '([modelable & conditions? query?])}
   [& unparsed-args]
-  (pipeline/transduce-unparsed :toucan.query-type/delete.update-count unparsed-args))
+  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/delete.update-count unparsed-args))

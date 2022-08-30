@@ -61,7 +61,7 @@
                 pk-map            pk-maps]
             (assoc parsed-args :changes changes, :kv-args pk-map)))))))
 
-(m/defmethod pipeline/transduce-with-model* :around [:toucan.query-type/update.* ::before-update]
+(m/defmethod pipeline/transduce-with-model :around [:toucan.query-type/update.* ::before-update]
   [rf query-type model {::keys [doing-before-update?], :keys [changes], :as parsed-args}]
   (cond
     doing-before-update?

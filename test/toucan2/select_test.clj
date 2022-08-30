@@ -180,12 +180,12 @@
 
 (derive ::people.no-timestamps ::people)
 
-(m/defmethod pipeline/transduce-with-model* :before [:toucan.query-type/select.* ::people.no-timestamps]
+(m/defmethod pipeline/transduce-with-model :before [:toucan.query-type/select.* ::people.no-timestamps]
   [_rf _query-type _model parsed-args]
   (update parsed-args :columns (fn [columns]
                                  (or columns [:id :name]))))
 
-(m/defmethod pipeline/transduce-with-model* [:toucan.query-type/select.instances ::people.no-timestamps]
+(m/defmethod pipeline/transduce-with-model [:toucan.query-type/select.instances ::people.no-timestamps]
   [rf query-type model parsed-args]
   (let [rf* ((map (fn [person]
                     (testing "select* :after should see Toucan 2 instances"
@@ -215,7 +215,7 @@
 ;; TODO this is probably not the way you'd want to accomplish this in real life -- I think you'd probably actually want
 ;; to implement [[toucan2.query/build]] instead. But it does do a good job of letting us test that combining aux methods
 ;; work like we'd expect.
-(m/defmethod pipeline/transduce-built-query* :before [:toucan.query-type/select.* ::people.limit-2 clojure.lang.IPersistentMap]
+(m/defmethod pipeline/transduce-built-query :before [:toucan.query-type/select.* ::people.limit-2 clojure.lang.IPersistentMap]
   [_rf _query-type _model built-query]
   (assoc built-query :limit 2))
 

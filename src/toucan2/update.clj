@@ -43,9 +43,9 @@
                                      :set    changes})]
     (next-method query-type model parsed-args)))
 
-(m/defmethod pipeline/transduce-resolved-query* [#_query-type :toucan.query-type/update.*
-                                                 #_model      :default
-                                                 #_query      :default]
+(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/update.*
+                                                #_model      :default
+                                                #_query      :default]
   [rf query-type model {:keys [changes], :as parsed-args} resolved-query]
   (if (empty? changes)
     (do
@@ -62,7 +62,7 @@
 (defn update!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [& unparsed-args]
-  (pipeline/transduce-unparsed :toucan.query-type/update.update-count unparsed-args))
+  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/update.update-count unparsed-args))
 
 (defn reducible-update-returning-pks
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
@@ -72,6 +72,6 @@
 (defn update-returning-pks!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [& unparsed-args]
-  (pipeline/transduce-unparsed :toucan.query-type/update.pks unparsed-args))
+  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/update.pks unparsed-args))
 
 ;;; TODO -- add `update-returning-instances!`, similar to [[toucan2.update/insert-returning-instances!]]

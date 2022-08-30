@@ -42,9 +42,9 @@
   [reducible-rows]
   (->IdentityQuery reducible-rows))
 
-(m/defmethod pipeline/transduce-built-query* [#_query-type :default #_:toucan.result-type/instances
-                                              #_model      :default
-                                              #_query      IdentityQuery]
+(m/defmethod pipeline/transduce-built-query [#_query-type :default
+                                             #_model      :default
+                                             #_query      IdentityQuery]
   [rf _query-type model {:keys [rows], :as _query}]
   (u/with-debug-result ["transduce IdentityQuery rows %s" rows]
     (transduce (if model
@@ -70,8 +70,8 @@
   query)
 
 ;;; allow using an identity query as an 'identity model'
-(m/defmethod pipeline/transduce-with-model* [#_query-type :default
-                                             #_model      IdentityQuery]
+(m/defmethod pipeline/transduce-with-model [#_query-type :default
+                                            #_model      IdentityQuery]
   [rf _query-type model _parsed-args]
   (transduce identity rf model))
 
@@ -91,9 +91,9 @@
   [connectable _options f]
   (f connectable))
 
-(m/defmethod pipeline/transduce-compiled-query-with-connection* [#_conn       IdentityConnection
-                                                                 #_query-type :default
-                                                                 #_model      :default]
+(m/defmethod pipeline/transduce-compiled-query-with-connection [#_conn       IdentityConnection
+                                                                #_query-type :default
+                                                                #_model      :default]
   [rf conn _query-type model _compiled-query]
   (transduce
    (map (fn [row]

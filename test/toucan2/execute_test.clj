@@ -136,7 +136,7 @@
 ;;; as HoneySQL. There is currently no way to define custom compilation behavior on the basis of the connectable. Not
 ;;; sure how this would actually work tho without realizing the connection *first*; that causes its own problems because
 ;;; it breaks [[toucan2.tools.identity-execute/identity-query]]
-(m/defmethod pipeline/transduce-compiled-query-with-connection* [#_connection ::connectable.not-even-jdbc
+(m/defmethod pipeline/transduce-compiled-query-with-connection [#_connection ::connectable.not-even-jdbc
                                                                  #_query-type :default
                                                                  #_model      :default]
   [rf _conn _query-type _model [{k :key}, :as _compiled-query]]
@@ -146,16 +146,16 @@
   (is (= [{:a 1} {:a 2} {:a 3}]
          (execute/query ::connectable.not-even-jdbc [{:key :a}]))))
 
-(m/defmethod pipeline/transduce-with-model* [:default ::model.not-even-jdbc]
+(m/defmethod pipeline/transduce-with-model [:default ::model.not-even-jdbc]
   [rf query-type model {:keys [queryable], :as _parsed-args}]
   (pipeline/transduce-compiled-query rf query-type model queryable))
 
 ;;; here's how you can have custom compilation behavior. At this point in time it requires specifying a model as well
 ;;; since connection isn't realized until after the query compilation stage.
 
-(m/defmethod pipeline/transduce-compiled-query-with-connection* [#_connection ::connectable.not-even-jdbc
-                                                                 #_query-type :default
-                                                                 #_model      ::model.not-even-jdbc]
+(m/defmethod pipeline/transduce-compiled-query-with-connection [#_connection ::connectable.not-even-jdbc
+                                                                #_query-type :default
+                                                                #_model      ::model.not-even-jdbc]
   [rf _conn _query-type _model {k :key, :as _compiled-query}]
   (reduce rf (rf) [{k 4} {k 5} {k 6}]))
 

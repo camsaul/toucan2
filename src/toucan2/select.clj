@@ -32,7 +32,7 @@
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
   [& unparsed-args]
-  (pipeline/transduce-unparsed :toucan.query-type/select.instances unparsed-args))
+  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/select.instances unparsed-args))
 
 (defn select-one {:arglists '([modelable & kv-args? query?]
                               [[modelable & columns] & kv-args? query?])}

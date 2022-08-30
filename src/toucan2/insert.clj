@@ -88,7 +88,7 @@
                 (empty? (:rows resolved-query)))
            (nil? resolved-query))))
 
-(m/defmethod pipeline/transduce-resolved-query* [#_query-type :toucan.query-type/insert.*
+(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/insert.*
                                                  #_model      :default
                                                  #_query      :default]
   [rf query-type model parsed-args resolved-query]
@@ -114,7 +114,7 @@
                [modelable k v & more]
                [modelable columns row-vectors])}
   [& unparsed-args]
-  (pipeline/transduce-unparsed :toucan.query-type/insert.update-count unparsed-args))
+  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/insert.update-count unparsed-args))
 
 (defn reducible-insert-returning-pks
   {:arglists '([modelable row-or-rows]
@@ -133,7 +133,7 @@
                [modelable k v & more]
                [modelable columns row-vectors])}
   [& unparsed-args]
-  (pipeline/transduce-unparsed :toucan.query-type/insert.pks unparsed-args))
+  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/insert.pks unparsed-args))
 
 (defn reducible-insert-returning-instances
   {:arglists '([modelable row-or-rows]
@@ -158,4 +158,4 @@
                [[modelable & columns-to-return] k v & more]
                [[modelable & columns-to-return] columns row-vectors])}
   [& unparsed-args]
-  (pipeline/transduce-unparsed :toucan.query-type/insert.instances unparsed-args))
+  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/insert.instances unparsed-args))
