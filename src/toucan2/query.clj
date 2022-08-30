@@ -36,13 +36,6 @@
 
 ;;;; [[parse-args]]
 
-;;; TODO -- not sure this needs to be a multimethod.
-(m/defmulti args-spec
-  "[[clojure.spec.alpha]] spec that should be used to parse unparsed args for `query-type` by the default implementation
-  of [[parse-args]]."
-  {:arglists '([query-type])}
-  u/dispatch-on-first-arg)
-
 (s/def ::default-args.modelable
   (s/or
    :modelable         (complement sequential?)
@@ -69,10 +62,6 @@
    :kv-args   ::default-args.kv-args
    :queryable ::default-args.queryable))
 
-(m/defmethod args-spec :default
-  [_query-type]
-  ::default-args)
-
 (s/def :toucan2.query.parsed-args/modelable
   some?)
 
@@ -96,8 +85,7 @@
 
 (defn parse-args
   "`parse-args` takes a sequence of unparsed args passed to something like [[toucan2.select/select]] and parses them into
-  a parsed args map. The default implementation uses [[clojure.spec.alpha]] to parse the args according to
-  the [[args-spec]] for `query-type`.
+  a parsed args map. The default implementation uses [[clojure.spec.alpha]] to parse the args according to `args-spec`.
 
   These keys are commonly returned by several of the different implementations `parse-args`, and other tooling is
   build to leverage them:
@@ -115,25 +103,27 @@
 
   * `:columns` -- for things that return instances, `:columns` is a sequence of columns to return. These are commonly
     specified by wrapping the modelable in a `[modelable & columns]` vector."
-  [query-type unparsed-args]
-  (u/try-with-error-context ["parse args" {::query-type query-type, ::unparsed-args unparsed-args}]
-    (u/with-debug-result (list `parse-args query-type unparsed-args)
-      (let [spec   (args-spec query-type)
-            parsed (s/conform spec unparsed-args)]
-        (when (s/invalid? parsed)
-          (throw (ex-info (format "Don't know how to interpret %s args: %s"
-                                  (u/safe-pr-str query-type)
-                                  (s/explain-str spec unparsed-args))
-                          (s/explain-data spec unparsed-args))))
-        (doto (cond-> parsed
-                (:modelable parsed)                 (merge (let [[modelable-type x] (:modelable parsed)]
-                                                             (case modelable-type
-                                                               :modelable         {:modelable x}
-                                                               :modelable-columns x)))
-                (not (contains? parsed :queryable)) (assoc :queryable {})
-                (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
-                                                                       (into {} (map (juxt :k :v)) kv-args))))
-          validate-parsed-args)))))
+  ([query-type unparsed-args]
+   (parse-args query-type ::default-args unparsed-args))
+
+  ([query-type spec unparsed-args]
+   (u/try-with-error-context ["parse args" {::query-type query-type, ::unparsed-args unparsed-args}]
+     (u/with-debug-result (list `parse-args query-type unparsed-args)
+       (let [parsed (s/conform spec unparsed-args)]
+         (when (s/invalid? parsed)
+           (throw (ex-info (format "Don't know how to interpret %s args: %s"
+                                   (u/safe-pr-str query-type)
+                                   (s/explain-str spec unparsed-args))
+                           (s/explain-data spec unparsed-args))))
+         (doto (cond-> parsed
+                 (:modelable parsed)                 (merge (let [[modelable-type x] (:modelable parsed)]
+                                                              (case modelable-type
+                                                                :modelable         {:modelable x}
+                                                                :modelable-columns x)))
+                 (not (contains? parsed :queryable)) (assoc :queryable {})
+                 (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
+                                                                        (into {} (map (juxt :k :v)) kv-args))))
+           validate-parsed-args))))))
 
 ;;;; [[do-with-resolved-query]] and [[with-resolved-query]]
 

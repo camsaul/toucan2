@@ -24,13 +24,9 @@
    :rows-or-queryable (s/alt :rows      ::args.rows
                              :queryable some?)))
 
-(m/defmethod query/args-spec :toucan.query-type/insert.*
-  [_query-type]
-  ::args)
-
 (defn parse-insert-args
   [query-type unparsed-args]
-  (let [parsed                               (query/parse-args query-type unparsed-args)
+  (let [parsed                               (query/parse-args query-type ::args unparsed-args)
         [rows-queryable-type rows-queryable] (:rows-or-queryable parsed)
         parsed                               (select-keys parsed [:modelable :columns])]
     (case rows-queryable-type

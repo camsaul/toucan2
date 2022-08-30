@@ -9,7 +9,7 @@
 
 ;;; this is basically the same as the args for `select` and `delete` but the difference is that it has an additional
 ;;; optional arg, `:pk`, as the second arg, and one additional optional arg, the `changes` map at the end
-(s/def ::default-args
+(s/def ::args
   (s/cat
    :modelable ::query/default-args.modelable
    :pk        (s/? (complement (some-fn keyword? map?)))
@@ -21,13 +21,9 @@
    ;; here.
    :changes map?))
 
-(m/defmethod query/args-spec :toucan.query-type/update.*
-  [_query-type]
-  ::default-args)
-
 (defn parse-update-args
   [query-type unparsed-args]
-  (let [parsed (query/parse-args query-type unparsed-args)]
+  (let [parsed (query/parse-args query-type ::args unparsed-args)]
     (cond-> parsed
       (contains? parsed :pk) (-> (dissoc :pk)
                                  (update :kv-args assoc :toucan/pk (:pk parsed))))))
