@@ -29,8 +29,6 @@ official announcement -- [take a look at the Trello board](https://trello.com/b/
 get a little further along I'll move things over to GitHub issues. I will update this README when I publish the first
 alpha release.
 
-If you want to look at the code please take a look at the [`mega-pipeline-overhaul` branch](https://github.com/camsaul/toucan2/tree/mega-pipeline-overhaul) which is a work-in-progress overhaul of the way the query execution pipeline works that vastly simplifies things. It should be merged into `master` in a few days once I work the kinks out. You can also browse the [Documentation](https://cljdoc.org/d/io.github.camsaul/toucan2/0.10.1.1-alpha/doc/readme), which is a work in progress.
-
 # `toucan2-toucan1`
 
 [![Clojars Project](https://clojars.org/io.github.camsaul/toucan2-toucan1/latest-version.svg)](https://clojars.org/io.github.camsaul/toucan2-toucan1)

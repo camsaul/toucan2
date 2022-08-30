@@ -4,6 +4,7 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [methodical.util.trace :as m.trace]
    [pretty.core :as pretty]
    [toucan2.compile :as compile]
    [toucan2.connection :as conn]
@@ -11,8 +12,7 @@
    [toucan2.jdbc.query :as jdbc.query]
    [toucan2.model :as model]
    [toucan2.query :as query]
-   [toucan2.util :as u]
-   [methodical.util.trace :as m.trace]))
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 

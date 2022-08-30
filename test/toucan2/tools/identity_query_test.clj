@@ -9,12 +9,7 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-select :as after-select]
-   [toucan2.tools.identity-query :as identity-query]
-   [toucan2.tools.transformed :as transformed]
-   [toucan2.insert :as insert]
-   [toucan2.tools.after-insert :as after-insert]
-   [toucan2.tools.before-insert :as before-insert]
-   [toucan2.connection :as conn]))
+   [toucan2.tools.identity-query :as identity-query]))
 
 (deftest query-test
   (is (= [[1 2]
