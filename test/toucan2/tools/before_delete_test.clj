@@ -6,7 +6,9 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.before-delete :as before-delete]
-   [toucan2.update :as update])
+   [toucan2.update :as update]
+   [toucan2.pipeline :as pipeline]
+   [toucan2.execute :as execute])
   (:import
    (java.time LocalDateTime)))
 
@@ -27,8 +29,11 @@
 (deftest before-delete-test
   (test/with-discarded-table-changes :venues
     (binding [*deleted-venues* (atom [])]
-      (is (= 2
-             (delete/delete! ::venues.before-delete :category "bar")))
+      (execute/with-call-count [call-count]
+        (is (= 2
+               (delete/delete! ::venues.before-delete :category "bar")))
+        (testing "call count"
+          (is (= 2 (call-count)))))
       (is (= [(instance/instance ::venues.before-delete
                                  {:id 3, :name "BevMo", :category "store"})]
              (select/select [::venues.before-delete :id :name :category])))
@@ -113,8 +118,11 @@
   (test/with-discarded-table-changes :venues
     (binding [*deleted-venues*   (atom [])
               *deleted-venues-2* (atom [])]
-      (is (= 2
-             (delete/delete! ::venues.before-delete.composed :category "bar")))
+      (execute/with-call-count [call-count]
+        (is (= 2
+               (delete/delete! ::venues.before-delete.composed :category "bar")))
+        (is (= 2
+               (call-count))))
       (doseq [varr [#'*deleted-venues*
                     #'*deleted-venues-2*]]
         (testing varr

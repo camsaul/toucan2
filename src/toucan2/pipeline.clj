@@ -629,8 +629,9 @@
 (defn- transduce-instances-from-pks
   [rf model columns pks]
   ;; make sure [[toucan2.select]] is loaded so we get the impls for `:toucan.query-type/select.instances`
-  (locking clojure.lang.RT/REQUIRE_LOCK
-    (require 'toucan2.select))
+  (when-not (contains? (loaded-libs) 'toucan2.select)
+    (locking clojure.lang.RT/REQUIRE_LOCK
+      (require 'toucan2.select)))
   (if (empty? pks)
     []
     (let [kv-args     {:toucan/pk [:in pks]}
