@@ -245,6 +245,8 @@
   (safe-printable [^clojure.core.Eduction ed]
     (walk-safe-printable (list 'eduction (.xform ed) (.coll ed)))))
 
+;;;; [[try-with-error-context]]
+
 (defprotocol ^:private AddContext
   (^:no-doc add-context ^Throwable [^Throwable e additional-context]))
 
@@ -294,7 +296,9 @@
   [additional-context & body]
   `(try
      ~@body
-     (catch Throwable e#
+     (catch Exception e#
+       (throw (add-context e# ~additional-context)))
+     (catch AssertionError e#
        (throw (add-context e# ~additional-context)))))
 
 (s/fdef try-with-error-context

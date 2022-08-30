@@ -60,27 +60,24 @@
    ["DEFAULT VALUES"])
  nil)
 
-(m/defmethod query/build [#_query-type :toucan.query-type/insert.*
-                          #_model      :default
-                          #_query      clojure.lang.IPersistentMap]
-  [query-type model {:keys [query], :as parsed-args}]
-  (let [rows (some (comp not-empty :rows) [parsed-args query])]
-    (when (empty? rows)
-      (throw (ex-info "Cannot build insert query with empty rows"
-                      {:query-type query-type, :model model, :args parsed-args})))
-    (merge
-     {:insert-into [(keyword (model/table-name model))]}
-     ;; if `rows` is just a single empty row then insert it with
-     ;;
-     ;; INSERT INTO table DEFAULT VALUES
-     ;;
-     ;; syntax. See the clause registered above
-     (if (= rows [{}])
-       {::default-values true}
-       {:values (map (partial instance/instance model)
-                     rows)}))))
-
-;;;; [[reducible-insert]] and [[insert!]]
+(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/insert.*
+                                                #_model      :default
+                                                #_query      clojure.lang.IPersistentMap]
+  [rf query-type model parsed-args resolved-query]
+  (let [rows        (some (comp not-empty :rows) [parsed-args resolved-query])
+        built-query (merge
+                     {:insert-into [(keyword (model/table-name model))]}
+                     ;; if `rows` is just a single empty row then insert it with
+                     ;;
+                     ;; INSERT INTO table DEFAULT VALUES
+                     ;;
+                     ;; syntax. See the clause registered above
+                     (if (= rows [{}])
+                       {::default-values true}
+                       {:values (map (partial instance/instance model)
+                                     rows)}))]
+    ;; rows is only added so we can get the default methods' no-op logic if there are no rows at all.
+    (next-method rf query-type model (assoc parsed-args :rows rows) built-query)))
 
 (defn- can-skip-insert? [parsed-args resolved-query]
   (and (empty? (:rows parsed-args))
@@ -90,8 +87,8 @@
            (nil? resolved-query))))
 
 (m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/insert.*
-                                                 #_model      :default
-                                                 #_query      :default]
+                                                #_model      :default
+                                                #_query      :default]
   [rf query-type model parsed-args resolved-query]
   (let [rows (some (comp not-empty :rows) [parsed-args resolved-query])]
     (if (can-skip-insert? parsed-args resolved-query)
@@ -101,6 +98,8 @@
         (rf (rf)))
       (u/with-debug-result ["Inserting %s rows into %s" (if (seq rows) (count rows) "?") model]
         (next-method rf query-type model parsed-args resolved-query)))))
+
+;;;; [[reducible-insert]] and [[insert!]]
 
 (defn reducible-insert
   {:arglists '([modelable row-or-rows]

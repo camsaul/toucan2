@@ -3,6 +3,7 @@
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.model :as model]
+   [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.test :as test]))
 
@@ -29,36 +30,6 @@
     :id [:in [1 2]]    [:in :id [1 2]]
     :id nil            [:= :id nil]))
 
-(deftest build-test
-  (is (= {:where [:= :a 1]}
-         (query/build ::my-query-type nil {:query {}, :kv-args {:a 1}}))))
-
-(m/defmethod model/primary-keys ::model-with-non-id-pk
-  [_model]
-  [:uuid])
-
-(deftest build-query-for-int-test
-  (testing "Raw integer PK as query"
-    (is (= {:where [:= :id 1]}
-           (query/build ::my-query-type nil {:query 1})
-           (query/build ::my-query-type nil {:kv-args {:toucan/pk 1}, :query {}}))))
-  (testing "custom non-:id PK"
-    (is (= {:where [:= :uuid 1]}
-           (query/build ::my-query-type ::model-with-non-id-pk {:query 1})
-           (query/build ::my-query-type ::model-with-non-id-pk {:kv-args {:toucan/pk 1}, :query {}})))))
-
-(deftest plain-sql-query-test
-  (doseq [query ["SELECT *"
-                 ["SELECT *"]]]
-    (testing (pr-str query)
-      (is (= ["SELECT *"]
-             (query/build nil nil {:query query})))
-      (testing "disallow kv-args"
-        (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"key-value args are not supported for plain SQL queries"
-             (query/build nil nil {:query query, :kv-args {:toucan/pk 1}})))))))
-
 (derive ::venues.compound-pk ::test/venues)
 
 (m/defmethod model/primary-keys ::venues.compound-pk
@@ -70,9 +41,10 @@
     (are [model arg expected] (= {:select [:*]
                                   :from   [[:venues]]
                                   :where  expected}
-                                 (query/build :toucan.query-type/select.instances
-                                              model
-                                              {:kv-args {:toucan/pk arg}, :query {}}))
+                                 (pipeline/build :toucan.query-type/select.instances
+                                                 model
+                                                 {:kv-args {:toucan/pk arg}}
+                                                 {}))
       ::test/venues        4                                    [:= :id 4]
       ::test/venues        [4]                                  [:= :id 4]
       ::test/venues        [:> 4]                               [:> :id 4]
@@ -95,9 +67,10 @@
   (is (= {:select [:*]
           :from   [[:venues :venue]]
           :where  [:= :venue/id 1]}
-         (query/build :toucan.query-type/select.instances
-                      ::venues.namespaced
-                      {:kv-args {:toucan/pk 1}, :query {}}))))
+         (pipeline/build :toucan.query-type/select.instances
+                         ::venues.namespaced
+                         {:kv-args {:toucan/pk 1}}
+                         {}))))
 
 (deftest honeysql-table-and-alias-test
   (are [model expected] (= expected

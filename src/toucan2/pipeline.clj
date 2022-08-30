@@ -198,7 +198,7 @@
   ```
   transduce-resolved-query
   ↓
-  toucan2.query/with-built-query
+  (build query)
   ↓
   transduce-built-query ← YOU ARE HERE
   ↓
@@ -240,13 +240,12 @@
   ↓
   transduce-resolved-query ← YOU ARE HERE
   ↓
-  toucan2.query/with-built-query
+  (build query)
   ↓
   transduce-built-query
   ```
 
-  The default implementation builds the resolved query with [[toucan2.query/with-built-query]] and then
-  calls [[transduce-built-query]]."
+  The default implementation builds the resolved query and then calls [[transduce-built-query]]."
   {:arglists '([rf query-type₁ model₂ parsed-args resolved-query₃])}
   (dispatch-ignore-rf
    (fn [query-type₁ model₂ _parsed-args resolved-query₃]
@@ -255,6 +254,10 @@
 (m/defmethod transduce-resolved-query :around :default
   [rf query-type model parsed-args resolved-query]
   {:pre [(ifn? rf) (query-type? query-type) (map? parsed-args)]}
+  ;; disabled for now since it breaks [[toucan2.no-jdbc-poc-test]]... but we should figure out how to fix that and
+  ;; then reenable this.
+  (assert (not (keyword? resolved-query))
+          (format "This doesn't look like a resolved query: %s" resolved-query))
   (u/println-debug ["transduce resolved query %s" resolved-query])
   (u/try-with-error-context ["with resolved query" {:query-type     query-type
                                                     :resolved-query resolved-query
@@ -263,21 +266,67 @@
 
 (m/defmethod transduce-resolved-query :default
   [rf query-type model parsed-args resolved-query]
-  ;; disabled for now since it breaks [[toucan2.no-jdbc-poc-test]]... but we should figure out how to fix that and
-  ;; then reenable this.
-  (assert (not (keyword? resolved-query))
-          (format "This doesn't look like a resolved query: %s" resolved-query))
-  (query/with-built-query [built-query [query-type model parsed-args resolved-query]]
-    ;; keep the original info around as metadata in case someone needs it later.
-    ;;
-    ;; TODO -- consider whether the [[with-built-query]] macro should do this for us.
-    (let [built-query (vary-meta built-query
-                                 assoc
-                                 ;; HACK in case you need it later. (We do.) See if there's a way we could do this
-                                 ;; without a big ol ugly HACK.
-                                 ::resolved-query resolved-query
-                                 ::parsed-args parsed-args)]
-      (transduce-built-query rf query-type model built-query))))
+  ;; keep the original info around as metadata in case someone needs it later.
+  (let [built-query (vary-meta resolved-query
+                               assoc
+                               ;; HACK in case you need it later. (We do.) See if there's a way we could do this
+                               ;; without a big ol ugly HACK.
+                               ::parsed-args parsed-args)]
+    (transduce-built-query rf query-type model built-query)))
+
+;;; Something like (select my-model nil) should basically mean SELECT * FROM my_model WHERE id IS NULL
+(m/defmethod transduce-resolved-query [#_query-type :default
+                                       #_model      :default
+                                       #_query      nil]
+  [rf query-type model parsed-args _nil]
+  ;; if `:query` is present but equal to `nil`, treat that as if the pk value IS NULL
+  (let [parsed-args (assoc-in parsed-args [:kv-args :toucan/pk] nil)]
+    (transduce-resolved-query rf query-type model parsed-args {})))
+
+;;; Treat lone integers as queries to select an integer primary key
+
+(m/defmethod transduce-resolved-query [#_query-type :default
+                                       #_model      :default
+                                       #_query      Integer]
+  [rf query-type model parsed-args n]
+  (transduce-resolved-query rf query-type model parsed-args (long n)))
+
+(m/defmethod transduce-resolved-query [#_query-type :default
+                                       #_model      :default
+                                       #_query      Long]
+  [rf query-type model parsed-args pk]
+  (transduce-resolved-query rf query-type model (update parsed-args :kv-args assoc :toucan/pk pk) {}))
+
+;;; default implementation for maps
+
+(m/defmethod transduce-resolved-query [#_query-type :default
+                                       #_model      :default
+                                       #_query      clojure.lang.IPersistentMap]
+  [rf query-type model {:keys [kv-args], :as parsed-args} query]
+  (let [query (query/apply-kv-args model query kv-args)]
+    (next-method rf query-type model (dissoc parsed-args :kv-args) query)))
+
+;;; handle SQL or [SQL & args]
+
+(m/defmethod transduce-resolved-query [#_query-type :default
+                                       #_model      :default
+                                       #_query      String]
+  [rf query-type model parsed-args sql]
+  (transduce-resolved-query rf query-type model parsed-args [sql]))
+
+(m/defmethod transduce-resolved-query [#_query-type :default
+                                       #_model      :default
+                                       #_query      clojure.lang.Sequential]
+  [rf query-type model {:keys [kv-args], :as parsed-args} sql-args]
+  ;; TODO -- this isn't necessarily a sql-args query. But we don't currently support this either way.
+  (when (seq kv-args)
+    (throw (ex-info "key-value args are not supported for plain SQL queries."
+                    {:query-type     query-type
+                     :model          model
+                     :parsed-args    parsed-args
+                     :method         #'transduce-resolved-query
+                     :dispatch-value (m/dispatch-value transduce-resolved-query rf query-type model parsed-args sql-args)})))
+  (next-method rf query-type model parsed-args sql-args))
 
 ;;;; [[transduce-unresolved-query]]
 
@@ -342,7 +391,12 @@
 
 (m/defmethod transduce-with-model :default
   [rf query-type model {:keys [queryable], :as parsed-args}]
-  (transduce-unresolved-query rf query-type model (dissoc parsed-args :queryable) queryable))
+  ;; if we literally parsed the queryable `nil` then leave it as is; if there is no `:queryable` at all default to a
+  ;; map.
+  (let [queryable (if (contains? parsed-args :queryable)
+                    queryable
+                    (or queryable {}))]
+    (transduce-unresolved-query rf query-type model (dissoc parsed-args :queryable) queryable)))
 
 ;;;; [[transduce-parsed-args]]
 
@@ -622,6 +676,13 @@
   (binding [transduce-resolved-query (fn [_rf _query-type _model₂ _parsed-args resolved-query]
                                        resolved-query)]
     (transduce-unresolved-query conj query-type model {} unresolved-query)))
+
+(defn build
+  "Helper for getting a built query for a `resolved-query`."
+  [query-type model parsed-args resolved-query]
+  (binding [transduce-built-query (fn [_rf _query-type _model query]
+                                    query)]
+    (transduce-with-model conj query-type model (assoc parsed-args :queryable resolved-query))))
 
 (defn do-traced-pipeline [thunk]
   (letfn [(traced-var [varr]

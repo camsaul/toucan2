@@ -5,7 +5,6 @@
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
-   [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
@@ -40,11 +39,11 @@
           :where  [:and
                    [:= :name "Tempest"]
                    [:= :id 1]]}
-         (query/build :toucan.query-type/update.*
-                      ::test/venues
-                      {:changes {:name "Hi-Dive"}
-                       :query   {:id 1}
-                       :kv-args {:name "Tempest"}}))))
+         (pipeline/build :toucan.query-type/update.*
+                         ::test/venues
+                         {:changes {:name "Hi-Dive"}
+                          :kv-args {:name "Tempest"}}
+                         {:id 1}))))
 
 (deftest pk-and-map-conditions-test
   (test/with-discarded-table-changes :venues
@@ -115,7 +114,7 @@
         (is (= {:update    [:venues]
                 :set       {:name "Taco Bell"}
                 :where     [:= :id nil]}
-               (query/build :toucan.query-type/update.* ::test/venues (assoc parsed-args :query query))))))
+               (pipeline/build :toucan.query-type/update.* ::test/venues parsed-args query)))))
     (is (= ["UPDATE venues SET name = ? WHERE id IS NULL" "Taco Bell"]
            (tools.compile/compile
              (update/update! ::test/venues nil {:name "Taco Bell"}))))

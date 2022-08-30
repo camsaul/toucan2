@@ -6,7 +6,7 @@
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
-   [toucan2.query :as query]
+   [toucan2.pipeline :as pipeline]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
@@ -58,10 +58,10 @@
 (deftest build-query-test
   (doseq [rows-fn [list vector]
           :let    [rows (rows-fn {:name "Grant & Green", :category "bar"})]]
-    (testing (pr-str (list `query/build :toucan.query-type/insert.* ::test/venues rows))
+    (testing (pr-str (list 'build :toucan.query-type/insert.* ::test/venues rows))
       (is (= {:insert-into [:venues]
               :values      [{:name "Grant & Green", :category "bar"}]}
-             (query/build :toucan.query-type/insert.* ::test/venues {:rows rows, :query {}}))))))
+             (pipeline/build :toucan.query-type/insert.* ::test/venues {:rows rows} {}))))))
 
 ;;; TODO -- a bit of a misnomer now.
 (defn- do-both-types-of-insert [f]

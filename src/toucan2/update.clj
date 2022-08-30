@@ -33,16 +33,15 @@
   (let [parsed-args (parse-update-args query-type unparsed-args)]
     (pipeline/transduce-parsed-args rf query-type parsed-args)))
 
-(m/defmethod query/build [:toucan.query-type/update.* :default clojure.lang.IPersistentMap]
-  [query-type model {:keys [kv-args query changes], :as parsed-args}]
-  (when (empty? changes)
-    (throw (ex-info "Cannot build an update query with no changes."
-                    {:query-type query-type, :model model, :parsed-args parsed-args})))
-  (let [parsed-args (assoc parsed-args
-                           :kv-args (merge kv-args query)
-                           :query   {:update (query/honeysql-table-and-alias model)
-                                     :set    changes})]
-    (next-method query-type model parsed-args)))
+(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/update.*
+                                                #_model      :default
+                                                #_query      clojure.lang.IPersistentMap]
+  [rf query-type model {:keys [kv-args changes], :as parsed-args} query]
+  (let [parsed-args (assoc parsed-args :kv-args (merge kv-args query))
+        built-query       {:update (query/honeysql-table-and-alias model)
+                           :set    changes}]
+    ;; `:changes` are added to `parsed-args` so we can get the no-op behavior in the default method.
+    (next-method rf query-type model (assoc parsed-args :changes changes) built-query)))
 
 (m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/update.*
                                                 #_model      :default

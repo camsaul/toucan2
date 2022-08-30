@@ -31,7 +31,6 @@
    [honey.sql.helpers :as hsql.helpers]
    [methodical.core :as m]
    [toucan2.model :as model]
-   [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
 ;;;; [[parse-args]]
@@ -126,104 +125,7 @@
            validate-parsed-args))))))
 
 
-;;;; [[build]]
-
-;;; TODO -- it's a little weird that literally every other multimethod in the query execution/compilation pipeline is
-;;; `do-with-` while this one isn't. Should this be `do-with-built-query` or something like that?
-;;;
-;;; TODO -- I'm 99% sure that `query` should be a separate arg from the rest of the `parsed-args`.
-(m/defmulti build
-  "`build` takes the parsed args returned by [[parse]] and builds them into a query that can be compiled
-  by [[toucan2.compile/with-compiled-query]]. For the default implementations, `build` takes the parsed arguments and
-  builds a Honey SQL 2 map."
-  {:arglists '([query-type₁ model₂ {:keys [query₃], :as parsed-args}])}
-  (fn [query-type model parsed-args]
-    (mapv protocols/dispatch-value [query-type
-                                    model
-                                    (:query parsed-args)])))
-
-(m/defmethod build :around :default
-  [query-type model parsed-args]
-  (assert (and (map? parsed-args)
-               (contains? parsed-args :query))
-          (format "%s expects map parsed-args with :query key, got %s." `build (u/safe-pr-str parsed-args)))
-  (u/try-with-error-context ["build query" {::query-type  query-type
-                                            ::model       model
-                                            ::parsed-args parsed-args}]
-    (u/with-debug-result ["%s %s %s with parsed args %s" `build query-type model parsed-args]
-      (next-method query-type model parsed-args))))
-
-(m/defmethod build :default
-  [query-type model parsed-args]
-  (throw (ex-info (format "Don't know how to build a query from parsed args %s. Do you need to implement %s for %s?"
-                          (u/safe-pr-str parsed-args)
-                          `build
-                          (u/safe-pr-str (m/dispatch-value build query-type model parsed-args)))
-                  {:query-type     query-type
-                   :model          model
-                   :parsed-args    parsed-args
-                   :method         #'build
-                   :dispatch-value (m/dispatch-value build query-type model parsed-args)})))
-
-;;; Something like (select my-model nil) should basically mean SELECT * FROM my_model WHERE id IS NULL
-(m/defmethod build [#_query-type :default
-                    #_model      :default
-                    #_query      nil]
-  [query-type model parsed-args]
-  (let [parsed-args (cond-> (assoc parsed-args :query {})
-                      ;; if `:query` is present but equal to `nil`, treat that as if the pk value IS NULL
-                      (contains? parsed-args :query)
-                      (update :kv-args assoc :toucan/pk nil))]
-    (build query-type model parsed-args)))
-
-(m/defmethod build [#_query-type :default
-                    #_model      :default
-                    #_query      Integer]
-  [query-type model parsed-args]
-  (build query-type model (update parsed-args :query long)))
-
-(m/defmethod build [#_query-type :default
-                    #_model      :default
-                    #_query      Long]
-  [query-type model {pk :query, :as parsed-args}]
-  (build query-type model (-> parsed-args
-                              (assoc :query {})
-                              (update :kv-args assoc :toucan/pk pk))))
-
-(m/defmethod build [#_query-type :default
-                    #_model      :default
-                    #_query      String]
-  [query-type model parsed-args]
-  (build query-type model (update parsed-args :query (fn [sql]
-                                                       [sql]))))
-
-(m/defmethod build [#_query-type :default
-                    #_model      :default
-                    #_query      clojure.lang.Sequential]
-  [query-type model {sql-args :query, :keys [kv-args], :as parsed-args}]
-  (when (seq kv-args)
-    (throw (ex-info "key-value args are not supported for plain SQL queries."
-                    {:query-type     query-type
-                     :model          model
-                     :parsed-args    parsed-args
-                     :method         #'build
-                     :dispatch-value (m/dispatch-value build query-type model parsed-args)})))
-  sql-args)
-
-(defmacro with-built-query [[built-query-binding [query-type model parsed-args resolved-query]] & body]
-  `(let [~built-query-binding (build ~query-type ~model (assoc ~parsed-args :query ~resolved-query))]
-     ~@body))
-
-(s/fdef with-built-query
-  :args (s/cat :bindings (s/spec (s/cat :lhs :clojure.core.specs.alpha/binding-form
-                                        :rhs (s/spec (s/cat :query-type     some?
-                                                            :model          any?
-                                                            :parsed-args    any?
-                                                            :resolved-query any?))))
-               :body     (s/+ any?))
-  :ret any?)
-
-;;;; Default [[build]] impl for maps; applying key-value args.
+;;;; Default [[pipeline/transduce-resolved-query]] impl for maps; applying key-value args.
 
 (m/defmulti apply-kv-arg
   {:arglists '([model₁ query₂ k₃ v])}
@@ -323,10 +225,6 @@
      (apply-kv-arg model query k v))
    query
    kv-args))
-
-(m/defmethod build [:default :default clojure.lang.IPersistentMap]
-  [_query-type model {:keys [kv-args query], :as _args}]
-  (apply-kv-args model query kv-args))
 
 (defn honeysql-table-and-alias
   "Build an Honey SQL `[table]` or `[table alias]` (if the model has a [[toucan2.model/namespace]] form) for `model` for

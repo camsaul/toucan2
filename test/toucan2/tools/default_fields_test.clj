@@ -3,7 +3,7 @@
    [clojure.test :refer :all]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
-   [toucan2.query :as query]
+   [toucan2.pipeline :as pipeline]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.default-fields :as default-fields]))
@@ -19,7 +19,7 @@
 
 (deftest select-test
   (is (= {:select [:id :name :category], :from [[:venues]]}
-         (query/build :toucan.query-type/select.instances ::venues.default-fields {:query {}})))
+         (pipeline/build :toucan.query-type/select.instances ::venues.default-fields {} {})))
   (is (= [(instance/instance ::venues.default-fields
                              {:id 1, :name "Tempest", :category "bar"})
           (instance/instance ::venues.default-fields
@@ -29,7 +29,7 @@
          (select/select ::venues.default-fields)))
   (testing "should still be able to override default fields"
       (is (= {:select [:id :name], :from [[:venues]]}
-             (query/build :toucan.query-type/select.* ::venues.default-fields {:query {}, :columns [:id :name]})))
+             (pipeline/build :toucan.query-type/select.* ::venues.default-fields {:columns [:id :name]} {})))
       (is (= (instance/instance ::venues.default-fields
                                 {:id 1, :name "Tempest"})
              (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]})))))

@@ -8,7 +8,6 @@
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
-   [toucan2.query :as query]
    [toucan2.save :as save]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -294,11 +293,10 @@
                (select/count ::test/venues)))))))
 
 (deftest delete!-test
-  (testing `query/build
+  (testing `pipeline/build
     (is (= {:delete-from [:venues]
             :where       [:= :category "bar"]}
-           (query/build :toucan.query-type/delete.update-count ::venues.category-keyword {:kv-args {:category :bar}
-                                                                                          :query   {}}))))
+           (pipeline/build :toucan.query-type/delete.update-count ::venues.category-keyword {:kv-args {:category :bar}} {}))))
   (testing "Delete row by PK"
     (test/with-discarded-table-changes :venues
       (is (= 1

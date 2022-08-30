@@ -75,7 +75,7 @@
                resolved-query))
         (is (= {:delete-from [:venues]
                 :where       [:= :id nil]}
-               (query/build :toucan.query-type/delete.update-count ::test/venues (assoc parsed-args :query resolved-query))))
+               (pipeline/build :toucan.query-type/delete.update-count ::test/venues parsed-args resolved-query)))
         (is (= ["DELETE FROM venues WHERE id IS NULL"]
                (tools.compile/compile
                  (delete/delete! ::test/venues nil))))))

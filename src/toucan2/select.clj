@@ -8,19 +8,17 @@
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
-(m/defmethod query/build [#_query-type :toucan.query-type/select.*
-                          #_model      :default
-                          #_query      clojure.lang.IPersistentMap]
-  [query-type model {:keys [columns], :as parsed-args}]
-  (let [parsed-args (-> parsed-args
-                        (update :query (fn [query]
-                                         (merge {:select (or (not-empty columns)
-                                                             [:*])}
-                                                (when model
-                                                  {:from [(query/honeysql-table-and-alias model)]})
-                                                query)))
-                        (dissoc :columns))]
-    (next-method query-type model parsed-args)))
+(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/select.*
+                                                #_model      :default
+                                                #_query      clojure.lang.IPersistentMap]
+  [rf query-type model {:keys [columns], :as parsed-args} resolved-query]
+  (let [parsed-args    (dissoc parsed-args :columns)
+        resolved-query (merge {:select (or (not-empty columns)
+                                           [:*])}
+                              (when model
+                                {:from [(query/honeysql-table-and-alias model)]})
+                              resolved-query)]
+    (next-method rf query-type model parsed-args resolved-query)))
 
 (defn reducible-select
   {:arglists '([modelable & kv-args? query?]

@@ -238,10 +238,9 @@
                     (xform v)
                     v))])))
 
-(m/defmethod query/build :before [#_query-type :toucan.query-type/update.*
-                                  #_model      ::transformed.model
-                                  #_query      :default]
-  [_query-type model {:keys [changes], :as parsed-args}]
+(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/update.*
+                                                    #_model      ::transformed.model]
+  [_rf _query-type model {:keys [changes], :as parsed-args}]
   (b/cond
     (not (map? changes))
     parsed-args

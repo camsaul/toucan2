@@ -22,8 +22,8 @@
 
 (deftest before-select-test
   (is (= (instance/instance ::people.id-and-name {:id             1
-                                      :name           "Cam"
-                                      ::after-select? true})
+                                                  :name           "Cam"
+                                                  ::after-select? true})
          (select/select-one ::people.id-and-name 1))))
 
 (derive ::people.named-cam ::test/people)
