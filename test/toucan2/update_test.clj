@@ -4,10 +4,12 @@
    [methodical.core :as m]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
+   [toucan2.tools.named-query :as tools.named-query]
    [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
@@ -78,9 +80,8 @@
              (update/update! ::test/venues 1 {})
              (update/update! ::test/venues {}))))))
 
-(m/defmethod query/do-with-resolved-query [:default ::named-conditions]
-  [model _queryable f]
-  (query/do-with-resolved-query model {:id 1} f))
+(tools.named-query/define-named-query ::named-conditions
+  {:id 1})
 
 (deftest named-conditions-test
   (test/with-discarded-table-changes :venues
@@ -108,7 +109,7 @@
               :changes   {:name "Taco Bell"}
               :queryable {}}
              parsed-args))
-      (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
+      (let [query (pipeline/resolve-query :toucan.query-type/update.* ::test/venues (:queryable parsed-args))]
         (is (= {}
                query))
         (is (= {:update    [:venues]

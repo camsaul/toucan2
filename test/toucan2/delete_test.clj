@@ -4,6 +4,7 @@
    [methodical.core :as m]
    [toucan2.delete :as delete]
    [toucan2.model :as model]
+   [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -69,12 +70,12 @@
     (let [parsed-args (query/parse-args :toucan.query-type/delete.update-count [::test/venues nil])]
       (is (= {:modelable ::test/venues, :queryable nil}
              parsed-args))
-      (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
+      (let [resolved-query (pipeline/resolve-query :toucan.query-type/delete.update-count ::test/venues (:queryable parsed-args))]
         (is (= nil
-               query))
+               resolved-query))
         (is (= {:delete-from [:venues]
                 :where       [:= :id nil]}
-               (query/build :toucan.query-type/delete.update-count ::test/venues (assoc parsed-args :query query))))
+               (query/build :toucan.query-type/delete.update-count ::test/venues (assoc parsed-args :query resolved-query))))
         (is (= ["DELETE FROM venues WHERE id IS NULL"]
                (tools.compile/compile
                  (delete/delete! ::test/venues nil))))))

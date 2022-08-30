@@ -10,7 +10,8 @@
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
-   [toucan2.tools.compile :as tools.compile])
+   [toucan2.tools.compile :as tools.compile]
+   [toucan2.tools.named-query :as tools.named-query])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -136,12 +137,9 @@
     (is (= [(instance/instance ::test/venues {:id 3, :name "BevMo"})]
            (select/select ::test/venues :id [:>= 3] {:select [:id :name], :order-by [[:id :asc]]})))))
 
-(m/defmethod query/do-with-resolved-query [:default ::count-query]
-  [model _queryable f]
-  (query/do-with-resolved-query model
-                                {:select [[:%count.* :count]]
-                                 :from   [(keyword (model/table-name model))]}
-                                f))
+(tools.named-query/define-named-query ::count-query
+  {:select [[:%count.* :count]]
+   :from   [(keyword (model/table-name &model))]})
 
 (deftest named-query-test
   (testing "venues"
@@ -374,7 +372,7 @@
     (let [parsed-args (query/parse-args :toucan.query-type/select.* [::test/venues nil])]
       (is (= {:modelable ::test/venues, :queryable nil}
              parsed-args))
-      (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
+      (let [query (pipeline/resolve-query :toucan.query-type/select.* ::test/venues (:queryable parsed-args))]
         (is (= nil
                query))
         (is (= {:select [:*], :from [[:venues]], :where [:= :id nil]}

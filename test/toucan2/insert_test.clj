@@ -9,7 +9,8 @@
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
-   [toucan2.tools.compile :as tools.compile])
+   [toucan2.tools.compile :as tools.compile]
+   [toucan2.tools.named-query :as tools.named-query])
   (:import
    (java.time LocalDateTime)))
 
@@ -234,10 +235,9 @@
             (is (= 0
                    (call-count)))))))))
 
-(m/defmethod query/do-with-resolved-query [:default ::named-rows]
-  [_model _queryable f]
-  (f {:rows [{:name "Grant & Green", :category "bar"}
-             {:name "North Beach Cantina", :category "restaurant"}]}))
+(tools.named-query/define-named-query ::named-rows
+  {:rows [{:name "Grant & Green", :category "bar"}
+          {:name "North Beach Cantina", :category "restaurant"}]})
 
 (deftest named-query-test
   (doseq [insert! [#'insert/insert!

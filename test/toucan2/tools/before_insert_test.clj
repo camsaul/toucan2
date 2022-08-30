@@ -3,13 +3,12 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer :all]
-   [methodical.core :as m]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
-   [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.before-insert :as before-insert]
+   [toucan2.tools.named-query :as tools.named-query]
    [toucan2.tools.transformed :as transformed])
   (:import
    (java.time LocalDateTime)))
@@ -79,10 +78,9 @@
             (is (= expected
                    (select/select-one ::venues.serialized-category :id 4)))))))))
 
-(m/defmethod query/do-with-resolved-query [:default ::named-rows]
-  [_model _queryable f]
-  (f {:rows [{:name "Grant & Green", :category "bar"}
-             {:name "North Beach Cantina", :category "restaurant"}]}))
+(tools.named-query/define-named-query ::named-rows
+  {:rows [{:name "Grant & Green", :category "bar"}
+          {:name "North Beach Cantina", :category "restaurant"}]})
 
 (deftest named-query-test
   (doseq [insert! [#_#'insert/insert!

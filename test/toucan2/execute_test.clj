@@ -6,9 +6,9 @@
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.pipeline :as pipeline]
-   [toucan2.query :as query]
    [toucan2.realize :as realize]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.tools.named-query :as tools.named-query])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -85,9 +85,8 @@
       (is (= expected
              (execute/query ::test/db {:select [:id :created_at], :from [:venues], :order-by [[:id :asc]]}))))))
 
-(m/defmethod query/do-with-resolved-query [:default ::named-query]
-  [_model _query f]
-  (f ["SELECT count(*) AS \"count\" FROM people;"]))
+(tools.named-query/define-named-query ::named-query
+  ["SELECT count(*) AS \"count\" FROM people;"])
 
 (deftest query-test-2
   (is (= [{:count 4}]
@@ -101,7 +100,9 @@
             {:id 2, :name "Sam", :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")}
             {:id 3, :name "Pam", :created-at (OffsetDateTime/parse "2020-01-01T21:56Z")}
             {:id 4, :name "Tam", :created-at (OffsetDateTime/parse "2020-05-25T19:56Z")}]
-           (execute/query ::test/db {:select [:*], :from [:people]}))))
+           (execute/query ::test/db {:select [:*], :from [:people]})))))
+
+(deftest execute-named-query-test
   (testing "named query"
     (is (= [{:count 4}]
            (execute/query ::test/db ::named-query)))))

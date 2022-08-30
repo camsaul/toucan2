@@ -29,22 +29,6 @@
     :id [:in [1 2]]    [:in :id [1 2]]
     :id nil            [:= :id nil]))
 
-(m/defmethod query/do-with-resolved-query [:default ::named-query]
-  [_model _queryable f]
-  (f {:select [[:%count.* :count]], :from [:venues]}))
-
-(deftest with-resolved-query-test
-  (let [executed-body? (atom false)]
-    (query/with-resolved-query [resolved-query [nil ::named-query]]
-      (reset! executed-body? true)
-      (is (= {:select [[:%count.* :count]], :from [:venues]}
-             resolved-query)))
-    (is @executed-body?))
-  (testing "detect errors"
-    (is (thrown?
-         clojure.lang.Compiler$CompilerException
-         (macroexpand-1 `(query/with-resolved-query ~'resolved-query ::named-query))))))
-
 (deftest build-test
   (is (= {:where [:= :a 1]}
          (query/build ::my-query-type nil {:query {}, :kv-args {:a 1}}))))

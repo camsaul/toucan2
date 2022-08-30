@@ -18,7 +18,6 @@
   (u/with-debug-result (list `before-delete model instance)
     (next-method model instance)))
 
-;;; TODO -- this should probably be done in `with-resolved-query` ?
 (m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/delete.*
                                                     #_model      ::before-delete]
   [_rf _query-type model parsed-args]

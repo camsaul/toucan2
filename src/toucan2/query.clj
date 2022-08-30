@@ -8,10 +8,10 @@
   ↓
   [[parse-args]] is used to parse args into a `parsed-args` map
   ↓
-  The `:queryable` key in parsed args is resolved and replaced with a `:query` by [[with-resolved-query]]
+  The `:queryable` key in parsed args is resolved
   ↓
-  [[build]] takes the `:query` in the parsed args and combines the other parsed args into it to build a
-  compilable query. The default backend builds a Honey SQL 2 query map
+  [[build]] takes the resolved query and combines the other parsed args into it to build a compilable query. The default
+  backend builds a Honey SQL 2 query map
   ↓
   some sort of reducible is returned.
 
@@ -93,9 +93,9 @@
   * `:modelable` -- usually the first of the `unparsed-args`, this is the thing that should get resolved to a model
      with [[toucan2.model/with-model]].
 
-  * `:queryable` -- something that can be resolved to a query with [[with-resolved-query]], for example a map or integer or
-    'named query' keyword. The resolved query is ultimately combined with other parsed args and built into something like
-    a Honey SQL map with [[build]], then compiled with [[toucan2.compile/with-compiled-query]].
+  * `:queryable` -- something that can be resolved to a query, for example a map or integer or 'named query' keyword.
+    The resolved query is ultimately combined with other parsed args and built into something like a Honey SQL map
+    with [[build]], then compiled with [[toucan2.compile/with-compiled-query]].
 
   * `:kv-args` -- map of key-value pairs. When [[build]] builds a query, it calls [[apply-kv-arg]] for each of the
     key-value pairs. The default behavior is to append a Honey SQL `:where` clause based on the pair; but you can
@@ -125,76 +125,6 @@
                                                                         (into {} (map (juxt :k :v)) kv-args))))
            validate-parsed-args))))))
 
-;;;; [[do-with-resolved-query]] and [[with-resolved-query]]
-
-(m/defmulti do-with-resolved-query
-  "Impls should resolve `queryable` to an *unbuilt* query that can be built by [[build]] and call
-
-  ```clj
-  (f query)
-  ```
-
-  Example:
-
-  ```clj
-  ;; define a custom query ::my-count that you can then use with select and the like
-  (m/defmethod do-with-resolved-query [:default ::my-count]
-    [model _queryable f]
-    (do-with-resolved-query model {:select [:%count.*], :from [(keyword (model/table-name model))]} f))
-
-  (select :model/user ::my-count)
-  ```
-
-  Dispatches off of `[modelable queryable]`."
-  {:arglists '([model₁ queryable₂ f])}
-  u/dispatch-on-first-two-args)
-
-;; define a custom query `::my-count`
-(m/defmethod do-with-resolved-query [:default ::my-count]
-  [model _queryable f]
-  (do-with-resolved-query model {:select [:%count.*], :from [(keyword (model/table-name model))]} f))
-
-(defmacro with-resolved-query
-  "Resolve a `queryable` to an *unbuilt* query and bind it to `query-binding`. After resolving the query the next step is
-  to build it into a compilable query using [[build]].
-
-  ``clj
-  (with-resolved-query [resolved-query [:model/user :some-named-query]]
-    (build model :toucan2.select/select (assoc parsed-args :query resolved-query)))
-  ```"
-  {:style/indent :defn}
-  [[query-binding [model queryable]] & body]
-  `(do-with-resolved-query ~model ~queryable (^:once fn* [query#]
-                                              ;; support destructing the query.
-                                              (let [~query-binding query#]
-                                                ~@body))))
-
-(s/fdef with-resolved-query
-  :args (s/cat :bindings (s/spec (s/cat :query               :clojure.core.specs.alpha/binding-form
-                                        :modelable+queryable (s/spec (s/cat :model     any? ; I guess model can be `nil` here
-                                                                            :queryable any?))))
-               :body     (s/+ any?))
-  :ret any?)
-
-(m/defmethod do-with-resolved-query :default
-  [_model queryable f]
-  (let [f* (^:once fn* [query]
-            (assert (not (:queryable query))
-                    "Don't pass parsed-args to do-with-resolved-query. Pass just the queryable")
-            (when (and u/*debug*
-                       (not= query queryable))
-              (u/with-debug-result ["%s: resolved queryable %s" `do-with-resolved-query queryable]
-                query))
-            (f query))]
-    (f* queryable)))
-
-(m/defmethod do-with-resolved-query :around :default
-  [model queryable f]
-  (let [f* (^:once fn* [query]
-            (u/try-with-error-context (when (not= queryable query)
-                                        ["with resolved query" {::model model, ::queryable queryable, ::resolved-query query}])
-              (f query)))]
-    (next-method model queryable f*)))
 
 ;;;; [[build]]
 
