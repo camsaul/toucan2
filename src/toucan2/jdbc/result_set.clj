@@ -5,6 +5,8 @@
    [pretty.core :as pretty]
    [toucan2.instance :as instance]
    [toucan2.jdbc.row :as jdbc.row]
+   [toucan2.magic-map :as magic-map]
+   [toucan2.model :as model]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u])
   (:import
@@ -53,7 +55,7 @@
   [^ResultSetMetaData rsmeta]
   (range 1 (inc (.getColumnCount rsmeta))))
 
-(defn- row-instance [model #_key-xform col-name->thunk]
+(defn- row-instance [model col-name->thunk]
   (let [row (jdbc.row/row col-name->thunk)]
     (u/with-debug-result ["Creating new instance of %s, which has key transform fn %s"
                           model
@@ -63,21 +65,29 @@
 (defn row-thunk
   "Return a thunk that when called fetched the current row from the cursor and returns it as a [[row-instance]]."
   [^Connection conn model ^ResultSet rset]
-  (let [rsmeta          (.getMetaData rset)
-        key-xform       (instance/key-transform-fn model)
+  (let [rsmeta           (.getMetaData rset)
+        ;; do case-insensitive lookup.
+        table->namespace (some-> (model/table-name->namespace model) (magic-map/magic-map u/lower-case-en))
+        key-xform        (instance/key-transform-fn model)
         ;; create a set of thunks to read each column. These thunks will call `read-column-thunk` to determine the
         ;; appropriate column-reading thunk the first time they are used.
-        col-name->thunk (into {} (for [^Long i (index-range rsmeta)
-                                       :let    [col-name     (key-xform (keyword (.getColumnName rsmeta i)))
-                                                ;; TODO -- add test to ensure we only resolve the read-column-thunk
-                                                ;; once even with multiple rows.
-                                                read-thunk   (delay (read-column-thunk conn model rset rsmeta i))
-                                                result-thunk (fn []
-                                                               (u/with-debug-result ["Realize column %s %s" i col-name]
-                                                                 (next.jdbc.rs/read-column-by-index (@read-thunk) rsmeta i)))]]
-                                   [col-name result-thunk]))]
+        col-name->thunk  (into {}
+                               (map (fn [^Long i]
+                                      (let [table-name    (.getTableName rsmeta i)
+                                            col-name      (.getColumnName rsmeta i)
+                                            table-ns-name (some-> (get table->namespace table-name) name)
+                                            col-key       (key-xform (keyword table-ns-name col-name))
+                                            ;; TODO -- add test to ensure we only resolve the read-column-thunk
+                                            ;; once even with multiple rows.
+                                            read-thunk   (delay (read-column-thunk conn model rset rsmeta i))
+                                            result-thunk (fn []
+                                                           (u/with-debug-result ["Realize column %s %s.%s as %s"
+                                                                                 i table-name col-name col-key]
+                                                             (next.jdbc.rs/read-column-by-index (@read-thunk) rsmeta i)))]
+                                        [col-key result-thunk])))
+                               (index-range rsmeta))]
     (fn row-instance-thunk []
-      (row-instance model #_key-xform col-name->thunk))))
+      (row-instance model col-name->thunk))))
 
 (deftype ^:no-doc ReducibleResultSet [^Connection conn model ^ResultSet rset]
   clojure.lang.IReduceInit

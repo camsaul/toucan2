@@ -100,3 +100,34 @@
       ::venues.compound-pk [:in [[4 "BevMo"]]]                  [:and [:in :id [4]] [:in :name ["BevMo"]]]
       ::venues.compound-pk [:in [[4 "BevMo"] [5 "BevLess"]]]    [:and [:in :id [4 5]] [:in :name ["BevMo" "BevLess"]]]
       ::venues.compound-pk [:between [4 "BevMo"] [5 "BevLess"]] [:and [:between :id 4 5] [:between :name "BevMo" "BevLess"]])))
+
+(derive ::venues.namespaced ::test/venues)
+
+(m/defmethod model/model->namespace ::venues.namespaced
+  [_model]
+  {::test/venues :venue})
+
+(deftest namespaced-toucan-pk-test
+  (is (= {:select [:*]
+          :from   [[:venues :venue]]
+          :where  [:= :venue/id 1]}
+         (query/build :toucan.query-type/select.instances
+                      ::venues.namespaced
+                      {:kv-args {:toucan/pk 1}, :query {}}))))
+
+(deftest honeysql-table-and-alias-test
+  (are [model expected] (= expected
+                           (query/honeysql-table-and-alias model))
+    ::test/venues       [:venues]
+    ::venues.namespaced [:venues :venue]
+    "venues"            [:venues]))
+
+;; (deftest identitfier-test
+;;   (testing "Custom Honey SQL identifier clause"
+;;     (are [identifier quoted? expected] (= expected
+;;                                           (hsql/format {:select [:*], :from [[identifier]]}
+;;                                                        {:quoted quoted?}))
+;;       [::query/identifier :wow]          false ["SELECT * FROM wow"]
+;;       [::query/identifier :wow]          true  ["SELECT * FROM \"wow\""]
+;;       [::query/identifier :table :field] false ["SELECT * FROM table.field"]
+;;       [::query/identifier :table :field] true  ["SELECT * FROM \"table\".\"field\""])))

@@ -81,3 +81,16 @@
     (test/with-discarded-table-changes :venues
       (is (= 0
              (delete/delete! ::test/venues nil))))))
+
+(derive ::venues.namespaced ::test/venues)
+
+(m/defmethod model/model->namespace ::venues.namespaced
+  [_model]
+  {::test/venues :venue})
+
+(deftest namespaced-test
+  (test/with-discarded-table-changes :venues
+    (is (= 1
+           (delete/delete! ::venues.namespaced :venue/id 3)))
+    (is (= nil
+           (select/select-one [::test/venues :id :name :category] :id 3)))))

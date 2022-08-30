@@ -17,7 +17,7 @@
                                          (merge {:select (or (not-empty columns)
                                                              [:*])}
                                                 (when model
-                                                  {:from [[(keyword (model/table-name model))]]})
+                                                  {:from [(query/honeysql-table-and-alias model)]})
                                                 query)))
                         (dissoc :columns))]
     (next-method query-type model parsed-args)))

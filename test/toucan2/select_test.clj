@@ -408,8 +408,14 @@
 (m/defmethod query/build :after [#_query-type :toucan.query-type/select.*
                                  #_model      ::venues.with-category
                                  #_query      clojure.lang.IPersistentMap]
-  [_query-type _model built-query]
-  (assoc built-query :left-join [[:category :c] [:= :venues.category :c.name]]))
+  [_query-type model built-query]
+  (let [model-ns-str    (some-> (model/namespace model) name)
+        venues-category (keyword
+                         (str
+                          (when model-ns-str
+                            (str model-ns-str \.))
+                          "category"))]
+    (assoc built-query :left-join [:category [:= venues-category :category.name]])))
 
 (deftest joined-model-test
   (is (= (instance/instance ::venues.with-category
@@ -421,5 +427,70 @@
                              :slug            "bar_01"
                              :parent-category nil})
          (select/select-one ::venues.with-category
-                            {:left-join [[:category :c] [:= :venues.category :c.name]]
-                             :order-by  [[:id :asc]]}))))
+                            {:order-by [[:id :asc]]}))))
+
+(derive ::venues.namespaced ::test/venues)
+
+(m/defmethod model/model->namespace ::venues.namespaced
+  [_model]
+  {::venues.namespaced :venue})
+
+(deftest namespaced-test
+  (is (= {"venues" :venue}
+         (model/table-name->namespace ::venues.namespaced)))
+  (is (= {:select    [:*]
+          :from      [[:venues :venue]]
+          :order-by  [[:id :asc]]}
+         (tools.compile/build
+           (select/select-one ::venues.namespaced {:order-by [[:id :asc]]}))))
+  (testing "When selecting a model with a namespace, keys should come back in that namespace."
+    (is (= (instance/instance ::venues.namespaced
+                              {:venue/id         1
+                               :venue/name       "Tempest"
+                               :venue/category   "bar"
+                               :venue/created-at (LocalDateTime/parse "2017-01-01T00:00")
+                               :venue/updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+           (select/select-one ::venues.namespaced {:order-by [[:id :asc]]})))))
+
+(doto ::venues.namespaced.with-category
+  (derive ::venues.namespaced)
+  (derive ::venues.with-category))
+
+(m/defmethod model/model->namespace ::venues.namespaced.with-category
+  [_model]
+  {::test/venues     :venue
+   ::test/categories :category})
+
+(deftest namespaced-with-joins-test
+  (is (= {:select    [:*]
+          :from      [[:venues :venue]]
+          :order-by  [[:id :asc]]
+          :left-join [:category [:= :venue.category :category.name]]}
+         (tools.compile/build
+           (select/select-one ::venues.namespaced.with-category {:order-by [[:id :asc]]}))))
+  (is (= (toucan2.instance/instance
+          ::venues.namespaced.with-category
+          {:venue/id                 1
+           :venue/name               "Tempest"
+           :venue/category           "bar"
+           :venue/created-at         (LocalDateTime/parse "2017-01-01T00:00")
+           :venue/updated-at         (LocalDateTime/parse "2017-01-01T00:00")
+           :category/name            "bar"
+           :category/slug            "bar_01"
+           :category/parent-category nil})
+         (select/select-one ::venues.namespaced.with-category {:order-by [[:id :asc]]}))))
+
+(deftest namespaced-with-joins-columns-test
+  (is (= :venue
+         (model/namespace ::venues.namespaced.with-category)))
+  (is (= {:select    [:venue/id :venue/name :category/name]
+          :from      [[:venues :venue]]
+          :order-by  [[:id :asc]]
+          :left-join [:category [:= :venue.category :category.name]]}
+         (tools.compile/build
+           (select/select-one [::venues.namespaced.with-category :venue/id :venue/name :category/name]
+                              {:order-by [[:id :asc]]}))))
+  (is (= (instance/instance ::venues.namespaced.with-category
+                            {:venue/id 1, :venue/name "Tempest", :category/name "bar"})
+         (select/select-one [::venues.namespaced.with-category :venue/id :venue/name :category/name]
+                            {:order-by [[:id :asc]]}))))

@@ -1,4 +1,5 @@
 (ns toucan2.model
+  (:refer-clojure :exclude [namespace])
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
@@ -78,7 +79,7 @@
   If an implementation returns a single keyword, the default `:around` method will automatically wrap it in a vector. It
   also validates that the ultimate result is a sequence of keywords, so it is safe to assume that calls to this will
   always return a sequence of keywords."
-  {:arglists '([model])}
+  {:arglists '([model₁])}
   u/dispatch-on-first-arg)
 
 ;;; if the PK comes back unwrapped, wrap it.
@@ -95,10 +96,6 @@
                               (u/safe-pr-str pk-or-pks))
                       {:model model, :result pk-or-pks})))
     pks))
-
-(m/defmethod primary-keys :default
-  [_model]
-  [:id])
 
 ;;; TODO -- rename to `primary-key-values-map`
 (defn primary-key-values
@@ -121,3 +118,34 @@
       (if (= (count pk-keys) 1)
         (first pk-keys)
         (apply juxt pk-keys)))))
+
+(m/defmulti model->namespace
+  {:arglists '([model₁])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod model->namespace :default
+  [_model]
+  nil)
+
+(defn table-name->namespace [model]
+  (not-empty
+   (into {}
+         (comp (filter (fn [[model _a-namespace]]
+                         (not= (m/effective-primary-method table-name model)
+                               (m/default-effective-method table-name))))
+               (map (fn [[model a-namespace]]
+                      [(table-name model) a-namespace])))
+         (model->namespace model))))
+
+(defn namespace [model]
+  (some
+   (fn [[a-model a-namespace]]
+     (when (isa? model a-model)
+       a-namespace))
+   (model->namespace model)))
+
+(m/defmethod primary-keys :default
+  [model]
+  (if-let [model-namespace (namespace model)]
+    [(keyword (name model-namespace) "id")]
+    [:id]))

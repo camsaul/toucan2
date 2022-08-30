@@ -219,23 +219,23 @@
 ;; queue
 (deftest post-insert-test
   (test/with-discarded-table-changes Category
-    (reset! category/categories-awaiting-moderation (clojure.lang.PersistentQueue/EMPTY))
-    (is (= (instance/instance Category {:id 5, :name "toucannery", :parent-category-id nil})
-           (t1.db/insert! Category :name "toucannery")))
-    (testing `category/categories-awaiting-moderation
-      (is (= [5]
-             @category/categories-awaiting-moderation)))
-    (testing "Should include columns added by after-insert"
-      (derive ::Category.post-insert Category)
-      (after-insert/define-after-insert ::Category.post-insert
-        [row]
-        (assoc row :after-insert? true))
-      (is (= (instance/instance ::Category.post-insert
-                                {:id 6, :name "aviary", :parent-category-id nil, :after-insert? true})
-             (t1.db/insert! ::Category.post-insert :name "aviary")))
-      (testing `category/categories-awaiting-moderation
-        (is (= [5 6]
-               @category/categories-awaiting-moderation))))))
+    (binding [category/*categories-awaiting-moderation* (atom (clojure.lang.PersistentQueue/EMPTY))]
+      (is (= (instance/instance Category {:id 5, :name "toucannery", :parent-category-id nil})
+             (t1.db/insert! Category :name "toucannery")))
+      (testing `category/*categories-awaiting-moderation*
+        (is (= [5]
+               @category/*categories-awaiting-moderation*)))
+      (testing "Should include columns added by after-insert"
+        (derive ::Category.post-insert Category)
+        (after-insert/define-after-insert ::Category.post-insert
+          [row]
+          (assoc row :after-insert? true))
+        (is (= (instance/instance ::Category.post-insert
+                                  {:id 6, :name "aviary", :parent-category-id nil, :after-insert? true})
+               (t1.db/insert! ::Category.post-insert :name "aviary")))
+        (testing `category/*categories-awaiting-moderation*
+          (is (= [5 6]
+                 @category/*categories-awaiting-moderation*)))))))
 
 ;; (after-insert/define-after-insert ::PostInsert
 ;;   [row]
@@ -254,19 +254,19 @@
 ;; queue
 (deftest post-update-test
   (test/with-discarded-table-changes Category
-    (reset! category/categories-recently-updated (clojure.lang.PersistentQueue/EMPTY))
-    (is (= true
-           (t1.db/update! Category 2 :name "lobster")))
-    (is (= 2
-           (peek @category/categories-recently-updated))))
+    (binding [category/*categories-recently-updated* (atom (clojure.lang.PersistentQueue/EMPTY))]
+      (is (= true
+             (t1.db/update! Category 2 :name "lobster")))
+      (is (= 2
+             (peek @category/*categories-recently-updated*)))))
   (test/with-discarded-table-changes Category
-    (reset! category/categories-recently-updated (clojure.lang.PersistentQueue/EMPTY))
-    (is (= true
-           (t1.db/update! Category 1 :name "fine-dining")))
-    (is (= true
-           (t1.db/update! Category 2 :name "steak-house")))
-    (is (= [1 2]
-           @category/categories-recently-updated))))
+    (binding [category/*categories-recently-updated* (atom (clojure.lang.PersistentQueue/EMPTY))]
+      (is (= true
+             (t1.db/update! Category 1 :name "fine-dining")))
+      (is (= true
+             (t1.db/update! Category 2 :name "steak-house")))
+      (is (= [1 2]
+             @category/*categories-recently-updated*)))))
 
 ;; (deftest do-post-update-test
 ;;   (testing `t1.models/post-update

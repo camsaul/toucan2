@@ -5,12 +5,14 @@
    [toucan2.delete :as delete]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
+   [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.save :as save]
    [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.transformed :as transformed]
    [toucan2.update :as update])
@@ -431,3 +433,53 @@
            :created-at (LocalDateTime/parse "2017-01-01T00:00")
            :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
          (select/select-one ::venues.override-transforms :toucan/pk 1))))
+
+(derive ::categories.namespaced.category-keyword ::test/categories)
+
+(transformed/deftransforms ::categories.namespaced.category-keyword
+  {:category/name {:in name, :out keyword}})
+
+(derive ::venues.namespaced.category-keyword ::test/venues)
+
+(transformed/deftransforms ::venues.namespaced.category-keyword
+  {:venue/category {:in name, :out keyword}})
+
+;;; workaround for https://github.com/camsaul/methodical/issues/97
+(doseq [varr [#'transformed/transforms]]
+  (m/prefer-method! varr ::venues.namespaced.category-keyword ::categories.namespaced.category-keyword))
+
+(doto ::venues.namespaced.with-category
+  (derive ::venues.namespaced.category-keyword)
+  (derive ::categories.namespaced.category-keyword))
+
+(m/defmethod model/table-name ::venues.namespaced.with-category
+  [_model]
+  (model/table-name ::test/venues))
+
+(m/defmethod model/model->namespace ::venues.namespaced.with-category
+  [_model]
+  {::venues.namespaced.category-keyword     :venue
+   ::categories.namespaced.category-keyword :category})
+
+(deftest namespaced-test
+  (is (= {:select    [:*]
+          :from      [[:venues :venue]]
+          :left-join [:category [:= :venue.category :category.name]]
+          :order-by  [[:id :asc]]}
+         (tools.compile/build
+           (select/select-one ::venues.namespaced.with-category
+                              {:left-join [:category [:= :venue.category :category.name]]
+                               :order-by  [[:id :asc]]}))))
+  (is (= (instance/instance
+          ::venues.namespaced.with-category
+          {:venue/id                 1
+           :venue/name               "Tempest"
+           :venue/category           :bar
+           :venue/created-at         (LocalDateTime/parse "2017-01-01T00:00")
+           :venue/updated-at         (LocalDateTime/parse "2017-01-01T00:00")
+           :category/name            :bar
+           :category/slug            "bar_01"
+           :category/parent-category nil})
+         (select/select-one ::venues.namespaced.with-category
+                            {:left-join [:category [:= :venue.category :category.name]]
+                             :order-by  [[:id :asc]]}))))
