@@ -3,6 +3,7 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [next.jdbc :as next.jdbc]
+   [next.jdbc.transaction :as next.jdbc.transaction]
    [pretty.core :as pretty]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
@@ -15,8 +16,13 @@
   an explicit will connectable will use it rather than the `:default` connection."
   nil)
 
+;;; TODO -- Should this have an additional `options` parameter like [[with-connection]] does? Or is the current strategy
+;;; of using a dynamic var working ok? If this has an options parameter then that would tend to bubble up and pretty
+;;; soon everything has an options parameter which ruins our life (speaking from pre-rewrite version of Toucan 2 where
+;;; originally everything did have an options parameter)
+
 (m/defmulti do-with-connection
-  {:arglists '([connectable f])}
+  {:arglists '([connectable₁ f])}
   u/dispatch-on-first-arg
   :default-value ::default)
 
@@ -119,41 +125,54 @@
     (f conn)))
 
 (m/defmulti do-with-transaction
-  {:arglists '([connection f])}
+  "`options` are options for determining what type of transaction we'll get. See dox for [[with-transaction]] for more
+  information."
+  {:arglists '([connection₁ options f])}
   u/dispatch-on-first-arg
   :default-value ::default)
 
 (m/defmethod do-with-transaction :around ::default
-  [connection f]
-  (u/with-debug-result (list `do-with-transaction (some-> connection class .getCanonicalName symbol))
-    (next-method connection (^:once fn* [conn]
-                             (binding [*current-connectable* conn]
-                               (f conn))))))
+  [connection options f]
+  (u/with-debug-result (list `do-with-transaction
+                             options
+                             (some-> connection class .getCanonicalName symbol))
+    (let [f* (^:once fn* [conn]
+              (binding [*current-connectable* conn]
+                (f conn)))]
+      (next-method connection options f*))))
 
 (m/defmethod do-with-transaction java.sql.Connection
-  [^java.sql.Connection conn f]
-  (next.jdbc/with-transaction [t-conn conn]
-    (f t-conn)))
+  [^java.sql.Connection conn options f]
+  (let [nested-tx-rule (get options :nested-transaction-rule :allow)
+        options        (dissoc options :nested-transaction-rule)]
+    (u/with-debug-result ["do with transaction (nested rule: %s) with options %s" nested-tx-rule options]
+      (binding [next.jdbc.transaction/*nested-tx* nested-tx-rule]
+        (next.jdbc/with-transaction [t-conn conn options]
+          (f t-conn))))))
 
 (defmacro with-transaction
-  {:style/indent 1}
-  [[conn-binding connectable] & body]
+  "Gets a connection with [[with-connection]], and executes `body` within that transaction.
+
+  An `options` map, if specified, determine what sort of transaction we're asking for (stuff like the read isolation
+  level and what not). One key, `:nested-transaction-rule`, is handled directly in Toucan 2; other options are passed
+  directly to the underlying implementation, such as [[next.jdbc.transaction]].
+
+  `:nested-transaction-rule` must be one of `#{:allow :ignore :prohibit}`, a set of possibilities shamelessly borrowed
+  from `next.jdbc`. For non-JDBC implementations, you should treat `:allow` as the default behavior if unspecified."
+  {:style/indent 1, :arglists '([[conn-binding connectable options?] & body])}
+  [[conn-binding connectable options] & body]
   `(with-connection [conn# ~connectable]
-     (do-with-transaction conn# (^:once fn* [~(or conn-binding '_)] ~@body))))
+     (do-with-transaction conn# ~options (^:once fn* [~(or conn-binding '_)] ~@body))))
+
+(s/def :toucan2.with-transaction-options/nested-transaction-rule
+  (s/nilable #{:allow :ignore :prohibit}))
+
+(s/def ::with-transaction-options
+  (s/keys :opt-un [:toucan2.with-transaction-options/nested-transaction-rule]))
 
 (s/fdef with-transaction
   :args (s/cat :bindings (s/spec (s/cat :connection-binding (s/? symbol?)
-                                        :connectable        (s/? any?)))
+                                        :connectable        (s/? any?)
+                                        :options            (s/? ::with-transaction-options)))
                :body (s/+ any?))
   :ret  any?)
-
-;;; wraps a `reducible` and makes sure it is reduced inside a transaction.
-(deftype ^:no-doc ReduceInTransaction [connectable reducible]
-  clojure.lang.IReduceInit
-  (reduce [_this rf init]
-    (with-transaction [_conn connectable]
-      (reduce rf init reducible)))
-
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `->ReduceInTransaction connectable reducible)))

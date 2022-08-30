@@ -2,8 +2,6 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
-   [pretty.core :as pretty]
-   [toucan2.connection :as conn]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
@@ -21,7 +19,8 @@
                (^:once fn* [model]
                 (when-not (= model modelable)
                   (u/println-debug ["Resolved modelable %s => model %s" modelable model]))
-                (u/try-with-error-context ["with resolved model" {::modelable modelable, ::model model}]
+                (u/try-with-error-context (when-not (= modelable model)
+                                            ["with resolved model" {::modelable modelable, ::model model}])
                   (f model)))))
 
 (defmacro with-model [[model-binding modelable] & body]
@@ -38,7 +37,7 @@
   no [[toucan2.connection/*current-connectable*]] is currently bound. By default, this just returns the global default
   connectable, `:default`, but you can tell Toucan to use a different default connectable for a model by implementing
   this method."
-  {:arglists '([model])}
+  {:arglists '([model₁])}
   u/dispatch-on-first-arg)
 
 (m/defmethod default-connectable :default
@@ -46,39 +45,8 @@
   ;; TODO -- or should this return `nil`, so we can fall thru to something else (presumably `:default` anyway)?
   :default)
 
-(defn- current-connectable [model]
-  (u/with-debug-result ["Realizing deferred current connectable for model %s." model]
-    (u/println-debug ["%s is %s" `conn/*current-connectable* conn/*current-connectable*])
-    (or conn/*current-connectable*
-        (do
-          (u/println-debug ["Using %s for model %s" `default-connectable model])
-          (default-connectable model)))))
-
-(defrecord ^:no-doc DeferredCurrentConnectable [model]
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `deferred-current-connectable model))
-
-  protocols/IModel
-  (model [_this]
-    model)
-
-  protocols/IWithModel
-  (with-model [_this new-model]
-    (DeferredCurrentConnectable. new-model)))
-
-(m/defmethod conn/do-with-connection DeferredCurrentConnectable
-  [{:keys [model]} f]
-  (let [connectable (current-connectable model)]
-    (assert (not (instance? DeferredCurrentConnectable connectable))
-            (format "%s returned another %s" `current-connectable `DeferredCurrentConnectable))
-    (conn/do-with-connection connectable f)))
-
-(defn deferred-current-connectable [model]
-  (->DeferredCurrentConnectable model))
-
 (m/defmulti table-name
-  {:arglists '([model])}
+  {:arglists '([model₁])}
   u/dispatch-on-first-arg)
 
 (m/defmethod table-name :default

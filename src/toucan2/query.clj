@@ -48,8 +48,14 @@
    :modelable-columns (s/cat :modelable some? ; can't have a nil model.
                              :columns   (s/* keyword?))))
 
+;;; TODO -- can we use [[s/every-kv]] for this stuff?
 (s/def ::default-args.kv-args
   (s/* (s/cat
+        :k keyword?
+        :v any?)))
+
+(s/def ::default-args.kv-args.non-empty
+  (s/+ (s/cat
         :k keyword?
         :v any?)))
 
@@ -86,10 +92,8 @@
     customize the behavior for specific keywords to do other things -- `:toucan/pk` is one such example.
 
   * `:columns` -- for things that return instances, `:columns` is a sequence of columns to return. These are commonly
-    specified by wrapping the modelable in a `[modelable & columns]` vector.
-
-  Dispatches off of `query-type`."
-  {:arglists '([query-type unparsed-args])}
+    specified by wrapping the modelable in a `[modelable & columns]` vector."
+  {:arglists '([query-type₁ unparsed-args])}
   u/dispatch-on-first-arg)
 
 ;;;; the stuff below validates parsed args in the `:default` `:around` method.
@@ -163,18 +167,13 @@
   ```
 
   Dispatches off of `[modelable queryable]`."
-  {:arglists '([model queryable f])}
+  {:arglists '([model₁ queryable₂ f])}
   u/dispatch-on-first-two-args)
 
 ;; define a custom query `::my-count`
 (m/defmethod do-with-resolved-query [:default ::my-count]
   [model _queryable f]
   (do-with-resolved-query model {:select [:%count.*], :from [(keyword (model/table-name model))]} f))
-
-(def ^:dynamic ^{:arglists '([model queryable f])} *with-resolved-query-fn*
-  "The function that should be invoked by [[with-resolved-query]]. By default, the multimethod [[do-with-resolved-query]],
-  but if you need to do some sort of crazy mocking you can swap it out with something else."
-  #'do-with-resolved-query)
 
 (defmacro with-resolved-query
   "Resolve a `queryable` to an *unbuilt* query and bind it to `query-binding`. After resolving the query the next step is
@@ -186,10 +185,10 @@
   ```"
   {:style/indent :defn}
   [[query-binding [model queryable]] & body]
-  `(*with-resolved-query-fn* ~model ~queryable (^:once fn* [query#]
-                                                ;; support destructing the query.
-                                                (let [~query-binding query#]
-                                                  ~@body))))
+  `(do-with-resolved-query ~model ~queryable (^:once fn* [query#]
+                                              ;; support destructing the query.
+                                              (let [~query-binding query#]
+                                                ~@body))))
 
 (s/fdef with-resolved-query
   :args (s/cat :bindings (s/spec (s/cat :query               :clojure.core.specs.alpha/binding-form
@@ -213,7 +212,8 @@
 (m/defmethod do-with-resolved-query :around :default
   [model queryable f]
   (let [f* (^:once fn* [query]
-            (u/try-with-error-context ["with resolved query" {::model model, ::queryable queryable, ::resolved-query query}]
+            (u/try-with-error-context (when (not= queryable query)
+                                        ["with resolved query" {::model model, ::queryable queryable, ::resolved-query query}])
               (f query)))]
     (next-method model queryable f*)))
 
@@ -226,10 +226,8 @@
 (m/defmulti build
   "`build` takes the parsed args returned by [[parse]] and builds them into a query that can be compiled
   by [[toucan2.compile/with-compiled-query]]. For the default implementations, `build` takes the parsed arguments and
-  builds a Honey SQL 2 map.
-
-  Dispatches on `[query-type model query]`."
-  {:arglists '([query-type model {:keys [query], :as parsed-args}])}
+  builds a Honey SQL 2 map."
+  {:arglists '([query-type₁ model₂ {:keys [query₃], :as parsed-args}])}
   (fn [query-type model parsed-args]
     (mapv protocols/dispatch-value [query-type
                                     model
@@ -237,12 +235,13 @@
 
 (m/defmethod build :around :default
   [query-type model parsed-args]
-  (assert (map? parsed-args)
-          (format "%s expects map parsed-args, got %s." `build (u/safe-pr-str parsed-args)))
+  (assert (and (map? parsed-args)
+               (contains? parsed-args :query))
+          (format "%s expects map parsed-args with :query key, got %s." `build (u/safe-pr-str parsed-args)))
   (u/try-with-error-context ["build query" {::query-type  query-type
                                             ::model       model
                                             ::parsed-args parsed-args}]
-    (u/with-debug-result (list `build query-type model parsed-args)
+    (u/with-debug-result ["%s %s %s with parsed args %s" `build query-type model parsed-args]
       (next-method query-type model parsed-args))))
 
 (m/defmethod build :default
@@ -258,7 +257,9 @@
                    :dispatch-value (m/dispatch-value build query-type model parsed-args)})))
 
 ;;; Something like (select my-model nil) should basically mean SELECT * FROM my_model WHERE id IS NULL
-(m/defmethod build [:default :default nil]
+(m/defmethod build [#_query-type :default
+                    #_model      :default
+                    #_query      nil]
   [query-type model parsed-args]
   (let [parsed-args (cond-> (assoc parsed-args :query {})
                       ;; if `:query` is present but equal to `nil`, treat that as if the pk value IS NULL
@@ -266,22 +267,30 @@
                       (update :kv-args assoc :toucan/pk nil))]
     (build query-type model parsed-args)))
 
-(m/defmethod build [:default :default Integer]
+(m/defmethod build [#_query-type :default
+                    #_model      :default
+                    #_query      Integer]
   [query-type model parsed-args]
   (build query-type model (update parsed-args :query long)))
 
-(m/defmethod build [:default :default Long]
+(m/defmethod build [#_query-type :default
+                    #_model      :default
+                    #_query      Long]
   [query-type model {pk :query, :as parsed-args}]
   (build query-type model (-> parsed-args
                               (assoc :query {})
                               (update :kv-args assoc :toucan/pk pk))))
 
-(m/defmethod build [:default :default String]
+(m/defmethod build [#_query-type :default
+                    #_model      :default
+                    #_query      String]
   [query-type model parsed-args]
   (build query-type model (update parsed-args :query (fn [sql]
                                                        [sql]))))
 
-(m/defmethod build [:default :default clojure.lang.Sequential]
+(m/defmethod build [#_query-type :default
+                    #_model      :default
+                    #_query      clojure.lang.Sequential]
   [query-type model {sql-args :query, :keys [kv-args], :as parsed-args}]
   (when (seq kv-args)
     (throw (ex-info "key-value args are not supported for plain SQL queries."
@@ -292,39 +301,112 @@
                      :dispatch-value (m/dispatch-value build query-type model parsed-args)})))
   sql-args)
 
+(defmacro with-built-query [[built-query-binding [query-type model parsed-args resolved-query]] & body]
+  `(let [~built-query-binding (build ~query-type ~model (assoc ~parsed-args :query ~resolved-query))]
+     ~@body))
+
+(s/fdef with-built-query
+  :args (s/cat :bindings (s/spec (s/cat :lhs :clojure.core.specs.alpha/binding-form
+                                        :rhs (s/spec (s/cat :query-type     some?
+                                                            :model          any?
+                                                            :parsed-args    any?
+                                                            :resolved-query any?))))
+               :body     (s/+ any?))
+  :ret any?)
+
 ;;;; Default [[build]] impl for maps; applying key-value args.
 
 (m/defmulti apply-kv-arg
-  {:arglists '([model query k v])}
+  {:arglists '([model₁ query₂ k₃ v])}
   u/dispatch-on-first-three-args)
 
-(defn condition->honeysql-where-clause [k v]
+(defn- fn-condition->honeysql-where-clause
+  [k [f & args]]
+  {:pre [(keyword? f) (seq args)]}
+  (into [f k] args))
+
+(defn condition->honeysql-where-clause
+  "Something sequential like `:id [:> 5]` becomes `[:> :id 5]`. Other stuff like `:id 5` just becomes `[:= :id 5]`."
+  [k v]
+  ;; don't think there's any situtation where `nil` on the LHS is on purpose and not a bug.
+  {:pre [(some? k)]}
   (if (sequential? v)
-    (vec (list* (first v) k (rest v)))
+    (fn-condition->honeysql-where-clause k v)
     [:= k v]))
 
 (m/defmethod apply-kv-arg [:default clojure.lang.IPersistentMap :default]
   [_model honeysql k v]
-  (update honeysql :where (fn [existing-where]
-                            (:where (hsql.helpers/where existing-where
-                                                        (condition->honeysql-where-clause k v))))))
+  (u/with-debug-result ["apply kv-arg %s %s" k v]
+    (update honeysql :where (fn [existing-where]
+                              (:where (hsql.helpers/where existing-where
+                                                          (condition->honeysql-where-clause k v)))))))
+
+(comment
+  ;; with a composite PK like
+  [:id :name]
+  ;; we need to be able to handle either
+  [:in [["BevMo" 4] ["BevLess" 5]]]
+  ;; or
+  [:between ["BevMo" 4] ["BevLess" 5]])
+
+(defn- toucan-pk-composite-values** [pk-columns tuple]
+  {:pre [(= (count pk-columns) (count tuple))]}
+  (map-indexed (fn [i col]
+                 {:col col, :v (nth tuple i)})
+               pk-columns))
+
+(defn- toucan-pk-nested-composite-values [pk-columns tuples]
+  (->> (mapcat (fn [tuple]
+                 (toucan-pk-composite-values** pk-columns tuple))
+               tuples)
+       (group-by :col)
+       (map (fn [[col ms]]
+              {:col col, :v (mapv :v ms)}))))
+
+(defn- toucan-pk-composite-values* [pk-columns tuple]
+  (if (some sequential? tuple)
+    (toucan-pk-nested-composite-values pk-columns tuple)
+    (toucan-pk-composite-values** pk-columns tuple)))
+
+(defn- toucan-pk-fn-values [pk-columns fn-name tuples]
+  (->> (mapcat (fn [tuple]
+                 (toucan-pk-composite-values* pk-columns tuple))
+               tuples)
+       (group-by :col)
+       (map (fn [[col ms]]
+              {:col col, :v (into [fn-name] (map :v) ms)}))))
+
+(defn- toucan-pk-composite-values [pk-columns tuple]
+  {:pre [(sequential? tuple)], :post [(sequential? %) (every? map? %) (every? :col %)]}
+  (if (keyword? (first tuple))
+    (toucan-pk-fn-values pk-columns (first tuple) (rest tuple))
+    (toucan-pk-composite-values* pk-columns tuple)))
+
+(defn- apply-non-composite-toucan-pk [model honeysql pk-column v]
+  ;; unwrap the value if we got something like `:toucan/pk [1]`
+  (let [v (if (and (sequential? v)
+                   (not (keyword? (first v)))
+                   (= (count v) 1))
+            (first v)
+            v)]
+    (apply-kv-arg model honeysql pk-column v)))
+
+(defn- apply-composite-toucan-pk [model honeysql pk-columns v]
+  (reduce
+   (fn [honeysql {:keys [col v]}]
+     (apply-kv-arg model honeysql col v))
+   honeysql
+   (toucan-pk-composite-values pk-columns v)))
 
 (m/defmethod apply-kv-arg [:default clojure.lang.IPersistentMap :toucan/pk]
   [model honeysql _k v]
-  (let [pk-columns (model/primary-keys model)
-        v          (if (sequential? v)
-                     v
-                     [v])]
-    (assert (= (count pk-columns)
-               (count v))
-            (format "Expected %s primary key values for %s, got %d values %s"
-                    (count pk-columns) (u/safe-pr-str pk-columns)
-                    (count v) (u/safe-pr-str v)))
-    (reduce
-     (fn [honeysql [k v]]
-       (apply-kv-arg model honeysql k v))
-     honeysql
-     (zipmap pk-columns v))))
+  ;; `fn-name` here would be if you passed something like `:toucan/pk [:in 1 2]` -- the fn name would be `:in` -- and we
+  ;; pass that to [[condition->honeysql-where-clause]]
+  (let [pk-columns (model/primary-keys model)]
+    (u/with-debug-result ["apply :toucan/pk %s for primary keys" v]
+      (if (= (count pk-columns) 1)
+        (apply-non-composite-toucan-pk model honeysql (first pk-columns) v)
+        (apply-composite-toucan-pk model honeysql pk-columns v)))))
 
 (defn apply-kv-args [model query kv-args]
   (reduce

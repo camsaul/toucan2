@@ -24,7 +24,7 @@
   nil)
 
 (deftest after-update-test
-  (doseq [f [#'update/update!
+  (doseq [f [#_#'update/update!
              #'update/update-returning-pks!]]
     (testing f
       (test/with-discarded-table-changes :venues

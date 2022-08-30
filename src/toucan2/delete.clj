@@ -3,10 +3,12 @@
   (:require
    [methodical.core :as m]
    [toucan2.model :as model]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]))
 
-(m/defmethod query/build [::delete :default clojure.lang.IPersistentMap]
+(m/defmethod query/build [#_query-type :toucan.query-type/delete.*
+                          #_model      :default
+                          #_query      clojure.lang.IPersistentMap]
   [query-type model parsed-args]
   (let [parsed-args (update parsed-args :query (fn [query]
                                                  (merge {:delete-from [(keyword (model/table-name model))]}
@@ -16,10 +18,10 @@
 (defn reducible-delete
   {:arglists '([modelable & conditions? query?])}
   [& unparsed-args]
-  (op/reducible-update ::delete unparsed-args))
+  (pipeline/reducible-unparsed :toucan.query-type/delete.update-count unparsed-args))
 
 (defn delete!
   "Returns number of rows deleted."
   {:arglists '([modelable & conditions? query?])}
   [& unparsed-args]
-  (op/returning-update-count! ::delete unparsed-args))
+  (pipeline/transduce-unparsed :toucan.query-type/delete.update-count unparsed-args))

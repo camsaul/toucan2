@@ -2,8 +2,7 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
-   [toucan2.insert :as insert]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
 
 (m/defmulti before-insert
@@ -18,11 +17,20 @@
          (before-insert model row))))
    rows))
 
-(m/defmethod op/reducible-update* :before [::insert/insert ::before-insert]
-  [_query-type model parsed-args]
-  (assert (map? parsed-args))
-  (u/with-debug-result ["Do before insert for %s" model]
-    (update parsed-args :rows do-before-insert-to-rows model)))
+;;; make sure we transform rows whether it's in the parsed args or in the resolved query.
+
+(m/defmethod pipeline/transduce-with-model* :before [#_query-type :toucan.query-type/insert.*
+                                                     #_model      ::before-insert]
+  [_rf _query-type model parsed-args]
+  (cond-> parsed-args
+    (:rows parsed-args) (update :rows do-before-insert-to-rows model)))
+
+(m/defmethod pipeline/transduce-resolved-query* :before [#_query-type :toucan.query-type/insert.*
+                                                         #_model      ::before-insert
+                                                         #_query      clojure.lang.IPersistentMap]
+  [_rf _query-type model _parsed-args resolved-query]
+  (cond-> resolved-query
+    (:rows resolved-query) (update :rows do-before-insert-to-rows model)))
 
 ;;; Important! before-insert should be done BEFORE any [[toucan2.tools.transformed/transforms]]. Transforms are often
 ;;; for serializing and deserializing values; we don't want before insert methods to have to work with
@@ -30,9 +38,9 @@
 ;;;
 ;;; By marking `::before-insert` as preferred over `:toucan2.tools.transformed/transformed` it will be done first (see
 ;;; https://github.com/camsaul/methodical#before-methods)
-(m/prefer-method! #'op/reducible-update*
-                  [::insert/insert ::before-insert]
-                  [::insert/insert :toucan2.tools.transformed/transformed])
+(m/prefer-method! #'pipeline/transduce-with-model*
+                  [:toucan.query-type/insert.* ::before-insert]
+                  [:toucan.query-type/insert.* :toucan2.tools.transformed/transformed.model])
 
 (defmacro define-before-insert
   {:style/indent :defn}

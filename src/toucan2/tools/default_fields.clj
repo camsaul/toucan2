@@ -3,7 +3,6 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.query :as query]
-   [toucan2.select :as select]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -12,7 +11,9 @@
   {:arglists '([model])}
   u/dispatch-on-first-arg)
 
-(m/defmethod query/build :before [::select/select ::default-fields clojure.lang.IPersistentMap]
+(m/defmethod query/build :before [#_query-type :toucan.result-type/instances
+                                  #_model      ::default-fields
+                                  #_query      clojure.lang.IPersistentMap]
   [_query-type model args]
   (u/with-debug-result ["add default fields for %s" model]
     (update args :columns (fn [columns]

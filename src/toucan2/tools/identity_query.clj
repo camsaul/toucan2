@@ -2,11 +2,12 @@
   (:require
    [methodical.core :as m]
    [pretty.core :as pretty]
-   [toucan2.execute :as execute]
+   [toucan2.connection :as conn]
    [toucan2.instance :as instance]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
-   [toucan2.realize :as realize]))
+   [toucan2.realize :as realize]
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
@@ -21,7 +22,8 @@
 
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (reduce rf init rows)))
+    (u/with-debug-result ["reduce IdentityQuery rows"]
+      (reduce rf init rows))))
 
 (defn identity-query
   "A queryable that returns `reducible-rows` as-is without compiling anything or running anything against a database.
@@ -40,22 +42,72 @@
   [reducible-rows]
   (->IdentityQuery reducible-rows))
 
-(m/defmethod execute/reduce-uncompiled-query [:default IdentityQuery]
-  [_connectable model {:keys [rows]} rf init]
-  (transduce
-   (map (if model
-          (fn [row]
-            (instance/instance model row))
-          identity))
-   (completing rf)
-   init
-   rows))
+(m/defmethod pipeline/transduce-built-query* [#_query-type :default #_:toucan.result-type/instances
+                                              #_model      :default
+                                              #_query      IdentityQuery]
+  [rf _query-type model {:keys [rows], :as _query}]
+  (u/with-debug-result ["transduce IdentityQuery rows %s" rows]
+    (transduce (if model
+                 (map (fn [result-row]
+                        (instance/instance model result-row)))
+                 identity)
+               rf
+               rows)))
 
-(m/defmethod query/build [:toucan2.select/select :default IdentityQuery]
+;;; this is an around method so we can intercept anything else that might normally be considered a more specific method
+;;; when it dispatches off of more-specific values of `query-type`
+(m/defmethod query/build :around [#_query-type :default
+                                  #_model      :default
+                                  #_query      IdentityQuery]
+  [_query-type _model {:keys [query], :as _args}]
+  query)
+
+;;; TODO -- not sure we need this method since we should be bypassing it with the method below
+(m/defmethod query/build [#_query-type :default
+                          #_model      IdentityQuery
+                          #_query      :default]
   [_query-type _model {:keys [query], :as _args}]
   query)
 
 ;;; allow using an identity query as an 'identity model'
-(m/defmethod op/reducible-returning-instances* [:toucan2.select/select IdentityQuery]
-  [_query-type an-identity-query _parsed-args]
-  an-identity-query)
+(m/defmethod pipeline/transduce-with-model* [#_query-type :default
+                                             #_model      IdentityQuery]
+  [rf _query-type model _parsed-args]
+  (transduce identity rf model))
+
+
+;;;; Identity connection
+
+(defrecord ^:no-doc IdentityConnection [rows]
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `identity-connection rows)))
+
+(m/defmethod conn/do-with-connection IdentityConnection
+  [connectable f]
+  (f connectable))
+
+(m/defmethod conn/do-with-transaction IdentityConnection
+  [connectable _options f]
+  (f connectable))
+
+(m/defmethod pipeline/transduce-compiled-query-with-connection* [#_conn       IdentityConnection
+                                                                 #_query-type :default
+                                                                 #_model      :default]
+  [rf conn _query-type model _compiled-query]
+  (transduce
+   (map (fn [row]
+          (instance/instance model row)))
+   rf
+   (:rows conn)))
+
+(defn identity-connection [rows]
+  (->IdentityConnection rows))
+
+;; (defrecord ^:no-doc IdentityQuery2 [rows]
+;;   pretty/PrettyPrintable
+;;   (pretty [_this]
+;;     (list `identity-query-2 rows)))
+
+;; (defn identity-query-2 [rows]
+;;   (->IdentityQuery2 rows))

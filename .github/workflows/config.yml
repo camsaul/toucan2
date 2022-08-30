@@ -50,6 +50,8 @@ jobs:
         key: tests-postgres
     - run: clojure -X:dev:test:test-postgres
       name: Run tests
+      env:
+        CI: TRUE
 
   tests-h2:
     runs-on: ubuntu-20.04
@@ -75,6 +77,8 @@ jobs:
         key: tests-h2
     - run: clojure -X:dev:test:test-h2
       name: Run tests
+      env:
+        CI: TRUE
 
   whitespace-linter:
     runs-on: ubuntu-20.04

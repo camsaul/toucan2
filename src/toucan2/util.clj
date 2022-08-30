@@ -221,6 +221,7 @@
 (defn- walk-safe-printable [x]
   (walk/postwalk safe-printable x))
 
+;;; TODO -- not sure if this is still needed, now that we're not using reducibles everywhere.
 (defn ^:no-doc safe-pr-str
   "Like [[clojure.core/pr-str]], but does not evaluate reducibles or eductions, and
   handles [[pretty.core/PrettyPrintable]] things recursively."

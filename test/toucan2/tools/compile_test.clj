@@ -29,7 +29,7 @@
            (tools.compile/compile
              (insert/insert! ::test/venues {:a 1}))))
     (testing "Don't execute anything"
-      (is (= 5 #_FIXME
+      (is (= 0
              (call-count))))))
 
 (deftest build-test
@@ -49,7 +49,7 @@
            (tools.compile/build
              (insert/insert! ::test/venues {:a 1}))))
     (testing "Don't execute anything"
-      (is (= 5 #_FIXME
+      (is (= 0
              (call-count))))))
 
 ;;; TODO

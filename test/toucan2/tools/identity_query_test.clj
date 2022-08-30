@@ -4,7 +4,7 @@
    [methodical.core :as m]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -49,27 +49,6 @@
          (select/select ::venues (identity-query/identity-query
                                   [{:id 1, :name "No Category", :category nil}])))))
 
-(m/defmethod op/reducible-returning-instances* :after [::select/select ::select-reducible-identity-query]
-  [_query-type _model _reducible-query]
-  (identity-query/identity-query [{:a 1, :b 2}
-                                  {:a 3, :b 4}]))
-
-(deftest identity-query-in-reducible-select-test
-  (testing "Can we have reducible-select* return an identity query, and have things still work?"
-    (is (= [{:a 1, :b 2}
-            {:a 3, :b 4}]
-           (select/select ::select-reducible-identity-query)))))
-
-(m/defmethod op/reducible-returning-instances* :after [::select/select ::wrap-reducible-query]
-  [_query-type _model _reducible-query]
-  (identity-query/identity-query (select/reducible-select [::test/venues :id :name] {:order-by [[:id :asc]], :limit 2})))
-
-(deftest wrap-reducible-query-test
-  (testing "Can identity-query wrap another reducible query?"
-    (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest"})
-            (instance/instance ::test/venues {:id 2, :name "Ho's Tavern"})]
-           (select/select ::wrap-reducible-query)))))
-
 (after-select/define-after-select ::my-after-select
   [instance]
   (assoc instance :after-select? true))
@@ -78,7 +57,9 @@
   (select/select model (identity-query/identity-query rows)))
 
 (defn- do-after-reducible-select [model rows]
-  (op/reducible-returning-instances* ::select/select model {:queryable (identity-query/identity-query rows)}))
+  (pipeline/reducible-with-model :toucan.query-type/select.instances
+                                 model
+                                 {:queryable (identity-query/identity-query rows)}))
 
 (deftest do-after-select-test
   (testing "Can we use `identity-query` to build some sort of abomination like Toucan 1 do-post-select?"
@@ -97,3 +78,39 @@
              results))
       (testing "Return plain rows, not instances"
         (is (not (instance/instance? (first results))))))))
+
+;; (deftest insert-test
+;;   (testing "Can we use identity-query with insert?"
+;;     (is (= [(instance/instance :venues {:a 1})]
+;;            (insert/insert-returning-instances!
+;;             :venues
+;;             (identity-query/identity-query-2 [{:a 1}]))))))
+
+;; (after-insert/define-after-insert ::model.after-insert
+;;   [m]
+;;   (assoc m :after-insert? true))
+
+;; (deftest after-insert-test
+;;   (testing "sanity check"
+;;     (is (isa? :toucan.query-type/insert.instances
+;;               :toucan2.tools.after/query-type))
+;;     (is (isa? ::model.after-insert
+;;               :toucan2.tools.after/model)))
+;;   (testing "Identity query should do after-insert for insert"
+;;     (is (= [(instance/instance ::model.after-insert
+;;                                {:a 1, :after-insert? true})]
+;;            (insert/insert-returning-instances!
+;;             ::model.after-insert
+;;             (identity-query/identity-query-2 [{:a 1}]))))))
+
+;; (before-insert/define-before-insert ::model.before-insert
+;;   [m]
+;;   (assoc m :before-insert? true))
+
+;; (deftest before-insert-test
+;;   (binding [conn/*current-connectable* (identity-query/identity-connection [{:a 2}])]
+;;     (is (= [(instance/instance ::model.before-insert
+;;                                {:a 2, :before-insert? true})]
+;;            (insert/insert-returning-instances!
+;;             ::model.before-insert
+;;             (identity-query/identity-query [{:ignored-row true}]))))))

@@ -5,7 +5,7 @@
    [methodical.core :as m]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.select :as select]
@@ -35,36 +35,36 @@
 
                            [:model ::my-query]
                            {:modelable :model, :queryable ::my-query}}]
-    (testing `(query/parse-args ::select/select ~args)
+    (testing `(query/parse-args :toucan.query-type/select.* ~args)
       (is (= expected
-             (query/parse-args ::select/select args))))))
+             (query/parse-args :toucan.query-type/select.* args))))))
 
 (deftest ^:parallel default-build-query-test
   (is (= {:select [:*]
           :from   [[:default]]}
-         (query/build ::select/select :default {:query {}})))
+         (query/build :toucan.query-type/select.* :default {:query {}})))
   (testing "don't override existing"
     (is (= {:select [:a :b]
             :from   [[:my_table]]}
-           (query/build ::select/select :default {:query {:select [:a :b], :from [[:my_table]]}}))))
+           (query/build :toucan.query-type/select.* :default {:query {:select [:a :b], :from [[:my_table]]}}))))
   (testing "columns"
     (is (= {:select [:a :b]
             :from   [[:default]]}
-           (query/build ::select/select :default {:query {}, :columns [:a :b]})))
+           (query/build :toucan.query-type/select.* :default {:query {}, :columns [:a :b]})))
     (testing "existing"
       (is (= {:select [:a]
               :from   [[:default]]}
-             (query/build ::select/select :default {:query {:select [:a]}, :columns [:a :b]})))))
+             (query/build :toucan.query-type/select.* :default {:query {:select [:a]}, :columns [:a :b]})))))
   (testing "conditions"
     (is (= {:select [:*]
             :from   [[:default]]
             :where  [:= :id 1]}
-           (query/build ::select/select :default {:query {}, :kv-args {:id 1}})))
+           (query/build :toucan.query-type/select.* :default {:query {}, :kv-args {:id 1}})))
     (testing "merge with existing"
       (is (= {:select [:*]
               :from   [[:default]]
               :where  [:and [:= :a :b] [:= :id 1]]}
-             (query/build ::select/select :default {:query {:where [:= :a :b]}, :kv-args {:id 1}}))))))
+             (query/build :toucan.query-type/select.* :default {:query {:where [:= :a :b]}, :kv-args {:id 1}}))))))
 
 (m/defmethod query/apply-kv-arg [:default clojure.lang.IPersistentMap ::custom.limit]
   [_model honeysql-form _k limit]
@@ -74,16 +74,16 @@
   (is (= {:select [:*]
           :from   [[:default]]
           :limit  100}
-         (query/build ::select/select :default {:query {}, :kv-args {::custom.limit 100}})
-         (query/build ::select/select :default {:query {:limit 1}, :kv-args {::custom.limit 100}}))))
+         (query/build :toucan.query-type/select.* :default {:query {}, :kv-args {::custom.limit 100}})
+         (query/build :toucan.query-type/select.* :default {:query {:limit 1}, :kv-args {::custom.limit 100}}))))
 
 (deftest built-in-pk-condition-test
   (is (= {:select [:*], :from [[:default]], :where [:= :id 1]}
-         (query/build ::select/select :default {:query {}, :kv-args {:toucan/pk 1}})))
+         (query/build :toucan.query-type/select.* :default {:query {}, :kv-args {:toucan/pk 1}})))
   (is (= {:select [:*], :from [[:default]], :where [:and
                                                     [:= :name "Cam"]
                                                     [:= :id 1]]}
-         (query/build ::select/select :default {:query {:where [:= :name "Cam"]}, :kv-args {:toucan/pk 1}}))))
+         (query/build :toucan.query-type/select.* :default {:query {:where [:= :name "Cam"]}, :kv-args {:toucan/pk 1}}))))
 
 (deftest select-test
   (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]]
@@ -180,26 +180,21 @@
 
 (derive ::people.no-timestamps ::people)
 
-;;; this could also be done as part a `:before` method.
-(m/defmethod op/reducible-returning-instances* [::select/select ::people.no-timestamps]
-  [query-type model parsed-args]
-  (let [parsed-args (update parsed-args :columns (fn [columns]
-                                                   (or columns [:id :name])))]
-    (next-method query-type model parsed-args)))
+(m/defmethod pipeline/transduce-with-model* :before [:toucan.query-type/select.* ::people.no-timestamps]
+  [_rf _query-type _model parsed-args]
+  (update parsed-args :columns (fn [columns]
+                                 (or columns [:id :name]))))
 
-(m/defmethod op/reducible-returning-instances* :after [::select/select ::people.no-timestamps]
-  [_query-type _model reducible-query]
-  (testing "should not be an eduction yet -- if it is it means this method is getting called more than once"
-    (is (not (instance? clojure.core.Eduction reducible-query))))
-  (assert (not (instance? clojure.core.Eduction reducible-query)))
-  (eduction
-   (map (fn [person]
-          (testing "select* :after should see Toucan 2 instances"
-            (is (instance/instance? person)))
-          (testing "instance table should be a ::people.no-timestamps"
-            (is (isa? (protocols/model person) ::people.no-timestamps)))
-          (assoc person :after-select? true)))
-   reducible-query))
+(m/defmethod pipeline/transduce-with-model* [:toucan.query-type/select.instances ::people.no-timestamps]
+  [rf query-type model parsed-args]
+  (let [rf* ((map (fn [person]
+                    (testing "select* :after should see Toucan 2 instances"
+                      (is (instance/instance? person)))
+                    (testing "instance table should be a ::people.no-timestamps"
+                      (is (isa? (protocols/model person) ::people.no-timestamps)))
+                    (assoc person :after-select? true)))
+             rf)]
+    (next-method rf* query-type model parsed-args)))
 
 (deftest default-query-test
   (testing "Should be able to set some defaults by implementing `select*`"
@@ -220,10 +215,9 @@
 ;; TODO this is probably not the way you'd want to accomplish this in real life -- I think you'd probably actually want
 ;; to implement [[toucan2.query/build]] instead. But it does do a good job of letting us test that combining aux methods
 ;; work like we'd expect.
-(m/defmethod op/reducible-returning-instances* :before [::select/select ::people.limit-2]
-  [_query-type _model {:keys [queryable], :as parsed-args}]
-  (cond-> parsed-args
-    (map? queryable) (update :queryable assoc :limit 2)))
+(m/defmethod pipeline/transduce-built-query* :before [:toucan.query-type/select.* ::people.limit-2 clojure.lang.IPersistentMap]
+  [_rf _query-type _model built-query]
+  (assoc built-query :limit 2))
 
 (deftest pre-select-test
   (testing "Should be able to do cool stuff in pre-select (select* :before)"
@@ -377,14 +371,14 @@
 
 (deftest select-nil-test
   (testing "(select model nil) should basically be the same as (select model :toucan/pk nil)"
-    (let [parsed-args (query/parse-args ::select/select [::test/venues nil])]
+    (let [parsed-args (query/parse-args :toucan.query-type/select.* [::test/venues nil])]
       (is (= {:modelable ::test/venues, :queryable nil}
              parsed-args))
       (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
         (is (= nil
                query))
         (is (= {:select [:*], :from [[:venues]], :where [:= :id nil]}
-               (query/build ::select/select ::test/venues (assoc parsed-args :query query))))))
+               (query/build :toucan.query-type/select.* ::test/venues (assoc parsed-args :query query))))))
     (is (= ["SELECT * FROM venues WHERE id IS NULL"]
            (tools.compile/compile
              (select/select ::test/venues nil))))

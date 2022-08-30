@@ -3,16 +3,11 @@
   (:require
    [methodical.core :as m]
    [toucan.models :as t1.models]
-   [toucan2.test :as test]
-   [toucan2.tools.default-fields :as default-fields]
-   [toucan2.tools.transformed :as transformed]))
+   [toucan2.test :as test]))
 
 (set! *warn-on-reflection* true)
 
 (t1.models/defmodel Venue :t1_venues)
-
-(default-fields/define-default-fields Venue
-  [:id :name :category])
 
 (defn- now [] (java.time.LocalDateTime/now))
 
@@ -22,18 +17,11 @@
   :update (fn [obj]
             (assoc obj :updated-at (now))))
 
-(derive Venue ::timestamped?)
-
-(def keyword-transform
-  {:in  (fn [k]
-          (cond
-            (not (keyword? k)) k
-            (namespace k)      (str (namespace k) "/" (name k))
-            :else              (name k)))
-   :out keyword})
-
-(transformed/deftransforms Venue
-  {:category keyword-transform})
+(t1.models/define-methods-with-IModel-method-map
+ Venue
+ {:default-fields (constantly [:id :name :category])
+  :types          (constantly {:category :keyword})
+  :properties     (constantly {::timestamped? true})})
 
 (m/defmethod test/create-table-sql-file [:postgres Venue]
   [_db-type _table-name]

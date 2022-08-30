@@ -3,8 +3,10 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer :all]
+   [methodical.core :as m]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
+   [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.before-insert :as before-insert]
@@ -76,3 +78,33 @@
                    (insert! ::venues.serialized-category {:name "Tin Vietnamese", :category {:name "restaurant"}})))
             (is (= expected
                    (select/select-one ::venues.serialized-category :id 4)))))))))
+
+(m/defmethod query/do-with-resolved-query [:default ::named-rows]
+  [_model _queryable f]
+  (f {:rows [{:name "Grant & Green", :category "bar"}
+             {:name "North Beach Cantina", :category "restaurant"}]}))
+
+(deftest named-query-test
+  (doseq [insert! [#_#'insert/insert!
+                   #_#'insert/insert-returning-pks!
+                   #'insert/insert-returning-instances!]]
+    (test/with-discarded-table-changes :venues
+      (testing insert!
+        (is (= (condp = insert!
+                 #'insert/insert!                     2
+                 #'insert/insert-returning-pks!       [4 5]
+                 #'insert/insert-returning-instances! [(instance/instance
+                                                        ::venues.before-insert
+                                                        {:id         4
+                                                         :name       "GRANT & GREEN"
+                                                         :category   "bar"
+                                                         :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                                       (instance/instance
+                                                        ::venues.before-insert
+                                                        {:id         5
+                                                         :name       "NORTH BEACH CANTINA"
+                                                         :category   "restaurant"
+                                                         :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
+               (insert! ::venues.before-insert ::named-rows)))))))

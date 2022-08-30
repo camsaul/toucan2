@@ -2,14 +2,15 @@
   (:refer-clojure :exclude [count])
   (:require
    [methodical.core :as m]
-   [toucan2.execute :as execute]
    [toucan2.model :as model]
-   [toucan2.operation :as op]
+   [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
-(m/defmethod query/build [::select :default clojure.lang.IPersistentMap]
+(m/defmethod query/build [#_query-type :toucan.query-type/select.*
+                          #_model      :default
+                          #_query      clojure.lang.IPersistentMap]
   [query-type model {:keys [columns], :as parsed-args}]
   (let [parsed-args (-> parsed-args
                         (update :query (fn [query]
@@ -21,30 +22,22 @@
                         (dissoc :columns))]
     (next-method query-type model parsed-args)))
 
-(m/defmethod op/reducible-returning-instances* [::select :default]
-  [query-type model parsed-args]
-  (query/with-resolved-query [query [model (:queryable parsed-args)]]
-    (let [query (query/build query-type model (assoc parsed-args :query query))]
-      (execute/reducible-query (model/deferred-current-connectable model)
-                               model
-                               query))))
-
 (defn reducible-select
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
   [& unparsed-args]
-  (op/reducible-returning-instances ::select unparsed-args))
+  (pipeline/reducible-unparsed :toucan.query-type/select.instances unparsed-args))
 
 (defn select
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
   [& unparsed-args]
-  (op/returning-instances ::select unparsed-args))
+  (pipeline/transduce-unparsed :toucan.query-type/select.instances unparsed-args))
 
 (defn select-one {:arglists '([modelable & kv-args? query?]
                               [[modelable & columns] & kv-args? query?])}
   [& unparsed-args]
-  (realize/reduce-first (apply reducible-select unparsed-args)))
+  (pipeline/transduce-unparsed-first-result :toucan.query-type/select.instances unparsed-args))
 
 (defn select-fn-reducible
   {:arglists '([f modelable & kv-args? query?])}

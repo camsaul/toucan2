@@ -1,6 +1,7 @@
 (ns toucan2.tools.default-fields-test
   (:require
    [clojure.test :refer :all]
+   [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.query :as query]
    [toucan2.select :as select]
@@ -16,9 +17,9 @@
 (default-fields/define-default-fields ::venues.default-fields
   [:id :name :category])
 
-(deftest define-default-fields-test
+(deftest select-test
   (is (= {:select [:id :name :category], :from [[:venues]]}
-         (query/build ::select/select ::venues.default-fields {:query {}})))
+         (query/build :toucan.query-type/select.instances ::venues.default-fields {:query {}})))
   (is (= [(instance/instance ::venues.default-fields
                              {:id 1, :name "Tempest", :category "bar"})
           (instance/instance ::venues.default-fields
@@ -27,8 +28,13 @@
                              {:id 3, :name "BevMo", :category "store"})]
          (select/select ::venues.default-fields)))
   (testing "should still be able to override default fields"
-    (is (= {:select [:id :name], :from [[:venues]]}
-           (query/build ::select/select ::venues.default-fields {:query {}, :columns [:id :name]})))
-    (is (= (instance/instance ::venues.default-fields
-                              {:id 1, :name "Tempest"})
-           (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]})))))
+      (is (= {:select [:id :name], :from [[:venues]]}
+             (query/build :toucan.query-type/select.* ::venues.default-fields {:query {}, :columns [:id :name]})))
+      (is (= (instance/instance ::venues.default-fields
+                                {:id 1, :name "Tempest"})
+             (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]})))))
+
+(deftest insert-returning-instances-test
+  (test/with-discarded-table-changes :venues
+    (is (= [(instance/instance ::venues.default-fields {:id 4, :name "BevLess", :category "store"})]
+           (insert/insert-returning-instances! ::venues.default-fields [{:name "BevLess", :category "store"}])))))

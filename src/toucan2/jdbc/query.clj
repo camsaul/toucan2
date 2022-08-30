@@ -17,8 +17,9 @@
 (defn- options []
   (merge @global-options *options*))
 
-(defn reduce-jdbc-query [^java.sql.Connection conn model sql-args rf init]
-  (let [opts (options)]
+(defn reduce-jdbc-query [^java.sql.Connection conn model sql-args rf init extra-options]
+  {:pre [(instance? java.sql.Connection conn) (sequential? sql-args) (string? (first sql-args)) (ifn? rf)]}
+  (let [opts (merge (options) extra-options)]
     (u/println-debug ["Preparing JDBC query with next.jdbc options %s" opts])
     (u/try-with-error-context [(format "execute SQL with %s" (.getCanonicalName (class conn))) {::sql-args sql-args}]
       (with-open [stmt (next.jdbc/prepare conn sql-args opts)]

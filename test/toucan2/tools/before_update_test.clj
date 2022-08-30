@@ -177,7 +177,7 @@
 
 (derive ::venues.capture-updates ::venues.before-update)
 
-(m/defmethod query/build [::update/update ::venues.capture-updates :default]
+(m/defmethod query/build [:toucan.query-type/update.* ::venues.capture-updates :default]
   [query-type model parsed-args]
   (when *venues-update-queries*
     (swap! *venues-update-queries* conj parsed-args))
@@ -326,3 +326,16 @@
   (test/with-discarded-table-changes :venues
     (is (= 1
            (update/update! ::venues.short-name 3 {:name "BevLess"})))))
+
+(deftest preserve-model-test
+  (testing "If before-update is called with an instance of a different model, preserve its model"
+    (doseq [m    [{}
+                  (instance/instance ::venues.short-name)
+                  (instance/instance ::some-other-model)]
+            :let [m        (assoc m :name "BevLess")
+                  expected (assoc m :name "BEVLESS")
+                  actual   (before-update/before-update ::venues.short-name m)]]
+      (is (= expected
+             actual))
+      (is (= (protocols/model expected)
+             (protocols/model actual))))))

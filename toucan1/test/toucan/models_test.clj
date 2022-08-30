@@ -1,14 +1,21 @@
 (ns toucan.models-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer :all]
    [toucan.db :as t1.db]
    [toucan.models :as t1.models]
    [toucan.test-models.category :as category :refer [Category]]
+   [toucan.test-models.phone-number :refer [PhoneNumber]]
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
    [toucan2.connection :as conn]
+   [toucan2.instance :as instance]
    [toucan2.model :as model]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.tools.after-insert :as after-insert]
+   [toucan2.tools.after-select :as after-select]
+   [toucan2.tools.hydrate :as hydrate]
+   [toucan2.tools.transformed :as transformed])
   (:import
    (java.time LocalDateTime)))
 
@@ -31,6 +38,18 @@
        clojure.lang.ExceptionInfo
        #"Invalid model: :some-other-keyword"
        (t1.models/resolve-model :some-other-keyword))))
+
+(deftest properties-test
+  (is (= {:toucan.test-models.venue/timestamped? true}
+         (t1.models/properties Venue)))
+  (is (= nil
+         (t1.models/properties Category))))
+
+(deftest primary-key-test
+  (is (= :id
+         (t1.models/primary-key Venue)))
+  (is (= :number
+         (t1.models/primary-key PhoneNumber))))
 
 (deftest types-test
   (testing ":bar should come back as a Keyword even though it's a VARCHAR in the DB, just like :name"
@@ -57,6 +76,39 @@
       (is (= {:category :bar/dive-bar, :name "Tempest", :id 1}
              (t1.db/select-one Venue :id 1))))))
 
+(deftest types-fn-test
+  (testing `t1.models/types
+    (is (= {:name :lowercase-string}
+           (t1.models/types Category)))
+    (are [direction] (= "wow"
+                        ((get-in (transformed/transforms Category) [:name direction]) "WOW"))
+      :in
+      :out))
+  (testing "Error on unknown types when invoking with a meaningful error message."
+    (t1.models/deftypes ::TypesModel {:k ::fake-keyword})
+    (is (thrown-with-msg?
+         Exception
+         #"Unregistered type: :toucan.models-test/fake-keyword. Known types:"
+         ((get-in (transformed/transforms ::TypesModel) [:k :in]) "wow"))))
+  (testing "Pick up changes to types"
+    ;; make sure the type functions aren't registered yet.
+    (remove-method @#'t1.models/type-fn [::to-number :in])
+    (remove-method @#'t1.models/type-fn [::to-number :out])
+    ;; should be able to dynamically resolve types defined AFTER the call to `deftypes`.
+    (t1.models/deftypes ::TypesModel {:n ::to-number})
+    (testing "type function is double"
+      (t1.models/add-type! ::to-number {:in double, :out double})
+      (let [f (get-in (transformed/transforms ::TypesModel) [:n :in])]
+        (is (= 100.0
+               (f 100)
+               (f 100.0)))))
+    (testing "type function is now long"
+      (t1.models/add-type! ::to-number {:in long, :out long})
+      (let [f (get-in (transformed/transforms ::TypesModel) [:n :in])]
+        (is (= 100
+               (f 100)
+               (f 100.0)))))))
+
 (deftest custom-types-test
   (testing (str "Test custom types. Category.name is a custom type, :lowercase-string, that automatically "
                 "lowercases strings as they come in")
@@ -68,6 +120,21 @@
              (t1.db/update! Category 1, :name "Bar-Or-Club")))
       (is (= {:id 1, :name "bar-or-club", :parent-category-id nil}
              (t1.db/select-one Category 1))))))
+
+(deftest do-post-select-test
+  (testing `t1.models/post-select
+    ;; needs to pick up transforms AND `after-select`
+    (after-select/define-after-select ::PostSelect
+      [row]
+      (assoc row :after-select? true))
+    (transformed/deftransforms ::PostSelect
+      {:name {:in str/upper-case, :out str/lower-case}})
+    (testing `t1.models/post-select
+      (is (= {:name "bevmo", :after-select? true}
+             (t1.models/post-select (instance/instance ::PostSelect {:name "BevMo"})))))
+    (testing `t1.models/do-post-select
+      (is (= {:name "bevmo", :after-select? true}
+             (t1.models/do-post-select ::PostSelect {:name "BevMo"}))))))
 
 (defn- timestamp-after-jan-first? [^LocalDateTime t]
   (.isAfter t (LocalDateTime/parse "2017-01-01T00:00:00")))
@@ -108,6 +175,21 @@
     (is (= {:id 5, :name "seafood", :parent-category-id 1}
            (t1.db/insert! Category :name "seafood", :parent-category-id 1)))))
 
+;; (deftest do-pre-insert-test
+;;   (testing `t1.models/pre-insert
+;;     ;; needs to pick up transforms AND `before-insert`
+;;     (before-insert/define-before-insert ::BeforeInsert
+;;       [row]
+;;       (assoc row :before-insert? true))
+;;     (transformed/deftransforms ::BeforeInsert
+;;       {:name {:in str/upper-case, :out str/lower-case}})
+;;     (testing `t1.models/do-pre-insert
+;;       (is (= {:name "BEVMO", :before-insert? true}
+;;              (t1.models/do-pre-insert ::BeforeInsert {:name "BevMo"}))))
+;;     (testing `t1.models/pre-insert
+;;       (is (= {:name "BEVMO", :before-insert? true}
+;;              (t1.models/pre-insert (instance/instance ::BeforeInsert {:name "BevMo"})))))))
+
 (deftest pre-update-test
   (test/with-discarded-table-changes Category
     (is (thrown-with-msg?
@@ -118,15 +200,54 @@
     (is (= true
            (t1.db/update! Category 2 :parent-category-id 4)))))
 
+;; (deftest do-pre-update-test
+;;   ;; needs to pick up transforms AND `before-update`
+;;   (before-update/define-before-update ::BeforeUpdate
+;;     [row]
+;;     (assoc row :before-update? true))
+;;   (transformed/deftransforms ::BeforeUpdate
+;;     {:name {:in str/upper-case, :out str/lower-case}})
+;;   (testing `t1.models/do-pre-update
+;;     (is (= {:name "BEVMO", :before-update? true}
+;;            (t1.models/do-pre-update ::BeforeUpdate {:name "BevMo"}))))
+;;   (testing `t1.models/pre-update
+;;     (is (= {:name "BEVMO", :before-update? true}
+;;            (t1.models/pre-update (instance/instance ::BeforeUpdate {:name "BevMo"}))))))
+
 ;; Categories adds the IDs of recently created Categories to a "moderation queue" as part of its `post-insert`
 ;; implementation; check that creating a new Category results in the ID of the new Category being at the front of the
 ;; queue
 (deftest post-insert-test
   (test/with-discarded-table-changes Category
     (reset! category/categories-awaiting-moderation (clojure.lang.PersistentQueue/EMPTY))
-    (t1.db/insert! Category :name "toucannery")
-    (is (= 5
-           (peek @category/categories-awaiting-moderation)))))
+    (is (= (instance/instance Category {:id 5, :name "toucannery", :parent-category-id nil})
+           (t1.db/insert! Category :name "toucannery")))
+    (testing `category/categories-awaiting-moderation
+      (is (= [5]
+             @category/categories-awaiting-moderation)))
+    (testing "Should include columns added by after-insert"
+      (derive ::Category.post-insert Category)
+      (after-insert/define-after-insert ::Category.post-insert
+        [row]
+        (assoc row :after-insert? true))
+      (is (= (instance/instance ::Category.post-insert
+                                {:id 6, :name "aviary", :parent-category-id nil, :after-insert? true})
+             (t1.db/insert! ::Category.post-insert :name "aviary")))
+      (testing `category/categories-awaiting-moderation
+        (is (= [5 6]
+               @category/categories-awaiting-moderation))))))
+
+;; (after-insert/define-after-insert ::PostInsert
+;;   [row]
+;;   (assoc row :after-insert? true))
+
+;; (transformed/deftransforms ::PostInsert
+;;   {:name {:in str/upper-case, :out str/lower-case}})
+
+;; (deftest do-post-insert-test
+;;   (testing (str `t1.models/post-insert " needs to pick up transforms AND `before-insert`")
+;;     (is (= (instance/instance ::PostInsert {:name "bevmo", :after-insert? true})
+;;            (t1.models/post-insert (instance/instance ::PostInsert {:name "BevMo"}))))))
 
 ;; Categories adds the IDs of recently updated Categories to a "update queue" as part of its `post-update`
 ;; implementation; check that updating a Category results in the ID of the updated Category being at the front of the
@@ -147,6 +268,18 @@
     (is (= [1 2]
            @category/categories-recently-updated))))
 
+;; (deftest do-post-update-test
+;;   (testing `t1.models/post-update
+;;     ;; needs to pick up transforms AND `after-update`
+;;     (after-update/define-after-update ::PostUpdate
+;;       [row]
+;;       (assoc row :after-update? true))
+;;     (transformed/deftransforms ::PostUpdate
+;;       {:name {:in str/upper-case, :out str/lower-case}})
+;;     (testing `t1.models/post-update
+;;       (is (= {:name "bevmo", :after-update? true}
+;;              (t1.models/post-update (instance/instance ::PostUpdate {:name "BevMo"})))))))
+
 ;; For Category, deleting a parent category should also delete any child categories.
 (deftest pre-delete-test
   (test/with-discarded-table-changes Category
@@ -164,10 +297,33 @@
                {:id 4, :name "mexican-resturaunt", :parent-category-id 3}}
              (set (t1.db/select Category)))))))
 
+;; (def ^:private pre-deleted (atom []))
+
+;; (before-delete/define-before-delete ::BeforeDelete
+;;   [row]
+;;   (swap! pre-deleted conj (assoc row :before-delete? true)))
+
+;; (transformed/deftransforms ::BeforeDelete
+;;   {:name {:in str/upper-case, :out str/lower-case}})
+
+;; (deftest do-pre-delete-test
+;;   (reset! pre-deleted [])
+;;   (testing `t1.models/pre-delete!
+;;     ;; needs to pick up transforms AND `before-delete`
+;;     (let [instance (instance/instance ::BeforeDelete {:name "BevMo"})]
+;;       (is (= instance
+;;              (t1.models/pre-delete! instance))))
+;;     (is (= [(instance/instance ::BeforeDelete {:name "bevmo", :before-delete? true})]
+;;            @pre-deleted))))
+
 (deftest default-fields-test
   (testing "check that we can still override default-fields"
     (is (= {:created-at (LocalDateTime/parse "2017-01-01T00:00:00")}
            (t1.db/select-one [Venue :created-at] :id 1)))))
+
+(deftest default-fields-fn-test
+  (is (= [:id :name :category]
+         (t1.models/default-fields Venue))))
 
 (deftest model-in-honeysql-test
   (testing "Test using model in HoneySQL form"
@@ -176,10 +332,20 @@
             {:id 3, :name "BevMo"}]
            (binding [conn/*current-connectable* ::test-setup/db]
              (t1.db/query {:select   [:id :name]
-                        :from     [(keyword (model/table-name Venue))]
-                        :order-by [:id]}))))))
+                           :from     [(keyword (model/table-name Venue))]
+                           :order-by [:id]}))))))
 
 (deftest empty-test
   (testing "Test (empty)"
     (is (= {}
            (empty (t1.db/select-one Venue :name "BevMo"))))))
+
+(t1.models/define-hydration-keys ::FakeModel [::database ::db])
+
+(deftest hydration-keys-test
+  (is (= [::database ::db]
+         (t1.models/hydration-keys ::FakeModel)))
+  (are [k] (= ::FakeModel
+              (hydrate/model-for-automagic-hydration :default k))
+    ::database
+    ::db))

@@ -78,7 +78,7 @@
   (changes [_this]
     nil))
 
-(p/defprotocol+ DispatchValue
+(p/defprotocol+ IDispatchValue
   :extend-via-metadata true
   "Protocol to get the value to use for multimethod dispatch in Toucan from something."
   (dispatch-value
@@ -86,7 +86,7 @@
    "Get the value that we should dispatch off of in multimethods for `this`. By default, the dispatch of a keyword is
     itself while the dispatch value of everything else is its [[type]]."))
 
-(extend-protocol DispatchValue
+(extend-protocol IDispatchValue
   Object
   (dispatch-value [x]
     (type x))
@@ -105,7 +105,7 @@
                                    (catch Throwable _
                                      nil))]
   (extend c3p0-connection-class
-    DispatchValue
+    IDispatchValue
     {:dispatch-value (fn [^java.sql.Wrapper conn]
                        (try
                          (dispatch-value (.unwrap conn java.sql.Connection))
