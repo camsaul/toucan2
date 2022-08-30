@@ -5,9 +5,7 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-update :as after-update]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 
@@ -20,11 +18,11 @@
 (after-update/define-after-update ::venues.after-update
   [venue]
   (when *venues-awaiting-moderation*
-    (swap! *venues-awaiting-moderation* conj venue))
+    (swap! *venues-awaiting-moderation* conj (dissoc venue :created-at :updated-at)))
   nil)
 
 (deftest after-update-test
-  (doseq [f [#_#'update/update!
+  (doseq [f [#'update/update!
              #'update/update-returning-pks!]]
     (testing f
       (test/with-discarded-table-changes :venues
@@ -38,17 +36,32 @@
                     (instance/instance ::venues.after-update {:id 2, :name "Ho's Tavern", :category "BARRR"})]
                    (select/select [::venues.after-update :id :name :category] :category "BARRR" {:order-by [[:id :asc]]}))))
           (testing (str "rows should have been added to " `*venues-awaiting-moderation*)
-            (is (= [(instance/instance ::venues.after-update {:id         1
-                                                              :name       "Tempest"
-                                                              :category   "BARRR"
-                                                              :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-                    (instance/instance ::venues.after-update {:id         2
-                                                              :name       "Ho's Tavern"
-                                                              :category   "BARRR"
-                                                              :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+            (is (= [(instance/instance ::venues.after-update {:id 1, :name "Tempest", :category "BARRR"})
+                    (instance/instance ::venues.after-update {:id 2, :name "Ho's Tavern", :category "BARRR"})]
                    @*venues-awaiting-moderation*))))))))
 
-;;; TODO -- should `after-update` automatically do things in a transaction? So if `after-update` fails, the original
-;;; updates were canceled?
+(derive ::venues.after-update.composed ::venues.after-update)
+
+(def ^:private ^:dynamic *recently-updated-venues* (atom []))
+
+(after-update/define-after-update ::venues.after-update.composed
+  [venue]
+  (when *recently-updated-venues*
+    (swap! *recently-updated-venues* conj (select-keys venue [:id :name])))
+  venue)
+
+(deftest compose-test
+  (testing "after-update should compose"
+    (test/with-discarded-table-changes :venues
+      (binding [*venues-awaiting-moderation* (atom [])
+                *recently-updated-venues*    (atom [])]
+        (is (= 2
+               (update/update! ::venues.after-update.composed :category "bar" {:category "BARRR"})))
+        (testing (str '*venues-awaiting-moderation* " from " ::venues.after-update)
+          (is (= [(instance/instance ::venues.after-update.composed {:id 1, :name "Tempest", :category "BARRR"})
+                  (instance/instance ::venues.after-update.composed {:id 2, :name "Ho's Tavern", :category "BARRR"})]
+                 @*venues-awaiting-moderation*)))
+        (testing (str '*recently-updated-venues* " from " ::venues.after-update.composed)
+          (is (= [(instance/instance ::venues.after-update.composed {:id 1, :name "Tempest"})
+                  (instance/instance ::venues.after-update.composed {:id 2, :name "Ho's Tavern"})]
+                 @*recently-updated-venues*)))))))
