@@ -2,7 +2,6 @@
   "Implementation of [[delete!]]."
   (:require
    [methodical.core :as m]
-   [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]))
 

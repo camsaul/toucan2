@@ -7,8 +7,7 @@
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
-   [toucan2.tools.compile :as tools.compile]
-   [toucan2.instance :as instance]))
+   [toucan2.tools.compile :as tools.compile]))
 
 (deftest parse-args-test
   (is (= {:modelable :model, :queryable 1}
