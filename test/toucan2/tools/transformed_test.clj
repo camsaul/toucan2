@@ -295,7 +295,8 @@
   (testing `query/build
     (is (= {:delete-from [:venues]
             :where       [:= :category "bar"]}
-           (query/build :toucan.query-type/delete.update-count ::venues.category-keyword {:kv-args {:category :bar}}))))
+           (query/build :toucan.query-type/delete.update-count ::venues.category-keyword {:kv-args {:category :bar}
+                                                                                          :query   {}}))))
   (testing "Delete row by PK"
     (test/with-discarded-table-changes :venues
       (is (= 1

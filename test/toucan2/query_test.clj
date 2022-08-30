@@ -57,11 +57,11 @@
   (testing "Raw integer PK as query"
     (is (= {:where [:= :id 1]}
            (query/build ::my-query-type nil {:query 1})
-           (query/build ::my-query-type nil {:kv-args {:toucan/pk 1}}))))
+           (query/build ::my-query-type nil {:kv-args {:toucan/pk 1}, :query {}}))))
   (testing "custom non-:id PK"
     (is (= {:where [:= :uuid 1]}
            (query/build ::my-query-type ::model-with-non-id-pk {:query 1})
-           (query/build ::my-query-type ::model-with-non-id-pk {:kv-args {:toucan/pk 1}})))))
+           (query/build ::my-query-type ::model-with-non-id-pk {:kv-args {:toucan/pk 1}, :query {}})))))
 
 (deftest plain-sql-query-test
   (doseq [query ["SELECT *"

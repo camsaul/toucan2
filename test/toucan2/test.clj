@@ -180,7 +180,7 @@
 
 (defn- set-up-test-db! [db-type]
   (when-not (contains? @initialized-test-dbs db-type)
-    (println "Set up" db-type "test DB")
+    #_(println "Set up" db-type "test DB")
     (with-open [conn (java.sql.DriverManager/getConnection (test-db-url db-type))]
       (doseq [table-name [:people
                           :venues

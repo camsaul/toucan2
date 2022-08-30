@@ -125,7 +125,7 @@
   (changes [_this]
     (not-empty (second (data/diff orig m))))
 
-  protocols/DispatchValue
+  protocols/IDispatchValue
   (dispatch-value [_this]
     (protocols/dispatch-value model))
 

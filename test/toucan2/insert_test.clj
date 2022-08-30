@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.execute :as execute]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
@@ -15,6 +16,8 @@
 (use-fixtures :each test/do-db-types-fixture)
 
 (set! *warn-on-reflection* true)
+
+(defrecord MyRecordType [x])
 
 (deftest parse-args-test
   (testing "single map row"
@@ -37,7 +40,19 @@
     (is (= {:modelable :model
             :rows      [{:name "The Ramp", :category "bar"}
                         {:name "Louie's", :category "bar"}]}
-           (query/parse-args :toucan.query-type/insert.* [:model [:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]])))))
+           (query/parse-args :toucan.query-type/insert.* [:model [:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]]))))
+  (testing "nil"
+    (is (= {:modelable :model, :rows nil}
+           (query/parse-args :toucan.query-type/insert.* [:model nil]))))
+  (testing "empty rows"
+    (is (= {:modelable :model, :rows []}
+           (query/parse-args :toucan.query-type/insert.* [:model []]))))
+  (testing "queryable"
+    (is (= {:modelable :model, :queryable ::named-rows}
+           (query/parse-args :toucan.query-type/insert.* [:model ::named-rows]))))
+  (testing "record type"
+    (is (= {:modelable :model, :rows [(->MyRecordType 1)]}
+           (query/parse-args :toucan.query-type/insert.* [:model (->MyRecordType 1)])))))
 
 (deftest build-query-test
   (doseq [rows-fn [list vector]
@@ -45,7 +60,7 @@
     (testing (pr-str (list `query/build :toucan.query-type/insert.* ::test/venues rows))
       (is (= {:insert-into [:venues]
               :values      [{:name "Grant & Green", :category "bar"}]}
-             (query/build :toucan.query-type/insert.* ::test/venues {:rows rows}))))))
+             (query/build :toucan.query-type/insert.* ::test/venues {:rows rows, :query {}}))))))
 
 ;;; TODO -- a bit of a misnomer now.
 (defn- do-both-types-of-insert [f]
@@ -161,13 +176,13 @@
              ::test/venues
              {:id         5
               :name       "North Beach Cantina"
-              :category   "resturaunt"
+              :category   "restaurant"
               :created-at (LocalDateTime/parse "2017-01-01T00:00")
               :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
            (insert/insert-returning-instances!
             ::test/venues
             [{:name "Grant & Green", :category "bar"}
-             {:name "North Beach Cantina", :category "resturaunt"}]))))
+             {:name "North Beach Cantina", :category "restaurant"}]))))
   (testing "Support wrapping the model in a vector, because why not?"
     (test/with-discarded-table-changes :venues
       (is (= [(instance/instance
@@ -181,7 +196,7 @@
              (insert/insert-returning-instances!
               [::test/venues :id :name]
               [{:name "Grant & Green", :category "bar"}
-               {:name "North Beach Cantina", :category "resturaunt"}]))))))
+               {:name "North Beach Cantina", :category "restaurant"}]))))))
 
 (deftest empty-row-test
   (testing "Should be able to insert an empty row."
@@ -198,3 +213,53 @@
                    (insert/insert! ::test/birds row-or-rows))))
           (is (= 1
                  (insert/insert! ::test/birds row-or-rows))))))))
+
+(deftest empty-rows-no-op-test
+  (testing "insert! empty rows should no-op"
+    (doseq [insert!     [#'insert/insert!
+                         #'insert/insert-returning-pks!
+                         #'insert/insert-returning-instances!]
+            model       [::test/venues
+                         :venues]
+            row-or-rows [nil
+                         []]]
+      (testing (pr-str (list insert! model row-or-rows))
+        (execute/with-call-count [call-count]
+          (is (= (condp = insert!
+                   #'insert/insert!                     0
+                   #'insert/insert-returning-pks!       []
+                   #'insert/insert-returning-instances! [])
+                 (insert! model row-or-rows)))
+          (testing "\ncall count"
+            (is (= 0
+                   (call-count)))))))))
+
+(m/defmethod query/do-with-resolved-query [:default ::named-rows]
+  [_model _queryable f]
+  (f {:rows [{:name "Grant & Green", :category "bar"}
+             {:name "North Beach Cantina", :category "restaurant"}]}))
+
+(deftest named-query-test
+  (doseq [insert! [#'insert/insert!
+                   #'insert/insert-returning-pks!
+                   #'insert/insert-returning-instances!]]
+    (test/with-discarded-table-changes :venues
+      (testing insert!
+        (is (= (condp = insert!
+                 #'insert/insert!                     2
+                 #'insert/insert-returning-pks!       [4 5]
+                 #'insert/insert-returning-instances! [(instance/instance
+                                                        ::test/venues
+                                                        {:id         4
+                                                         :name       "Grant & Green"
+                                                         :category   "bar"
+                                                         :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                                       (instance/instance
+                                                        ::test/venues
+                                                        {:id         5
+                                                         :name       "North Beach Cantina"
+                                                         :category   "restaurant"
+                                                         :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
+               (insert! ::test/venues ::named-rows)))))))

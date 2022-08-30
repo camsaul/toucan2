@@ -16,6 +16,9 @@
  {:dev
   {:extra-deps
    {com.h2database/h2           {:mvn/version "2.1.214"}
+    eftest/eftest               {:mvn/version "0.5.9"}
+    org.clojure/java.classpath  {:mvn/version "1.0.0"}
+    org.clojure/tools.namespace {:mvn/version "1.3.0"}
     org.postgresql/postgresql   {:mvn/version "42.4.2"}
     pjstadig/humane-test-output {:mvn/version "0.11.0"}}
 
@@ -47,10 +50,9 @@
   ;;
   ;; clojure -X:dev:test
   :test
-  {:extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
-   :exec-fn    cognitect.test-runner.api/test
-   :exec-args  {:dirs ["test"
-                       "toucan1/test"]}}
+  {:exec-fn   toucan2.test-runner/run-tests
+   :exec-args {:only ["test"
+                      "toucan1/test"]}}
 
   ;; run tests only against H2.
   ;;
@@ -62,13 +64,13 @@
   ;;
   ;; clj -X:dev:test:test-core
   :test-core
-  {:exec-args {:dirs ["test"]}}
+  {:exec-args {:only ["test"]}}
 
   ;; only run tests against `toucan2-toucan1`
   ;;
   ;; clj -X:dev:test:test-toucan1
   :test-toucan1
-  {:exec-args {:dirs ["toucan1/test"]}}
+  {:exec-args {:only ["toucan1/test"]}}
 
   ;; run tests only against Postgres.
   ;;

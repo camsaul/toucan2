@@ -2,6 +2,7 @@
   (:require
    [methodical.core :as m]
    [pretty.core :as pretty]
+   [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
@@ -73,3 +74,40 @@
                                              #_model      IdentityQuery]
   [rf _query-type model _parsed-args]
   (transduce identity rf model))
+
+
+;;;; Identity connection
+
+(defrecord ^:no-doc IdentityConnection [rows]
+  pretty/PrettyPrintable
+  (pretty [_this]
+    (list `identity-connection rows)))
+
+(m/defmethod conn/do-with-connection IdentityConnection
+  [connectable f]
+  (f connectable))
+
+(m/defmethod conn/do-with-transaction IdentityConnection
+  [connectable _options f]
+  (f connectable))
+
+(m/defmethod pipeline/transduce-compiled-query-with-connection* [#_conn       IdentityConnection
+                                                                 #_query-type :default
+                                                                 #_model      :default]
+  [rf conn _query-type model _compiled-query]
+  (transduce
+   (map (fn [row]
+          (instance/instance model row)))
+   rf
+   (:rows conn)))
+
+(defn identity-connection [rows]
+  (->IdentityConnection rows))
+
+;; (defrecord ^:no-doc IdentityQuery2 [rows]
+;;   pretty/PrettyPrintable
+;;   (pretty [_this]
+;;     (list `identity-query-2 rows)))
+
+;; (defn identity-query-2 [rows]
+;;   (->IdentityQuery2 rows))

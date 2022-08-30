@@ -48,8 +48,14 @@
    :modelable-columns (s/cat :modelable some? ; can't have a nil model.
                              :columns   (s/* keyword?))))
 
+;;; TODO -- can we use [[s/every-kv]] for this stuff?
 (s/def ::default-args.kv-args
   (s/* (s/cat
+        :k keyword?
+        :v any?)))
+
+(s/def ::default-args.kv-args.non-empty
+  (s/+ (s/cat
         :k keyword?
         :v any?)))
 
@@ -86,10 +92,8 @@
     customize the behavior for specific keywords to do other things -- `:toucan/pk` is one such example.
 
   * `:columns` -- for things that return instances, `:columns` is a sequence of columns to return. These are commonly
-    specified by wrapping the modelable in a `[modelable & columns]` vector.
-
-  Dispatches off of `query-type`."
-  {:arglists '([query-type unparsed-args])}
+    specified by wrapping the modelable in a `[modelable & columns]` vector."
+  {:arglists '([query-type₁ unparsed-args])}
   u/dispatch-on-first-arg)
 
 ;;;; the stuff below validates parsed args in the `:default` `:around` method.
@@ -171,11 +175,6 @@
   [model _queryable f]
   (do-with-resolved-query model {:select [:%count.*], :from [(keyword (model/table-name model))]} f))
 
-(def ^:dynamic ^{:arglists '([model queryable f])} *with-resolved-query-fn*
-  "The function that should be invoked by [[with-resolved-query]]. By default, the multimethod [[do-with-resolved-query]],
-  but if you need to do some sort of crazy mocking you can swap it out with something else."
-  #'do-with-resolved-query)
-
 (defmacro with-resolved-query
   "Resolve a `queryable` to an *unbuilt* query and bind it to `query-binding`. After resolving the query the next step is
   to build it into a compilable query using [[build]].
@@ -186,10 +185,10 @@
   ```"
   {:style/indent :defn}
   [[query-binding [model queryable]] & body]
-  `(*with-resolved-query-fn* ~model ~queryable (^:once fn* [query#]
-                                                ;; support destructing the query.
-                                                (let [~query-binding query#]
-                                                  ~@body))))
+  `(do-with-resolved-query ~model ~queryable (^:once fn* [query#]
+                                              ;; support destructing the query.
+                                              (let [~query-binding query#]
+                                                ~@body))))
 
 (s/fdef with-resolved-query
   :args (s/cat :bindings (s/spec (s/cat :query               :clojure.core.specs.alpha/binding-form
@@ -227,9 +226,7 @@
 (m/defmulti build
   "`build` takes the parsed args returned by [[parse]] and builds them into a query that can be compiled
   by [[toucan2.compile/with-compiled-query]]. For the default implementations, `build` takes the parsed arguments and
-  builds a Honey SQL 2 map.
-
-  Dispatches on `[query-type model query]`."
+  builds a Honey SQL 2 map."
   {:arglists '([query-type₁ model₂ {:keys [query₃], :as parsed-args}])}
   (fn [query-type model parsed-args]
     (mapv protocols/dispatch-value [query-type
@@ -238,8 +235,9 @@
 
 (m/defmethod build :around :default
   [query-type model parsed-args]
-  (assert (map? parsed-args)
-          (format "%s expects map parsed-args, got %s." `build (u/safe-pr-str parsed-args)))
+  (assert (and (map? parsed-args)
+               (contains? parsed-args :query))
+          (format "%s expects map parsed-args with :query key, got %s." `build (u/safe-pr-str parsed-args)))
   (u/try-with-error-context ["build query" {::query-type  query-type
                                             ::model       model
                                             ::parsed-args parsed-args}]

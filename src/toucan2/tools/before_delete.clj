@@ -19,7 +19,8 @@
     (next-method model instance)))
 
 ;;; TODO -- this should probably be done in `with-resolved-query` ?
-(m/defmethod pipeline/transduce-with-model* :before [:toucan.query-type/delete.* ::before-delete]
+(m/defmethod pipeline/transduce-with-model* :before [#_query-type :toucan.query-type/delete.*
+                                                     #_model      ::before-delete]
   [_rf _query-type model parsed-args]
   (conn/with-transaction [_conn
                           (or conn/*current-connectable*

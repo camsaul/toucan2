@@ -44,7 +44,9 @@
                                      :set    changes})]
     (next-method query-type model parsed-args)))
 
-(m/defmethod pipeline/transduce-resolved-query* [:toucan.query-type/update.* :default]
+(m/defmethod pipeline/transduce-resolved-query* [#_query-type :toucan.query-type/update.*
+                                                 #_model      :default
+                                                 #_query      :default]
   [rf query-type model {:keys [changes], :as parsed-args} resolved-query]
   (if (empty? changes)
     (do

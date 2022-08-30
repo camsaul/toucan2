@@ -37,7 +37,7 @@
   no [[toucan2.connection/*current-connectable*]] is currently bound. By default, this just returns the global default
   connectable, `:default`, but you can tell Toucan to use a different default connectable for a model by implementing
   this method."
-  {:arglists '([model])}
+  {:arglists '([model₁])}
   u/dispatch-on-first-arg)
 
 (m/defmethod default-connectable :default
@@ -46,7 +46,7 @@
   :default)
 
 (m/defmulti table-name
-  {:arglists '([model])}
+  {:arglists '([model₁])}
   u/dispatch-on-first-arg)
 
 (m/defmethod table-name :default

@@ -11,7 +11,10 @@
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.insert :as insert]))
+   [toucan2.insert :as insert]
+   [toucan2.tools.after-insert :as after-insert]
+   [toucan2.tools.before-insert :as before-insert]
+   [toucan2.connection :as conn]))
 
 (deftest query-test
   (is (= [[1 2]
@@ -81,9 +84,38 @@
       (testing "Return plain rows, not instances"
         (is (not (instance/instance? (first results))))))))
 
-;;; FIXME
-#_(deftest insert-test
-    (testing "Can we use identity-query with insert?"
-      (let [query (identity-query/identity-query [{:a 1}])]
-        (is (= :wow
-               (insert/insert-returning-instances! nil query))))))
+;; (deftest insert-test
+;;   (testing "Can we use identity-query with insert?"
+;;     (is (= [(instance/instance :venues {:a 1})]
+;;            (insert/insert-returning-instances!
+;;             :venues
+;;             (identity-query/identity-query-2 [{:a 1}]))))))
+
+;; (after-insert/define-after-insert ::model.after-insert
+;;   [m]
+;;   (assoc m :after-insert? true))
+
+;; (deftest after-insert-test
+;;   (testing "sanity check"
+;;     (is (isa? :toucan.query-type/insert.instances
+;;               :toucan2.tools.after/query-type))
+;;     (is (isa? ::model.after-insert
+;;               :toucan2.tools.after/model)))
+;;   (testing "Identity query should do after-insert for insert"
+;;     (is (= [(instance/instance ::model.after-insert
+;;                                {:a 1, :after-insert? true})]
+;;            (insert/insert-returning-instances!
+;;             ::model.after-insert
+;;             (identity-query/identity-query-2 [{:a 1}]))))))
+
+;; (before-insert/define-before-insert ::model.before-insert
+;;   [m]
+;;   (assoc m :before-insert? true))
+
+;; (deftest before-insert-test
+;;   (binding [conn/*current-connectable* (identity-query/identity-connection [{:a 2}])]
+;;     (is (= [(instance/instance ::model.before-insert
+;;                                {:a 2, :before-insert? true})]
+;;            (insert/insert-returning-instances!
+;;             ::model.before-insert
+;;             (identity-query/identity-query [{:ignored-row true}]))))))

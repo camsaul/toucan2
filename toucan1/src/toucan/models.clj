@@ -1,13 +1,12 @@
 (ns toucan.models
-  "The `defmodel` macro, used to define Toucan models, and
-   the `IModel` protocol and default implementations, which implement Toucan model functionality."
+  "The [[defmodel]] macro, used to define Toucan models, and Toucan-2-compatible replacements for the old `IModel` protocol and its default
+  implementations, which implement Toucan model functionality."
   (:require
    [camel-snake-kebab.core :as csk]
    [clojure.spec.alpha :as s]
    [clojure.string :as str]
    [methodical.core :as m]
    [potemkin :as p]
-   [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
@@ -19,12 +18,10 @@
    [toucan2.tools.before-insert :as before-insert]
    [toucan2.tools.before-select :as before-select]
    [toucan2.tools.before-update :as before-update]
-   [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.default-fields :as default-fields]
    [toucan2.tools.hydrate :as hydrate]
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update]
    [toucan2.util :as u]))
 
 (comment default-fields/keep-me)
@@ -286,105 +283,90 @@
   {:pre [(instance/instance? instance)]}
   (do-post-select (protocols/model instance) instance))
 
-(defn do-pre-insert
-  "Do the [[toucan2.tools.before-insert]] stuff for a `row-map` using the methods for `modelable`."
-  [modelable row-map]
-  {:pre [(map? row-map)]}
-  (model/with-model [model modelable]
-    (-> (tools.compile/build
-          (insert/insert! model row-map))
-        :values
-        first)))
+;;; TODO -- the stuff below is commented out for now until I can decide whether they're supposed to be done for
+;;; side-effects, or to get transformed stuff, or both.
 
-(defn pre-insert
-  "Do the [[toucan2.tools.before-insert]] stuff for an `instance`."
-  [instance]
-  {:pre [(instance/instance? instance)]}
-  (do-pre-insert (protocols/model instance) instance))
+;; (defn do-pre-insert
+;;   "Do the [[toucan2.tools.before-insert]] stuff for a `row-map` using the methods for `modelable`."
+;;   [modelable row-map]
+;;   {:pre [(map? row-map)]}
+;;   (model/with-model [model modelable]
+;;     (-> (tools.compile/build
+;;           (insert/insert! model row-map))
+;;         :values
+;;         first)))
 
-(derive ::post-insert ::insert/insert)
-
-;; (m/defmethod op/reducible-returning-instances* [::post-insert :default]
-;;   [_query-type _model parsed-args]
-;;   (:instances parsed-args))
-
-(defn post-insert [instance] instance)
+;; (defn pre-insert
+;;   "Do the [[toucan2.tools.before-insert]] stuff for an `instance`."
+;;   [instance]
+;;   {:pre [(instance/instance? instance)]}
+;;   (do-pre-insert (protocols/model instance) instance))
 
 ;; (defn post-insert
 ;;   "Do [[toucan2.tools.before-update]] stuff for an `instance`."
 ;;   [instance]
 ;;   {:pre [(instance/instance? instance)]}
 ;;   (let [model (protocols/model instance)]
-;;     (realize/reduce-first
-;;      (eduction
-;;       ;; HACK -- we shouldn't need to look into [[transformed]] internals, but it's broken so we have to.
-;;       (transformed/transform-result-rows-transducer model)
-;;       (op/reducible-returning-instances* ::post-insert
-;;                                          model
-;;                                          {:instances [instance]})))))
+;;     (binding [conn/*current-connectable* (identity-query/identity-connection [instance])]
+;;       (first
+;;        (insert/insert-returning-instances!
+;;         model
+;;         [{}])))))
 
-;;; TODO -- this is an extremely wack way to implement this, because it only applies changes from
-;;; [[toucan2.tools.before-update]] and [[toucan2.tools.transformed]]. Maybe that's ok because that is all that was used
-;;; for Toucan 1. But we shouldn't have to poke into their internals to get the transforms -- we need a general way to
-;;; do this
-(defn do-pre-update
-  "Do [[toucan2.tools.before-update]] stuff for a `changes-map` using the methods for `modelable`."
-  [_modelable changes-map]
-  {:pre [(map? changes-map)]}
-  ;; mega HACK
-  ;; FIXME
-  #_(model/with-model [model modelable]
-      (as-> changes-map changes-map
-        ;; make sure a method exists before calling it so it doesn't error
-        (cond->> changes-map
-          (m/applicable-primary-method before-update/before-update model)
-          (before-update/before-update model))
-        ;; apply the transformed changes.
-        (:kv-args (transformed/apply-in-transforms model {:kv-args changes-map})))))
+;; ;;; Is this supposed to be done for side effects, or to apply transforms to changes, or both?
 
-(defn pre-update
-  "Do [[toucan2.tools.before-update]] stuff for an `instance`."
-  [changes-instance]
-  {:pre [(instance/instance? changes-instance)]}
-  (do-pre-update (protocols/model changes-instance) changes-instance))
+;; (defn do-pre-update
+;;   "Do [[toucan2.tools.before-update]] stuff for a `changes-map` using the methods for `modelable`."
+;;   [modelable changes-map]
+;;   {:pre [(map? changes-map)]}
+;;   (model/with-model [model modelable]
+;;     (binding [
+;;               pipeline/*transduce-built-query* (fn [rf query-type model built-query]
+;;                                                  (println "built-query:" built-query) ; NOCOMMIT
+;;                                                  (if (isa? query-type :toucan.query-type/select.*)
+;;                                                    (pipeline/transduce-built-query* rf query-type model built-query)
+;;                                                    (binding [conn/*current-connectable* (identity-query/identity-connection nil)]
+;;                                                      built-query)))]
+;;       (update/update! model nil changes-map))))
 
-(derive ::post-update ::update/update)
-
-;; (m/defmethod op/reducible-returning-instances* [::post-update :default]
-;;   [_query-type _model parsed-args]
-;;   (:instances parsed-args))
-
-(defn post-update
-  [instance]
-  instance)
+;; (defn pre-update
+;;   "Do [[toucan2.tools.before-update]] stuff for an `instance`."
+;;   [changes-instance]
+;;   {:pre [(instance/instance? changes-instance)]}
+;;   (do-pre-update (protocols/model changes-instance) changes-instance))
 
 ;; (defn post-update
 ;;   "Do [[toucan2.tools.after-update]] stuff for an `instance`."
 ;;   [instance]
 ;;   {:pre [(instance/instance? instance)]}
 ;;   (let [model (protocols/model instance)]
-;;     (realize/reduce-first
-;;      (eduction
-;;       ;; HACK -- we shouldn't need to look into [[transformed]] internals, but it's broken so we have to.
-;;       (transformed/transform-result-rows-transducer model)
-;;       (op/reducible-returning-instances* ::post-update
-;;                                          model
-;;                                          {:instances [instance]})))))
+;;     (binding [conn/*current-connectable* (identity-query/identity-connection [instance])]
+;;       (pipeline/transduce-with-model
+;;        (completing conj first)
+;;        :toucan.query-type/update.instances
+;;        model
+;;        ;; dummy changes so this query doesn't get optimized away
+;;        {:queryable {}, :changes {::dummy true}}))))
 
-(defn pre-delete
-  "Do [[toucan2.tools.before-delete]] stuff for an `instance`."
-  [instance]
-  {:pre [(instance/instance? instance)]}
-  ;; FIXME
-  #_(let [model (protocols/model instance)]
-      ;; mega HACK
-      (as-> instance instance
-        ;; make sure a method exists before calling it so it doesn't error
-        (cond->> instance
-          (m/applicable-primary-method before-delete/before-delete model)
-          (before-delete/before-delete model))
-        ;; apply the transformed changes.
-        (:kv-args (transformed/apply-in-transforms model {:kv-args instance})))))
+;; (defn pre-delete!
+;;   "Do [[toucan2.tools.before-delete]] stuff for an `instance`, for side effects. Returns `instance` as-is."
+;;   [instance]
+;;   {:pre [(instance/instance? instance)]}
+;;   ;; FIXME
+;;   (let [model (protocols/model instance)]
+;;     (binding [conn/*current-connectable*          (identity-query/identity-connection nil)
+;;               pipeline/*transduce-compiled-query* (fn [rf query-type model _compiled-query]
+;;                                                     (if (isa? query-type :toucan.query-type/select.instances)
+;;                                                       (transduce
+;;                                                        (map (partial instance/instance model))
+;;                                                        rf
+;;                                                        [instance])
+;;                                                       (transduce
+;;                                                        identity
+;;                                                        rf
+;;                                                        [0])))]
+;;       (delete/delete! model Integer/MAX_VALUE)
+;;       instance)))
 
 (defn hydration-keys
   "Get the keys that automagically hydrate to a model.

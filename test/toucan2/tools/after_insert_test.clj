@@ -4,7 +4,8 @@
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.test :as test]
-   [toucan2.tools.after-insert :as after-insert])
+   [toucan2.tools.after-insert :as after-insert]
+   [toucan2.tools.after-select :as after-select])
   (:import
    (java.time LocalDateTime)))
 
@@ -64,3 +65,31 @@
                       (when (= model ::venues.after-insert.composed)
                         {:composed? true})))]
                    @*venues-awaiting-moderation*))))))))
+
+(derive ::venues.after-insert.after-select ::venues.after-insert)
+
+(after-select/define-after-select ::venues.after-insert.after-select
+  [venue]
+  (assoc venue :after-select? true))
+
+(deftest dont-do-after-select-test
+  (testing "After-insert should not do after-select stuff"
+    (test/with-discarded-table-changes :venues
+      (binding [*venues-awaiting-moderation* (atom [])]
+        (is (= [{:id                   4
+                 :name                 "Lombard Heights Market"
+                 :category             "liquor-store"
+                 :created-at           (LocalDateTime/parse "2017-01-01T00:00")
+                 :updated-at           (LocalDateTime/parse "2017-01-01T00:00")
+                 :awaiting-moderation? true}]
+               (insert/insert-returning-instances! ::venues.after-insert.after-select
+                                                   {:name "Lombard Heights Market", :category "liquor-store"})))
+        (testing "should be added to *venues-awaiting-moderation*"
+          (is (= [(instance/instance
+                   ::venues.after-insert.after-select
+                   {:id         4
+                    :name       "Lombard Heights Market"
+                    :category   "liquor-store"
+                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                 @*venues-awaiting-moderation*)))))))

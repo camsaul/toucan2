@@ -11,7 +11,8 @@
    [toucan2.jdbc.query :as jdbc.query]
    [toucan2.model :as model]
    [toucan2.query :as query]
-   [toucan2.util :as u]))
+   [toucan2.util :as u]
+   [methodical.util.trace :as m.trace]))
 
 (set! *warn-on-reflection* true)
 
@@ -96,7 +97,7 @@
   ```
   Entrypoint e.g. select/select
   ↓
-  transduce-unparsed*           ← you are here
+  transduce-unparsed*           ← YOU ARE HERE
   ↓
   toucan2.query/parse-args
   ↓
@@ -116,7 +117,7 @@
   ↓
   toucan2.query/parse-args
   ↓
-  transduce-parsed-args* ← you are here
+  transduce-parsed-args* ← YOU ARE HERE
   ↓
   toucan2.model/with-model
   ↓
@@ -136,7 +137,7 @@
   ↓
   toucan2.model/with-model
   ↓
-  transduce-with-model* ← you are here
+  transduce-with-model* ← YOU ARE HERE
   ↓
   toucan2.query/with-resolved-query
   ↓
@@ -148,7 +149,6 @@
   {:arglists '([rf query-type₁ model₂ parsed-args])}
   (dispatch-ignore-rf u/dispatch-on-first-two-args))
 
-;;; TODO -- not entirely clear why this doesn't dispatch off of the resolved query as well.
 (m/defmulti transduce-resolved-query*
   "The fourth step in the query execution pipeline. Called with a resolved query immediately before 'building' it.
 
@@ -157,7 +157,7 @@
   ↓
   toucan2.query/with-resolved-query
   ↓
-  transduce-resolved-query* ← you are here
+  transduce-resolved-query* ← YOU ARE HERE
   ↓
   toucan2.query/with-built-query
   ↓
@@ -166,8 +166,10 @@
 
   The default implementation builds the resolved query with [[toucan2.query/with-built-query]] and then
   calls [[transduce-built-query*]]."
-  {:arglists '([rf query-type₁ model₂ parsed-args resolved-query])}
-  (dispatch-ignore-rf u/dispatch-on-first-two-args))
+  {:arglists '([rf query-type₁ model₂ parsed-args resolved-query₃])}
+  (dispatch-ignore-rf
+   (fn [query-type₁ model₂ _parsed-args resolved-query₃]
+     (u/dispatch-on-first-three-args query-type₁ model₂ resolved-query₃))))
 
 (m/defmulti transduce-built-query*
   "The fifth step in the query execution pipeline. Called with a query that is ready to be compiled, e.g. a fully-formed
@@ -178,7 +180,7 @@
   ↓
   toucan2.query/with-built-query
   ↓
-  transduce-built-query* ← you are here
+  transduce-built-query* ← YOU ARE HERE
   ↓
   toucan2.compile/with-compiled-query
   ↓
@@ -199,7 +201,7 @@
   ↓
   toucan2.compile/with-compiled-query
   ↓
-  transduce-compiled-query* ← you are here
+  transduce-compiled-query* ← YOU ARE HERE
   ↓
   toucan2.connection/with-connection
   ↓
@@ -220,7 +222,7 @@
   ↓
   toucan2.connection/with-connection
   ↓
-  transduce-compiled-query-with-connection* ← you are here
+  transduce-compiled-query-with-connection* ← YOU ARE HERE
   ↓
   execute query
   ↓
@@ -239,31 +241,31 @@
 
 (def ^:dynamic ^{:arglists '([rf query-type unparsed])}
   *transduce-unparsed*
-  #'toucan2.pipeline/transduce-unparsed*)
+  #'transduce-unparsed*)
 
 (def ^:dynamic ^{:arglists '([rf query-type parsed-args])}
   *transduce-parsed-args*
-  #'toucan2.pipeline/transduce-parsed-args*)
+  #'transduce-parsed-args*)
 
 (def ^:dynamic ^{:arglists '([rf query-type model parsed-args])}
   *transduce-with-model*
-  #'toucan2.pipeline/transduce-with-model*)
+  #'transduce-with-model*)
 
 (def ^:dynamic ^{:arglists '([rf query-type model parsed-args resolved-query])}
   *transduce-resolved-query*
-  #'toucan2.pipeline/transduce-resolved-query*)
+  #'transduce-resolved-query*)
 
 (def ^:dynamic ^{:arglists '([rf query-type model built-query])}
   *transduce-built-query*
-  #'toucan2.pipeline/transduce-built-query*)
+  #'transduce-built-query*)
 
 (def ^:dynamic ^{:arglists '([rf query-type model compiled-query])}
   *transduce-compiled-query*
-  #'toucan2.pipeline/transduce-compiled-query*)
+  #'transduce-compiled-query*)
 
 (def ^:dynamic ^{:arglists '([rf conn query-type model compiled-query])}
   *transduce-compiled-query-with-connection*
-  #'toucan2.pipeline/transduce-compiled-query-with-connection*)
+  #'transduce-compiled-query-with-connection*)
 
 ;;;; rf helper functions
 
@@ -427,8 +429,8 @@
                                         #_model          :default
                                         #_compiled-query :default]
   [rf query-type model compiled-query]
-  (conn/with-transaction [conn (current-connectable model) {:nested-transaction-rule :ignore}]
-    (transduce-compiled-query-with-connection rf conn query-type model compiled-query)))
+  (conn/with-transaction [_conn (current-connectable model) {:nested-transaction-rule :ignore}]
+    (next-method rf query-type model compiled-query)))
 
 ;;;; reducible versions
 
@@ -620,3 +622,19 @@
         ;; once we have a sequence of PKs then get instances as with `select` and do our magic on them using the
         ;; ORIGINAL `rf`.
         (transduce-instances-from-pks rf model columns pks)))))
+
+;;;; Tracing
+
+(defn do-traced-pipeline [thunk]
+  (letfn [(traced-var [varr]
+            (partial m.trace/trace* (vary-meta (var-get varr)
+                                               assoc
+                                               ::m.trace/description (symbol varr))))]
+    (binding [*transduce-unparsed*                       (traced-var #'transduce-unparsed*)
+              *transduce-parsed-args*                    (traced-var #'transduce-parsed-args*)
+              *transduce-with-model*                     (traced-var #'transduce-with-model*)
+              *transduce-resolved-query*                 (traced-var #'transduce-resolved-query*)
+              *transduce-built-query*                    (traced-var #'transduce-built-query*)
+              *transduce-compiled-query*                 (traced-var #'transduce-compiled-query*)
+              *transduce-compiled-query-with-connection* (traced-var #'transduce-compiled-query-with-connection*)]
+      (thunk))))

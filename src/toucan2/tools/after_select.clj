@@ -7,8 +7,12 @@
   {:style/indent :defn}
   [model [instance-binding] & body]
   `(pipeline/define-out-transform [:toucan.query-type/select.instances ~model]
-     [~instance-binding]
-     ~@body))
+     [instance#]
+     ;; don't do after-select if this select is a result of doing something like insert-returning instances
+     (if (isa? ~'&query-type :toucan2.pipeline/select.instances-from-pks)
+       instance#
+       (let [~instance-binding instance#]
+         ~@body))))
 
 (s/fdef define-after-select
   :args (s/cat :model    some?

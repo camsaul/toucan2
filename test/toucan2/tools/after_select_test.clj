@@ -61,7 +61,7 @@
                (insert/insert-returning-pks! model :name "Tin Vietnamese", :category "restaurant"))))
       (test/with-discarded-table-changes :venues
         (is (= [(instance/instance model
-                                   {:id 4, :name "Tin Vietnamese", :short-name "Tin ", :category "restaurant"})]
+                                   {:id 4, :name "Tin Vietnamese", #_:short-name #_"Tin ", :category "restaurant"})]
                (insert/insert-returning-instances! [model :id :name :category]
                                                    :name "Tin Vietnamese"
                                                    :category "restaurant")))))))

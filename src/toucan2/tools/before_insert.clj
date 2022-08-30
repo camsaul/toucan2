@@ -17,9 +17,20 @@
          (before-insert model row))))
    rows))
 
-(m/defmethod pipeline/transduce-with-model* :before [:toucan.query-type/insert.* ::before-insert]
+;;; make sure we transform rows whether it's in the parsed args or in the resolved query.
+
+(m/defmethod pipeline/transduce-with-model* :before [#_query-type :toucan.query-type/insert.*
+                                                     #_model      ::before-insert]
   [_rf _query-type model parsed-args]
-  (update parsed-args :rows do-before-insert-to-rows model))
+  (cond-> parsed-args
+    (:rows parsed-args) (update :rows do-before-insert-to-rows model)))
+
+(m/defmethod pipeline/transduce-resolved-query* :before [#_query-type :toucan.query-type/insert.*
+                                                         #_model      ::before-insert
+                                                         #_query      clojure.lang.IPersistentMap]
+  [_rf _query-type model _parsed-args resolved-query]
+  (cond-> resolved-query
+    (:rows resolved-query) (update :rows do-before-insert-to-rows model)))
 
 ;;; Important! before-insert should be done BEFORE any [[toucan2.tools.transformed/transforms]]. Transforms are often
 ;;; for serializing and deserializing values; we don't want before insert methods to have to work with
