@@ -1,25 +1,12 @@
 (ns toucan2.select
   (:refer-clojure :exclude [count])
   (:require
-   [better-cond.core :as b]
    [methodical.core :as m]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
-
-(defn- model-honeysql-from-clause [model]
-  [(b/cond
-     :let [table-id (keyword (model/table-name model))
-           alias-id (model/namespace model)
-           alias-id (when alias-id
-                      (keyword alias-id))]
-     alias-id
-     [table-id alias-id]
-
-     :else
-     [table-id])])
 
 (m/defmethod query/build [#_query-type :toucan.query-type/select.*
                           #_model      :default
@@ -30,7 +17,7 @@
                                          (merge {:select (or (not-empty columns)
                                                              [:*])}
                                                 (when model
-                                                  {:from (model-honeysql-from-clause model)})
+                                                  {:from [(query/honeysql-table-and-alias model)]})
                                                 query)))
                         (dissoc :columns))]
     (next-method query-type model parsed-args)))

@@ -121,3 +121,25 @@
     (test/with-discarded-table-changes :venues
       (is (= 0
              (update/update! ::test/venues nil {:name "Taco Bell"}))))))
+
+(derive ::venues.namespaced ::test/venues)
+
+(m/defmethod model/model->namespace ::venues.namespaced
+  [_model]
+  {::test/venues :venue})
+
+(deftest namespaced-test
+  (doseq [update! [#'update/update!
+                   #'update/update-returning-pks!]]
+    (test/with-discarded-table-changes :venues
+      (testing update!
+        (is (= (condp = update!
+                 #'update/update!               1
+                 #'update/update-returning-pks! [3])
+               (update! ::venues.namespaced 3 {:venue/name "Grant & Green", :venue/category "bar"})))
+        (is (= (instance/instance
+                ::test/venues
+                {:id       3
+                 :name     "Grant & Green"
+                 :category "bar"})
+               (select/select-one [::test/venues :id :name :category] :id 3)))))))

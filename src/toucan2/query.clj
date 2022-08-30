@@ -26,6 +26,7 @@
   Compiled query is executed with connection
   ```"
   (:require
+   [better-cond.core :as b]
    [clojure.spec.alpha :as s]
    [honey.sql.helpers :as hsql.helpers]
    [methodical.core :as m]
@@ -417,6 +418,21 @@
 (m/defmethod build [:default :default clojure.lang.IPersistentMap]
   [_query-type model {:keys [kv-args query], :as _args}]
   (apply-kv-args model query kv-args))
+
+(defn honeysql-table-and-alias
+  "Build an Honey SQL `[table]` or `[table alias]` (if the model has a [[toucan2.model/namespace]] form) for `model` for
+  use in something like a `:select` clause."
+  [model]
+  (b/cond
+    :let [table-id (keyword (model/table-name model))
+          alias-id (model/namespace model)
+          alias-id (when alias-id
+                     (keyword alias-id))]
+    alias-id
+    [table-id alias-id]
+
+    :else
+    [table-id]))
 
 ;; (defn- format-identifier [_ parts]
 ;;   [(str/join \. (map hsql/format-entity parts))])

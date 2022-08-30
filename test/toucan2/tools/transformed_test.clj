@@ -5,17 +5,17 @@
    [toucan2.delete :as delete]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
+   [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.save :as save]
    [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update]
-   [toucan2.model :as model]
-   [toucan2.tools.compile :as tools.compile])
+   [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
 

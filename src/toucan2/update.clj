@@ -3,7 +3,6 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
-   [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.util :as u]))
@@ -40,7 +39,7 @@
                     {:query-type query-type, :model model, :parsed-args parsed-args})))
   (let [parsed-args (assoc parsed-args
                            :kv-args (merge kv-args query)
-                           :query   {:update [(keyword (model/table-name model))]
+                           :query   {:update (query/honeysql-table-and-alias model)
                                      :set    changes})]
     (next-method query-type model parsed-args)))
 
