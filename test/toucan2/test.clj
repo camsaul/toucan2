@@ -118,11 +118,12 @@
   (fn [db-type model-or-table-name]
     [(keyword db-type) (keyword model-or-table-name)]))
 
-(m/defmethod create-table-sql-file [:postgres :people] [_db-type _table] "toucan2/test/people.postgres.sql")
-(m/defmethod create-table-sql-file [:h2 :people]       [_db-type _table] "toucan2/test/people.h2.sql")
-(m/defmethod create-table-sql-file [:postgres :venues] [_db-type _table] "toucan2/test/venues.postgres.sql")
-(m/defmethod create-table-sql-file [:h2 :venues]       [_db-type _table] "toucan2/test/venues.h2.sql")
-(m/defmethod create-table-sql-file [:default :birds]   [_db-type _table] "toucan2/test/birds.sql")
+(m/defmethod create-table-sql-file [:postgres :people]    [_db-type _table] "toucan2/test/people.postgres.sql")
+(m/defmethod create-table-sql-file [:h2 :people]          [_db-type _table] "toucan2/test/people.h2.sql")
+(m/defmethod create-table-sql-file [:postgres :venues]    [_db-type _table] "toucan2/test/venues.postgres.sql")
+(m/defmethod create-table-sql-file [:h2 :venues]          [_db-type _table] "toucan2/test/venues.h2.sql")
+(m/defmethod create-table-sql-file [:default :birds]      [_db-type _table] "toucan2/test/birds.sql")
+(m/defmethod create-table-sql-file [:default :categories] [_db-type _table] "toucan2/test/categories.sql")
 
 (derive ::people ::models)
 
@@ -141,6 +142,12 @@
 (m/defmethod model/table-name ::birds
   [_model]
   "birds")
+
+(derive ::categories ::models)
+
+(m/defmethod model/table-name ::categories
+  [_model]
+  "category")
 
 (defn- create-table-statements [db-type table-name]
   (let [filename (create-table-sql-file db-type table-name)
@@ -184,7 +191,8 @@
     (with-open [conn (java.sql.DriverManager/getConnection (test-db-url db-type))]
       (doseq [table-name [:people
                           :venues
-                          :birds]]
+                          :birds
+                          :categories]]
         (create-table! db-type conn table-name)))
     (swap! initialized-test-dbs conj db-type)))
 

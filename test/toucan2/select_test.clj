@@ -12,7 +12,7 @@
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile])
   (:import
-   (java.time OffsetDateTime)))
+   (java.time LocalDateTime OffsetDateTime)))
 
 (set! *warn-on-reflection* true)
 
@@ -388,3 +388,38 @@
            (select/select-one ::test/venues nil)
            (select/select-one-fn :id ::test/venues nil)
            (select/select-one-fn int ::test/venues nil)))))
+
+(deftest select-join-test
+  (testing "Extra columns from joined tables should come back"
+    (is (= (instance/instance ::test/venues
+                              {:id              1
+                               :name            "bar"
+                               :category        "bar"
+                               :created-at      (LocalDateTime/parse "2017-01-01T00:00")
+                               :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
+                               :slug            "bar_01"
+                               :parent-category nil})
+           (select/select-one ::test/venues
+                              {:left-join [[:category :c] [:= :venues.category :c.name]]
+                               :order-by  [[:id :asc]]})))))
+
+(derive ::venues.with-category ::test/venues)
+
+(m/defmethod query/build :after [#_query-type :toucan.query-type/select.*
+                                 #_model      ::venues.with-category
+                                 #_query      clojure.lang.IPersistentMap]
+  [_query-type _model built-query]
+  (assoc built-query :left-join [[:category :c] [:= :venues.category :c.name]]))
+
+(deftest joined-model-test
+  (is (= (instance/instance ::venues.with-category
+                            {:id              1
+                             :name            "bar"
+                             :category        "bar"
+                             :created-at      (LocalDateTime/parse "2017-01-01T00:00")
+                             :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
+                             :slug            "bar_01"
+                             :parent-category nil})
+         (select/select-one ::venues.with-category
+                            {:left-join [[:category :c] [:= :venues.category :c.name]]
+                             :order-by  [[:id :asc]]}))))
