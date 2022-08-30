@@ -40,7 +40,7 @@
 ;;; https://github.com/camsaul/methodical#before-methods)
 (m/prefer-method! #'pipeline/transduce-with-model*
                   [:toucan.query-type/insert.* ::before-insert]
-                  [:toucan.query-type/insert.* :toucan2.tools.transformed/transformed])
+                  [:toucan.query-type/insert.* :toucan2.tools.transformed/transformed.model])
 
 (defmacro define-before-insert
   {:style/indent :defn}
