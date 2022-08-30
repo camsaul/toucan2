@@ -25,7 +25,6 @@
   ↓
   Compiled query is executed with connection
   ```"
-
   (:require
    [clojure.spec.alpha :as s]
    [honey.sql.helpers :as hsql.helpers]
@@ -418,3 +417,8 @@
 (m/defmethod build [:default :default clojure.lang.IPersistentMap]
   [_query-type model {:keys [kv-args query], :as _args}]
   (apply-kv-args model query kv-args))
+
+;; (defn- format-identifier [_ parts]
+;;   [(str/join \. (map hsql/format-entity parts))])
+
+;; (hsql/register-fn! ::identifier #'format-identifier)

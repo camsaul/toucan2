@@ -100,3 +100,13 @@
       ::venues.compound-pk [:in [[4 "BevMo"]]]                  [:and [:in :id [4]] [:in :name ["BevMo"]]]
       ::venues.compound-pk [:in [[4 "BevMo"] [5 "BevLess"]]]    [:and [:in :id [4 5]] [:in :name ["BevMo" "BevLess"]]]
       ::venues.compound-pk [:between [4 "BevMo"] [5 "BevLess"]] [:and [:between :id 4 5] [:between :name "BevMo" "BevLess"]])))
+
+;; (deftest identitfier-test
+;;   (testing "Custom Honey SQL identifier clause"
+;;     (are [identifier quoted? expected] (= expected
+;;                                           (hsql/format {:select [:*], :from [[identifier]]}
+;;                                                        {:quoted quoted?}))
+;;       [::query/identifier :wow]          false ["SELECT * FROM wow"]
+;;       [::query/identifier :wow]          true  ["SELECT * FROM \"wow\""]
+;;       [::query/identifier :table :field] false ["SELECT * FROM table.field"]
+;;       [::query/identifier :table :field] true  ["SELECT * FROM \"table\".\"field\""])))

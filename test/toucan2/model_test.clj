@@ -66,13 +66,13 @@
 
 (m/defmethod model/model->namespace ::venues
   [_model]
-  {::test/venues     :venue
+  {::venues          :venue
    ::test/categories :category})
 
 (deftest model->namespace-test
   (are [model expected] (= expected
                            (model/model->namespace model))
-    ::venues {::test/venues :venue, ::test/categories :category}
+    ::venues {::venues :venue, ::test/categories :category}
     :venues  nil
     nil      nil))
 
@@ -82,3 +82,13 @@
     ::venues {"venues" :venue, "category" :category}
     :venues  nil
     nil      nil))
+
+(derive ::venues.descendant ::venues)
+
+(deftest namespace-test
+  (are [model expected] (= expected
+                           (model/namespace model))
+    ::venues            :venue
+    ::venues.descendant :venue
+    :venues             nil
+    nil                 nil))

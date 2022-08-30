@@ -14,7 +14,8 @@
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.transformed :as transformed]
    [toucan2.update :as update]
-   [toucan2.model :as model])
+   [toucan2.model :as model]
+   [toucan2.tools.compile :as tools.compile])
   (:import
    (java.time LocalDateTime)))
 
@@ -461,6 +462,14 @@
    ::categories.namespaced.category-keyword :category})
 
 (deftest namespaced-test
+  (is (= {:select    [:*]
+          :from      [[:venues :venue]]
+          :left-join [:category [:= :venue.category :category.name]]
+          :order-by  [[:id :asc]]}
+         (tools.compile/build
+           (select/select-one ::venues.namespaced.with-category
+                              {:left-join [:category [:= :venue.category :category.name]]
+                               :order-by  [[:id :asc]]}))))
   (is (= (instance/instance
           ::venues.namespaced.with-category
           {:venue/id                 1
@@ -472,5 +481,5 @@
            :category/slug            "bar_01"
            :category/parent-category nil})
          (select/select-one ::venues.namespaced.with-category
-                            {:left-join [[:category :c] [:= :venues.category :c.name]]
+                            {:left-join [:category [:= :venue.category :category.name]]
                              :order-by  [[:id :asc]]}))))

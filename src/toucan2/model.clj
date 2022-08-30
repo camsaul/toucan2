@@ -1,4 +1,5 @@
 (ns toucan2.model
+  (:refer-clojure :exclude [namespace])
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
@@ -139,3 +140,10 @@
                (map (fn [[model a-namespace]]
                       [(table-name model) a-namespace])))
          (model->namespace model))))
+
+(defn namespace [model]
+  (some
+   (fn [[a-model a-namespace]]
+     (when (isa? model a-model)
+       a-namespace))
+   (model->namespace model)))
