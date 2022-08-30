@@ -309,12 +309,13 @@
 ;;;; [[transduce-parsed-args]]
 
 (m/defmulti ^:dynamic transduce-parsed-args
-  "The second step in the query execution pipeline. Called with args as parsed by [[toucan2.query/parse-args]].
+  "The second step in the query execution pipeline. Called with args as parsed by something like
+  [[toucan2.query/parse-args]].
 
   ```
   transduce-unparsed
   ↓
-  toucan2.query/parse-args
+  (parse args)
   ↓
   transduce-parsed-args ← YOU ARE HERE
   ↓
@@ -351,14 +352,14 @@
   ↓
   transduce-unparsed           ← YOU ARE HERE
   ↓
-  toucan2.query/parse-args
+  (parse args)
   ↓
   transduce-parsed-args
   ```
 
   The default implementation parses the args with [[toucan2.query/parse-args]] and then
   calls [[transduce-parsed-args]]."
-  {:arglists '([rf query-type₁ unparsed])}
+  {:arglists '([rf query-type₁ unparsed-args])}
   (dispatch-ignore-rf u/dispatch-on-first-arg))
 
 (m/defmethod transduce-unparsed :around :default

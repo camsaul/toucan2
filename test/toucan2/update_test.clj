@@ -18,19 +18,19 @@
 
 (deftest parse-update-args-test
   (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
-         (query/parse-args :toucan.query-type/update.* [:model 1 {:a 1}])))
+         (update/parse-update-args :toucan.query-type/update.* [:model 1 {:a 1}])))
   (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk nil}, :queryable {}}
-         (query/parse-args :toucan.query-type/update.* [:model nil {:a 1}])))
+         (update/parse-update-args :toucan.query-type/update.* [:model nil {:a 1}])))
   (is (= {:modelable :model, :kv-args {:id 1}, :changes {:a 1}, :queryable {}}
-         (query/parse-args :toucan.query-type/update.* [:model :id 1 {:a 1}])))
+         (update/parse-update-args :toucan.query-type/update.* [:model :id 1 {:a 1}])))
   (testing "composite PK"
     (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk [1 2]}, :queryable {}}
-           (query/parse-args :toucan.query-type/update.* [:model [1 2] {:a 1}]))))
+           (update/parse-update-args :toucan.query-type/update.* [:model [1 2] {:a 1}]))))
   (testing "key-value conditions"
     (is (= {:modelable :model, :kv-args {:name "Cam", :toucan/pk 1}, :changes {:a 1}, :queryable {}}
-           (query/parse-args :toucan.query-type/update.* [:model 1 :name "Cam" {:a 1}]))))
+           (update/parse-update-args :toucan.query-type/update.* [:model 1 :name "Cam" {:a 1}]))))
   (is (= {:modelable :model, :changes {:name "Hi-Dive"}, :queryable {:id 1}}
-         (query/parse-args :toucan.query-type/update.* [:model {:id 1} {:name "Hi-Dive"}]))))
+         (update/parse-update-args :toucan.query-type/update.* [:model {:id 1} {:name "Hi-Dive"}]))))
 
 (deftest build-test
   (is (= {:update [:venues]
@@ -102,7 +102,7 @@
 
 (deftest update-nil-test
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
-    (let [parsed-args (query/parse-args :toucan.query-type/update.* [::test/venues nil {:name "Taco Bell"}])]
+    (let [parsed-args (update/parse-update-args :toucan.query-type/update.* [::test/venues nil {:name "Taco Bell"}])]
       (is (= {:modelable ::test/venues
               :kv-args   {:toucan/pk nil}
               :changes   {:name "Taco Bell"}

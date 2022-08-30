@@ -25,12 +25,17 @@
   [_query-type]
   ::default-args)
 
-(m/defmethod query/parse-args :toucan.query-type/update.*
+(defn parse-update-args
   [query-type unparsed-args]
-  (let [parsed (next-method query-type unparsed-args)]
+  (let [parsed (query/parse-args query-type unparsed-args)]
     (cond-> parsed
       (contains? parsed :pk) (-> (dissoc :pk)
                                  (update :kv-args assoc :toucan/pk (:pk parsed))))))
+
+(m/defmethod pipeline/transduce-unparsed :toucan.query-type/update.*
+  [rf query-type unparsed-args]
+  (let [parsed-args (parse-update-args query-type unparsed-args)]
+    (pipeline/transduce-parsed-args rf query-type parsed-args)))
 
 (m/defmethod query/build [:toucan.query-type/update.* :default clojure.lang.IPersistentMap]
   [query-type model {:keys [kv-args query changes], :as parsed-args}]
