@@ -43,7 +43,7 @@
   {:deps       {com.github.camsaul/whitespace-linter {:sha "e35bc252ccf5cc74f7d543ef95ad8a3e5131f25b"}}
    :ns-default whitespace-linter
    :exec-fn    whitespace-linter/lint
-   :exec-args  {:paths            ["deps.edn" ".clj-kondo" "src" "test" "toucan1/src" "toucan1/test" ".github"]
+   :exec-args  {:paths            ["deps.edn" "src" "test" "toucan1/src" "toucan1/test" ".github"]
                 :include-patterns ["\\.clj[cs]?$" "\\.edn$" "\\.yaml$" "\\.sql$"]}}
 
   ;; Run tests against the value of `TEST_DBS`, by default `postgres,h2`.
