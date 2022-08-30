@@ -18,24 +18,29 @@
   (u/with-debug-result (list `before-delete model instance)
     (next-method model instance)))
 
-;;; TODO -- this should probably be done in `with-resolved-query` ?
-(m/defmethod pipeline/transduce-with-model* :before [#_query-type :toucan.query-type/delete.*
-                                                     #_model      ::before-delete]
+(def ^:private ^:dynamic *in-before-delete* false)
+
+(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/delete.*
+                                                    #_model      ::before-delete]
   [_rf _query-type model parsed-args]
-  (conn/with-transaction [_conn
-                          (or conn/*current-connectable*
-                              (model/default-connectable model))
-                          {:nested-transaction-rule :ignore}]
-    ;; select and transduce the matching rows and run their [[before-delete]] methods
-    (pipeline/transduce-with-model
-     ((map (fn [row]
-             (before-delete model row)))
-      (constantly nil))
-     :toucan.query-type/select.instances
-     model
-     parsed-args)
-    ;; cool, now we can proceed
-    parsed-args))
+  ;; prevent unnecessary duplicate before deletes
+  (if *in-before-delete*
+    parsed-args
+    (binding [*in-before-delete* true]
+      (conn/with-transaction [_conn
+                              (or conn/*current-connectable*
+                                  (model/default-connectable model))
+                              {:nested-transaction-rule :ignore}]
+        ;; select and transduce the matching rows and run their [[before-delete]] methods
+        (pipeline/transduce-with-model
+         ((map (fn [row]
+                 (before-delete model row)))
+          (constantly nil))
+         :toucan.query-type/select.instances
+         model
+         parsed-args)
+        ;; cool, now we can proceed
+        parsed-args))))
 
 (defn ^:no-doc before-delete-impl [next-method model instance f]
   (let [result (or (f model instance)

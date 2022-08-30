@@ -5,7 +5,6 @@
    [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.pipeline :as pipeline]
-   [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
@@ -42,9 +41,9 @@
   [reducible-rows]
   (->IdentityQuery reducible-rows))
 
-(m/defmethod pipeline/transduce-built-query* [#_query-type :default #_:toucan.result-type/instances
-                                              #_model      :default
-                                              #_query      IdentityQuery]
+(m/defmethod pipeline/transduce-built-query [#_query-type :default
+                                             #_model      :default
+                                             #_query      IdentityQuery]
   [rf _query-type model {:keys [rows], :as _query}]
   (u/with-debug-result ["transduce IdentityQuery rows %s" rows]
     (transduce (if model
@@ -56,22 +55,22 @@
 
 ;;; this is an around method so we can intercept anything else that might normally be considered a more specific method
 ;;; when it dispatches off of more-specific values of `query-type`
-(m/defmethod query/build :around [#_query-type :default
-                                  #_model      :default
-                                  #_query      IdentityQuery]
-  [_query-type _model {:keys [query], :as _args}]
-  query)
+(m/defmethod pipeline/transduce-resolved-query :around [#_query-type :default
+                                                        #_model      :default
+                                                        #_query      IdentityQuery]
+  [rf query-type model _parsed-args resolved-query]
+  (pipeline/transduce-built-query rf query-type model resolved-query))
 
 ;;; TODO -- not sure we need this method since we should be bypassing it with the method below
-(m/defmethod query/build [#_query-type :default
-                          #_model      IdentityQuery
-                          #_query      :default]
-  [_query-type _model {:keys [query], :as _args}]
-  query)
+(m/defmethod pipeline/transduce-resolved-query [#_query-type :default
+                                                #_model      IdentityQuery
+                                                #_query      :default]
+  [rf query-type model _parsed-args resolved-query]
+  (pipeline/transduce-built-query rf query-type model resolved-query))
 
 ;;; allow using an identity query as an 'identity model'
-(m/defmethod pipeline/transduce-with-model* [#_query-type :default
-                                             #_model      IdentityQuery]
+(m/defmethod pipeline/transduce-with-model [#_query-type :default
+                                            #_model      IdentityQuery]
   [rf _query-type model _parsed-args]
   (transduce identity rf model))
 
@@ -91,9 +90,9 @@
   [connectable _options f]
   (f connectable))
 
-(m/defmethod pipeline/transduce-compiled-query-with-connection* [#_conn       IdentityConnection
-                                                                 #_query-type :default
-                                                                 #_model      :default]
+(m/defmethod pipeline/transduce-compiled-query-with-connection [#_conn       IdentityConnection
+                                                                #_query-type :default
+                                                                #_model      :default]
   [rf conn _query-type model _compiled-query]
   (transduce
    (map (fn [row]

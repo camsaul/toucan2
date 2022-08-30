@@ -10,7 +10,8 @@
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
-   [toucan2.tools.compile :as tools.compile])
+   [toucan2.tools.compile :as tools.compile]
+   [toucan2.tools.named-query :as tools.named-query])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -42,29 +43,29 @@
 (deftest ^:parallel default-build-query-test
   (is (= {:select [:*]
           :from   [[:default]]}
-         (query/build :toucan.query-type/select.* :default {:query {}})))
+         (pipeline/build :toucan.query-type/select.* :default {} {})))
   (testing "don't override existing"
     (is (= {:select [:a :b]
             :from   [[:my_table]]}
-           (query/build :toucan.query-type/select.* :default {:query {:select [:a :b], :from [[:my_table]]}}))))
+           (pipeline/build :toucan.query-type/select.* :default {} {:select [:a :b], :from [[:my_table]]}))))
   (testing "columns"
     (is (= {:select [:a :b]
             :from   [[:default]]}
-           (query/build :toucan.query-type/select.* :default {:query {}, :columns [:a :b]})))
+           (pipeline/build :toucan.query-type/select.* :default {:columns [:a :b]} {})))
     (testing "existing"
       (is (= {:select [:a]
               :from   [[:default]]}
-             (query/build :toucan.query-type/select.* :default {:query {:select [:a]}, :columns [:a :b]})))))
+             (pipeline/build :toucan.query-type/select.* :default {:columns [:a :b]} {:select [:a]})))))
   (testing "conditions"
     (is (= {:select [:*]
             :from   [[:default]]
             :where  [:= :id 1]}
-           (query/build :toucan.query-type/select.* :default {:query {}, :kv-args {:id 1}})))
+           (pipeline/build :toucan.query-type/select.* :default {:kv-args {:id 1}} {})))
     (testing "merge with existing"
       (is (= {:select [:*]
               :from   [[:default]]
               :where  [:and [:= :a :b] [:= :id 1]]}
-             (query/build :toucan.query-type/select.* :default {:query {:where [:= :a :b]}, :kv-args {:id 1}}))))))
+             (pipeline/build :toucan.query-type/select.* :default {:kv-args {:id 1}} {:where [:= :a :b]}))))))
 
 (m/defmethod query/apply-kv-arg [:default clojure.lang.IPersistentMap ::custom.limit]
   [_model honeysql-form _k limit]
@@ -74,16 +75,16 @@
   (is (= {:select [:*]
           :from   [[:default]]
           :limit  100}
-         (query/build :toucan.query-type/select.* :default {:query {}, :kv-args {::custom.limit 100}})
-         (query/build :toucan.query-type/select.* :default {:query {:limit 1}, :kv-args {::custom.limit 100}}))))
+         (pipeline/build :toucan.query-type/select.* :default {:kv-args {::custom.limit 100}} {})
+         (pipeline/build :toucan.query-type/select.* :default {:kv-args {::custom.limit 100}} {:limit 1}))))
 
 (deftest built-in-pk-condition-test
   (is (= {:select [:*], :from [[:default]], :where [:= :id 1]}
-         (query/build :toucan.query-type/select.* :default {:query {}, :kv-args {:toucan/pk 1}})))
+         (pipeline/build :toucan.query-type/select.* :default {:kv-args {:toucan/pk 1}} {})))
   (is (= {:select [:*], :from [[:default]], :where [:and
                                                     [:= :name "Cam"]
                                                     [:= :id 1]]}
-         (query/build :toucan.query-type/select.* :default {:query {:where [:= :name "Cam"]}, :kv-args {:toucan/pk 1}}))))
+         (pipeline/build :toucan.query-type/select.* :default {:kv-args {:toucan/pk 1}} {:where [:= :name "Cam"]}))))
 
 (deftest select-test
   (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]]
@@ -136,12 +137,9 @@
     (is (= [(instance/instance ::test/venues {:id 3, :name "BevMo"})]
            (select/select ::test/venues :id [:>= 3] {:select [:id :name], :order-by [[:id :asc]]})))))
 
-(m/defmethod query/do-with-resolved-query [:default ::count-query]
-  [model _queryable f]
-  (query/do-with-resolved-query model
-                                {:select [[:%count.* :count]]
-                                 :from   [(keyword (model/table-name model))]}
-                                f))
+(tools.named-query/define-named-query ::count-query
+  {:select [[:%count.* :count]]
+   :from   [(keyword (model/table-name &model))]})
 
 (deftest named-query-test
   (testing "venues"
@@ -180,12 +178,12 @@
 
 (derive ::people.no-timestamps ::people)
 
-(m/defmethod pipeline/transduce-with-model* :before [:toucan.query-type/select.* ::people.no-timestamps]
+(m/defmethod pipeline/transduce-with-model :before [:toucan.query-type/select.* ::people.no-timestamps]
   [_rf _query-type _model parsed-args]
   (update parsed-args :columns (fn [columns]
                                  (or columns [:id :name]))))
 
-(m/defmethod pipeline/transduce-with-model* [:toucan.query-type/select.instances ::people.no-timestamps]
+(m/defmethod pipeline/transduce-with-model [:toucan.query-type/select.instances ::people.no-timestamps]
   [rf query-type model parsed-args]
   (let [rf* ((map (fn [person]
                     (testing "select* :after should see Toucan 2 instances"
@@ -213,9 +211,9 @@
 (derive ::people.limit-2 ::people)
 
 ;; TODO this is probably not the way you'd want to accomplish this in real life -- I think you'd probably actually want
-;; to implement [[toucan2.query/build]] instead. But it does do a good job of letting us test that combining aux methods
-;; work like we'd expect.
-(m/defmethod pipeline/transduce-built-query* :before [:toucan.query-type/select.* ::people.limit-2 clojure.lang.IPersistentMap]
+;; to implement [[toucan2.pipeline/build]] instead. But it does do a good job of letting us test that combining aux
+;; methods work like we'd expect.
+(m/defmethod pipeline/transduce-built-query :before [:toucan.query-type/select.* ::people.limit-2 clojure.lang.IPersistentMap]
   [_rf _query-type _model built-query]
   (assoc built-query :limit 2))
 
@@ -374,11 +372,11 @@
     (let [parsed-args (query/parse-args :toucan.query-type/select.* [::test/venues nil])]
       (is (= {:modelable ::test/venues, :queryable nil}
              parsed-args))
-      (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
+      (let [query (pipeline/resolve-query :toucan.query-type/select.* ::test/venues (:queryable parsed-args))]
         (is (= nil
                query))
         (is (= {:select [:*], :from [[:venues]], :where [:= :id nil]}
-               (query/build :toucan.query-type/select.* ::test/venues (assoc parsed-args :query query))))))
+               (pipeline/build :toucan.query-type/select.* ::test/venues parsed-args query)))))
     (is (= ["SELECT * FROM venues WHERE id IS NULL"]
            (tools.compile/compile
              (select/select ::test/venues nil))))
@@ -405,17 +403,18 @@
 
 (derive ::venues.with-category ::test/venues)
 
-(m/defmethod query/build :after [#_query-type :toucan.query-type/select.*
-                                 #_model      ::venues.with-category
-                                 #_query      clojure.lang.IPersistentMap]
-  [_query-type model built-query]
+(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/select.*
+                                                #_model      ::venues.with-category
+                                                #_query      clojure.lang.IPersistentMap]
+  [rf query-type model parsed-args resolved-query]
   (let [model-ns-str    (some-> (model/namespace model) name)
         venues-category (keyword
                          (str
                           (when model-ns-str
                             (str model-ns-str \.))
-                          "category"))]
-    (assoc built-query :left-join [:category [:= venues-category :category.name]])))
+                          "category"))
+        resolved-query  (assoc resolved-query :left-join [:category [:= venues-category :category.name]])]
+    (next-method rf query-type model parsed-args resolved-query)))
 
 (deftest joined-model-test
   (is (= (instance/instance ::venues.with-category

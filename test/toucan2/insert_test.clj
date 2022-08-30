@@ -6,10 +6,11 @@
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
-   [toucan2.query :as query]
+   [toucan2.pipeline :as pipeline]
    [toucan2.select :as select]
    [toucan2.test :as test]
-   [toucan2.tools.compile :as tools.compile])
+   [toucan2.tools.compile :as tools.compile]
+   [toucan2.tools.named-query :as tools.named-query])
   (:import
    (java.time LocalDateTime)))
 
@@ -22,45 +23,45 @@
 (deftest parse-args-test
   (testing "single map row"
     (is (= {:modelable :model, :rows [{:row 1}]}
-           (query/parse-args :toucan.query-type/insert.* [:model {:row 1}]))))
+           (insert/parse-insert-args :toucan.query-type/insert.* [:model {:row 1}]))))
   (testing "multiple map rows"
     (is (= {:modelable :model, :rows [{:row 1} {:row 2}]}
-           (query/parse-args :toucan.query-type/insert.* [:model [{:row 1} {:row 2}]]))))
+           (insert/parse-insert-args :toucan.query-type/insert.* [:model [{:row 1} {:row 2}]]))))
   (testing "kv args"
     (is (= {:modelable :model, :rows [{:a 1, :b 2, :c 3}]}
-           (query/parse-args :toucan.query-type/insert.* [:model :a 1, :b 2, :c 3])))
+           (insert/parse-insert-args :toucan.query-type/insert.* [:model :a 1, :b 2, :c 3])))
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"Don't know how to interpret :toucan.query-type/insert\.\* args:"
-         (query/parse-args :toucan.query-type/insert.* [:model :a 1, :b 2, :c]))))
+         (insert/parse-insert-args :toucan.query-type/insert.* [:model :a 1, :b 2, :c]))))
   (testing "columns + vector rows"
     (is (= {:modelable :model
             :rows      [{:a 1, :b 2, :c 3} {:a 4, :b 5, :c 6}]}
-           (query/parse-args :toucan.query-type/insert.* [:model [:a :b :c] [[1 2 3] [4 5 6]]])))
+           (insert/parse-insert-args :toucan.query-type/insert.* [:model [:a :b :c] [[1 2 3] [4 5 6]]])))
     (is (= {:modelable :model
             :rows      [{:name "The Ramp", :category "bar"}
                         {:name "Louie's", :category "bar"}]}
-           (query/parse-args :toucan.query-type/insert.* [:model [:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]]))))
+           (insert/parse-insert-args :toucan.query-type/insert.* [:model [:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]]))))
   (testing "nil"
     (is (= {:modelable :model, :rows nil}
-           (query/parse-args :toucan.query-type/insert.* [:model nil]))))
+           (insert/parse-insert-args :toucan.query-type/insert.* [:model nil]))))
   (testing "empty rows"
     (is (= {:modelable :model, :rows []}
-           (query/parse-args :toucan.query-type/insert.* [:model []]))))
+           (insert/parse-insert-args :toucan.query-type/insert.* [:model []]))))
   (testing "queryable"
     (is (= {:modelable :model, :queryable ::named-rows}
-           (query/parse-args :toucan.query-type/insert.* [:model ::named-rows]))))
+           (insert/parse-insert-args :toucan.query-type/insert.* [:model ::named-rows]))))
   (testing "record type"
     (is (= {:modelable :model, :rows [(->MyRecordType 1)]}
-           (query/parse-args :toucan.query-type/insert.* [:model (->MyRecordType 1)])))))
+           (insert/parse-insert-args :toucan.query-type/insert.* [:model (->MyRecordType 1)])))))
 
 (deftest build-query-test
   (doseq [rows-fn [list vector]
           :let    [rows (rows-fn {:name "Grant & Green", :category "bar"})]]
-    (testing (pr-str (list `query/build :toucan.query-type/insert.* ::test/venues rows))
+    (testing (pr-str (list 'build :toucan.query-type/insert.* ::test/venues rows))
       (is (= {:insert-into [:venues]
               :values      [{:name "Grant & Green", :category "bar"}]}
-             (query/build :toucan.query-type/insert.* ::test/venues {:rows rows, :query {}}))))))
+             (pipeline/build :toucan.query-type/insert.* ::test/venues {:rows rows} {}))))))
 
 ;;; TODO -- a bit of a misnomer now.
 (defn- do-both-types-of-insert [f]
@@ -234,10 +235,9 @@
             (is (= 0
                    (call-count)))))))))
 
-(m/defmethod query/do-with-resolved-query [:default ::named-rows]
-  [_model _queryable f]
-  (f {:rows [{:name "Grant & Green", :category "bar"}
-             {:name "North Beach Cantina", :category "restaurant"}]}))
+(tools.named-query/define-named-query ::named-rows
+  {:rows [{:name "Grant & Green", :category "bar"}
+          {:name "North Beach Cantina", :category "restaurant"}]})
 
 (deftest named-query-test
   (doseq [insert! [#'insert/insert!

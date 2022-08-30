@@ -5,8 +5,8 @@
    [methodical.core :as m]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
+   [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
-   [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-select :as after-select]
@@ -177,11 +177,13 @@
 
 (derive ::venues.capture-updates ::venues.before-update)
 
-(m/defmethod query/build [:toucan.query-type/update.* ::venues.capture-updates :default]
-  [query-type model parsed-args]
+(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/update.*
+                                                #_model      ::venues.capture-updates
+                                                #_query      :default]
+  [rf query-type model parsed-args resolved-query]
   (when *venues-update-queries*
     (swap! *venues-update-queries* conj parsed-args))
-  (next-method query-type model parsed-args))
+  (next-method rf query-type model parsed-args resolved-query))
 
 ;;; this changes the category to `category-<id>` with the venue ID
 (derive ::venues.add-unique-category ::venues.capture-updates)
@@ -206,7 +208,6 @@
               (testing "Don't add extra :where clauses if there's just one set of changes to apply to all matching rows."
                 (is (= [{:kv-args                             {:category "bar"}
                          :changes                             {:category "dive-bar"}
-                         :query                               {}
                          ::before-update/doing-before-update? true}]
                        @*venues-update-queries*))))))))))
 
@@ -225,12 +226,10 @@
                      (call-count)))
               (is (= [{:changes                             {:updated-at (LocalDateTime/parse "2021-06-09T15:18:00")
                                                              :category   "category-1"}
-                       :query                               {}
                        :kv-args                             {:id 1}
                        ::before-update/doing-before-update? true}
                       {:changes                             {:updated-at (LocalDateTime/parse "2021-06-09T15:18:00")
                                                              :category   "category-2"}
-                       :query                               {}
                        :kv-args                             {:id 2}
                        ::before-update/doing-before-update? true}]
                      @*venues-update-queries*))

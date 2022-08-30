@@ -7,7 +7,7 @@
 
 (set! *warn-on-reflection* true)
 
-(m/defmethod pipeline/transduce-with-model* [:default ::system-properties]
+(m/defmethod pipeline/transduce-with-model [:default ::system-properties]
   [rf _query-type _model {:keys [queryable kv-args]}]
   (let [ks (into (if (keyword? queryable) [queryable] [])
                  (mapcat identity)

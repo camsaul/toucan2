@@ -1,15 +1,14 @@
 (ns toucan2.tools.identity-query-test
   (:require
    [clojure.test :refer :all]
-   [methodical.core :as m]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.pipeline :as pipeline]
-   [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-select :as after-select]
-   [toucan2.tools.identity-query :as identity-query]))
+   [toucan2.tools.identity-query :as identity-query]
+   [toucan2.tools.named-query :as tools.named-query]))
 
 (deftest query-test
   (is (= [[1 2]
@@ -25,10 +24,9 @@
           (instance/instance ::parrot {:id 2, :name "Green Friend"})]
          (select/select ::parrot parrot-query))))
 
-(m/defmethod query/do-with-resolved-query [:default ::parrot-query]
-  [_model _queryable f]
-  (f (identity-query/identity-query [{:id 1, :name "Parroty"}
-                                     {:id 2, :name "Green Friend"}])))
+(tools.named-query/define-named-query ::parrot-query
+  (identity-query/identity-query [{:id 1, :name "Parroty"}
+                                  {:id 2, :name "Green Friend"}]))
 
 (deftest named-query-test
   (is (= [(instance/instance ::parrot {:id 1, :name "Parroty"})

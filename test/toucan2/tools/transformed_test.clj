@@ -8,7 +8,6 @@
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
-   [toucan2.query :as query]
    [toucan2.save :as save]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -277,14 +276,14 @@
 (deftest transform-insert-returning-results-without-select-test
   (testing "insert-returning-instances results should be transformed if they come directly from the DB (not via select)"
     (test/with-discarded-table-changes :venues
-      (binding [pipeline/*transduce-resolved-query* (fn [rf _query-type _model {:keys [rows]} _resolved-query]
-                                                      {:pre [(seq? rows)]}
-                                                      (transduce identity rf (map (fn [row]
-                                                                                    (update row :category name))
-                                                                                  rows)))]
+      (binding [pipeline/transduce-resolved-query (fn [rf _query-type _model {:keys [rows]} _resolved-query]
+                                                    {:pre [(seq? rows)]}
+                                                    (transduce identity rf (map (fn [row]
+                                                                                  (update row :category name))
+                                                                                rows)))]
         (is (= (instance/instance ::venues.category-keyword
                                   {:name "BevLess", :category :bar})
-               (pipeline/transduce-with-model*
+               (pipeline/transduce-with-model
                 (completing conj first)
                 :toucan.query-type/insert.instances
                 ::venues.category-keyword
@@ -294,11 +293,10 @@
                (select/count ::test/venues)))))))
 
 (deftest delete!-test
-  (testing `query/build
+  (testing `pipeline/build
     (is (= {:delete-from [:venues]
             :where       [:= :category "bar"]}
-           (query/build :toucan.query-type/delete.update-count ::venues.category-keyword {:kv-args {:category :bar}
-                                                                                          :query   {}}))))
+           (pipeline/build :toucan.query-type/delete.update-count ::venues.category-keyword {:kv-args {:category :bar}} {}))))
   (testing "Delete row by PK"
     (test/with-discarded-table-changes :venues
       (is (= 1

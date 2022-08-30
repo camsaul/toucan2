@@ -9,7 +9,7 @@
 
 ;;; this is basically the same as the args for `select` and `delete` but the difference is that it has an additional
 ;;; optional arg, `:pk`, as the second arg, and one additional optional arg, the `changes` map at the end
-(s/def ::default-args
+(s/def ::args
   (s/cat
    :modelable ::query/default-args.modelable
    :pk        (s/? (complement (some-fn keyword? map?)))
@@ -21,31 +21,31 @@
    ;; here.
    :changes map?))
 
-(m/defmethod query/args-spec :toucan.query-type/update.*
-  [_query-type]
-  ::default-args)
-
-(m/defmethod query/parse-args :toucan.query-type/update.*
+(defn parse-update-args
   [query-type unparsed-args]
-  (let [parsed (next-method query-type unparsed-args)]
+  (let [parsed (query/parse-args query-type ::args unparsed-args)]
     (cond-> parsed
       (contains? parsed :pk) (-> (dissoc :pk)
                                  (update :kv-args assoc :toucan/pk (:pk parsed))))))
 
-(m/defmethod query/build [:toucan.query-type/update.* :default clojure.lang.IPersistentMap]
-  [query-type model {:keys [kv-args query changes], :as parsed-args}]
-  (when (empty? changes)
-    (throw (ex-info "Cannot build an update query with no changes."
-                    {:query-type query-type, :model model, :parsed-args parsed-args})))
-  (let [parsed-args (assoc parsed-args
-                           :kv-args (merge kv-args query)
-                           :query   {:update (query/honeysql-table-and-alias model)
-                                     :set    changes})]
-    (next-method query-type model parsed-args)))
+(m/defmethod pipeline/transduce-unparsed :toucan.query-type/update.*
+  [rf query-type unparsed-args]
+  (let [parsed-args (parse-update-args query-type unparsed-args)]
+    (pipeline/transduce-parsed-args rf query-type parsed-args)))
 
-(m/defmethod pipeline/transduce-resolved-query* [#_query-type :toucan.query-type/update.*
-                                                 #_model      :default
-                                                 #_query      :default]
+(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/update.*
+                                                #_model      :default
+                                                #_query      clojure.lang.IPersistentMap]
+  [rf query-type model {:keys [kv-args changes], :as parsed-args} query]
+  (let [parsed-args (assoc parsed-args :kv-args (merge kv-args query))
+        built-query       {:update (query/honeysql-table-and-alias model)
+                           :set    changes}]
+    ;; `:changes` are added to `parsed-args` so we can get the no-op behavior in the default method.
+    (next-method rf query-type model (assoc parsed-args :changes changes) built-query)))
+
+(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/update.*
+                                                #_model      :default
+                                                #_query      :default]
   [rf query-type model {:keys [changes], :as parsed-args} resolved-query]
   (if (empty? changes)
     (do
@@ -62,7 +62,7 @@
 (defn update!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [& unparsed-args]
-  (pipeline/transduce-unparsed :toucan.query-type/update.update-count unparsed-args))
+  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/update.update-count unparsed-args))
 
 (defn reducible-update-returning-pks
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
@@ -72,6 +72,6 @@
 (defn update-returning-pks!
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}
   [& unparsed-args]
-  (pipeline/transduce-unparsed :toucan.query-type/update.pks unparsed-args))
+  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/update.pks unparsed-args))
 
 ;;; TODO -- add `update-returning-instances!`, similar to [[toucan2.update/insert-returning-instances!]]

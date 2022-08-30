@@ -6,9 +6,9 @@
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.pipeline :as pipeline]
-   [toucan2.query :as query]
    [toucan2.realize :as realize]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.tools.named-query :as tools.named-query])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -85,9 +85,8 @@
       (is (= expected
              (execute/query ::test/db {:select [:id :created_at], :from [:venues], :order-by [[:id :asc]]}))))))
 
-(m/defmethod query/do-with-resolved-query [:default ::named-query]
-  [_model _query f]
-  (f ["SELECT count(*) AS \"count\" FROM people;"]))
+(tools.named-query/define-named-query ::named-query
+  ["SELECT count(*) AS \"count\" FROM people;"])
 
 (deftest query-test-2
   (is (= [{:count 4}]
@@ -101,7 +100,9 @@
             {:id 2, :name "Sam", :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")}
             {:id 3, :name "Pam", :created-at (OffsetDateTime/parse "2020-01-01T21:56Z")}
             {:id 4, :name "Tam", :created-at (OffsetDateTime/parse "2020-05-25T19:56Z")}]
-           (execute/query ::test/db {:select [:*], :from [:people]}))))
+           (execute/query ::test/db {:select [:*], :from [:people]})))))
+
+(deftest execute-named-query-test
   (testing "named query"
     (is (= [{:count 4}]
            (execute/query ::test/db ::named-query)))))
@@ -136,7 +137,7 @@
 ;;; as HoneySQL. There is currently no way to define custom compilation behavior on the basis of the connectable. Not
 ;;; sure how this would actually work tho without realizing the connection *first*; that causes its own problems because
 ;;; it breaks [[toucan2.tools.identity-execute/identity-query]]
-(m/defmethod pipeline/transduce-compiled-query-with-connection* [#_connection ::connectable.not-even-jdbc
+(m/defmethod pipeline/transduce-compiled-query-with-connection [#_connection ::connectable.not-even-jdbc
                                                                  #_query-type :default
                                                                  #_model      :default]
   [rf _conn _query-type _model [{k :key}, :as _compiled-query]]
@@ -146,16 +147,16 @@
   (is (= [{:a 1} {:a 2} {:a 3}]
          (execute/query ::connectable.not-even-jdbc [{:key :a}]))))
 
-(m/defmethod pipeline/transduce-with-model* [:default ::model.not-even-jdbc]
+(m/defmethod pipeline/transduce-with-model [:default ::model.not-even-jdbc]
   [rf query-type model {:keys [queryable], :as _parsed-args}]
   (pipeline/transduce-compiled-query rf query-type model queryable))
 
 ;;; here's how you can have custom compilation behavior. At this point in time it requires specifying a model as well
 ;;; since connection isn't realized until after the query compilation stage.
 
-(m/defmethod pipeline/transduce-compiled-query-with-connection* [#_connection ::connectable.not-even-jdbc
-                                                                 #_query-type :default
-                                                                 #_model      ::model.not-even-jdbc]
+(m/defmethod pipeline/transduce-compiled-query-with-connection [#_connection ::connectable.not-even-jdbc
+                                                                #_query-type :default
+                                                                #_model      ::model.not-even-jdbc]
   [rf _conn _query-type _model {k :key, :as _compiled-query}]
   (reduce rf (rf) [{k 4} {k 5} {k 6}]))
 

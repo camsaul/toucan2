@@ -4,10 +4,11 @@
    [methodical.core :as m]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
-   [toucan2.query :as query]
+   [toucan2.pipeline :as pipeline]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
+   [toucan2.tools.named-query :as tools.named-query]
    [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
@@ -18,19 +19,19 @@
 
 (deftest parse-update-args-test
   (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
-         (query/parse-args :toucan.query-type/update.* [:model 1 {:a 1}])))
+         (update/parse-update-args :toucan.query-type/update.* [:model 1 {:a 1}])))
   (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk nil}, :queryable {}}
-         (query/parse-args :toucan.query-type/update.* [:model nil {:a 1}])))
+         (update/parse-update-args :toucan.query-type/update.* [:model nil {:a 1}])))
   (is (= {:modelable :model, :kv-args {:id 1}, :changes {:a 1}, :queryable {}}
-         (query/parse-args :toucan.query-type/update.* [:model :id 1 {:a 1}])))
+         (update/parse-update-args :toucan.query-type/update.* [:model :id 1 {:a 1}])))
   (testing "composite PK"
     (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk [1 2]}, :queryable {}}
-           (query/parse-args :toucan.query-type/update.* [:model [1 2] {:a 1}]))))
+           (update/parse-update-args :toucan.query-type/update.* [:model [1 2] {:a 1}]))))
   (testing "key-value conditions"
     (is (= {:modelable :model, :kv-args {:name "Cam", :toucan/pk 1}, :changes {:a 1}, :queryable {}}
-           (query/parse-args :toucan.query-type/update.* [:model 1 :name "Cam" {:a 1}]))))
+           (update/parse-update-args :toucan.query-type/update.* [:model 1 :name "Cam" {:a 1}]))))
   (is (= {:modelable :model, :changes {:name "Hi-Dive"}, :queryable {:id 1}}
-         (query/parse-args :toucan.query-type/update.* [:model {:id 1} {:name "Hi-Dive"}]))))
+         (update/parse-update-args :toucan.query-type/update.* [:model {:id 1} {:name "Hi-Dive"}]))))
 
 (deftest build-test
   (is (= {:update [:venues]
@@ -38,11 +39,11 @@
           :where  [:and
                    [:= :name "Tempest"]
                    [:= :id 1]]}
-         (query/build :toucan.query-type/update.*
-                      ::test/venues
-                      {:changes {:name "Hi-Dive"}
-                       :query   {:id 1}
-                       :kv-args {:name "Tempest"}}))))
+         (pipeline/build :toucan.query-type/update.*
+                         ::test/venues
+                         {:changes {:name "Hi-Dive"}
+                          :kv-args {:name "Tempest"}}
+                         {:id 1}))))
 
 (deftest pk-and-map-conditions-test
   (test/with-discarded-table-changes :venues
@@ -78,9 +79,8 @@
              (update/update! ::test/venues 1 {})
              (update/update! ::test/venues {}))))))
 
-(m/defmethod query/do-with-resolved-query [:default ::named-conditions]
-  [model _queryable f]
-  (query/do-with-resolved-query model {:id 1} f))
+(tools.named-query/define-named-query ::named-conditions
+  {:id 1})
 
 (deftest named-conditions-test
   (test/with-discarded-table-changes :venues
@@ -102,19 +102,19 @@
 
 (deftest update-nil-test
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
-    (let [parsed-args (query/parse-args :toucan.query-type/update.* [::test/venues nil {:name "Taco Bell"}])]
+    (let [parsed-args (update/parse-update-args :toucan.query-type/update.* [::test/venues nil {:name "Taco Bell"}])]
       (is (= {:modelable ::test/venues
               :kv-args   {:toucan/pk nil}
               :changes   {:name "Taco Bell"}
               :queryable {}}
              parsed-args))
-      (query/with-resolved-query [query [::test/venues (:queryable parsed-args)]]
+      (let [query (pipeline/resolve-query :toucan.query-type/update.* ::test/venues (:queryable parsed-args))]
         (is (= {}
                query))
         (is (= {:update    [:venues]
                 :set       {:name "Taco Bell"}
                 :where     [:= :id nil]}
-               (query/build :toucan.query-type/update.* ::test/venues (assoc parsed-args :query query))))))
+               (pipeline/build :toucan.query-type/update.* ::test/venues parsed-args query)))))
     (is (= ["UPDATE venues SET name = ? WHERE id IS NULL" "Taco Bell"]
            (tools.compile/compile
              (update/update! ::test/venues nil {:name "Taco Bell"}))))

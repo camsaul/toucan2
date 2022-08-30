@@ -217,7 +217,7 @@
                  (f row))))))
     identity))
 
-(m/defmethod pipeline/transduce-with-model* [#_query-type :toucan.result-type/instances
+(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.result-type/instances
                                              #_model      ::transformed.model]
   [rf query-type model parsed-args]
   ;; don't try to transform stuff when we're doing SELECT directly with PKs (e.g. to fake INSERT returning instances),
@@ -238,10 +238,9 @@
                     (xform v)
                     v))])))
 
-(m/defmethod query/build :before [#_query-type :toucan.query-type/update.*
-                                  #_model      ::transformed.model
-                                  #_query      :default]
-  [_query-type model {:keys [changes], :as parsed-args}]
+(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/update.*
+                                                    #_model      ::transformed.model]
+  [_rf _query-type model {:keys [changes], :as parsed-args}]
   (b/cond
     (not (map? changes))
     parsed-args
@@ -270,7 +269,7 @@
         row-xform  (apply comp row-xforms)]
     (map row-xform rows)))
 
-(m/defmethod pipeline/transduce-with-model* :before [#_query-type :toucan.query-type/insert.*
+(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/insert.*
                                                      #_model      ::transformed.model]
   [_rf query-type model parsed-args]
   (assert (isa? model ::transformed.model))
@@ -295,8 +294,8 @@
 
 ;;;; after insert
 
-(m/defmethod pipeline/transduce-with-model* [#_query-type :toucan.query-type/insert.pks
-                                             #_model      ::transformed.model]
+(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.query-type/insert.pks
+                                            #_model      ::transformed.model]
   [rf query-type model parsed-args]
   (let [pk-keys (model/primary-keys model)
         rf*     ((comp

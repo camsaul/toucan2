@@ -63,9 +63,9 @@
                          row)))))]
     ((map row-fn) rf)))
 
-(m/defmethod pipeline/transduce-compiled-query* [#_query-type     ::query-type
-                                                 #_model          ::model
-                                                 #_compiled-query :default]
+(m/defmethod pipeline/transduce-compiled-query [#_query-type     ::query-type
+                                                #_model          ::model
+                                                #_compiled-query :default]
   [rf query-type model sql-args]
   (let [upgraded-type (pipeline/similar-query-type-returning query-type :toucan.result-type/instances)
         _             (assert upgraded-type (format "Don't know how to upgrade a %s query to one returning instances"

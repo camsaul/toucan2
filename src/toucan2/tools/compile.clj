@@ -15,16 +15,16 @@
   ```"
   {:style/indent 0}
   [& body]
-  `(binding [pipeline/*transduce-compiled-query* (fn [rf# query-type# model# compiled-query#]
-                                                   compiled-query#)]
+  `(binding [pipeline/transduce-compiled-query (fn [rf# query-type# model# compiled-query#]
+                                                 compiled-query#)]
      ~@body))
 
 (defmacro build
   "Return the built query before compilation that would have been executed by `body` without compiling or executing it."
   {:style/indent 0}
   [& body]
-  `(binding [pipeline/*transduce-built-query* (fn [rf# query-type# model# built-query#]
-                                                built-query#)]
+  `(binding [pipeline/transduce-built-query (fn [rf# query-type# model# built-query#]
+                                              built-query#)]
      ~@body))
 
 (defmacro resolved
@@ -32,8 +32,8 @@
   args passed to [[toucan2.select/select]] created by `body` without building a query, compiling it, or executing it."
   {:style/indent 0}
   [& body]
-  `(binding [pipeline/*transduce-resolved-query* (fn [rf# query-type# model# parsed-args# resolved-query#]
-                                                   {:parsed-args parsed-args#, :resolved-query resolved-query#})]
+  `(binding [pipeline/transduce-resolved-query (fn [rf# query-type# model# parsed-args# resolved-query#]
+                                                 {:parsed-args parsed-args#, :resolved-query resolved-query#})]
      ~@body))
 
 ;; (defmacro parsed-args
