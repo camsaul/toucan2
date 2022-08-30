@@ -263,3 +263,31 @@
                                                          :created-at (LocalDateTime/parse "2017-01-01T00:00")
                                                          :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
                (insert! ::test/venues ::named-rows)))))))
+
+(derive ::venues.namespaced ::test/venues)
+
+(m/defmethod model/model->namespace ::venues.namespaced
+  [_model]
+  {::test/venues :venue})
+
+(deftest namespaced-test
+  (doseq [insert! [#'insert/insert!
+                   #'insert/insert-returning-pks!
+                   #'insert/insert-returning-instances!]]
+    (test/with-discarded-table-changes :venues
+      (testing insert!
+        (is (= (condp = insert!
+                 #'insert/insert!                     1
+                 #'insert/insert-returning-pks!       [4]
+                 #'insert/insert-returning-instances! [(instance/instance
+                                                        ::venues.namespaced
+                                                        {:venue/name     "Grant & Green"
+                                                         :venue/category "bar"})])
+               (insert! [::venues.namespaced :venue/name :venue/category]
+                        {:venue/name "Grant & Green", :venue/category "bar"})))
+        (is (= (instance/instance
+                ::test/venues
+                {:id       4
+                 :name     "Grant & Green"
+                 :category "bar"})
+               (select/select-one [::test/venues :id :name :category] :id 4)))))))

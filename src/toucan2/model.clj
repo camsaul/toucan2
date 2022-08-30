@@ -97,10 +97,6 @@
                       {:model model, :result pk-or-pks})))
     pks))
 
-(m/defmethod primary-keys :default
-  [_model]
-  [:id])
-
 ;;; TODO -- rename to `primary-key-values-map`
 (defn primary-key-values
   "Return a map of primary key values for a Toucan 2 `instance`."
@@ -147,3 +143,9 @@
      (when (isa? model a-model)
        a-namespace))
    (model->namespace model)))
+
+(m/defmethod primary-keys :default
+  [model]
+  (if-let [model-namespace (namespace model)]
+    [(keyword (name model-namespace) "id")]
+    [:id]))
