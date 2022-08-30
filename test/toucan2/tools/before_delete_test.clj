@@ -2,13 +2,12 @@
   (:require
    [clojure.test :refer :all]
    [toucan2.delete :as delete]
+   [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.before-delete :as before-delete]
-   [toucan2.update :as update]
-   [toucan2.pipeline :as pipeline]
-   [toucan2.execute :as execute])
+   [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
 
