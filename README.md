@@ -24,14 +24,12 @@ Toucan 2 uses [Honey SQL 2](https://github.com/seancorfield/honeysql),
 [Methodical](https://github.com/camsaul/methodical) under the hood. Everything is super efficient and reducible under
 the hood (even inserts, updates, and deletes!) and magical (in a good way).
 
-After working on this off and on for several years I decided that the library was overly complicated (at nearly 8000
-lines of code) and decided to start over and re-implement things in a ~simpler fashion~ (EDIT: back up to 7000 LoC,
-but it's easier to use this time). The library is mostly usable now but I have a big pile of things to do before the
+The library is mostly usable now but I have a big pile of things to do before the
 official announcement -- [take a look at the Trello board](https://trello.com/b/DFx8rVa8/toucan-2-todo) -- when things
 get a little further along I'll move things over to GitHub issues. I will update this README when I publish the first
 alpha release.
 
-In the mean time, browse the [Documentation](docs/), which are a work in progress.
+If you want to look at the code please take a look at the [`mega-pipeline-overhaul` branch](https://github.com/camsaul/toucan2/tree/mega-pipeline-overhaul) which is a work-in-progress overhaul of the way the query execution pipeline works that vastly simplifies things. It should be merged into `master` in a few days once I work the kinks out. You can also browse the [Documentation](https://cljdoc.org/d/io.github.camsaul/toucan2/0.10.1.1-alpha/doc/readme), which is a work in progress.
 
 # `toucan2-toucan1`
 
