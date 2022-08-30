@@ -11,7 +11,7 @@
                           #_query      clojure.lang.IPersistentMap]
   [query-type model parsed-args]
   (let [parsed-args (update parsed-args :query (fn [query]
-                                                 (merge {:delete-from [(keyword (model/table-name model))]}
+                                                 (merge {:delete-from (query/honeysql-table-and-alias model)}
                                                         query)))]
     (next-method query-type model parsed-args)))
 
