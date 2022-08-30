@@ -14,8 +14,6 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (derive ::venues ::test/venues)
 
 (derive ::venues.category-keyword ::venues)

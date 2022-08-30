@@ -63,3 +63,22 @@
 
 ;;; [[model/default-connectable]] gets tested basically everywhere, because we define it for the models in
 ;;; [[toucan2.test]] and use it in almost every test namespace
+
+(m/defmethod model/model->namespace ::venues
+  [_model]
+  {::test/venues     :venue
+   ::test/categories :category})
+
+(deftest model->namespace-test
+  (are [model expected] (= expected
+                           (model/model->namespace model))
+    ::venues {::test/venues :venue, ::test/categories :category}
+    :venues  nil
+    nil      nil))
+
+(deftest table-name->namespace-test
+  (are [model expected] (= expected
+                           (model/table-name->namespace model))
+    ::venues {"venues" :venue, "category" :category}
+    :venues  nil
+    nil      nil))

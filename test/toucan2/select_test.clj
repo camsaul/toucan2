@@ -423,3 +423,43 @@
          (select/select-one ::venues.with-category
                             {:left-join [[:category :c] [:= :venues.category :c.name]]
                              :order-by  [[:id :asc]]}))))
+
+(derive ::venues.namespaced ::test/venues)
+
+(m/defmethod model/model->namespace ::venues.namespaced
+  [_model]
+  {::venues.namespaced :venue})
+
+(deftest namespaced-test
+  (is (= {"venues" :venue}
+         (model/table-name->namespace ::venues.namespaced)))
+  (testing "When selecting a model with a namespace, keys should come back in that namespace."
+    (is (= (instance/instance ::venues.namespaced
+                              {:venue/id         1
+                               :venue/name       "Tempest"
+                               :venue/category   "bar"
+                               :venue/created-at (LocalDateTime/parse "2017-01-01T00:00")
+                               :venue/updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+           (select/select-one ::venues.namespaced {:order-by [[:id :asc]]})))))
+
+(doto ::venues.namespaced.with-category
+  (derive ::venues.namespaced)
+  (derive ::venues.with-category))
+
+(m/defmethod model/model->namespace ::venues.namespaced.with-category
+  [_model]
+  {::test/venues     :venue
+   ::test/categories :category})
+
+(deftest namespaced-with-joins-test
+  (is (= (toucan2.instance/instance
+          ::venues.namespaced.with-category
+          {:venue/id                 1
+           :venue/name               "Tempest"
+           :venue/category           "bar"
+           :venue/created-at         (LocalDateTime/parse "2017-01-01T00:00")
+           :venue/updated-at         (LocalDateTime/parse "2017-01-01T00:00")
+           :category/name            "bar"
+           :category/slug            "bar_01"
+           :category/parent-category nil})
+         (select/select-one ::venues.namespaced.with-category {:order-by [[:id :asc]]}))))

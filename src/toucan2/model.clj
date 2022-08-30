@@ -78,7 +78,7 @@
   If an implementation returns a single keyword, the default `:around` method will automatically wrap it in a vector. It
   also validates that the ultimate result is a sequence of keywords, so it is safe to assume that calls to this will
   always return a sequence of keywords."
-  {:arglists '([model])}
+  {:arglists '([model₁])}
   u/dispatch-on-first-arg)
 
 ;;; if the PK comes back unwrapped, wrap it.
@@ -121,3 +121,21 @@
       (if (= (count pk-keys) 1)
         (first pk-keys)
         (apply juxt pk-keys)))))
+
+(m/defmulti model->namespace
+  {:arglists '([model₁])}
+  u/dispatch-on-first-arg)
+
+(m/defmethod model->namespace :default
+  [_model]
+  nil)
+
+(defn table-name->namespace [model]
+  (not-empty
+   (into {}
+         (comp (filter (fn [[model _a-namespace]]
+                         (not= (m/effective-primary-method table-name model)
+                               (m/default-effective-method table-name))))
+               (map (fn [[model a-namespace]]
+                      [(table-name model) a-namespace])))
+         (model->namespace model))))

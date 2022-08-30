@@ -10,7 +10,6 @@
 
 (use-fixtures
   :each
-  test/do-db-types-fixture
   (fn [thunk]
     (is (= 6
            (select/count ::test/birds)))
