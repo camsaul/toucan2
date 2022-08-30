@@ -12,7 +12,7 @@
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile])
   (:import
-   (java.time OffsetDateTime)))
+   (java.time LocalDateTime OffsetDateTime)))
 
 (set! *warn-on-reflection* true)
 
@@ -388,3 +388,17 @@
            (select/select-one ::test/venues nil)
            (select/select-one-fn :id ::test/venues nil)
            (select/select-one-fn int ::test/venues nil)))))
+
+(deftest select-join-test
+  (testing "Extra columns from joined tables should come back"
+    (is (= (instance/instance ::test/venues
+                              {:id              1
+                               :name            "bar"
+                               :category        "bar"
+                               :created-at      (LocalDateTime/parse "2017-01-01T00:00")
+                               :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
+                               :slug            "bar_01"
+                               :parent-category nil})
+           (select/select-one ::test/venues
+                              {:left-join [[:category :c] [:= :venues.category :c.name]]
+                               :order-by  [[:id :asc]]})))))
