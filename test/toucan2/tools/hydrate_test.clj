@@ -425,3 +425,47 @@
       (testing "don't hydrate nil keys"
         (is (= {:good-bird? nil}
                no-bird))))))
+
+(deftest unnest-model-test
+  (are [coll expected] (= expected
+                          (#'hydrate/unnest-model coll))
+    nil        nil
+    :a         nil
+    []         nil
+    [:a]       :a
+    [[:a]]     :a
+    [[[:a]]]   :a
+    [[[[:a]]]] :a))
+
+(m/defmethod hydrate/simple-hydrate [:default ::any.y]
+  [_model k m]
+  (assoc m k 500))
+
+(deftest nested-hydrate-sequence-test
+  (testing "Should be able to do nested hydration for sequences"
+    (is (= {:m [(instance/instance ::m.hydrate-sequence {:a 1, ::any.y 500})
+                (instance/instance ::m.hydrate-sequence {:a 2, ::any.y 500})]}
+           (hydrate/hydrate
+            {:m [(instance/instance ::m.hydrate-sequence {:a 1})
+                 (instance/instance ::m.hydrate-sequence {:a 2})]}
+            [:m ::any.y])))))
+
+(m/defmethod hydrate/simple-hydrate [::m.hydrate-sequence ::model.x]
+  [_model k m]
+  (assoc m k 1000))
+
+(deftest hydrate-sequence-dispatch-on-model-test
+  (testing "We should dispatch on the model of the first instance when hydrating a sequence"
+    (is (= [(instance/instance ::m.hydrate-sequence {:a 1, ::model.x 1000})
+            (instance/instance ::m.hydrate-sequence {:a 2, ::model.x 1000})]
+           (hydrate/hydrate
+            [(instance/instance ::m.hydrate-sequence {:a 1})
+             (instance/instance ::m.hydrate-sequence {:a 2})]
+            ::model.x)))
+    (testing "Should work when doing recursive hydration"
+      (is (= {:m [(instance/instance ::m.hydrate-sequence {:a 1, ::model.x 1000})
+                  (instance/instance ::m.hydrate-sequence {:a 2, ::model.x 1000})]}
+             (hydrate/hydrate
+              {:m [(instance/instance ::m.hydrate-sequence {:a 1})
+                   (instance/instance ::m.hydrate-sequence {:a 2})]}
+              [:m ::model.x]))))))

@@ -121,7 +121,7 @@
 
   Normally you should never need to call this yourself. The only reason you would implement it is if you are
   implementing a custom hydration strategy."
-  {:arglists '([model strategy k])}
+  {:arglists '([model₁ strategy₂ k₃])}
   u/dispatch-on-first-three-args)
 
 (m/defmulti hydrate-with-strategy
@@ -129,7 +129,7 @@
 
   Normally you should not call this yourself. The only reason you would implement this method is if you are implementing
   a custom hydration strategy."
-  {:arglists '([model strategy k instances])}
+  {:arglists '([model strategy₁ k instances])}
   (fn [_model strategy _k _instances]
     strategy))
 
@@ -179,7 +179,7 @@
 
   You probably don't want to write an implementation for `[<some-model> :default]` or `[:default :default]`, unless you
   want every key that we attempt to hydrate to be hydrated by that method."
-  {:arglists '([original-model k])}
+  {:arglists '([original-model₁ k₂])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod model-for-automagic-hydration :default
@@ -230,7 +230,7 @@
     [_original-model _dest-key _hydrated-model]
     [:creator-id])
   ```"
-  {:arglists '([original-model dest-key hydrated-model])}
+  {:arglists '([original-model₁ dest-key₂ hydrated-model₃])}
   u/dispatch-on-first-three-args)
 
 (m/defmethod fk-keys-for-automagic-hydration :default
@@ -339,7 +339,7 @@
   than doing one call per row. If you just want to hydrate each row independently, implement [[simple-hydrate]] instead.
   If you are hydrating entire instances of some other model, consider setting up automagic batched hydration
   using [[model-for-automagic-hydration]] and possibly [[fk-keys-for-automagic-hydration]]."
-  {:arglists '([model k instances])}
+  {:arglists '([model₁ k₂ instances])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod can-hydrate-with-strategy? [:default ::multimethod-batched :default]
@@ -357,7 +357,7 @@
 ;;; TODO -- better dox
 (m/defmulti simple-hydrate
   "Implementations should return a version of map `row` with the key `k` added."
-  {:arglists '([model k row])}
+  {:arglists '([model₁ k₂ row])}
   u/dispatch-on-first-two-args)
 
 (m/defmethod can-hydrate-with-strategy? [:default ::multimethod-simple :default]
@@ -379,7 +379,7 @@
 (defn- strategies []
   (keys (m/primary-methods hydrate-with-strategy)))
 
-(defn- hydration-strategy
+(defn ^:no-doc hydration-strategy
   "Determine the appropriate hydration strategy to hydrate the key `k` in instances of `model`."
   [model k]
   (some
@@ -438,23 +438,38 @@
   "Hydrate a single hydration form."
   [model results k]
   (when (seq results)
-    (if (sequential? (first results))
+    (cond
+      (sequential? (first results))
       (hydrate-sequence-of-sequences model results k)
-      (cond
-        (keyword? k)
-        (hydrate-key model results k)
 
-        (sequential? k)
-        (hydrate-key-seq results k)
+      (keyword? k)
+      (hydrate-key model results k)
 
-        :else
-        (throw (ex-info (format "Invalid hydration form: %s. Expected keyword or sequence." k)
-                        {:invalid-form k}))))))
+      (sequential? k)
+      (hydrate-key-seq results k)
+
+      :else
+      (throw (ex-info (format "Invalid hydration form: %s. Expected keyword or sequence." k)
+                      {:invalid-form k})))))
 
 (defn- hydrate-forms
-  "Hydrate many hydration forms across a *sequence* of `results` by recursively calling `hydrate-one-form`."
+  "Hydrate many hydration forms across a *sequence* of `results` by recursively calling [[hydrate-one-form]]."
   [model results & forms]
   (reduce (partial hydrate-one-form model) results forms))
+
+(defn- unnest-model
+  "Given an arbitrarily nested sequence `coll`, continue unnesting the sequence until we get a non-sequential first item.
+
+  ```clj
+  (unnest-model [:a :b])  => :a
+  (unnest-model [[:a]])   => :a
+  (unnest-model [[[:a]]]) => :a
+  ```"
+  [coll]
+  (->> (iterate first coll)
+       (take-while sequential?)
+       last
+       first))
 
 
 ;;;                                                 Public Interface
@@ -476,9 +491,10 @@
           (empty? instance-or-instances))
      instance-or-instances
 
+     ;; sequence of instances
      (sequential? instance-or-instances)
-     (let [first-row (first instance-or-instances)]
-       (apply hydrate-forms (protocols/model first-row) instance-or-instances ks))
+     (let [model (protocols/model (unnest-model instance-or-instances))]
+       (apply hydrate-forms model instance-or-instances ks))
 
      ;; not sequential
      :else
