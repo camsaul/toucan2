@@ -33,19 +33,11 @@
   (let [parsed-args (parse-update-args query-type unparsed-args)]
     (pipeline/transduce-parsed-args rf query-type parsed-args)))
 
-(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/update.*
-                                                #_model      :default
-                                                #_query      clojure.lang.IPersistentMap]
-  [rf query-type model {:keys [kv-args changes], :as parsed-args} query]
-  (let [parsed-args (assoc parsed-args :kv-args (merge kv-args query))
-        built-query       {:update (query/honeysql-table-and-alias model)
-                           :set    changes}]
-    ;; `:changes` are added to `parsed-args` so we can get the no-op behavior in the default method.
-    (next-method rf query-type model (assoc parsed-args :changes changes) built-query)))
+;;;; Code for building Honey SQL for UPDATE lives in [[toucan2.map-backend.honeysql2]]
 
-(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/update.*
-                                                #_model      :default
-                                                #_query      :default]
+(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/update.*
+                                       #_model      :default
+                                       #_query      :default]
   [rf query-type model {:keys [changes], :as parsed-args} resolved-query]
   (if (empty? changes)
     (do

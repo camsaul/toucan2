@@ -1,35 +1,8 @@
 (ns toucan2.query
-  "Query compilation pipeline is something like this:
-
-  ```
-  Call something like [[toucan2.select/select]] with `modelable` and `unparsed-args`
-  ↓
-  `modelable` is resolved to `model` with [[toucan2.model/with-model]]
-  ↓
-  [[parse-args]] is used to parse args into a `parsed-args` map
-  ↓
-  The `:queryable` key in parsed args is resolved
-  ↓
-  [[build]] takes the resolved query and combines the other parsed args into it to build a compilable query. The default
-  backend builds a Honey SQL 2 query map
-  ↓
-  some sort of reducible is returned.
-
-  <reducing the reducible>
-  ↓
-  [[toucan2.compile/with-compiled-query]] compiles the built query (e.g. Honey SQL 2) into something that can be
-  executed natively (e.g. a `sql-args` vector)
-  ↓
-  [[toucan2.connection/with-connection]] is used to get a connection from the current connectable, or the default
-  connectable for `model`, or the global default connectable
-  ↓
-  Compiled query is executed with connection
-  ```"
   (:require
-   [better-cond.core :as b]
    [clojure.spec.alpha :as s]
-   [honey.sql.helpers :as hsql.helpers]
    [methodical.core :as m]
+   [toucan2.map-backend :as map]
    [toucan2.model :as model]
    [toucan2.util :as u]))
 
@@ -38,7 +11,7 @@
 (s/def ::default-args.modelable
   (s/or
    :modelable         (complement sequential?)
-   :modelable-columns (s/cat :modelable some? ; can't have a nil model.
+   :modelable-columns (s/cat :modelable some? ; can't have a nil model. Or can you?
                              :columns   (s/* keyword?))))
 
 ;;; TODO -- can we use [[s/every-kv]] for this stuff?
@@ -93,8 +66,8 @@
      with [[toucan2.model/with-model]].
 
   * `:queryable` -- something that can be resolved to a query, for example a map or integer or 'named query' keyword.
-    The resolved query is ultimately combined with other parsed args and built into something like a Honey SQL map
-    with [[build]], then compiled with [[toucan2.compile/with-compiled-query]].
+    The resolved query is ultimately combined with other parsed args and built into something like a Honey SQL map, then
+    compiled to something like SQL.
 
   * `:kv-args` -- map of key-value pairs. When [[build]] builds a query, it calls [[apply-kv-arg]] for each of the
     key-value pairs. The default behavior is to append a Honey SQL `:where` clause based on the pair; but you can
@@ -125,32 +98,19 @@
            validate-parsed-args))))))
 
 
-;;;; Default [[pipeline/transduce-resolved-query]] impl for maps; applying key-value args.
+;;;; Part of the default [[pipeline/transduce-build]] for maps: applying key-value args
 
 (m/defmulti apply-kv-arg
   {:arglists '([model₁ query₂ k₃ v])}
   u/dispatch-on-first-three-args)
 
-(defn- fn-condition->honeysql-where-clause
-  [k [f & args]]
-  {:pre [(keyword? f) (seq args)]}
-  (into [f k] args))
+;;; not 100% sure we need this method since the query should already have `:type` metadata, but it's nice to have it
+;;; anyway so we can play around with this stuff from the REPL
+(m/defmethod apply-kv-arg [#_model :default #_query clojure.lang.IPersistentMap #_k :default]
+  [model query k v]
+  (apply-kv-arg model (vary-meta query assoc :type (map/backend)) k v))
 
-(defn condition->honeysql-where-clause
-  "Something sequential like `:id [:> 5]` becomes `[:> :id 5]`. Other stuff like `:id 5` just becomes `[:= :id 5]`."
-  [k v]
-  ;; don't think there's any situtation where `nil` on the LHS is on purpose and not a bug.
-  {:pre [(some? k)]}
-  (if (sequential? v)
-    (fn-condition->honeysql-where-clause k v)
-    [:= k v]))
-
-(m/defmethod apply-kv-arg [:default clojure.lang.IPersistentMap :default]
-  [_model honeysql k v]
-  (u/with-debug-result ["apply kv-arg %s %s" k v]
-    (update honeysql :where (fn [existing-where]
-                              (:where (hsql.helpers/where existing-where
-                                                          (condition->honeysql-where-clause k v)))))))
+;;;; See [[toucan2.map-backend.honeysql2]] for the Honey SQL-specific impl for this.
 
 (comment
   ;; with a composite PK like
@@ -193,23 +153,25 @@
     (toucan-pk-fn-values pk-columns (first tuple) (rest tuple))
     (toucan-pk-composite-values* pk-columns tuple)))
 
-(defn- apply-non-composite-toucan-pk [model honeysql pk-column v]
+(defn- apply-non-composite-toucan-pk [model m pk-column v]
   ;; unwrap the value if we got something like `:toucan/pk [1]`
   (let [v (if (and (sequential? v)
                    (not (keyword? (first v)))
                    (= (count v) 1))
             (first v)
             v)]
-    (apply-kv-arg model honeysql pk-column v)))
+    (apply-kv-arg model m pk-column v)))
 
-(defn- apply-composite-toucan-pk [model honeysql pk-columns v]
+(defn- apply-composite-toucan-pk [model m pk-columns v]
   (reduce
-   (fn [honeysql {:keys [col v]}]
-     (apply-kv-arg model honeysql col v))
-   honeysql
+   (fn [m {:keys [col v]}]
+     (apply-kv-arg model m col v))
+   m
    (toucan-pk-composite-values pk-columns v)))
 
-(m/defmethod apply-kv-arg [:default clojure.lang.IPersistentMap :toucan/pk]
+;;; `:around` so we can intercept the normal handler. This "unpacks" the PK and ultimately uses the normal calls to
+;;; [[apply-kv-arg]]
+(m/defmethod apply-kv-arg :around [#_model :default #_query :default #_k :toucan/pk]
   [model honeysql _k v]
   ;; `fn-name` here would be if you passed something like `:toucan/pk [:in 1 2]` -- the fn name would be `:in` -- and we
   ;; pass that to [[condition->honeysql-where-clause]]
@@ -225,23 +187,3 @@
      (apply-kv-arg model query k v))
    query
    kv-args))
-
-(defn honeysql-table-and-alias
-  "Build an Honey SQL `[table]` or `[table alias]` (if the model has a [[toucan2.model/namespace]] form) for `model` for
-  use in something like a `:select` clause."
-  [model]
-  (b/cond
-    :let [table-id (keyword (model/table-name model))
-          alias-id (model/namespace model)
-          alias-id (when alias-id
-                     (keyword alias-id))]
-    alias-id
-    [table-id alias-id]
-
-    :else
-    [table-id]))
-
-;; (defn- format-identifier [_ parts]
-;;   [(str/join \. (map hsql/format-entity parts))])
-
-;; (hsql/register-fn! ::identifier #'format-identifier)

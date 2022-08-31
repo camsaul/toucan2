@@ -13,8 +13,8 @@
    [toucan.test-models.phone-number :refer [PhoneNumber]]
    [toucan.test-models.user :refer [User]]
    [toucan.test-models.venue :refer [Venue]]
-   [toucan2.compile :as compile]
    [toucan2.connection :as conn]
+   [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
    [toucan2.test :as test]))
 
@@ -32,13 +32,13 @@
  (update (hsql/get-dialect :ansi) :quote quote-for-current-db-type))
 
 (defn do-with-default-quoting-style [thunk]
-  (let [original-options @compile/global-honeysql-options]
+  (let [original-options @map.honeysql/global-options]
     (try
       (t1.db/set-default-quoting-style! ::quote-for-current-db-type)
       (testing (format "With default quoting style = %s\n" ::quote-for-current-db-type)
         (thunk))
       (finally
-        (reset! compile/global-honeysql-options original-options)))))
+        (reset! map.honeysql/global-options original-options)))))
 
 (defn- reset-db! [db-type]
   (doseq [model [Address

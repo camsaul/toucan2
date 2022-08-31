@@ -4,7 +4,6 @@
   (:refer-clojure :exclude [compile count instance?])
   (:require
    [potemkin :as p]
-   [toucan2.compile]
    [toucan2.connection]
    [toucan2.delete]
    [toucan2.execute]
@@ -30,7 +29,6 @@
 
 ;;; this is so no one gets confused and things these namespaces are unused.
 (comment
-  toucan2.compile/keep-me
   toucan2.connection/keep-me
   toucan2.delete/keep-me
   toucan2.execute/keep-me
@@ -55,10 +53,6 @@
   toucan2.util/keep-me)
 
 (p/import-vars
- [toucan2.compile
-  global-honeysql-options
-  with-compiled-query]
-
  [toucan2.connection
   do-with-connection
   with-connection

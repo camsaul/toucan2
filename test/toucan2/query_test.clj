@@ -18,18 +18,6 @@
     [:model :k :v]         {:modelable :model, :kv-args {:k :v}, :queryable {}}
     [:model :k :v {}]      {:modelable :model, :kv-args {:k :v}, :queryable {}}))
 
-(deftest ^:parallel condition->honeysql-where-clause-test
-  (are [k v expected] (= expected
-                         (query/condition->honeysql-where-clause k v))
-    :id :id            [:= :id :id]
-    1   :id            [:= 1 :id]
-    :id 1              [:= :id 1]
-    :a  1              [:= :a 1]
-    :id [:> 1]         [:> :id 1]
-    :a  [:between 1 2] [:between :a 1 2]
-    :id [:in [1 2]]    [:in :id [1 2]]
-    :id nil            [:= :id nil]))
-
 (derive ::venues.compound-pk ::test/venues)
 
 (m/defmethod model/primary-keys ::venues.compound-pk
@@ -71,20 +59,3 @@
                          ::venues.namespaced
                          {:kv-args {:toucan/pk 1}}
                          {}))))
-
-(deftest honeysql-table-and-alias-test
-  (are [model expected] (= expected
-                           (query/honeysql-table-and-alias model))
-    ::test/venues       [:venues]
-    ::venues.namespaced [:venues :venue]
-    "venues"            [:venues]))
-
-;; (deftest identitfier-test
-;;   (testing "Custom Honey SQL identifier clause"
-;;     (are [identifier quoted? expected] (= expected
-;;                                           (hsql/format {:select [:*], :from [[identifier]]}
-;;                                                        {:quoted quoted?}))
-;;       [::query/identifier :wow]          false ["SELECT * FROM wow"]
-;;       [::query/identifier :wow]          true  ["SELECT * FROM \"wow\""]
-;;       [::query/identifier :table :field] false ["SELECT * FROM table.field"]
-;;       [::query/identifier :table :field] true  ["SELECT * FROM \"table\".\"field\""])))

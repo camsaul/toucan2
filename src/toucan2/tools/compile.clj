@@ -32,8 +32,8 @@
   args passed to [[toucan2.select/select]] created by `body` without building a query, compiling it, or executing it."
   {:style/indent 0}
   [& body]
-  `(binding [pipeline/transduce-resolved-query (fn [rf# query-type# model# parsed-args# resolved-query#]
-                                                 {:parsed-args parsed-args#, :resolved-query resolved-query#})]
+  `(binding [pipeline/transduce-build (fn [rf# query-type# model# parsed-args# resolved-query#]
+                                        {:parsed-args parsed-args#, :resolved-query resolved-query#})]
      ~@body))
 
 ;; (defmacro parsed-args

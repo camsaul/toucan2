@@ -54,14 +54,15 @@
                                                 parsed-args)))]
         (u/println-debug ["changes->pk-maps = %s" changes->pk-maps])
         (if (= (count changes->pk-maps) 1)
-          ;; every row has the same exact changes: we only need to perform a single update, using the original conditions.
+          ;; every row has the same exact changes: we only need to perform a single update, using the original
+          ;; conditions.
           [(assoc parsed-args :changes (first (keys changes->pk-maps)))]
           ;; more than one set of changes: need to do multiple updates.
           (for [[changes pk-maps] changes->pk-maps
                 pk-map            pk-maps]
             (assoc parsed-args :changes changes, :kv-args pk-map)))))))
 
-(m/defmethod pipeline/transduce-with-model :around [:toucan.query-type/update.* ::before-update]
+(m/defmethod pipeline/transduce-with-model :around [#_query-type :toucan.query-type/update.* #_model ::before-update]
   [rf query-type model {::keys [doing-before-update?], :keys [changes], :as parsed-args}]
   (cond
     doing-before-update?

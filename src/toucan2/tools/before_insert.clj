@@ -25,9 +25,9 @@
   (cond-> parsed-args
     (:rows parsed-args) (update :rows do-before-insert-to-rows model)))
 
-(m/defmethod pipeline/transduce-resolved-query :before [#_query-type :toucan.query-type/insert.*
-                                                        #_model      ::before-insert
-                                                        #_query      clojure.lang.IPersistentMap]
+(m/defmethod pipeline/transduce-build :before [#_query-type :toucan.query-type/insert.*
+                                               #_model      ::before-insert
+                                               #_query      clojure.lang.IPersistentMap]
   [_rf _query-type model _parsed-args resolved-query]
   (cond-> resolved-query
     (:rows resolved-query) (update :rows do-before-insert-to-rows model)))
