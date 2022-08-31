@@ -8,8 +8,7 @@
    [methodical.core :as m]
    [pjstadig.humane-test-output :as humane-test-output]
    [toucan2.connection :as conn]
-   [toucan2.model :as model]
-   [toucan2.test :as test]))
+   [toucan2.model :as model]))
 
 (set! *warn-on-reflection* true)
 
@@ -163,7 +162,7 @@
 
   ([db-type table-name]
    (binding [*current-db-type* db-type]
-     (conn/with-connection [conn ::test/db]
+     (conn/with-connection [conn ::db]
        (create-table! db-type conn table-name))))
 
   ([db-type ^java.sql.Connection conn table-name]

@@ -425,3 +425,113 @@
       (testing "don't hydrate nil keys"
         (is (= {:good-bird? nil}
                no-bird))))))
+
+(deftest unnest-first-result-test
+  (are [coll expected] (= expected
+                          (#'hydrate/unnest-first-result coll))
+    nil        nil
+    :a         nil
+    []         nil
+    [:a]       :a
+    [[:a]]     :a
+    [[[:a]]]   :a
+    [[[[:a]]]] :a))
+
+(m/defmethod hydrate/simple-hydrate [:default ::k]
+  [_model k m]
+  (assoc m k 5))
+
+(deftest nested-hydrate-sequence-test
+  (testing "Should be able to do nested hydration for sequences"
+    (is (= {:m [(instance/instance ::m.hydrate-sequence {:a 1, ::k 5})
+                (instance/instance ::m.hydrate-sequence {:a 2, ::k 5})]}
+           (hydrate/hydrate
+            {:m [(instance/instance ::m.hydrate-sequence {:a 1})
+                 (instance/instance ::m.hydrate-sequence {:a 2})]}
+            [:m ::k])))))
+
+(m/defmethod hydrate/simple-hydrate [::m.hydrate-sequence ::model.x]
+  [_model k m]
+  (assoc m k 1000))
+
+(deftest hydrate-sequence-dispatch-on-model-test
+  (testing "We should dispatch on the model of the first instance when hydrating a sequence"
+    (is (= [(instance/instance ::m.hydrate-sequence {:a 1, ::model.x 1000})
+            (instance/instance ::m.hydrate-sequence {:a 2, ::model.x 1000})]
+           (hydrate/hydrate
+            [(instance/instance ::m.hydrate-sequence {:a 1})
+             (instance/instance ::m.hydrate-sequence {:a 2})]
+            ::model.x)))
+    (testing "Should work when doing recursive hydration"
+      (is (= {:m [(instance/instance ::m.hydrate-sequence {:a 1, ::model.x 1000})
+                  (instance/instance ::m.hydrate-sequence {:a 2, ::model.x 1000})]}
+             (hydrate/hydrate
+              {:m [(instance/instance ::m.hydrate-sequence {:a 1})
+                   (instance/instance ::m.hydrate-sequence {:a 2})]}
+              [:m ::model.x]))))))
+
+(deftest flatten-unflatten-test
+  (are [form] (= form
+                 (#'hydrate/unflatten-collection (#'hydrate/flatten-collection form)))
+    nil
+    []
+    '()
+    [{:a 1}]
+    '({:a 1})
+    [{:a 1} {:b 2}]
+    [[]]
+    '(())
+    [[{:a 1} {:b 2}] {:c 3} {:d 4}]
+    [[[]]]
+    '((()))
+    [[[{:a 1} {:b 2}] {:c 3} {:d 4} {:e 5} {:f 6}]]
+    [[[[]]]]
+    '(((())))
+    [[[[{:a 1} {:b 2}] {:c 3} {:d 4} {:e 5} {:f 6}] {:g 7} {:h 8}]]))
+
+(deftest preserve-shape-test
+  (testing "hydration should preserve the shape/nesting of the original form"
+    (are [form expected] (= expected
+                            (hydrate/hydrate form ::k))
+      nil             nil
+      []              []
+      [{:a 1}]        [{:a 1, ::k 5}]
+      [{:a 1} {:b 2}] [{:a 1, ::k 5} {:b 2, ::k 5}]
+      [[]]            [[]]
+      [[[]]]          [[[]]]
+      [[[[]]]]        [[[[]]]]
+
+      [[{:a 1} {:b 2}] {:c 3} {:d 4}]
+      [[{:a 1, ::k 5} {:b 2, ::k 5}] {:c 3, ::k 5} {:d 4, ::k 5}]
+
+
+      [[[{:a 1} {:b 2}] {:c 3} {:d 4}] {:e 5} {:f 6}]
+      [[[{:a 1, ::k 5} {:b 2, ::k 5}] {:c 3, ::k 5} {:d 4, ::k 5}] {:e 5, ::k 5} {:f 6, ::k 5}]
+
+      [[[[{:a 1} {:b 2}] {:c 3} {:d 4}] {:e 5} {:f 6}] {:g 7} {:h 8}]
+      [[[[{:a 1, ::k 5} {:b 2, ::k 5}] {:c 3, ::k 5} {:d 4, ::k 5}] {:e 5, ::k 5} {:f 6, ::k 5}] {:g 7, ::k 5} {:h 8, ::k 5}])))
+
+(deftest error-on-unknown-key-test
+  (let [original-global-value @@#'hydrate/global-error-on-unknown-key]
+    (try
+      (hydrate/set-error-on-unknown-key! false)
+      (is (= {}
+             (hydrate/hydrate {} ::unknown-key)))
+      (testing "dynamic var"
+        (binding [hydrate/*error-on-unknown-key* true]
+          (is (thrown-with-msg?
+               Exception
+               #"Don't know how to hydrate :toucan2.tools.hydrate-test/unknown-key"
+               (hydrate/hydrate {} ::unknown-key)))))
+      (testing "global setting"
+        (hydrate/set-error-on-unknown-key! true)
+        (is (thrown-with-msg?
+             Exception
+             #"Don't know how to hydrate :toucan2.tools.hydrate-test/unknown-key"
+             (hydrate/hydrate {} ::unknown-key))))
+      (testing "dynamic var should override global setting"
+        (binding [hydrate/*error-on-unknown-key* false]
+          (is (= {}
+                 (hydrate/hydrate {} ::unknown-key)))))
+      (finally
+        (reset! @#'hydrate/global-error-on-unknown-key original-global-value)))))
