@@ -360,6 +360,11 @@
   {:arglists '([model₁ k₂ row])}
   u/dispatch-on-first-two-args)
 
+(m/defmethod simple-hydrate :around :default
+  [model k row]
+  (u/try-with-error-context ["simple hydrate" {:model model, :k k, :row row}]
+    (next-method model k row)))
+
 (m/defmethod can-hydrate-with-strategy? [:default ::multimethod-simple :default]
   [model _strategy k]
   (boolean (m/effective-primary-method simple-hydrate (m/dispatch-value simple-hydrate model k))))
@@ -397,8 +402,9 @@
 (defn- hydrate-key
   [model rows k]
   (if-let [strategy (hydration-strategy model k)]
-    (u/with-debug-result ["Hydrating %s %s with strategy %s" (or model "map") k strategy]
-      (hydrate-with-strategy model strategy k rows))
+    (u/try-with-error-context ["hydrate key" {:model model, :key k, :strategy strategy}]
+      (u/with-debug-result ["Hydrating %s %s with strategy %s" (or model "map") k strategy]
+        (hydrate-with-strategy model strategy k rows)))
     (do
       (u/println-debug ["Don't know how to hydrate %s" k])
       rows)))
@@ -423,47 +429,84 @@
 
 (declare hydrate-one-form)
 
-(defn- hydrate-sequence-of-sequences [model groups k]
-  (let [indexed-flattened-results (for [[i group] (map-indexed vector groups)
-                                        result    group]
-                                    [i result])
-        indecies                  (map first indexed-flattened-results)
-        flattened                 (map second indexed-flattened-results)
-        hydrated                  (hydrate-one-form model flattened k)
-        groups                    (partition-by first (map vector indecies hydrated))]
-    (for [group groups]
-      (map second group))))
+(defn- flatten-collection
+  "Convert a collection `coll` into a flattened sequence of maps with `:item` and `:path`.
+
+  ```clj
+  (flatten-collection [[{:a 1}]])
+  =>
+  [{:path [], :item []}
+   {:path [0], :item []}
+   {:path [0 0], :item {:a 1}}]
+  ```"
+  ([coll]
+   (flatten-collection [] coll))
+
+  ([path coll]
+   (if (sequential? coll)
+     (into [{:path path, :item (empty coll)}]
+           (comp (map-indexed (fn [i x]
+                                (flatten-collection (conj path i) x)))
+                 cat)
+           coll)
+     [{:path path, :item coll}])))
+
+(defn- unflatten-collection
+  "Take a sequence of items flattened by [[flatten-collection]] and restore them to their original shape."
+  [flattened]
+  (reduce
+   (fn [acc {:keys [path item]}]
+     (if (= path [])
+       item
+       (assoc-in acc path item)))
+   []
+   flattened))
+
+(defn- hydrate-sequence-of-sequences [model coll k]
+  (let [flattened (flatten-collection coll)
+        items     (for [{:keys [item path]} flattened
+                        :when (map? item)]
+                    (vary-meta item assoc ::path path))
+        hydrated (hydrate-one-form model items k)]
+    (unflatten-collection (concat flattened
+                                  (for [item hydrated]
+                                    (do
+                                      (assert (::path (meta item)))
+                                      {:item item, :path (::path (meta item))}))))))
 
 (defn- hydrate-one-form
-  "Hydrate a single hydration form."
+  "Hydrate for a single hydration key or form `k`."
   [model results k]
-  (when (seq results)
-    (cond
-      (sequential? (first results))
-      (hydrate-sequence-of-sequences model results k)
+  (cond
+    (and (sequential? results)
+         (empty? results))
+    results
 
-      (keyword? k)
-      (hydrate-key model results k)
+    (sequential? (first results))
+    (hydrate-sequence-of-sequences model results k)
 
-      (sequential? k)
-      (hydrate-key-seq results k)
+    (keyword? k)
+    (hydrate-key model results k)
 
-      :else
-      (throw (ex-info (format "Invalid hydration form: %s. Expected keyword or sequence." k)
-                      {:invalid-form k})))))
+    (sequential? k)
+    (hydrate-key-seq results k)
+
+    :else
+    (throw (ex-info (format "Invalid hydration form: %s. Expected keyword or sequence." k)
+                    {:invalid-form k}))))
 
 (defn- hydrate-forms
   "Hydrate many hydration forms across a *sequence* of `results` by recursively calling [[hydrate-one-form]]."
   [model results & forms]
   (reduce (partial hydrate-one-form model) results forms))
 
-(defn- unnest-model
+(defn- unnest-first-result
   "Given an arbitrarily nested sequence `coll`, continue unnesting the sequence until we get a non-sequential first item.
 
   ```clj
-  (unnest-model [:a :b])  => :a
-  (unnest-model [[:a]])   => :a
-  (unnest-model [[[:a]]]) => :a
+  (unnest-first-result [:a :b])  => :a
+  (unnest-first-result [[:a]])   => :a
+  (unnest-first-result [[[:a]]]) => :a
   ```"
   [coll]
   (->> (iterate first coll)
@@ -483,19 +526,20 @@
    instance-or-instances)
 
   ([instance-or-instances & ks]
-   (cond
-     (not instance-or-instances)
-     nil
+   (u/try-with-error-context ["hydrate" {:what instance-or-instances, :keys ks}]
+     (cond
+       (not instance-or-instances)
+       nil
 
-     (and (sequential? instance-or-instances)
-          (empty? instance-or-instances))
-     instance-or-instances
+       (and (sequential? instance-or-instances)
+            (empty? instance-or-instances))
+       instance-or-instances
 
-     ;; sequence of instances
-     (sequential? instance-or-instances)
-     (let [model (protocols/model (unnest-model instance-or-instances))]
-       (apply hydrate-forms model instance-or-instances ks))
+       ;; sequence of instances
+       (sequential? instance-or-instances)
+       (let [model (protocols/model (unnest-first-result instance-or-instances))]
+         (apply hydrate-forms model instance-or-instances ks))
 
-     ;; not sequential
-     :else
-     (first (apply hydrate-forms (protocols/model instance-or-instances) [instance-or-instances] ks)))))
+       ;; not sequential
+       :else
+       (first (apply hydrate-forms (protocols/model instance-or-instances) [instance-or-instances] ks))))))
