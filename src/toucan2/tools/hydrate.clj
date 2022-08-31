@@ -286,7 +286,7 @@
       (u/println-debug ["Not hydrating %s because no rows have non-nil FK values" hydrating-model]))))
 
 (defn- do-automagic-batched-hydration [dest-key rows pk->fetched-instance]
-  (u/with-debug-result #_-no-result ["Attempting to hydrate %d/%d rows" (count (filter ::fk rows)) (count rows)]
+  (u/with-debug-result ["Attempting to hydrate %d/%d rows" (count (filter ::fk rows)) (count rows)]
     (for [row rows]
       (if-not (::fk row)
         row
@@ -399,6 +399,18 @@
 
 (declare hydrate)
 
+(def ^:dynamic *error-on-unknown-key* nil)
+
+(defonce ^:private global-error-on-unknown-key (atom false))
+
+(defn set-error-on-unknown-key! [new-value]
+  (reset! global-error-on-unknown-key new-value))
+
+(defn ^:no-doc error-on-unknown-key? []
+  (if (some? *error-on-unknown-key*)
+    *error-on-unknown-key*
+    @global-error-on-unknown-key))
+
 (defn- hydrate-key
   [model rows k]
   (if-let [strategy (hydration-strategy model k)]
@@ -406,7 +418,10 @@
       (u/with-debug-result ["Hydrating %s %s with strategy %s" (or model "map") k strategy]
         (hydrate-with-strategy model strategy k rows)))
     (do
-      (u/println-debug ["Don't know how to hydrate %s" k])
+      (u/println-debug ["Don't know how to hydrate %s for model %s rows %s" k model (take 1 rows)])
+      (when (error-on-unknown-key?)
+        (throw (ex-info (format "Don't know how to hydrate %s" (pr-str k))
+                        {:model model, :rows rows, :k k})))
       rows)))
 
 (defn- hydrate-key-seq
@@ -477,6 +492,7 @@
 (defn- hydrate-one-form
   "Hydrate for a single hydration key or form `k`."
   [model results k]
+  (u/println-debug ["hydrate %s for model %s rows %s" k model (take 1 results)])
   (cond
     (and (sequential? results)
          (empty? results))

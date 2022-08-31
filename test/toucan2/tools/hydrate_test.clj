@@ -517,3 +517,28 @@
 
       [[[[{:a 1} {:b 2}] {:c 3} {:d 4}] {:e 5} {:f 6}] {:g 7} {:h 8}]
       [[[[{:a 1, ::k 5} {:b 2, ::k 5}] {:c 3, ::k 5} {:d 4, ::k 5}] {:e 5, ::k 5} {:f 6, ::k 5}] {:g 7, ::k 5} {:h 8, ::k 5}])))
+
+(deftest error-on-unknown-key-test
+  (let [original-global-value @@#'hydrate/global-error-on-unknown-key]
+    (try
+      (hydrate/set-error-on-unknown-key! false)
+      (is (= {}
+             (hydrate/hydrate {} ::unknown-key)))
+      (testing "dynamic var"
+        (binding [hydrate/*error-on-unknown-key* true]
+          (is (thrown-with-msg?
+               Exception
+               #"Don't know how to hydrate :toucan2.tools.hydrate-test/unknown-key"
+               (hydrate/hydrate {} ::unknown-key)))))
+      (testing "global setting"
+        (hydrate/set-error-on-unknown-key! true)
+        (is (thrown-with-msg?
+             Exception
+             #"Don't know how to hydrate :toucan2.tools.hydrate-test/unknown-key"
+             (hydrate/hydrate {} ::unknown-key))))
+      (testing "dynamic var should override global setting"
+        (binding [hydrate/*error-on-unknown-key* false]
+          (is (= {}
+                 (hydrate/hydrate {} ::unknown-key)))))
+      (finally
+        (reset! @#'hydrate/global-error-on-unknown-key original-global-value)))))
