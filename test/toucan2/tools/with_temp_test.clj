@@ -96,7 +96,7 @@
 
 (m/defmethod pipeline/transduce-with-model [#_query-type :default #_model ::unresolved-model]
   [rf query-type _model parsed-args]
-  (rf query-type ::test/birds parsed-args))
+  (next-method rf query-type ::test/birds parsed-args))
 
 (deftest resolve-model-test
   (testing "with-temp should resolve models"
