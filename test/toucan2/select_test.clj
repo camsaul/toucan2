@@ -403,9 +403,9 @@
 
 (derive ::venues.with-category ::test/venues)
 
-(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/select.*
-                                                #_model      ::venues.with-category
-                                                #_query      clojure.lang.IPersistentMap]
+(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/select.*
+                                       #_model      ::venues.with-category
+                                       #_query      clojure.lang.IPersistentMap]
   [rf query-type model parsed-args resolved-query]
   (let [model-ns-str    (some-> (model/namespace model) name)
         venues-category (keyword

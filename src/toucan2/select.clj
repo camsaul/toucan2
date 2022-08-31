@@ -4,21 +4,12 @@
    [methodical.core :as m]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
-   [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
-(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/select.*
-                                                #_model      :default
-                                                #_query      clojure.lang.IPersistentMap]
-  [rf query-type model {:keys [columns], :as parsed-args} resolved-query]
-  (let [parsed-args    (dissoc parsed-args :columns)
-        resolved-query (merge {:select (or (not-empty columns)
-                                           [:*])}
-                              (when model
-                                {:from [(query/honeysql-table-and-alias model)]})
-                              resolved-query)]
-    (next-method rf query-type model parsed-args resolved-query)))
+;;; args spec lives in [[toucan2.query]]
+;;;
+;;; Code for building Honey SQL for a SELECT lives in [[toucan2.map-backend.honeysql2]]
 
 (defn reducible-select
   {:arglists '([modelable & kv-args? query?]

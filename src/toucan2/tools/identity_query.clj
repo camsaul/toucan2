@@ -55,16 +55,16 @@
 
 ;;; this is an around method so we can intercept anything else that might normally be considered a more specific method
 ;;; when it dispatches off of more-specific values of `query-type`
-(m/defmethod pipeline/transduce-resolved-query :around [#_query-type :default
-                                                        #_model      :default
-                                                        #_query      IdentityQuery]
+(m/defmethod pipeline/transduce-build :around [#_query-type :default
+                                               #_model      :default
+                                               #_query      IdentityQuery]
   [rf query-type model _parsed-args resolved-query]
   (pipeline/transduce-built-query rf query-type model resolved-query))
 
 ;;; TODO -- not sure we need this method since we should be bypassing it with the method below
-(m/defmethod pipeline/transduce-resolved-query [#_query-type :default
-                                                #_model      IdentityQuery
-                                                #_query      :default]
+(m/defmethod pipeline/transduce-build [#_query-type :default
+                                       #_model      IdentityQuery
+                                       #_query      :default]
   [rf query-type model _parsed-args resolved-query]
   (pipeline/transduce-built-query rf query-type model resolved-query))
 

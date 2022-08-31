@@ -177,13 +177,13 @@
 
 (derive ::venues.capture-updates ::venues.before-update)
 
-(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/update.*
-                                                #_model      ::venues.capture-updates
-                                                #_query      :default]
-  [rf query-type model parsed-args resolved-query]
+(m/defmethod pipeline/transduce-built-query [#_query-type :toucan.query-type/update.*
+                                             #_model      ::venues.capture-updates
+                                             #_query      :default]
+  [rf query-type model built-query]
   (when *venues-update-queries*
-    (swap! *venues-update-queries* conj parsed-args))
-  (next-method rf query-type model parsed-args resolved-query))
+    (swap! *venues-update-queries* conj built-query))
+  (next-method rf query-type model built-query))
 
 ;;; this changes the category to `category-<id>` with the venue ID
 (derive ::venues.add-unique-category ::venues.capture-updates)
@@ -206,9 +206,9 @@
               (is (= 2
                      (call-count)))
               (testing "Don't add extra :where clauses if there's just one set of changes to apply to all matching rows."
-                (is (= [{:kv-args                             {:category "bar"}
-                         :changes                             {:category "dive-bar"}
-                         ::before-update/doing-before-update? true}]
+                (is (= [{:update [:venues]
+                         :set    {:category "dive-bar"}
+                         :where  [:= :category "bar"]}]
                        @*venues-update-queries*))))))))))
 
 (deftest before-update-batch-updates-multiple-batches-test
@@ -224,14 +224,14 @@
             (testing "Should have 3 DB calls -- one to fetch matching rows, then 2 separate updates"
               (is (= 3
                      (call-count)))
-              (is (= [{:changes                             {:updated-at (LocalDateTime/parse "2021-06-09T15:18:00")
-                                                             :category   "category-1"}
-                       :kv-args                             {:id 1}
-                       ::before-update/doing-before-update? true}
-                      {:changes                             {:updated-at (LocalDateTime/parse "2021-06-09T15:18:00")
-                                                             :category   "category-2"}
-                       :kv-args                             {:id 2}
-                       ::before-update/doing-before-update? true}]
+              (is (= [{:update [:venues]
+                       :set    {:updated-at (LocalDateTime/parse "2021-06-09T15:18")
+                                :category   "category-1"}
+                       :where  [:= :id 1]}
+                      {:update [:venues]
+                       :set    {:updated-at (LocalDateTime/parse "2021-06-09T15:18")
+                                :category   "category-2"}
+                       :where  [:= :id 2]}]
                      @*venues-update-queries*))
               (is (= [(instance/instance ::test/venues
                                          {:id         1

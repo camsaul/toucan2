@@ -2,10 +2,7 @@
   "Implementation of [[insert!]]."
   (:require
    [clojure.spec.alpha :as s]
-   [honey.sql :as hsql]
    [methodical.core :as m]
-   [toucan2.instance :as instance]
-   [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.util :as u]))
@@ -49,36 +46,6 @@
   (let [parsed-args (parse-insert-args query-type unparsed-args)]
     (pipeline/transduce-parsed-args rf query-type parsed-args)))
 
-;;; Support
-;;;
-;;;    INSERT INTO table DEFAULT VALUES
-;;;
-;;; syntax. Not currently part of Honey SQL -- see upstream issue https://github.com/seancorfield/honeysql/issues/423
-(hsql/register-clause!
- ::default-values
- (fn [_clause _value]
-   ["DEFAULT VALUES"])
- nil)
-
-(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/insert.*
-                                                #_model      :default
-                                                #_query      clojure.lang.IPersistentMap]
-  [rf query-type model parsed-args resolved-query]
-  (let [rows        (some (comp not-empty :rows) [parsed-args resolved-query])
-        built-query (merge
-                     {:insert-into [(keyword (model/table-name model))]}
-                     ;; if `rows` is just a single empty row then insert it with
-                     ;;
-                     ;; INSERT INTO table DEFAULT VALUES
-                     ;;
-                     ;; syntax. See the clause registered above
-                     (if (= rows [{}])
-                       {::default-values true}
-                       {:values (map (partial instance/instance model)
-                                     rows)}))]
-    ;; rows is only added so we can get the default methods' no-op logic if there are no rows at all.
-    (next-method rf query-type model (assoc parsed-args :rows rows) built-query)))
-
 (defn- can-skip-insert? [parsed-args resolved-query]
   (and (empty? (:rows parsed-args))
        ;; don't try to optimize out stuff like identity query.
@@ -86,7 +53,7 @@
                 (empty? (:rows resolved-query)))
            (nil? resolved-query))))
 
-(m/defmethod pipeline/transduce-resolved-query [#_query-type :toucan.query-type/insert.*
+(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/insert.*
                                                 #_model      :default
                                                 #_query      :default]
   [rf query-type model parsed-args resolved-query]
@@ -98,6 +65,8 @@
         (rf (rf)))
       (u/with-debug-result ["Inserting %s rows into %s" (if (seq rows) (count rows) "?") model]
         (next-method rf query-type model parsed-args resolved-query)))))
+
+;;; The code for building an INSERT query as Honey SQL lives in [[toucan2.map-backend.honeysql2]]
 
 ;;;; [[reducible-insert]] and [[insert!]]
 

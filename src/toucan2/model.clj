@@ -6,6 +6,9 @@
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
+;;; TODO -- not sure this should be `do-with-model` anymore. If you want to do something special with a model e.g.
+;;; `with-open` then you can do that inside `transduce-with-model`. Maybe this should just be `resolve-model` or
+;;; something.
 (m/defmulti do-with-model
   {:arglists '([modelable f])}
   u/dispatch-on-first-arg)

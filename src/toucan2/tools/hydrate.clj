@@ -399,10 +399,12 @@
 
 (declare hydrate)
 
+;;; TODO -- consider renaming this to `*error-on-unknown-key-override*`
 (def ^:dynamic *error-on-unknown-key* nil)
 
 (defonce ^:private global-error-on-unknown-key (atom false))
 
+;;; TODO -- maybe we should just make [[global-error-on-unknown-key]] public so we don't need this separate function.
 (defn set-error-on-unknown-key! [new-value]
   (reset! global-error-on-unknown-key new-value))
 

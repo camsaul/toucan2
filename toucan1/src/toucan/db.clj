@@ -7,14 +7,15 @@
    [potemkin :as p]
    [pretty.core :as pretty]
    [toucan.models :as t1.models]
-   [toucan2.compile :as compile]
    [toucan2.connection :as conn]
    [toucan2.delete :as delete]
    [toucan2.execute :as execute]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.jdbc.query :as jdbc.query]
+   [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
+   [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
@@ -30,56 +31,57 @@
  [select select select-one count exists?])
 
 (def ^:dynamic *quoting-style*
-  "Temporarily override the default [[quoting-style]]. DEPRECATED: bind [[toucan2.compile/*honeysql-options*]]
+  "Temporarily override the default [[quoting-style]]. DEPRECATED: bind [[toucan2.map-backend.honeysql/*options*]]
   instead."
   nil)
 
 (defn set-default-quoting-style!
-  "Set the default [[quoting-style]]. DEPRECATED: set [[toucan2.compile/global-honeysql-options]] directly."
+  "Set the default [[quoting-style]]. DEPRECATED: set [[toucan2.map-backend.honeysql2/global-options]] directly."
   [new-quoting-style]
-  (swap! compile/global-honeysql-options assoc :dialect new-quoting-style, :quoted (boolean new-quoting-style)))
+  map.honeysql/global-options
+  (swap! map.honeysql/global-options assoc :dialect new-quoting-style, :quoted (boolean new-quoting-style)))
 
 (defn quoting-style
   "In Toucan 1, this was the `:quoting` option to pass to Honey SQL 1. This now corresponds to the `:dialect` option
   passed to Honey SQL 2."
   []
   (or *quoting-style*
-      (get @compile/global-honeysql-options :dialect)))
+      (get @map.honeysql/global-options :dialect)))
 
 (def ^:dynamic *automatically-convert-dashes-and-underscores*
   "Whether to automatically convert dashes in keywords to `snake_case` when compiling HoneySQL queries, even when
   quoting. This is `false` by default.
 
-  DEPRECATED: binding [[toucan2.compile/*honeysql-options*]] instead."
+  DEPRECATED: binding [[toucan2.map-backend.honeysql/*options*]] instead."
   nil)
 
 (defn set-default-automatically-convert-dashes-and-underscores!
-  "DEPRECATED: set [[toucan2.compile/global-honeysql-options]] directly."
+  "DEPRECATED: set [[toucan2.map-backend.honeysql2/global-options]] directly."
   [automatically-convert-dashes-and-underscores]
-  (swap! compile/global-honeysql-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores)))
+  (swap! map.honeysql/global-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores)))
 
 (defn automatically-convert-dashes-and-underscores?
   []
   (if (nil? *automatically-convert-dashes-and-underscores*)
-    (get @compile/global-honeysql-options :quoted-snake)
+    (get @map.honeysql/global-options :quoted-snake)
     *automatically-convert-dashes-and-underscores*))
 
 (defn- honeysql-options []
   (merge
    ;; defaults
    {:quoted true, :dialect :ansi, #_:quoted-snake #_true}
-   compile/*honeysql-options*
+   map.honeysql/*options*
    (when-let [style (quoting-style)]
      {:dialect style})
    (when-let [convert? (automatically-convert-dashes-and-underscores?)]
      (when (some? convert?)
        {:quoted-snake convert?}))))
 
-(m/defmethod compile/do-with-compiled-query [:toucan1/model clojure.lang.IPersistentMap]
-  [model honeysql f]
+(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model :toucan1/model]
+  [rf query-type model parsed-args]
   (u/with-debug-result ["Compiling Honey SQL query for legacy Toucan 1 model %s" model]
-    (binding [compile/*honeysql-options* (honeysql-options)]
-      (next-method model honeysql f))))
+    (binding [map.honeysql/*options* (honeysql-options)]
+      (next-method rf query-type model parsed-args))))
 
 ;; replaces `*db-connection*`
 (p/import-vars [conn *current-connectable*])
@@ -132,17 +134,16 @@
      ~@body))
 
 (defn honeysql->sql
-  "DEPRECATED: Use [[toucan2.compile/with-compiled-query]] instead."
+  "DEPRECATED: Use [[toucan2.pipeline/compile]] instead."
   [honeysql-form]
-  (compile/with-compiled-query [query [nil honeysql-form]]
-    query))
+  (pipeline/compile :default :default honeysql-form))
 
 (deftype ^:no-doc Toucan1ReducibleQuery [honeysql-form jdbc-options]
   clojure.lang.IReduceInit
   (reduce [this rf init]
     (u/with-debug-result ["reduce Toucan 1 reducible query %s" this]
       (binding [jdbc.query/*options*    (merge jdbc.query/*options* jdbc-options)
-                compile/*honeysql-options* (honeysql-options)]
+                map.honeysql/*options* (honeysql-options)]
         (reduce rf init (execute/reducible-query nil honeysql-form)))))
 
   pretty/PrettyPrintable
@@ -276,7 +277,7 @@
 
 (m/defmethod model/do-with-model SimpleModel
   [model f]
-  (binding [compile/*honeysql-options* (honeysql-options)]
+  (binding [map.honeysql/*options* (honeysql-options)]
     (f model)))
 
 (defn simple-insert-many!

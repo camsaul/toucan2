@@ -206,9 +206,6 @@
       ;;; TODO -- what about multiple empty rows?? :shrug:
       (testing (format "row-or-rows = %s" (pr-str row-or-rows))
         (test/with-discarded-table-changes :birds
-          (is (= {:insert-into [:birds], ::insert/default-values true}
-                 (tools.compile/build
-                   (insert/insert! ::test/birds row-or-rows))))
           (is (= ["INSERT INTO birds DEFAULT VALUES"]
                  (tools.compile/compile
                    (insert/insert! ::test/birds row-or-rows))))
