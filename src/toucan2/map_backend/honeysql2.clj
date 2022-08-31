@@ -113,7 +113,7 @@
 ;;;; Query compilation
 
 (defonce global-options
-  (atom nil))
+  (atom {:quoted true, :dialect :ansi, :quoted-snake true}))
 
 (def ^:dynamic *options* nil)
 

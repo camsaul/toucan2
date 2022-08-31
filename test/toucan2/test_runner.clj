@@ -6,12 +6,12 @@
    [clojure.java.io :as io]
    [clojure.pprint :as pprint]
    [clojure.string :as str]
-   [clojure.test :as t]
    [clojure.tools.namespace.find :as ns.find]
    [eftest.report.pretty]
    [eftest.report.progress]
    [eftest.runner]
-   [pjstadig.humane-test-output :as humane-test-output]))
+   [pjstadig.humane-test-output :as humane-test-output]
+   [toucan2.test :as test]))
 
 (set! *warn-on-reflection* true)
 
@@ -68,28 +68,8 @@
 
 ;;;; Running tests & reporting the output
 
-(defonce ^:private orig-test-var t/test-var)
-
-(def ^:private ^:dynamic *parallel-test-counter*
-  nil)
-
-(defn- parallel? [test-var]
-  (:parallel (meta test-var)))
-
 (alter-var-root #'eftest.runner/synchronized?
-                (constantly (complement parallel?)))
-
-(defn run-test
-  "Run a single test `test-var`. Wraps/replaces [[clojure.test/test-var]]."
-  [test-var]
-  (some-> *parallel-test-counter* (swap! update
-                                         (if (parallel? test-var)
-                                           :parallel
-                                           :single-threaded)
-                                         (fnil inc 0)))
-  (orig-test-var test-var))
-
-(alter-var-root #'t/test-var (constantly run-test))
+                (constantly (complement test/parallel?)))
 
 (def ^:private ci? (some-> (System/getenv "CI") str/lower-case parse-boolean))
 
@@ -118,7 +98,7 @@
   ([test-vars options]
    ;; don't randomize test order for now please, thanks anyway
    (with-redefs [eftest.runner/deterministic-shuffle (fn [_ test-vars] test-vars)]
-     (binding [*parallel-test-counter* (atom {})]
+     (binding [test/*parallel-test-counter* (atom {})]
        (merge
         (eftest.runner/run-tests
          test-vars
@@ -127,7 +107,7 @@
            :multithread?    :vars
            :report          (reporter)}
           options))
-        @*parallel-test-counter*)))))
+        @test/*parallel-test-counter*)))))
 
 ;;;; `clojure -X` entrypoint
 

@@ -4,17 +4,19 @@
    [clojure.spec.alpha :as s]
    [clojure.string :as str]
    [clojure.template :as clojure.template]
-   [clojure.test :refer :all]
+   [clojure.test :as t]
+   [honey.sql :as hsql]
    [methodical.core :as m]
    [pjstadig.humane-test-output :as humane-test-output]
    [toucan2.connection :as conn]
+   [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]))
 
 (set! *warn-on-reflection* true)
 
 (humane-test-output/activate!)
 
-;; replace [[clojure.test/are]] with a version that includes the actual form being tested as `testing` context. It's a
+;; replace [[t/are]] with a version that includes the actual form being tested as `testing` context. It's a
 ;; lot easier to debug that way. It expands things exactly the same way tho (using [[clojure.template]]) so there is
 ;; zero difference for anything but the test output.
 
@@ -24,10 +26,14 @@
     `(do
        ~@(for [tuple tuples]
            (let [spliced (clojure.template/apply-template bindings assertion tuple)]
-             `(testing '~spliced
-                (is ~spliced)))))))
+             `(t/testing '~spliced
+                (t/is ~spliced)))))))
 
-(alter-var-root #'clojure.test/are (constantly @#'are+))
+(doto #'t/are
+  (alter-var-root (constantly @#'are+))
+  (alter-meta! merge (select-keys (meta #'are+) [:ns :name :file :column :line])))
+
+(println "Installed" #'are+)
 
 ;;;; test [[db-types]] and tooling
 
@@ -50,9 +56,9 @@
                            :when (seq s)]
                        (keyword s)))))))
 
-(deftest db-types-from-env-test
-  (are [s expected] (is (= expected
-                           (db-types-from-env s)))
+(t/deftest db-types-from-env-test
+  (t/are [s expected] (= expected
+                         (db-types-from-env s))
     nil           nil
     ""            nil
     " "           nil
@@ -61,10 +67,10 @@
 
 (defonce ^:private db-types*
   (atom (or (db-types-from-env)
-            #{:postgres :h2})))
+            #{:h2})))
 
 (defn- db-types
-  "The enabled test DB types that we should run tests against inside of [[for-all-db-types]] forms."
+  "The enabled test DB types that we should run tests against."
   []
   (set @db-types*))
 
@@ -73,23 +79,84 @@
 
 (defn current-db-type []
   (or *current-db-type*
-      ;; default to `:postgres` if it's enabled.
-      (when (contains? (db-types) :postgres)
-        :postgres)
+      ;; default to `:h2` if it's enabled.
+      (when (contains? (db-types) :h2)
+        :h2)
       (first (db-types))))
 
 (println "Running tests against DB types:" (pr-str (db-types)))
 
-(defn do-db-types-fixture
-  "[[clojure.test]] fixture for running tests in a namespace against various db types using [[do-db-types]].
+;;;; custom version of [[t/test-var]]
 
-    ;; run tests in this namespace against all the enabled test [[db-types]]
-    (use-fixtures :each (do-db-types-fixture))"
-  [thunk]
-  (doseq [db-type (db-types)]
-    (binding [*current-db-type* db-type]
-      (testing (str db-type \newline)
-        (thunk)))))
+(defonce ^:private orig-test-var t/test-var)
+
+;;; This is only used by [[toucan2.test-runner]] but it lives here so we don't have to have ANOTHER function that wraps
+;;; [[t/run-test]] AGAIN inside the test runner code
+(def ^:dynamic *parallel-test-counter*
+  nil)
+
+(defn parallel? [test-var]
+  (:parallel (meta test-var)))
+
+(defn- wrap-test-var!
+  "Swaps out the `:test` metadata for var so testing it will run the test against all the dbs we're testing."
+  [varr]
+  (when-not (::original-test (meta varr))
+    (alter-meta! varr (fn [mta]
+                        (assoc mta ::original-test (:test mta)))))
+  (let [orig    (get (meta varr) ::original-test)
+        wrapped (fn wrapped-test-fn []
+                  (doseq [db-type (db-types)]
+                    (binding [*current-db-type* db-type]
+                      (t/testing (str db-type \newline)
+                        (orig)))))]
+    (alter-meta! varr assoc :test wrapped)))
+
+(defn- test-var*
+  "Run a single test `test-var`. Wraps/replaces [[t/test-var]]."
+  [varr]
+  (some-> *parallel-test-counter* (swap! update
+                                         (if (parallel? varr)
+                                           :parallel
+                                           :single-threaded)
+                                         (fnil inc 0)))
+  (wrap-test-var! varr)
+  (orig-test-var varr))
+(println "Wrapped" #'t/test-var "as" #'test-var*)
+
+(doto #'t/test-var
+  (alter-var-root (constantly test-var*))
+  (alter-meta! merge (select-keys (meta #'test-var*) [:ns :name :file :column :line])))
+
+(when-let [cider-test-var (try
+                            (requiring-resolve 'cider.nrepl.middleware.test/test-var)
+                            (catch Throwable _))]
+  (defonce ^:private orig-cider-test-var @cider-test-var)
+
+  (defn- cider-test-var* [varr]
+    (wrap-test-var! varr)
+    (orig-cider-test-var varr))
+
+  (doto cider-test-var
+    (alter-var-root (constantly cider-test-var*))
+    (alter-meta! merge (select-keys (meta #'cider-test-var*) [:ns :name :file :column :line])))
+  (println "Wrapped" cider-test-var "as" #'cider-test-var*))
+
+;;;; default HoneySQL options
+
+(defn quote-for-current-db [& args]
+  (let [f (:quote (hsql/get-dialect :ansi))
+        f (case (current-db-type)
+            :postgres f
+            :h2       (comp str/upper-case f))]
+    (apply f args)))
+
+(hsql/register-dialect!
+ ::current-db.dialect
+ (assoc (hsql/get-dialect :ansi)
+        :quote quote-for-current-db))
+
+(swap! map.honeysql/global-options assoc :dialect ::current-db.dialect)
 
 ;;;; URLs for test DBs.
 
@@ -201,17 +268,21 @@
     (set-up-test-db! db-type)
     (conn/do-with-connection (test-db-url db-type) f)))
 
-(defn do-with-discarded-table-changes [db-type table-name thunk]
+(defn do-with-discarded-table-changes [_db-type table-name thunk]
   (try
     (thunk)
     (finally
-      (with-open [conn (java.sql.DriverManager/getConnection (test-db-url db-type))]
-        (create-table! db-type conn table-name)))))
+      (create-table! table-name))))
 
 (defmacro with-discarded-table-changes
   {:style/indent 1}
   [table-name & body]
   `(do-with-discarded-table-changes (current-db-type) ~table-name (^:once fn* [] ~@body)))
+
+(defn discard-table-changes-all-dbs! [table-name]
+  (doseq [db-type (db-types)]
+    (binding [*current-db-type* db-type]
+      (create-table! table-name))))
 
 (s/fdef with-discarded-table-changes
   :args (s/cat :table-name (some-fn symbol? keyword?)

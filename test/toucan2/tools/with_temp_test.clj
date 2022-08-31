@@ -13,11 +13,12 @@
   (fn [thunk]
     (is (= 6
            (select/count ::test/birds)))
-    (test/with-discarded-table-changes :birds
+    (try
       (thunk)
       (testing "after with-temp body"
         (is (= 6
-               (select/count ::test/birds)))))))
+               (select/count ::test/birds))))
+      (finally (test/discard-table-changes-all-dbs! "birds")))))
 
 (deftest valid-syntax-test
   (are [form] (seqable? (macroexpand-1 form))

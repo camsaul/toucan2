@@ -11,8 +11,6 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (derive ::venues.after-insert ::test/venues)
 
 (def ^:private ^:dynamic *venues-awaiting-moderation* nil)

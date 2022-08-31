@@ -20,8 +20,6 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (derive ::venues.category-keyword ::test/venues)
 (derive ::venues.category-keyword ::transformed/transformed.model)
 
@@ -46,35 +44,26 @@
   {:id {:in  parse-int
         :out str}})
 
-(defmacro ^:private test-both-normal-and-magic-keys
-  {:style/indent 1}
-  [[category-key-binding] & body]
-  `(doseq [[message# ~category-key-binding] {"normal keys" :category
-                                             "magic keys" :CATEGORY}]
-     (testing (str message# \newline)
-       ~@body)))
-
 (deftest select-in-test
-  (test-both-normal-and-magic-keys [category-key]
-    (testing "select should transform values going in"
-      (testing "key-value condition"
+  (testing "select should transform values going in"
+    (testing "key-value condition"
+      (is (= [{:id 1, :name "Tempest", :category :bar}
+              {:id 2, :name "Ho's Tavern", :category :bar}]
+             (select/select ::venues.category-keyword :category :bar {:select   [:id :name :category]
+                                                                      :order-by [[:id :asc]]})))
+      (testing "Toucan-style [f & args] condition"
         (is (= [{:id 1, :name "Tempest", :category :bar}
                 {:id 2, :name "Ho's Tavern", :category :bar}]
-               (select/select ::venues.category-keyword category-key :bar {:select   [:id :name category-key]
-                                                                           :order-by [[:id :asc]]})))
-        (testing "Toucan-style [f & args] condition"
-          (is (= [{:id 1, :name "Tempest", :category :bar}
-                  {:id 2, :name "Ho's Tavern", :category :bar}]
-                 (select/select ::venues.category-keyword category-key [:in [:bar]]
-                                {:select   [:id :name category-key]
-                                 :order-by [[:id :asc]]})))))
-      (testing "as the PK"
-        (testing "(single value)"
-          (is (= [{:id "1", :name "Tempest", :category :bar}]
-                 (select/select ::venues.string-id-and-category-keyword :toucan/pk "1" {:select [:id :name category-key]}))))
-        (testing "(vector of multiple values)"
-          (is (= [{:id "1", :name "Tempest", :category :bar}]
-                 (select/select ::venues.string-id-and-category-keyword :toucan/pk ["1"] {:select [:id :name category-key]}))))))))
+               (select/select ::venues.category-keyword :category [:in [:bar]]
+                              {:select   [:id :name :category]
+                               :order-by [[:id :asc]]})))))
+    (testing "as the PK"
+      (testing "(single value)"
+        (is (= [{:id "1", :name "Tempest", :category :bar}]
+               (select/select ::venues.string-id-and-category-keyword :toucan/pk "1" {:select [:id :name :category]}))))
+      (testing "(vector of multiple values)"
+        (is (= [{:id "1", :name "Tempest", :category :bar}]
+               (select/select ::venues.string-id-and-category-keyword :toucan/pk ["1"] {:select [:id :name :category]})))))))
 
 (deftest select-out-test
   (testing "select should transform values coming out"
@@ -191,87 +180,84 @@
                @*col-read-counts*))))))
 
 (deftest update!-test
-  (test-both-normal-and-magic-keys [category-key]
-    (testing "key-value conditions"
+  (testing "key-value conditions"
+    (test/with-discarded-table-changes :venues
+      (is (= 2
+             (update/update! ::venues.category-keyword :category :bar {:category :BAR})))
+      (is (= #{["Ho's Tavern" :BAR] ["Tempest" :BAR]}
+             (select/select-fn-set (juxt :name :category) ::venues.category-keyword :category :BAR))))
+    (testing "Toucan-style [f & args] condition"
       (test/with-discarded-table-changes :venues
         (is (= 2
-               (update/update! ::venues.category-keyword category-key :bar {category-key :BAR})))
-        (is (= #{["Ho's Tavern" :BAR] ["Tempest" :BAR]}
-               (select/select-fn-set (juxt :name category-key) ::venues.category-keyword category-key :BAR))))
-      (testing "Toucan-style [f & args] condition"
-        (test/with-discarded-table-changes :venues
-          (is (= 2
-                 (update/update! ::venues.category-keyword category-key [:in [:bar]] {category-key :BAR})))
-          (is (= #{:store :BAR}
-                 (select/select-fn-set category-key ::venues.category-keyword))))))
-    (testing "conditions map"
-      (test/with-discarded-table-changes :venues
-        (is (= 2
-               (update/update! ::venues.category-keyword {category-key :bar} {category-key :BAR})))))
-    (testing "PK"
-      (test/with-discarded-table-changes :venues
-        (is (= 1
-               (update/update! ::venues.string-id-and-category-keyword "1" {:name "Wow"})))
-        (is (= "Wow"
-               (select/select-one-fn :name ::venues.category-keyword 1)))))))
+               (update/update! ::venues.category-keyword :category [:in [:bar]] {:category :BAR})))
+        (is (= #{:store :BAR}
+               (select/select-fn-set :category ::venues.category-keyword))))))
+  (testing "conditions map"
+    (test/with-discarded-table-changes :venues
+      (is (= 2
+             (update/update! ::venues.category-keyword {:category :bar} {:category :BAR})))))
+  (testing "PK"
+    (test/with-discarded-table-changes :venues
+      (is (= 1
+             (update/update! ::venues.string-id-and-category-keyword "1" {:name "Wow"})))
+      (is (= "Wow"
+             (select/select-one-fn :name ::venues.category-keyword 1))))))
 
 (deftest save!-test
-  (test-both-normal-and-magic-keys [category-key]
-    (test/with-discarded-table-changes :venues
-      (let [venue (select/select-one ::venues.category-keyword 1)]
-        (is (= {:category :dive-bar}
-               (protocols/changes (assoc venue category-key :dive-bar))))
-        (is (= {:id         1
-                :name       "Tempest"
-                :category   :dive-bar
-                :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                :updated-at (LocalDateTime/parse  "2017-01-01T00:00")}
-               (save/save! (assoc venue category-key :dive-bar))))
-        (is (= {:id         1
-                :name       "Tempest"
-                :category   :dive-bar
-                :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
-               (select/select-one ::venues.category-keyword 1)))))))
+  (test/with-discarded-table-changes :venues
+    (let [venue (select/select-one ::venues.category-keyword 1)]
+      (is (= {:category :dive-bar}
+             (protocols/changes (assoc venue :category :dive-bar))))
+      (is (= {:id         1
+              :name       "Tempest"
+              :category   :dive-bar
+              :created-at (LocalDateTime/parse "2017-01-01T00:00")
+              :updated-at (LocalDateTime/parse  "2017-01-01T00:00")}
+             (save/save! (assoc venue :category :dive-bar))))
+      (is (= {:id         1
+              :name       "Tempest"
+              :category   :dive-bar
+              :created-at (LocalDateTime/parse "2017-01-01T00:00")
+              :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+             (select/select-one ::venues.category-keyword 1))))))
 
 (deftest insert!-test
   (doseq [insert! [#'insert/insert!
                    #'insert/insert-returning-pks!
                    #'insert/insert-returning-instances!]]
     (testing insert!
-      (test-both-normal-and-magic-keys [category-key]
-        (doseq [[args-description args] {"single map row"        [{:name "Hi-Dive", category-key :bar}]
-                                         "multiple map rows"     [[{:name "Hi-Dive", category-key :bar}]]
-                                         "kv args"               [:name "Hi-Dive", category-key :bar]
-                                         "columns + vector rows" [[:name category-key] [["Hi-Dive" :bar]]]}]
-          (testing (str args-description \newline (pr-str (list* insert! ::venues.category-keyword args)))
-            (test/with-discarded-table-changes :venues
-              (is (= (condp = insert!
-                       #'insert/insert!                     1
-                       #'insert/insert-returning-pks!       [4]
-                       #'insert/insert-returning-instances! [(instance/instance
-                                                              ::venues.category-keyword
-                                                              {:id         4
-                                                               :name       "Hi-Dive"
-                                                               :category   :bar
-                                                               :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                               :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
-                     (apply insert! ::venues.category-keyword args)))
-              (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
-                     (select/select-fn-set :name ::venues.category-keyword category-key :bar))))))
-        (testing "transformed primary key"
+      (doseq [[args-description args] {"single map row"        [{:name "Hi-Dive", :category :bar}]
+                                       "multiple map rows"     [[{:name "Hi-Dive", :category :bar}]]
+                                       "kv args"               [:name "Hi-Dive", :category :bar]
+                                       "columns + vector rows" [[:name :category] [["Hi-Dive" :bar]]]}]
+        (testing (str args-description \newline (pr-str (list* insert! ::venues.category-keyword args)))
           (test/with-discarded-table-changes :venues
             (is (= (condp = insert!
                      #'insert/insert!                     1
-                     #'insert/insert-returning-pks!       ["4"]
+                     #'insert/insert-returning-pks!       [4]
                      #'insert/insert-returning-instances! [(instance/instance
-                                                            ::venues.string-id-and-category-keyword
-                                                            {:id         "4"
+                                                            ::venues.category-keyword
+                                                            {:id         4
                                                              :name       "Hi-Dive"
                                                              :category   :bar
                                                              :created-at (LocalDateTime/parse "2017-01-01T00:00")
                                                              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
-                   (insert! ::venues.string-id-and-category-keyword [{:name "Hi-Dive", category-key :bar}])))))))))
+                   (apply insert! ::venues.category-keyword args)))
+            (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
+                   (select/select-fn-set :name ::venues.category-keyword :category :bar))))))
+      (testing "transformed primary key"
+        (test/with-discarded-table-changes :venues
+          (is (= (condp = insert!
+                   #'insert/insert!                     1
+                   #'insert/insert-returning-pks!       ["4"]
+                   #'insert/insert-returning-instances! [(instance/instance
+                                                          ::venues.string-id-and-category-keyword
+                                                          {:id         "4"
+                                                           :name       "Hi-Dive"
+                                                           :category   :bar
+                                                           :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
+                 (insert! ::venues.string-id-and-category-keyword [{:name "Hi-Dive", :category :bar}]))))))))
 
 (deftest transform-insert-returning-results-without-select-test
   (testing "insert-returning-instances results should be transformed if they come directly from the DB (not via select)"
@@ -305,19 +291,18 @@
              (select/select ::test/venues 1)))
       (is (= #{2}
              (select/select-fn-set :id ::test/venues 2)))))
-  (test-both-normal-and-magic-keys [category-key]
-    (testing "Delete row by key-value conditions"
+  (testing "Delete row by key-value conditions"
+    (test/with-discarded-table-changes :venues
+      (is (= 2
+             (delete/delete! ::venues.category-keyword :category :bar)))
+      (is (= []
+             (select/select ::venues.category-keyword :category :bar))))
+    (testing "Toucan-style fn-args vector"
       (test/with-discarded-table-changes :venues
         (is (= 2
-               (delete/delete! ::venues.category-keyword category-key :bar)))
+               (delete/delete! ::venues.category-keyword :category [:in [:bar]])))
         (is (= []
-               (select/select ::venues.category-keyword category-key :bar))))
-      (testing "Toucan-style fn-args vector"
-        (test/with-discarded-table-changes :venues
-          (is (= 2
-                 (delete/delete! ::venues.category-keyword category-key [:in [:bar]])))
-          (is (= []
-                 (select/select ::venues.category-keyword category-key :bar))))))))
+               (select/select ::venues.category-keyword :category :bar)))))))
 
 (deftest no-npes-test
   (testing "Don't apply transforms to values that are nil (avoid NPEs)\n"

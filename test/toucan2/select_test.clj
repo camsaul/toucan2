@@ -17,8 +17,6 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (derive ::people ::test/people)
 
 (deftest ^:parallel parse-args-test
@@ -363,7 +361,10 @@
   (testing "Select shouldn't add a :from clause if one is passed in explicitly already"
     (is (= (instance/instance ::test/people {:id 1})
            (select/select-one ::test/people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]})))
-    (is (= ["SELECT p.id FROM people AS p WHERE p.id = ?" 1]
+    (is (= [(case (test/current-db-type)
+              :h2       "SELECT \"P\".\"ID\" FROM \"PEOPLE\" AS \"P\" WHERE \"P\".\"ID\" = ?"
+              :postgres "SELECT \"p\".\"id\" FROM \"people\" AS \"p\" WHERE \"p\".\"id\" = ?")
+            1]
            (tools.compile/compile
              (select/select-one :people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]}))))))
 
@@ -377,7 +378,9 @@
                query))
         (is (= {:select [:*], :from [[:venues]], :where [:= :id nil]}
                (pipeline/build :toucan.query-type/select.* ::test/venues parsed-args query)))))
-    (is (= ["SELECT * FROM venues WHERE id IS NULL"]
+    (is (= [(case (test/current-db-type)
+              :h2       "SELECT * FROM \"VENUES\" WHERE \"ID\" IS NULL"
+              :postgres "SELECT * FROM \"venues\" WHERE \"id\" IS NULL")]
            (tools.compile/compile
              (select/select ::test/venues nil))))
     (is (= []

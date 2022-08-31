@@ -45,17 +45,17 @@
       (is (= expected
              (model/table-name model))))))
 
-(derive ::people.quoted ::test/people)
+(derive ::people.unquoted ::test/people)
 
-(m/defmethod model/do-with-model ::people.quoted
+(m/defmethod model/do-with-model ::people.unquoted
   [modelable f]
-  (binding [map.honeysql/*options* {:quoted true}]
+  (binding [map.honeysql/*options* {:quoted false}]
     (next-method modelable f)))
 
 (deftest default-honeysql-options-for-a-model-test
   (testing "There should be a way to specify 'default options' for a specific model"
-    (model/with-model [_model ::people.quoted]
-      (is (= ["SELECT * FROM \"people\" WHERE \"id\" = ?" 1]
+    (model/with-model [_model ::people.unquoted]
+      (is (= ["SELECT * FROM people WHERE id = ?" 1]
              (pipeline/compile {:select [:*]
                                 :from   [[:people]]
                                 :where  [:= :id 1]}))))))

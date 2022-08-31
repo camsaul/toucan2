@@ -10,8 +10,6 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (derive ::venues.default-fields ::test/venues)
 
 (default-fields/define-default-fields ::venues.default-fields

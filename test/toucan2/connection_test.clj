@@ -72,18 +72,16 @@
               (conn/with-transaction nil
                 (is (instance? java.sql.Connection conn/*current-connectable*))
                 (test-connection conn/*current-connectable*))))))))
-  (test/do-db-types-fixture
-   (fn []
-     (test/with-discarded-table-changes :venues
-       (is (thrown?
-            clojure.lang.ExceptionInfo
-            (conn/with-transaction [_conn]
-              (update/update! ::test/venues 1 {:name "Tin Vietnamese"})
-              (is (= "Tin Vietnamese"
-                     (select/select-one-fn :name ::test/venues 1)))
-              (throw (ex-cause "OOPS")))
-            (is (= "Tin Vietnamese"
-                   (select/select-one-fn :name ::test/venues 1)))))))))
+  (test/with-discarded-table-changes :venues
+    (is (thrown?
+         clojure.lang.ExceptionInfo
+         (conn/with-transaction [_conn]
+           (update/update! ::test/venues 1 {:name "Tin Vietnamese"})
+           (is (= "Tin Vietnamese"
+                  (select/select-one-fn :name ::test/venues 1)))
+           (throw (ex-cause "OOPS")))
+         (is (= "Tin Vietnamese"
+                (select/select-one-fn :name ::test/venues 1)))))))
 
 (deftest jdbc-spec-test
   (conn/with-connection [conn {:dbtype   "h2:mem"

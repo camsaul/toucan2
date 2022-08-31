@@ -21,10 +21,10 @@
 
 (set! *warn-on-reflection* true)
 
+(use-fixtures :each test-setup/do-with-quoted-snake-disabled)
+
 (comment heroes/keep-me
          test-setup/keep-me)
-
-(use-fixtures :each test-setup/do-with-default-quoting-style test/do-db-types-fixture)
 
 (deftest simple-model-test
   (testing "Simple model should use the same key transform as the original model"
