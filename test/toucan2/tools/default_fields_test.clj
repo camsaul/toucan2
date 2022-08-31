@@ -38,3 +38,19 @@
   (test/with-discarded-table-changes :venues
     (is (= [(instance/instance ::venues.default-fields {:id 4, :name "BevLess", :category "store"})]
            (insert/insert-returning-instances! ::venues.default-fields [{:name "BevLess", :category "store"}])))))
+
+(derive ::venues.anaphor ::test/venues)
+(derive ::venues.anaphor.id ::venues.anaphor)
+(derive ::venues.anaphor.category ::venues.anaphor)
+
+(default-fields/define-default-fields ::venues.anaphor
+  (case &model
+    ::venues.anaphor.id       [:id :name]
+    ::venues.anaphor.category [:category :name]))
+
+(deftest anaphor-test
+  (testing "define-default-fields should introduce an &model anaphor"
+    (are [model expected] (= expected
+                             (select/select-one model 1))
+      ::venues.anaphor.id       {:name "Tempest", :id 1}
+      ::venues.anaphor.category {:name "Tempest", :category "bar"})))
