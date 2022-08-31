@@ -3,7 +3,7 @@
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.instance :as instance]
-   [toucan2.model :as model]
+   [toucan2.pipeline :as pipeline]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.with-temp :as with-temp]))
@@ -94,9 +94,9 @@
       (is (= 7
              (select/count ::birds.with-default-type))))))
 
-(m/defmethod model/do-with-model ::unresolved-model
-  [_modelable f]
-  (f ::test/birds))
+(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model ::unresolved-model]
+  [rf query-type _model parsed-args]
+  (rf query-type ::test/birds parsed-args))
 
 (deftest resolve-model-test
   (testing "with-temp should resolve models"

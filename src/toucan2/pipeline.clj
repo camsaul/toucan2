@@ -394,7 +394,7 @@
   ```
   transduce-parsed
   ↓
-  toucan2.model/with-model
+  toucan2.model/resolve-model
   ↓
   transduce-with-model ← YOU ARE HERE
   ↓
@@ -409,7 +409,6 @@
 (m/defmethod transduce-with-model :around :default
   [rf query-type model parsed-args]
   {:pre [(ifn? rf) (query-type? query-type) (map? parsed-args)]}
-  (u/println-debug ["transduce for model %s" model])
   (u/try-with-error-context ["with model" {:model model}]
     (next-method rf query-type model parsed-args)))
 
@@ -435,12 +434,12 @@
   ↓
   transduce-parsed ← YOU ARE HERE
   ↓
-  toucan2.model/with-model
+  toucan2.model/resolve-model
   ↓
   transduce-with-model
   ```
 
-  The default implementation resolves the `:modelable` in `parsed-args` with [[toucan2.model/with-model]] and then
+  The default implementation resolves the `:modelable` in `parsed-args` with [[toucan2.model/resolve-model]] and then
   calls [[transduce-with-model]]."
   {:arglists '([rf query-type₁ parsed-args])}
   (dispatch-ignore-rf u/dispatch-on-first-arg))
@@ -454,7 +453,7 @@
 
 (m/defmethod transduce-parsed :default
   [rf query-type {:keys [modelable], :as parsed-args}]
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     (transduce-with-model rf query-type model (dissoc parsed-args :modelable))))
 
 ;;;; [[transduce-unparsed]]

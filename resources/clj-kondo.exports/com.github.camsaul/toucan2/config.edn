@@ -4,8 +4,6 @@
  :lint-as
  {toucan2.core/build             clojure.core/identity
   toucan2.core/compile           clojure.core/identity
-  toucan2.core/with-model        clojure.core/let
-  toucan2.model/with-model       clojure.core/let
   toucan2.query/with-built-query clojure.core/let
   toucan2.tools.compile/build    clojure.core/identity
   toucan2.tools.compile/compile  clojure.core/identity}

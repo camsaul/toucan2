@@ -164,7 +164,7 @@
   ^clojure.lang.Keyword [modelable field-name]
   (if (vector? field-name)
     [(qualify modelable (first field-name)) (second field-name)]
-    (model/with-model [model modelable]
+    (let [model (model/resolve-model modelable)]
       (keyword (str (name (model/table-name model)) \. (name field-name))))))
 
 (defn qualified?
@@ -178,7 +178,7 @@
 ;;   "DEPRECATED: You almost certainly don't need to be using this -- us [[toucan2.select/select]] instead, which can now
 ;;   handle arbitrary queries."
 ;;   [modelable rows]
-;;   (model/with-model [model modelable]
+;;   (let [model (model/resolve-model modelable)]
 ;;     (select/select model (identity-query/identity-query rows))))
 
 (defn simple-select
@@ -275,24 +275,23 @@
   [{:keys [original-model]}]
   (instance/key-transform-fn original-model))
 
-(m/defmethod model/do-with-model SimpleModel
-  [model f]
+(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model SimpleModel]
+  [rf query-type model parsed-args]
   (binding [map.honeysql/*options* (honeysql-options)]
-    (f model)))
+    (next-method rf query-type model parsed-args)))
 
 (defn simple-insert-many!
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead. Returns the IDs of the inserted rows."
   [modelable row-maps]
   (when (seq row-maps)
-    (model/with-model [model modelable]
+    (let [model (model/resolve-model modelable)]
       (insert/insert-returning-pks! (->SimpleModel model) row-maps))))
 
 (defn insert-many!
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead."
   [modelable row-maps]
   (when (seq row-maps)
-    (model/with-model [_model modelable]
-      (insert/insert-returning-pks! modelable row-maps))))
+    (insert/insert-returning-pks! modelable row-maps)))
 
 (defn simple-insert!
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead."
@@ -355,7 +354,7 @@
    (simple-delete! modelable nil))
 
   ([modelable conditions-map]
-   (model/with-model [model modelable]
+   (let [model (model/resolve-model modelable)]
      (pos? (apply delete/delete! (->SimpleModel model) (into [] (mapcat vec) conditions-map)))))
 
   ([modelable k v & {:as more}]

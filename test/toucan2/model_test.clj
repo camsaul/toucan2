@@ -5,7 +5,9 @@
    [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
-   [toucan2.test :as test]))
+   [toucan2.select :as select]
+   [toucan2.test :as test]
+   [toucan2.tools.compile :as tools.compile]))
 
 (deftest primary-keys-test
   (testing "default implementation"
@@ -47,18 +49,18 @@
 
 (derive ::people.unquoted ::test/people)
 
-(m/defmethod model/do-with-model ::people.unquoted
-  [modelable f]
+(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model ::people.unquoted]
+  [rf query-type model parsed-args]
   (binding [map.honeysql/*options* {:quoted false}]
-    (next-method modelable f)))
+    (next-method rf query-type model parsed-args)))
 
 (deftest default-honeysql-options-for-a-model-test
   (testing "There should be a way to specify 'default options' for a specific model"
-    (model/with-model [_model ::people.unquoted]
-      (is (= ["SELECT * FROM people WHERE id = ?" 1]
-             (pipeline/compile {:select [:*]
-                                :from   [[:people]]
-                                :where  [:= :id 1]}))))))
+    (is (= ["SELECT * FROM people WHERE id = ?" 1]
+           (tools.compile/compile
+             (select/select ::people.unquoted {:select [:*]
+                                               :from   [[:people]]
+                                               :where  [:= :id 1]}))))))
 
 ;;; [[model/default-connectable]] gets tested basically everywhere, because we define it for the models in
 ;;; [[toucan2.test]] and use it in almost every test namespace

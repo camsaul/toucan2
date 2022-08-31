@@ -86,9 +86,9 @@
   default-connectable
   primary-key-values
   primary-keys
+  resolve-model
   select-pks-fn
-  table-name
-  with-model]
+  table-name]
 
  [toucan2.protocols
   changes

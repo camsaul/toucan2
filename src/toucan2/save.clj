@@ -29,17 +29,17 @@
                   (some-> object class .getCanonicalName)
                   (u/safe-pr-str object)))
   (if-let [changes (not-empty (protocols/changes object))]
-    (model/with-model [model (protocols/model object)]
-      (let [pk-values     (select-keys object (model/primary-keys (protocols/model object)))
-            rows-affected (update/update! model pk-values changes)]
-        (when-not (pos? rows-affected)
-          (throw (ex-info (format "Unable to save object: %s with primary key %s does not exist."
-                                  (u/safe-pr-str model)
-                                  (u/safe-pr-str pk-values))
-                          {:object object
-                           :pk     pk-values})))
-        (when (> rows-affected 1)
-          (u/println-debug ["Warning: more than 1 row affected when saving %s with primary key %s"
-                            model pk-values]))
-        (instance/reset-original object)))
+    (let [model         (protocols/model object)
+          pk-values     (select-keys object (model/primary-keys (protocols/model object)))
+          rows-affected (update/update! model pk-values changes)]
+      (when-not (pos? rows-affected)
+        (throw (ex-info (format "Unable to save object: %s with primary key %s does not exist."
+                                (u/safe-pr-str model)
+                                (u/safe-pr-str pk-values))
+                        {:object object
+                         :pk     pk-values})))
+      (when (> rows-affected 1)
+        (u/println-debug ["Warning: more than 1 row affected when saving %s with primary key %s"
+                          model pk-values]))
+      (instance/reset-original object))
     object))

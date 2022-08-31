@@ -1,40 +1,23 @@
 (ns toucan2.model
   (:refer-clojure :exclude [namespace])
   (:require
-   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
-;;; TODO -- not sure this should be `do-with-model` anymore. If you want to do something special with a model e.g.
-;;; `with-open` then you can do that inside `transduce-with-model`. Maybe this should just be `resolve-model` or
-;;; something.
-(m/defmulti do-with-model
-  {:arglists '([modelable f])}
+(m/defmulti resolve-model
+  {:arglists '([modelable₁])}
   u/dispatch-on-first-arg)
 
-(m/defmethod do-with-model :default
-  [model f]
-  (f model))
+(m/defmethod resolve-model :default
+  [modelable]
+  modelable)
 
-(m/defmethod do-with-model :around :default
-  [modelable f]
-  (next-method modelable
-               (^:once fn* [model]
-                (when-not (= model modelable)
-                  (u/println-debug ["Resolved modelable %s => model %s" modelable model]))
-                (u/try-with-error-context (when-not (= modelable model)
-                                            ["with resolved model" {::modelable modelable, ::model model}])
-                  (f model)))))
-
-(defmacro with-model [[model-binding modelable] & body]
-  `(do-with-model ~modelable (^:once fn* [~model-binding] ~@body)))
-
-(s/fdef with-model
-  :args (s/cat :bindings (s/spec (s/cat :model-binding symbol? ; don't think it makes sense to destructure a model.
-                                        :modelable     some?)) ; I think modelable should always be required, and non-nil
-               :body     (s/+ any?))
-  :ret any?)
+(m/defmethod resolve-model :around :default
+  [modelable]
+  (let [model (next-method modelable)]
+    (u/println-debug ["Resolved modelable %s => model %s" modelable model])
+    model))
 
 (m/defmulti default-connectable
   "The default connectable that should be used when executing queries for `model` if
@@ -116,11 +99,11 @@
 
   The primary keys are determined by [[primary-keys]]. By default this is simply the keyword `:id`."
   [modelable]
-  (with-model [model modelable]
-    (let [pk-keys (primary-keys model)]
-      (if (= (count pk-keys) 1)
-        (first pk-keys)
-        (apply juxt pk-keys)))))
+  (let [model   (resolve-model modelable)
+        pk-keys (primary-keys model)]
+    (if (= (count pk-keys) 1)
+      (first pk-keys)
+      (apply juxt pk-keys))))
 
 (m/defmulti model->namespace
   {:arglists '([model₁])}
