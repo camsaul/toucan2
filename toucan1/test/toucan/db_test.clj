@@ -15,16 +15,17 @@
    [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.map-backend.honeysql2 :as map.honeysql]
-   [toucan2.test :as test])
+   [toucan2.test :as test]
+   [toucan2.tools.compile :as tools.compile])
   (:import
    (java.util Locale)))
 
 (set! *warn-on-reflection* true)
 
+(use-fixtures :each test-setup/do-with-quoted-snake-disabled)
+
 (comment heroes/keep-me
          test-setup/keep-me)
-
-(use-fixtures :each test-setup/do-with-default-quoting-style test/do-db-types-fixture)
 
 (deftest simple-model-test
   (testing "Simple model should use the same key transform as the original model"
@@ -218,14 +219,14 @@
 (deftest update-where!-test
   (test/with-discarded-table-changes User
     (t1.db/update-where! User {:first-name [:not= "Cam"]}
-                      :first-name "Cam")
+                         :first-name "Cam")
     (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
             {:id 2, :first-name "Cam", :last-name "Toucan"}
             {:id 3, :first-name "Cam", :last-name "Bird"}]
            (t1.db/select User {:order-by [:id]}))))
   (test/with-discarded-table-changes User
     (t1.db/update-where! User {:first-name "Cam"}
-                      :first-name "Not Cam")
+                         :first-name "Not Cam")
     (is (= [{:id 1, :first-name "Not Cam", :last-name "Saul"}
             {:id 2, :first-name "Rasta", :last-name "Toucan"}
             {:id 3, :first-name "Lucky", :last-name "Bird"}]
@@ -309,6 +310,11 @@
          (t1.db/count User, :first-name [:not= "Cam"]))))
 
 (deftest select-test
+  (testing "identifiers should be quoted"
+    (is (= [(case (test/current-db-type)
+              :h2       "SELECT * FROM \"T1_USERS\" ORDER BY \"ID\" ASC"
+              :postgres "SELECT * FROM \"t1_users\" ORDER BY \"id\" ASC")]
+           (tools.compile/compile (t1.db/select User {:order-by [:id]})))))
   (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
           {:id 2, :first-name "Rasta", :last-name "Toucan"}
           {:id 3, :first-name "Lucky", :last-name "Bird"}]

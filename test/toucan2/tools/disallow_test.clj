@@ -8,8 +8,6 @@
    [toucan2.tools.disallow :as disallow]
    [toucan2.update :as update]))
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (derive ::venues.no-select ::test/venues)
 (derive ::venues.no-select ::disallow/select)
 

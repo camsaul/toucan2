@@ -14,8 +14,6 @@
   (:import
    (java.time LocalDateTime)))
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (set! *warn-on-reflection* true)
 
 (defrecord MyRecordType [x])
@@ -206,7 +204,9 @@
       ;;; TODO -- what about multiple empty rows?? :shrug:
       (testing (format "row-or-rows = %s" (pr-str row-or-rows))
         (test/with-discarded-table-changes :birds
-          (is (= ["INSERT INTO birds DEFAULT VALUES"]
+          (is (= [(case (test/current-db-type)
+                    :h2       "INSERT INTO \"BIRDS\" DEFAULT VALUES"
+                    :postgres "INSERT INTO \"birds\" DEFAULT VALUES")]
                  (tools.compile/compile
                    (insert/insert! ::test/birds row-or-rows))))
           (is (= 1

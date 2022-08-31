@@ -15,8 +15,6 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (derive ::venues.before-insert ::test/venues)
 
 (before-insert/define-before-insert ::venues.before-insert

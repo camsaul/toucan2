@@ -9,8 +9,6 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (derive ::people.id-and-name ::test/people)
 
 (before-select/define-before-select ::people.id-and-name

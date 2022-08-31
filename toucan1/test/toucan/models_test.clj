@@ -19,9 +19,9 @@
   (:import
    (java.time LocalDateTime)))
 
-(use-fixtures :each test-setup/do-with-default-quoting-style test/do-db-types-fixture)
-
 (set! *warn-on-reflection* true)
+
+(use-fixtures :each test-setup/do-with-quoted-snake-disabled)
 
 (deftest resolve-model-test
   (are [x] (= :toucan.test-models.category/Category

@@ -15,8 +15,6 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (deftest parse-update-args-test
   (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
          (update/parse-update-args :toucan.query-type/update.* [:model 1 {:a 1}])))
@@ -111,11 +109,13 @@
       (let [query (pipeline/resolve-query :toucan.query-type/update.* ::test/venues (:queryable parsed-args))]
         (is (= {}
                query))
-        (is (= {:update    [:venues]
-                :set       {:name "Taco Bell"}
-                :where     [:= :id nil]}
+        (is (= {:update [:venues]
+                :set    {:name "Taco Bell"}
+                :where  [:= :id nil]}
                (pipeline/build :toucan.query-type/update.* ::test/venues parsed-args query)))))
-    (is (= ["UPDATE venues SET name = ? WHERE id IS NULL" "Taco Bell"]
+    (is (= [(case (test/current-db-type)
+              :h2       "UPDATE \"VENUES\" SET \"NAME\" = ? WHERE \"ID\" IS NULL"
+              :postgres "UPDATE \"venues\" SET \"name\" = ? WHERE \"id\" IS NULL") "Taco Bell"]
            (tools.compile/compile
              (update/update! ::test/venues nil {:name "Taco Bell"}))))
     (test/with-discarded-table-changes :venues

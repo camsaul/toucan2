@@ -17,8 +17,6 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (def ^:dynamic ^:private *updated-venues* nil)
 
 (derive ::venues.before-update ::test/venues)

@@ -27,6 +27,7 @@
 
    :jvm-opts
    ["-Duser.timezone=UTC"
+    "-Dclojure.main.report=stderr"
     ;; Exceptions that get thrown repeatedly are created without stacktraces as a performance optimization in newer Java
     ;; versions. This makes debugging pretty hard when working on stuff locally -- prefer debuggability over performance
     ;; for local dev work.
@@ -51,6 +52,7 @@
   ;; clojure -X:dev:test
   :test
   {:exec-fn   toucan2.test-runner/run-tests
+   :jvm-opts  ["-Dtest.dbs=h2,postgres"]
    :exec-args {:only ["test"
                       "toucan1/test"]}}
 

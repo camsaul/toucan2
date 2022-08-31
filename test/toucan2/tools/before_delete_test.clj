@@ -13,8 +13,6 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test/do-db-types-fixture)
-
 (derive ::venues.before-delete ::test/venues)
 
 (def ^:dynamic ^:private *deleted-venues* nil)

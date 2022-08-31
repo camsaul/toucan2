@@ -76,7 +76,9 @@
         (is (= {:delete-from [:venues]
                 :where       [:= :id nil]}
                (pipeline/build :toucan.query-type/delete.update-count ::test/venues parsed-args resolved-query)))
-        (is (= ["DELETE FROM venues WHERE id IS NULL"]
+        (is (= [(case (test/current-db-type)
+                  :h2       "DELETE FROM \"VENUES\" WHERE \"ID\" IS NULL"
+                  :postgres "DELETE FROM \"venues\" WHERE \"id\" IS NULL")]
                (tools.compile/compile
                  (delete/delete! ::test/venues nil))))))
     (test/with-discarded-table-changes :venues
