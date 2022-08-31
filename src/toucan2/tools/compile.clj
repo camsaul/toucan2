@@ -15,7 +15,7 @@
   ```"
   {:style/indent 0}
   [& body]
-  `(binding [pipeline/transduce-compiled-query (fn [rf# query-type# model# compiled-query#]
+  `(binding [pipeline/transduce-execute (fn [rf# query-type# model# compiled-query#]
                                                  compiled-query#)]
      ~@body))
 
@@ -23,7 +23,7 @@
   "Return the built query before compilation that would have been executed by `body` without compiling or executing it."
   {:style/indent 0}
   [& body]
-  `(binding [pipeline/transduce-built-query (fn [rf# query-type# model# built-query#]
+  `(binding [pipeline/transduce-compile (fn [rf# query-type# model# built-query#]
                                               built-query#)]
      ~@body))
 

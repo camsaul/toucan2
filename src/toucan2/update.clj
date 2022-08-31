@@ -31,7 +31,7 @@
 (m/defmethod pipeline/transduce-unparsed :toucan.query-type/update.*
   [rf query-type unparsed-args]
   (let [parsed-args (parse-update-args query-type unparsed-args)]
-    (pipeline/transduce-parsed-args rf query-type parsed-args)))
+    (pipeline/transduce-parsed rf query-type parsed-args)))
 
 ;;;; Code for building Honey SQL for UPDATE lives in [[toucan2.map-backend.honeysql2]]
 

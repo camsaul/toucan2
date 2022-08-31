@@ -1,6 +1,17 @@
 (ns toucan2.pipeline
   "This is a low-level namespace implementing our query execution pipeline. Most of the stuff you'd use on a regular basis
-  are implemented on top of stuff here."
+  are implemented on top of stuff here.
+
+  Pipeline order is
+
+  1. [[transduce-unparsed]]
+  2. [[transduce-parsed]]
+  3. [[transduce-with-model]]
+  4. [[transduce-resolve]]
+  5. [[transduce-build]]
+  6. [[transduce-compile]]
+  7. [[transduce-execute]]
+  8. [[transduce-execute-with-connection]]"
   (:refer-clojure :exclude [compile])
   (:require
    [methodical.core :as m]
@@ -97,7 +108,7 @@
 
 (def ^:dynamic *call-count-thunk*
   "Thunk function to call every time a query is executed if [[toucan2.execute/with-call-count]] is in use. Implementees
-  of [[transduce-compiled-query-with-connection]] should invoke this every time a query gets executed. You can
+  of [[transduce-execute-with-connection]] should invoke this every time a query gets executed. You can
   use [[increment-call-count!]] to simplify the chore of making sure it's non-`nil` before invoking it."
   nil)
 
@@ -110,18 +121,18 @@
   (fn [_rf & args]
     (apply f args)))
 
-;;;; [[transduce-compiled-query-with-connection]]
+;;;; [[transduce-execute-with-connection]]
 
-(m/defmulti ^:dynamic transduce-compiled-query-with-connection
+(m/defmulti ^:dynamic transduce-execute-with-connection
   "The eighth and final step in the query execution pipeline. Called with a fully compiled query that can be executed
   natively, and an open connection for executing it.
 
   ```
-  transduce-compiled-query
+  transduce-execute
   ↓
   toucan2.connection/with-connection
   ↓
-  transduce-compiled-query-with-connection ← YOU ARE HERE
+  transduce-execute-with-connection ← YOU ARE HERE
   ↓
   execute query
   ↓
@@ -134,37 +145,37 @@
   {:arglists '([rf conn₁ query-type₂ model₃ compiled-query])}
   (dispatch-ignore-rf u/dispatch-on-first-three-args))
 
-(m/defmethod transduce-compiled-query-with-connection :around :default
+(m/defmethod transduce-execute-with-connection :around :default
   [rf conn query-type model compiled-query]
   {:pre [(ifn? rf) (some? conn) (query-type? query-type) (some? compiled-query)]}
   (u/println-debug ["transduce query with %s connection" (symbol (.getCanonicalName (class conn)))])
   (u/try-with-error-context ["with connection" {:connection (symbol (.getCanonicalName (class conn)))}]
     (next-method rf conn query-type model compiled-query)))
 
-;;;; [[transduce-compiled-query]]
+;;;; [[transduce-execute]]
 
-(m/defmulti ^:dynamic transduce-compiled-query
+(m/defmulti ^:dynamic transduce-execute
   "The seventh step in the query execution pipeline. Called with a compiled query that is ready to be executed natively, for
   example a `[sql & args]` vector, immediately before opening a connection.
 
   ```
-  transduce-built-query
+  transduce-compile
   ↓
   (compile query)
   ↓
-  transduce-compiled-query ← YOU ARE HERE
+  transduce-execute ← YOU ARE HERE
   ↓
   toucan2.connection/with-connection
   ↓
-  transduce-compiled-query-with-connection
+  transduce-execute-with-connection
   ```
 
   The default implementation opens a connection (or uses the current connection)
-  using [[toucan2.connection/with-connection]] and then calls [[transduce-compiled-query-with-connection]]."
+  using [[toucan2.connection/with-connection]] and then calls [[transduce-execute-with-connection]]."
   {:arglists '([rf query-type₁ model₂ compiled-query₃])}
   (dispatch-ignore-rf u/dispatch-on-first-three-args))
 
-(m/defmethod transduce-compiled-query :around :default
+(m/defmethod transduce-execute :around :default
   [rf query-type model compiled-query]
   {:pre [(ifn? rf) (query-type? query-type) (some? compiled-query)]}
   (u/println-debug ["transduce compiled query %s" compiled-query])
@@ -175,24 +186,23 @@
   (or conn/*current-connectable*
       (model/default-connectable model)))
 
-(m/defmethod transduce-compiled-query :default
+(m/defmethod transduce-execute :default
   [rf query-type model compiled-query]
   (conn/with-connection [conn (current-connectable model)]
-    (transduce-compiled-query-with-connection rf conn query-type model compiled-query)))
+    (transduce-execute-with-connection rf conn query-type model compiled-query)))
 
 ;;; For DML stuff we will run the whole thing in a transaction if we're not already in one.
 ;;;
 ;;; Not 100% sure this is necessary since we would probably already be in one if we needed to be because stuff like
 ;;; [[toucan2.tools.before-delete]] have to put us in one much earlier.
-(m/defmethod transduce-compiled-query [#_query-type :toucan.statement-type/DML #_model :default #_compiled-query :default]
+(m/defmethod transduce-execute [#_query-type :toucan.statement-type/DML #_model :default #_compiled-query :default]
   [rf query-type model compiled-query]
   (conn/with-transaction [_conn (current-connectable model) {:nested-transaction-rule :ignore}]
     (next-method rf query-type model compiled-query)))
 
-;;;; [[transduce-built-query]]
+;;;; [[transduce-compile]]
 
-;;; TODO -- consider renaming this to `transduce-compile` or something a little clearer.
-(m/defmulti ^:dynamic transduce-built-query
+(m/defmulti ^:dynamic transduce-compile
   "The sixth step in the query execution pipeline. Called with a query that is ready to be compiled, e.g. a fully-formed
   Honey SQL form.
 
@@ -201,21 +211,21 @@
   ↓
   (build query)
   ↓
-  transduce-built-query ← YOU ARE HERE
+  transduce-compile ← YOU ARE HERE
   ↓
   (compile query)
   ↓
-  transduce-compiled-query
+  transduce-execute
   ```
 
-  The default implementation compiles the query and then calls [[transduce-compiled-query]]."
+  The default implementation compiles the query and then calls [[transduce-execute]]."
   {:arglists '([rf query-type₁ model₂ built-query₃])}
   (dispatch-ignore-rf u/dispatch-on-first-three-args))
 
 ;;; HACK
 (def ^:private ^:dynamic *built-query* nil)
 
-(m/defmethod transduce-built-query :around :default
+(m/defmethod transduce-compile :around :default
   [rf query-type model built-query]
   {:pre [(ifn? rf) (query-type? query-type) (some? built-query)]}
   (u/println-debug ["transduce built query %s" built-query])
@@ -224,7 +234,7 @@
     (binding [*built-query* built-query]
       (next-method rf query-type model built-query))))
 
-(m/defmethod transduce-built-query :default
+(m/defmethod transduce-compile :default
   [rf query-type model query]
   (assert (and (some? query)
                (or (not (coll? query))
@@ -232,19 +242,19 @@
           (format "Compiled query should not be nil/empty. Got: %s" (pr-str query)))
   (let [query (vary-meta query (fn [metta]
                                  (merge (meta *built-query*) metta)))]
-    (transduce-compiled-query rf query-type model query)))
+    (transduce-execute rf query-type model query)))
 
 ;;; TODO -- this is a little JDBC-specific. What if some other query engine wants to run plain string queries without us
 ;;; wrapping them in a vector? Maybe this is something that should be handled at the query execution level in
-;;; [[transduce-compiled-query-with-connection]] instead. I guess that wouldn't actually work because we need to attach
+;;; [[transduce-execute-with-connection]] instead. I guess that wouldn't actually work because we need to attach
 ;;; metadata to compiled queries
-(m/defmethod transduce-built-query [#_query-type :default #_model :default #_built-query String]
+(m/defmethod transduce-compile [#_query-type :default #_model :default #_built-query String]
   [rf query-type model sql]
-  (transduce-built-query rf query-type model [sql]))
+  (transduce-compile rf query-type model [sql]))
 
-(m/defmethod transduce-built-query [#_query-type :default #_model :default #_built-query clojure.lang.IPersistentMap]
+(m/defmethod transduce-compile [#_query-type :default #_model :default #_built-query clojure.lang.IPersistentMap]
   [rf query-type model m]
-  (transduce-built-query rf query-type model (vary-meta m assoc :type (map/backend))))
+  (transduce-compile rf query-type model (vary-meta m assoc :type (map/backend))))
 
 ;;;; [[transduce-build]]
 
@@ -252,7 +262,7 @@
   "The fifth step in the query execution pipeline. Called with a resolved query immediately before 'building' it.
 
   ```
-  transduce-unresolved-query
+  transduce-resolve
   ↓
   (resolve query)
   ↓
@@ -260,10 +270,10 @@
   ↓
   (build query)
   ↓
-  transduce-built-query
+  transduce-compile
   ```
 
-  The default implementation builds the resolved query and then calls [[transduce-built-query]]."
+  The default implementation builds the resolved query and then calls [[transduce-compile]]."
   {:arglists '([rf query-type₁ model₂ parsed-args resolved-query₃])}
   (dispatch-ignore-rf
    (fn [query-type₁ model₂ _parsed-args resolved-query₃]
@@ -290,7 +300,7 @@
                                ;; HACK in case you need it later. (We do.) See if there's a way we could do this
                                ;; without a big ol ugly HACK.
                                ::parsed-args parsed-args)]
-    (transduce-built-query rf query-type model built-query)))
+    (transduce-compile rf query-type model built-query)))
 
 ;;; Something like (select my-model nil) should basically mean SELECT * FROM my_model WHERE id IS NULL
 (m/defmethod transduce-build [#_query-type :default #_model :default #_query nil]
@@ -342,15 +352,15 @@
                      :dispatch-value (m/dispatch-value transduce-build rf query-type model parsed-args sql-args)})))
   (next-method rf query-type model parsed-args sql-args))
 
-;;;; [[transduce-unresolved-query]]
+;;;; [[transduce-resolve]]
 
-(m/defmulti ^:dynamic transduce-unresolved-query
+(m/defmulti ^:dynamic transduce-resolve
   "The fourth step in the query execution pipeline.
 
   ```
   transduce-with-model
   ↓
-  transduce-unresolved-query ← YOU ARE HERE
+  transduce-resolve ← YOU ARE HERE
   ↓
   (resolve query)
   ↓
@@ -363,7 +373,7 @@
   (dispatch-ignore-rf (fn [query-type model _parsed-args unresolved-query]
                         (u/dispatch-on-first-three-args query-type model unresolved-query))))
 
-(m/defmethod transduce-unresolved-query :around :default
+(m/defmethod transduce-resolve :around :default
   [rf query-type model parsed-args unresolved-query]
   {:pre [(ifn? rf) (query-type? query-type) (map? parsed-args)]}
   (u/println-debug ["transduce unresolved query %s" unresolved-query])
@@ -372,7 +382,7 @@
                                                       :parsed-args      parsed-args}]
     (next-method rf query-type model parsed-args unresolved-query)))
 
-(m/defmethod transduce-unresolved-query :default
+(m/defmethod transduce-resolve :default
   [rf query-type model parsed-args unresolved-query]
   (transduce-build rf query-type model parsed-args unresolved-query))
 
@@ -382,16 +392,16 @@
   "The third step in the query execution pipeline. This is the first step that dispatches off of resolved model.
 
   ```
-  transduce-parsed-args
+  transduce-parsed
   ↓
   toucan2.model/with-model
   ↓
   transduce-with-model ← YOU ARE HERE
   ↓
-  transduce-unresolved-query
+  transduce-resolve
   ```
 
-  The default implementation does nothing special and calls [[transduce-unresolved-query]] with the `:queryable` in
+  The default implementation does nothing special and calls [[transduce-resolve]] with the `:queryable` in
   `parsed-args`."
   {:arglists '([rf query-type₁ model₂ parsed-args])}
   (dispatch-ignore-rf u/dispatch-on-first-two-args))
@@ -410,11 +420,11 @@
   (let [queryable (if (contains? parsed-args :queryable)
                     queryable
                     (or queryable {}))]
-    (transduce-unresolved-query rf query-type model (dissoc parsed-args :queryable) queryable)))
+    (transduce-resolve rf query-type model (dissoc parsed-args :queryable) queryable)))
 
-;;;; [[transduce-parsed-args]]
+;;;; [[transduce-parsed]]
 
-(m/defmulti ^:dynamic transduce-parsed-args
+(m/defmulti ^:dynamic transduce-parsed
   "The second step in the query execution pipeline. Called with args as parsed by something like
   [[toucan2.query/parse-args]].
 
@@ -423,7 +433,7 @@
   ↓
   (parse args)
   ↓
-  transduce-parsed-args ← YOU ARE HERE
+  transduce-parsed ← YOU ARE HERE
   ↓
   toucan2.model/with-model
   ↓
@@ -435,14 +445,14 @@
   {:arglists '([rf query-type₁ parsed-args])}
   (dispatch-ignore-rf u/dispatch-on-first-arg))
 
-(m/defmethod transduce-parsed-args :around :default
+(m/defmethod transduce-parsed :around :default
   [rf query-type parsed-args]
   {:pre [(ifn? rf) (query-type? query-type) (map? parsed-args)]}
   (u/println-debug ["transduce parsed args %s" parsed-args])
   (u/try-with-error-context ["with parsed args" {:parsed-args parsed-args}]
     (next-method rf query-type parsed-args)))
 
-(m/defmethod transduce-parsed-args :default
+(m/defmethod transduce-parsed :default
   [rf query-type {:keys [modelable], :as parsed-args}]
   (model/with-model [model modelable]
     (transduce-with-model rf query-type model (dissoc parsed-args :modelable))))
@@ -460,11 +470,11 @@
   ↓
   (parse args)
   ↓
-  transduce-parsed-args
+  transduce-parsed
   ```
 
   The default implementation parses the args with [[toucan2.query/parse-args]] and then
-  calls [[transduce-parsed-args]]."
+  calls [[transduce-parsed]]."
   {:arglists '([rf query-type₁ unparsed-args])}
   (dispatch-ignore-rf u/dispatch-on-first-arg))
 
@@ -478,7 +488,7 @@
 (m/defmethod transduce-unparsed :default
   [rf query-type unparsed]
   (let [parsed-args (query/parse-args query-type unparsed)]
-    (transduce-parsed-args rf query-type parsed-args)))
+    (transduce-parsed rf query-type parsed-args)))
 
 ;;;; rf helper functions
 
@@ -541,7 +551,7 @@
 
 (defn reducible-parsed-args
   [query-type parsed-args]
-  (reducible-fn transduce-parsed-args query-type parsed-args))
+  (reducible-fn transduce-parsed query-type parsed-args))
 
 (defn reducible-with-model
   [query-type model parsed-args]
@@ -556,15 +566,15 @@
 
 ;; (defn reducible-built-query
 ;;   [query-type model built-query]
-;;   (reducible-fn transduce-built-query query-type model built-query))
+;;   (reducible-fn transduce-compile query-type model built-query))
 
 ;; (defn reducible-compiled-query
 ;;   [query-type model compiled-query]
-;;   (reducible-fn transduce-compiled-query query-type model compiled-query))
+;;   (reducible-fn transduce-execute query-type model compiled-query))
 
 ;; (defn reducible-compiled-query-with-connection
 ;;   [conn query-type model compiled-query]
-;;   (reducible-fn transduce-compiled-query-with-connection conn query-type model compiled-query))
+;;   (reducible-fn transduce-execute-with-connection conn query-type model compiled-query))
 
 ;;;; utils
 
@@ -606,9 +616,9 @@
 
 ;;;; default JDBC impls. Not convinced they belong here.
 
-(m/defmethod transduce-compiled-query-with-connection [#_connection java.sql.Connection
-                                                        #_query-type :default
-                                                        #_model      :default]
+(m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
+                                                       #_query-type :default
+                                                       #_model      :default]
   [rf conn query-type model sql-args]
   (increment-call-count!)
   ;; `:return-keys` is passed in this way instead of binding a dynamic var because we don't want any additional queries
@@ -621,9 +631,9 @@
 ;;; To get Databases to return the generated primary keys rather than the update count for SELECT/UPDATE/DELETE we need
 ;;; to set the `next.jdbc` option `:return-keys true`
 
-(m/defmethod transduce-compiled-query-with-connection [#_connection java.sql.Connection
-                                                        #_query-type :toucan.result-type/pks
-                                                        #_model      :default]
+(m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
+                                                       #_query-type :toucan.result-type/pks
+                                                       #_model      :default]
   [rf conn query-type model sql-args]
   (let [rf* ((map (model/select-pks-fn model))
              rf)]
@@ -657,9 +667,9 @@
                        :queryable {}}]
       (transduce-with-model rf ::select.instances-from-pks model parsed-args))))
 
-(m/defmethod transduce-compiled-query-with-connection [#_connection java.sql.Connection
-                                                        #_query-type :toucan.result-type/instances
-                                                        #_model      :default]
+(m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
+                                                       #_query-type :toucan.result-type/instances
+                                                       #_model      :default]
   [rf conn query-type model sql-args]
   ;; for non-DML stuff (ie `SELECT`) JDBC can actually return instances with zero special magic, so we can just let the
   ;; next method do it's thing. Presumably if we end up here with something that is neither DML or DQL, but maybe
@@ -678,7 +688,7 @@
       ;; actual instances to the original `rf` once we get them.
       ;;
       ;;
-      (let [pks     (transduce-compiled-query-with-connection conj conn pk-query-type model sql-args)
+      (let [pks     (transduce-execute-with-connection conj conn pk-query-type model sql-args)
             ;; this is sort of a hack but I don't know of any other way to pass along `:columns` information with the
             ;; original parsed args
             columns (get-in (meta sql-args) [::parsed-args :columns])]
@@ -693,12 +703,12 @@
   [query-type model unresolved-query]
   (binding [transduce-build (fn [_rf _query-type _model₂ _parsed-args resolved-query]
                               resolved-query)]
-    (transduce-unresolved-query conj query-type model {} unresolved-query)))
+    (transduce-resolve conj query-type model {} unresolved-query)))
 
 (defn build
   "Helper for getting a built query for a `resolved-query`."
   [query-type model parsed-args resolved-query]
-  (binding [transduce-built-query (fn [_rf _query-type _model query]
+  (binding [transduce-compile (fn [_rf _query-type _model query]
                                     query)]
     (transduce-with-model conj query-type model (assoc parsed-args :queryable resolved-query))))
 
@@ -709,9 +719,9 @@
   ([query-type built-query]
    (compile query-type nil built-query))
   ([query-type model built-query]
-   (binding [transduce-compiled-query (fn [_rf _query-type _model query]
+   (binding [transduce-execute (fn [_rf _query-type _model query]
                                         query)]
-     (transduce-built-query conj (or query-type :toucan.query-type/*) model built-query))))
+     (transduce-compile conj (or query-type :toucan.query-type/*) model built-query))))
 
 (defn do-traced-pipeline
   "E.g.
@@ -730,17 +740,17 @@
                       (when (topics :unparsed)
                         {#'transduce-unparsed (traced-var #'transduce-unparsed)})
                       (when (topics :parsed)
-                        {#'transduce-parsed-args (traced-var #'transduce-parsed-args)})
+                        {#'transduce-parsed (traced-var #'transduce-parsed)})
                       (when (topics :with-model)
                         {#'transduce-with-model (traced-var #'transduce-with-model)})
                       (when (topics :resolve)
-                        {#'transduce-unresolved-query (traced-var #'transduce-unresolved-query)})
+                        {#'transduce-resolve (traced-var #'transduce-resolve)})
                       (when (topics :build)
                         {#'transduce-build (traced-var #'transduce-build)})
                       (when (topics :compile)
-                        {#'transduce-built-query (traced-var #'transduce-built-query)})
+                        {#'transduce-compile (traced-var #'transduce-compile)})
                       (when (topics :with-query)
-                        {#'transduce-compiled-query (traced-var #'transduce-compiled-query)})
+                        {#'transduce-execute (traced-var #'transduce-execute)})
                       (when (topics :execute)
-                        {#'transduce-compiled-query-with-connection (traced-var #'transduce-compiled-query-with-connection)}))
+                        {#'transduce-execute-with-connection (traced-var #'transduce-execute-with-connection)}))
                      thunk))))

@@ -63,7 +63,7 @@
                          row)))))]
     ((map row-fn) rf)))
 
-(m/defmethod pipeline/transduce-compiled-query [#_query-type     ::query-type
+(m/defmethod pipeline/transduce-execute [#_query-type     ::query-type
                                                 #_model          ::model
                                                 #_compiled-query :default]
   [rf query-type model sql-args]
@@ -73,7 +73,7 @@
         rf*           (result-type-rf query-type model rf)
         m             (if (= query-type upgraded-type)
                         next-method
-                        pipeline/transduce-compiled-query)]
+                        pipeline/transduce-execute)]
     (m rf* upgraded-type model sql-args)))
 
 (defn ^:no-doc ^{:style/indent [:form]} define-after-impl

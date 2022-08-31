@@ -213,7 +213,7 @@
 ;; TODO this is probably not the way you'd want to accomplish this in real life -- I think you'd probably actually want
 ;; to implement [[toucan2.pipeline/build]] instead. But it does do a good job of letting us test that combining aux
 ;; methods work like we'd expect.
-(m/defmethod pipeline/transduce-built-query :before [:toucan.query-type/select.* ::people.limit-2 clojure.lang.IPersistentMap]
+(m/defmethod pipeline/transduce-compile :before [#_query-type :toucan.query-type/select.* #_model ::people.limit-2 #_query :toucan.map-backend/honeysql2]
   [_rf _query-type _model built-query]
   (assoc built-query :limit 2))
 

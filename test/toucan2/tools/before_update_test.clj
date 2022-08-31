@@ -177,7 +177,7 @@
 
 (derive ::venues.capture-updates ::venues.before-update)
 
-(m/defmethod pipeline/transduce-built-query [#_query-type :toucan.query-type/update.*
+(m/defmethod pipeline/transduce-compile [#_query-type :toucan.query-type/update.*
                                              #_model      ::venues.capture-updates
                                              #_query      :default]
   [rf query-type model built-query]

@@ -121,7 +121,7 @@
 ;;; [[*options*]] inside of [[toucan2.model/with-model]] if they need to do something special? I'm leaning
 ;;; towards the latter.
 
-(m/defmethod pipeline/transduce-built-query [#_query-type :default
+(m/defmethod pipeline/transduce-compile [#_query-type :default
                                              #_model      :default
                                              #_query      :toucan.map-backend/honeysql2]
   [rf query-type model honeysql]

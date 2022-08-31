@@ -321,10 +321,10 @@
 ;;   {:pre [(map? changes-map)]}
 ;;   (model/with-model [model modelable]
 ;;     (binding [
-;;               pipeline/transduce-built-query (fn [rf query-type model built-query]
+;;               pipeline/transduce-compile (fn [rf query-type model built-query]
 ;;                                                  (println "built-query:" built-query) ; NOCOMMIT
 ;;                                                  (if (isa? query-type :toucan.query-type/select.*)
-;;                                                    (pipeline/transduce-built-query rf query-type model built-query)
+;;                                                    (pipeline/transduce-compile rf query-type model built-query)
 ;;                                                    (binding [conn/*current-connectable* (identity-query/identity-connection nil)]
 ;;                                                      built-query)))]
 ;;       (update/update! model nil changes-map))))
@@ -355,7 +355,7 @@
 ;;   ;; FIXME
 ;;   (let [model (protocols/model instance)]
 ;;     (binding [conn/*current-connectable*          (identity-query/identity-connection nil)
-;;               pipeline/transduce-compiled-query (fn [rf query-type model _compiled-query]
+;;               pipeline/transduce-execute (fn [rf query-type model _compiled-query]
 ;;                                                     (if (isa? query-type :toucan.query-type/select.instances)
 ;;                                                       (transduce
 ;;                                                        (map (partial instance/instance model))

@@ -21,7 +21,7 @@
    `(define-named-query ~query-name :default :default ~resolved-query))
 
   ([query-name query-type model resolved-query]
-   `(m/defmethod pipeline/transduce-unresolved-query [~query-type ~model ~query-name]
+   `(m/defmethod pipeline/transduce-resolve [~query-type ~model ~query-name]
       [rf# ~'&query-type ~'&model ~'&parsed-args ~'&unresolved-query]
       (~'next-method rf# ~'&query-type ~'&model ~'&parsed-args ~resolved-query))))
 
