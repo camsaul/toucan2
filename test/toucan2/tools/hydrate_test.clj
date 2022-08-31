@@ -475,45 +475,38 @@
                  (#'hydrate/unflatten-collection (#'hydrate/flatten-collection form)))
     nil
     []
+    '()
     [{:a 1}]
+    '({:a 1})
     [{:a 1} {:b 2}]
     [[]]
+    '(())
     [[{:a 1} {:b 2}] {:c 3} {:d 4}]
     [[[]]]
+    '((()))
     [[[{:a 1} {:b 2}] {:c 3} {:d 4} {:e 5} {:f 6}]]
     [[[[]]]]
+    '(((())))
     [[[[{:a 1} {:b 2}] {:c 3} {:d 4} {:e 5} {:f 6}] {:g 7} {:h 8}]]))
 
 (deftest preserve-shape-test
   (testing "hydration should preserve the shape/nesting of the original form"
     (are [form expected] (= expected
                             (hydrate/hydrate form ::k))
-      nil
-      nil
-
-      []
-      []
-
-      [{:a 1}]
-      [{:a 1, ::k 5}]
-
-      [{:a 1} {:b 2}]
-      [{:a 1, ::k 5} {:b 2, ::k 5}]
-
-      [[]]
-      [[]]
+      nil             nil
+      []              []
+      [{:a 1}]        [{:a 1, ::k 5}]
+      [{:a 1} {:b 2}] [{:a 1, ::k 5} {:b 2, ::k 5}]
+      [[]]            [[]]
+      [[[]]]          [[[]]]
+      [[[[]]]]        [[[[]]]]
 
       [[{:a 1} {:b 2}] {:c 3} {:d 4}]
       [[{:a 1, ::k 5} {:b 2, ::k 5}] {:c 3, ::k 5} {:d 4, ::k 5}]
 
-      [[[]]]
-      [[[]]]
 
       [[[{:a 1} {:b 2}] {:c 3} {:d 4}] {:e 5} {:f 6}]
       [[[{:a 1, ::k 5} {:b 2, ::k 5}] {:c 3, ::k 5} {:d 4, ::k 5}] {:e 5, ::k 5} {:f 6, ::k 5}]
-
-      [[[[]]]]
-      [[[[]]]]
 
       [[[[{:a 1} {:b 2}] {:c 3} {:d 4}] {:e 5} {:f 6}] {:g 7} {:h 8}]
       [[[[{:a 1, ::k 5} {:b 2, ::k 5}] {:c 3, ::k 5} {:d 4, ::k 5}] {:e 5, ::k 5} {:f 6, ::k 5}] {:g 7, ::k 5} {:h 8, ::k 5}])))

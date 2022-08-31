@@ -459,7 +459,7 @@
 
   ([path coll]
    (if (sequential? coll)
-     (into [{:path path, :item (empty coll)}]
+     (into [{:path path, :item []}]
            (comp (map-indexed (fn [i x]
                                 (flatten-collection (conj path i) x)))
                  cat)
