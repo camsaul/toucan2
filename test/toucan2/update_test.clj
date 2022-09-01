@@ -162,4 +162,9 @@
       (testing "Explicit connectable should override current connectable"
         (binding [conn/*current-connectable* :fake-db]
           (is (= 1
-                 (update/update! :conn ::test/db :venues 1 {:name "Hi-Dive"}))))))))
+                 (update/update! :conn ::test/db :venues 1 {:name "Hi-Dive"})))))
+      (testing "Explicit connectable should override model default connectable"
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Don't know how to get a connection from .* :fake-db"
+             (update/update! :conn :fake-db ::test/venues 1 {:name "Hi-Dive"})))))))

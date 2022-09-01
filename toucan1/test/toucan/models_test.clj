@@ -23,7 +23,7 @@
 
 (use-fixtures :each test-setup/do-with-quoted-snake-disabled)
 
-(deftest ^:parallel resolve-model-test
+(deftest resolve-model-test
   (are [x] (= :toucan.test-models.category/Category
               (t1.models/resolve-model x))
     Category
@@ -39,13 +39,13 @@
        #"Invalid model: :some-other-keyword"
        (t1.models/resolve-model :some-other-keyword))))
 
-(deftest ^:parallel properties-test
+(deftest properties-test
   (is (= {:toucan.test-models.venue/timestamped? true}
          (t1.models/properties Venue)))
   (is (= nil
          (t1.models/properties Category))))
 
-(deftest ^:parallel primary-key-test
+(deftest primary-key-test
   (is (= :id
          (t1.models/primary-key Venue)))
   (is (= :number
@@ -76,7 +76,7 @@
       (is (= {:category :bar/dive-bar, :name "Tempest", :id 1}
              (t1.db/select-one Venue :id 1))))))
 
-(deftest ^:parallel types-fn-test
+(deftest types-fn-test
   (testing `t1.models/types
     (is (= {:name :lowercase-string}
            (t1.models/types Category)))
@@ -121,7 +121,7 @@
       (is (= {:id 1, :name "bar-or-club", :parent-category-id nil}
              (t1.db/select-one Category 1))))))
 
-(deftest ^:parallel do-post-select-test
+(deftest do-post-select-test
   (testing `t1.models/post-select
     ;; needs to pick up transforms AND `after-select`
     (after-select/define-after-select ::PostSelect
@@ -175,7 +175,7 @@
     (is (= {:id 5, :name "seafood", :parent-category-id 1}
            (t1.db/insert! Category :name "seafood", :parent-category-id 1)))))
 
-;; (deftest ^:parallel do-pre-insert-test
+;; (deftest do-pre-insert-test
 ;;   (testing `t1.models/pre-insert
 ;;     ;; needs to pick up transforms AND `before-insert`
 ;;     (before-insert/define-before-insert ::BeforeInsert
@@ -200,7 +200,7 @@
     (is (= true
            (t1.db/update! Category 2 :parent-category-id 4)))))
 
-;; (deftest ^:parallel do-pre-update-test
+;; (deftest do-pre-update-test
 ;;   ;; needs to pick up transforms AND `before-update`
 ;;   (before-update/define-before-update ::BeforeUpdate
 ;;     [row]
@@ -244,7 +244,7 @@
 ;; (transformed/deftransforms ::PostInsert
 ;;   {:name {:in str/upper-case, :out str/lower-case}})
 
-;; (deftest ^:parallel do-post-insert-test
+;; (deftest do-post-insert-test
 ;;   (testing (str `t1.models/post-insert " needs to pick up transforms AND `before-insert`")
 ;;     (is (= (instance/instance ::PostInsert {:name "bevmo", :after-insert? true})
 ;;            (t1.models/post-insert (instance/instance ::PostInsert {:name "BevMo"}))))))
@@ -268,7 +268,7 @@
       (is (= [1 2]
              @category/*categories-recently-updated*)))))
 
-;; (deftest ^:parallel do-post-update-test
+;; (deftest do-post-update-test
 ;;   (testing `t1.models/post-update
 ;;     ;; needs to pick up transforms AND `after-update`
 ;;     (after-update/define-after-update ::PostUpdate
@@ -306,7 +306,7 @@
 ;; (transformed/deftransforms ::BeforeDelete
 ;;   {:name {:in str/upper-case, :out str/lower-case}})
 
-;; (deftest ^:parallel do-pre-delete-test
+;; (deftest do-pre-delete-test
 ;;   (reset! pre-deleted [])
 ;;   (testing `t1.models/pre-delete!
 ;;     ;; needs to pick up transforms AND `before-delete`
@@ -316,16 +316,16 @@
 ;;     (is (= [(instance/instance ::BeforeDelete {:name "bevmo", :before-delete? true})]
 ;;            @pre-deleted))))
 
-(deftest ^:parallel default-fields-test
+(deftest default-fields-test
   (testing "check that we can still override default-fields"
     (is (= {:created-at (LocalDateTime/parse "2017-01-01T00:00:00")}
            (t1.db/select-one [Venue :created-at] :id 1)))))
 
-(deftest ^:parallel default-fields-fn-test
+(deftest default-fields-fn-test
   (is (= [:id :name :category]
          (t1.models/default-fields Venue))))
 
-(deftest ^:parallel model-in-honeysql-test
+(deftest model-in-honeysql-test
   (testing "Test using model in HoneySQL form"
     (is (= [{:id 1, :name "Tempest"}
             {:id 2, :name "Ho's Tavern"}
@@ -335,14 +335,14 @@
                            :from     [(keyword (model/table-name Venue))]
                            :order-by [:id]}))))))
 
-(deftest ^:parallel empty-test
+(deftest empty-test
   (testing "Test (empty)"
     (is (= {}
            (empty (t1.db/select-one Venue :name "BevMo"))))))
 
 (t1.models/define-hydration-keys ::FakeModel [::database ::db])
 
-(deftest ^:parallel hydration-keys-test
+(deftest hydration-keys-test
   (is (= [::database ::db]
          (t1.models/hydration-keys ::FakeModel)))
   (are [k] (= ::FakeModel

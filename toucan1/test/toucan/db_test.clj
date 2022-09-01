@@ -27,7 +27,7 @@
 (comment heroes/keep-me
          test-setup/keep-me)
 
-(deftest ^:parallel simple-model-test
+(deftest simple-model-test
   (testing "Simple model should use the same key transform as the original model"
     (is (identical? (instance/key-transform-fn PhoneNumber)
                     (instance/key-transform-fn (t1.db/->SimpleModel PhoneNumber))))))
@@ -44,7 +44,7 @@
            (binding [t1.db/*quoting-style* :sqlserver]
              ((t1.db/quote-fn) "toucan")))))
 
-(deftest ^:parallel dashed-field-names-test
+(deftest dashed-field-names-test
   (testing "Test allowing dashed field names"
     (is (not (t1.db/automatically-convert-dashes-and-underscores?)))
     (binding [t1.db/*automatically-convert-dashes-and-underscores* true]
@@ -102,7 +102,7 @@
         (catch Throwable _))
       (is (zero? (t1.db/count Venue :name "Cam's Toucannery"))))))
 
-(deftest ^:parallel with-call-counting-test
+(deftest with-call-counting-test
   (testing "Test with-call-counting"
     (is (= 2
            (t1.db/with-call-counting [call-count]
@@ -110,14 +110,14 @@
              (t1.db/select-one User)
              (call-count))))))
 
-(deftest ^:parallel query-test
+(deftest query-test
   (testing "Test query"
     (binding [conn/*current-connectable* ::test-setup/db]
       (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
              (t1.db/query {:select   [:*]
-                           :from     [:t1_users]
-                           :order-by [:id]
-                           :limit    1}))))))
+                        :from     [:t1_users]
+                        :order-by [:id]
+                        :limit    1}))))))
 
 (deftest lower-case-identifiers-test
   ;; only test postgres, since H2 has uppercase identifiers
@@ -136,33 +136,33 @@
           (finally
             (Locale/setDefault original-locale)))))))
 
-(defn- ^:parallel transduce-to-set
+(defn- transduce-to-set
   "Process `reducible-query-result` using a transducer that puts the rows from the resultset into a set"
   [reducible-query-result]
   (transduce (map identity) conj #{} reducible-query-result))
 
-(deftest ^:parallel query-reducible-test
+(deftest query-reducible-test
   (conn/with-connection [_conn ::test-setup/db]
     (testing "Test query-reducible"
       (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
              (transduce-to-set (t1.db/reducible-query {:select   [:*]
-                                                       :from     [:t1_users]
-                                                       :order-by [:id]
-                                                       :limit    1})))))))
+                                                    :from     [:t1_users]
+                                                    :order-by [:id]
+                                                    :limit    1})))))))
 
-(deftest ^:parallel qualify-test
+(deftest qualify-test
   (is (= :t1_users.first-name
          (t1.db/qualify User :first-name)))
   (is (= :t1_users.first-name
          (t1.db/qualify User "first-name"))))
 
-(deftest ^:parallel qualified?-test
+(deftest qualified?-test
   (is (t1.db/qualified? :users.first-name))
   (is (t1.db/qualified? "users.first-name"))
   (is (not (t1.db/qualified? :first-name)))
   (is (not (t1.db/qualified? "first-name"))))
 
-(deftest ^:parallel simple-select-test
+(deftest simple-select-test
   (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
          (t1.db/simple-select User {:where [:= :id 1]})))
   (is (= [{:id 3, :first-name "Lucky", :last-name "Bird"}]
@@ -188,7 +188,7 @@
                                                               (reset! fn-args args))]
                    (t1.db/reducible-query {} :b 3, :c 4)))))))
 
-(deftest ^:parallel simple-select-one-test
+(deftest simple-select-one-test
   (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
          (t1.db/simple-select-one User {:where [:= :first-name "Cam"]}))))
 
@@ -235,14 +235,14 @@
 (deftest update-non-nil-keys!-test
   (test/with-discarded-table-changes User
     (t1.db/update-non-nil-keys! User 2
-                                :first-name nil
-                                :last-name "Can")
+                             :first-name nil
+                             :last-name "Can")
     (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
            (t1.db/select-one User 2))))
   (test/with-discarded-table-changes User
     (t1.db/update-non-nil-keys! User 2
-                                {:first-name nil
-                                 :last-name  "Can"})
+                             {:first-name nil
+                              :last-name  "Can"})
     (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
            (t1.db/select-one User 2)))))
 
@@ -255,14 +255,14 @@
     (test/with-discarded-table-changes User
       (is (= [4 5]
              (t1.db/simple-insert-many! User [{:first-name "Grass" :last-name (hsql/call :upper "Hopper")}
-                                              {:first-name "Ko" :last-name "Libri"}]))))))
+                                           {:first-name "Ko" :last-name "Libri"}]))))))
 
 (deftest insert-many!-test
   (testing "It must return the inserted ids, it must not fail when using SQL function calls."
     (test/with-discarded-table-changes User
       (is (= [4 5]
              (t1.db/insert-many! User [{:first-name "Grass" :last-name (hsql/call :upper "Hopper")}
-                                       {:first-name "Ko" :last-name "Libri"}])))))
+                                    {:first-name "Ko" :last-name "Libri"}])))))
   (testing "It must call pre-insert hooks"
     (test/with-discarded-table-changes Category
       (is (thrown-with-msg?
@@ -283,7 +283,7 @@
       (is (= {:id 4, :first-name "Grass", :last-name "HOPPER"}
              (t1.db/insert! User {:first-name "Grass" :last-name (hsql/call :upper "Hopper")}))))))
 
-(deftest ^:parallel select-one-test
+(deftest select-one-test
   (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
          (t1.db/select-one User, :first-name "Cam")))
   (is (= {:id 3, :first-name "Lucky", :last-name "Bird"}
@@ -291,17 +291,17 @@
   (is (= {:first-name "Lucky", :last-name "Bird"}
          (t1.db/select-one [User :first-name :last-name] {:order-by [[:id :desc]]}))))
 
-(deftest ^:parallel select-one-field-test
+(deftest select-one-field-test
   (is (= "Cam"
          (t1.db/select-one-field :first-name User, :id 1)))
   (is (= 1
          (t1.db/select-one-field :id User, :first-name "Cam"))))
 
-(deftest ^:parallel select-one-id-test
+(deftest select-one-id-test
   (is (= 1
          (t1.db/select-one-id User, :first-name "Cam"))))
 
-(deftest ^:parallel count-test
+(deftest count-test
   (is (= 3
          (t1.db/count User)))
   (is (= 1
@@ -309,7 +309,7 @@
   (is (= 2
          (t1.db/count User, :first-name [:not= "Cam"]))))
 
-(deftest ^:parallel select-test
+(deftest select-test
   (testing "identifiers should be quoted"
     (is (= [(case (test/current-db-type)
               :h2       "SELECT * FROM \"T1_USERS\" ORDER BY \"ID\" ASC"
@@ -322,8 +322,8 @@
   (is (= [{:id 2, :first-name "Rasta", :last-name "Toucan"}
           {:id 3, :first-name "Lucky", :last-name "Bird"}]
          (t1.db/select User
-                       :first-name [:not= "Cam"]
-                       {:order-by [:id]})))
+                    :first-name [:not= "Cam"]
+                    {:order-by [:id]})))
   (is (= [{:first-name "Cam", :last-name "Saul"}
           {:first-name "Rasta", :last-name "Toucan"}
           {:first-name "Lucky", :last-name "Bird"}]
@@ -333,7 +333,7 @@
             {:first-name "Rasta", :last-name "Toucan"}]
            (t1.db/select [User :first-name :last-name] :id [:between 1 2] {:order-by [:id]})))))
 
-(deftest ^:parallel select-reducible-test
+(deftest select-reducible-test
   (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}
            {:id 2, :first-name "Rasta", :last-name "Toucan"}
            {:id 3, :first-name "Lucky", :last-name "Bird"}}
@@ -342,7 +342,7 @@
     (is (= 6
            (transduce (map :id) + 0 (t1.db/select-reducible User {:order-by [:id]}))))))
 
-(deftest ^:parallel select-field-test
+(deftest select-field-test
   (is (= #{"Lucky" "Rasta" "Cam"}
          (t1.db/select-field :first-name User)))
   (is (= #{"Lucky" "Rasta"}
@@ -351,11 +351,11 @@
     (is (= #{1 3 2}
            (t1.db/select-ids User)))))
 
-(deftest ^:parallel select-ids-test
+(deftest select-ids-test
   (is (= #{3 2}
          (t1.db/select-ids User, :id [:not= 1]))))
 
-(deftest ^:parallel select-field->field-test
+(deftest select-field->field-test
   (is (= {1 "Cam", 2 "Rasta", 3 "Lucky"}
          (t1.db/select-field->field :id :first-name User)))
   (is (= {"Cam" 1, "Rasta" 2, "Lucky" 3}
@@ -364,13 +364,13 @@
     (is (= {1 "Cam", 2 "Rasta", 3 "Lucky"}
            (t1.db/select-id->field :first-name User)))))
 
-(deftest ^:parallel exists?-test
+(deftest exists?-test
   (is (t1.db/exists? User, :first-name "Cam"))
   (is (t1.db/exists? User, :first-name "Rasta", :last-name "Toucan"))
   (is (= false
          (t1.db/exists? User, :first-name "Kanye", :last-name "Nest"))))
 
-(deftest ^:parallel disable-db-logging-test
+(deftest disable-db-logging-test
   (testing "This is just a dummy test to make sure the var actually exists."
     (is (= false
            t1.db/*disable-db-logging*))))

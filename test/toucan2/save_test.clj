@@ -102,4 +102,9 @@
             (is (some? (save/save! nil (assoc venue :name "Grant & Green 2"))))))
         (testing "Explicit connectable should override current connectable"
           (binding [conn/*current-connectable* :fake-db]
-            (is (some? (save/save! ::test/db (assoc venue :name "Grant & Green"))))))))))
+            (is (some? (save/save! ::test/db (assoc venue :name "Grant & Green"))))))
+        (testing "Explicit connectable should override model default connectable"
+          (is (thrown-with-msg?
+               clojure.lang.ExceptionInfo
+               #"Don't know how to get a connection from .* :fake-db"
+               (save/save! :fake-db (assoc (select/select-one ::test/venues 2) :name "Grant & Green")))))))))

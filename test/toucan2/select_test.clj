@@ -514,4 +514,9 @@
     (testing "Explicit connectable should override current connectable"
       (binding [conn/*current-connectable* :fake-db]
         (is (= true
-               (select/exists? :conn ::test/db [:venues :id :name] 1)))))))
+               (select/exists? :conn ::test/db [:venues :id :name] 1)))))
+    (testing "Explicit connectable should override model default connectable"
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Don't know how to get a connection from .* :fake-db"
+           (select/exists? :conn :fake-db [::test/venues :id :name] 1))))))

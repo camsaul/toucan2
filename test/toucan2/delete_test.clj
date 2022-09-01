@@ -117,4 +117,9 @@
       (testing "Explicit connectable should override current connectable"
         (binding [conn/*current-connectable* :fake-db]
           (is (= 1
-                 (delete/delete! :conn ::test/db :venues 3))))))))
+                 (delete/delete! :conn ::test/db :venues 3)))))
+      (testing "Explicit connectable should override model default connectable"
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Don't know how to get a connection from .* :fake-db"
+             (delete/delete! :conn :fake-db ::test/venues 3)))))))

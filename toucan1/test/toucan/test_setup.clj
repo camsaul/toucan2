@@ -3,8 +3,10 @@
   properly."
   (:require
    [clojure.string :as str]
+   [clojure.test :refer :all]
    [honey.sql :as hsql]
    [methodical.core :as m]
+   [toucan.db :as t1.db]
    [toucan.models :as t1.models]
    [toucan.test-models.address :refer [Address]]
    [toucan.test-models.category :refer [Category]]
@@ -30,19 +32,21 @@
  (update (hsql/get-dialect :ansi) :quote quote-for-current-db-type))
 
 (defn do-with-default-quoting-style [thunk]
-  (binding [map.honeysql/*options* (assoc map.honeysql/*options* :dialect ::quote-for-current-db-type)]
-    (thunk))
-  #_(let [original-options @map.honeysql/global-options]
-      (try
-        (t1.db/set-default-quoting-style! ::quote-for-current-db-type)
-        (testing (format "With default quoting style = %s\n" ::quote-for-current-db-type)
-          (thunk))
-        (finally
-          (reset! map.honeysql/global-options original-options)))))
+  (let [original-options @map.honeysql/global-options]
+    (try
+      (t1.db/set-default-quoting-style! ::quote-for-current-db-type)
+      (testing (format "With default quoting style = %s\n" ::quote-for-current-db-type)
+        (thunk))
+      (finally
+        (reset! map.honeysql/global-options original-options)))))
 
 (defn do-with-quoted-snake-disabled [thunk]
-  (binding [map.honeysql/*options* (assoc map.honeysql/*options* :quoted-snake false)]
-    (thunk)))
+  (let [original-options @map.honeysql/global-options]
+    (try
+      (swap! map.honeysql/global-options assoc :quoted-snake false)
+      (thunk)
+      (finally
+        (reset! map.honeysql/global-options original-options)))))
 
 (defn- reset-db! [db-type]
   (doseq [model [Address
@@ -56,10 +60,8 @@
 
 (defn- init-db! [db-type]
   (when-not (contains? @initialized-db-types db-type)
-    (locking initialized-db-types
-      (when-not (contains? @initialized-db-types db-type)
-        (reset-db! db-type)
-        (swap! initialized-db-types conj db-type)))))
+    (reset-db! db-type)
+    (swap! initialized-db-types conj db-type)))
 
 (derive ::db ::test/db)
 
