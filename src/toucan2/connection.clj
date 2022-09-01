@@ -19,7 +19,7 @@
 
 ;;; This is an UNCACHED multimethod for now because of the upstream bug https://github.com/camsaul/methodical/issues/112
 ;;; Once that bug is fixed we can turn this back into a normal cached multimethod.
-(def ^{:arglists '([connectable₁ f]), :name 'do-with-connection} do-with-connection
+(defonce ^{:arglists '([connectable₁ f]), :name 'do-with-connection} do-with-connection
   (m/uncached-multifn
    (m/standard-multifn-impl
     (m/thread-last-method-combination)
@@ -37,7 +37,6 @@
     (log/debugf :execute "Resolve connection %s" connectable-class)
     (u/try-with-error-context ["resolve connection" {::connectable connectable-class}]
       (next-method connectable (^:once fn* [conn]
-                                (println "conn:" conn) ; NOCOMMIT
                                 (binding [*current-connectable* conn]
                                   (f conn)))))))
 
