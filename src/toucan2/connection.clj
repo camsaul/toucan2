@@ -82,7 +82,7 @@
 ;;; by [[do-with-connection]] to get the value for [[*current-connectable*]]. For a reducible query this means you'll
 ;;; get the value at the time you reduce the query rather than at the time you build the reducible query.
 (m/defmethod do-with-connection nil
-  [connectable f]
+  [_connectable f]
   (let [current-connectable (if (nil? *current-connectable*)
                               :default
                               *current-connectable*)]
