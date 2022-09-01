@@ -2,7 +2,9 @@
  {io.github.camsaul/toucan2-toucan1 {:local/root ".."}}
 
  :aliases
- {
+ {:dev
+  {:extra-paths ["test"]}
+
   ;; clojure -M:check
   :check
   {:extra-deps {athos/clj-check {:git/url "https://github.com/athos/clj-check.git"
