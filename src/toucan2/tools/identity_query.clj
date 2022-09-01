@@ -4,9 +4,9 @@
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
    [toucan2.instance :as instance]
+   [toucan2.log :as log]
    [toucan2.pipeline :as pipeline]
-   [toucan2.realize :as realize]
-   [toucan2.util :as u]))
+   [toucan2.realize :as realize]))
 
 (set! *warn-on-reflection* true)
 
@@ -21,8 +21,8 @@
 
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (u/with-debug-result ["reduce IdentityQuery rows"]
-      (reduce rf init rows))))
+    (log/debugf :execute "reduce IdentityQuery rows")
+    (reduce rf init rows)))
 
 (defn identity-query
   "A queryable that returns `reducible-rows` as-is without compiling anything or running anything against a database.
@@ -41,17 +41,15 @@
   [reducible-rows]
   (->IdentityQuery reducible-rows))
 
-(m/defmethod pipeline/transduce-compile [#_query-type :default
-                                             #_model      :default
-                                             #_query      IdentityQuery]
+(m/defmethod pipeline/transduce-compile [#_query-type :default #_model :default #_query IdentityQuery]
   [rf _query-type model {:keys [rows], :as _query}]
-  (u/with-debug-result ["transduce IdentityQuery rows %s" rows]
-    (transduce (if model
-                 (map (fn [result-row]
-                        (instance/instance model result-row)))
-                 identity)
-               rf
-               rows)))
+  (log/debugf :execute "transduce IdentityQuery rows %s" rows)
+  (transduce (if model
+               (map (fn [result-row]
+                      (instance/instance model result-row)))
+               identity)
+             rf
+             rows))
 
 ;;; this is an around method so we can intercept anything else that might normally be considered a more specific method
 ;;; when it dispatches off of more-specific values of `query-type`

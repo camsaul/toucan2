@@ -5,6 +5,7 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
@@ -26,9 +27,9 @@
   [query-type f]
   (assert (fn? f)
           (format "Expected each-row-fn for query type %s to return a function, got ^%s %s"
-                  (u/safe-pr-str query-type)
+                  (pr-str query-type)
                   (some-> f class .getCanonicalName)
-                  (u/safe-pr-str f)))
+                  (pr-str f)))
   f)
 
 (m/defmulti ^:no-doc result-type-rf
@@ -53,14 +54,14 @@
   (let [row-fn (each-row-fn original-query-type model)
         row-fn (fn [row]
                  (u/try-with-error-context ["Apply after row fn" {::query-type original-query-type, ::model model}]
-                   (u/with-debug-result ["Apply after %s for %s" original-query-type model]
-                     (let [result (row-fn row)]
-                       ;; if the row fn didn't return something (not generally necessary for something like
-                       ;; `after-update` which is always done for side effects) then return the original row. We still
-                       ;; need it for stuff like getting the PKs back out.
-                       (if (some? result)
-                         result
-                         row)))))]
+                   (log/debugf :results "Apply after %s for %s" original-query-type model)
+                   (let [result (row-fn row)]
+                     ;; if the row fn didn't return something (not generally necessary for something like
+                     ;; `after-update` which is always done for side effects) then return the original row. We still
+                     ;; need it for stuff like getting the PKs back out.
+                     (if (some? result)
+                       result
+                       row))))]
     ((map row-fn) rf)))
 
 (m/defmethod pipeline/transduce-execute [#_query-type     ::query-type

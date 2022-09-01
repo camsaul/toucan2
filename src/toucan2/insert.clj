@@ -3,9 +3,9 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.log :as log]
    [toucan2.pipeline :as pipeline]
-   [toucan2.query :as query]
-   [toucan2.util :as u]))
+   [toucan2.query :as query]))
 
 (s/def ::args.rows
   (s/alt :nil               nil?
@@ -60,10 +60,11 @@
   (let [rows (some (comp not-empty :rows) [parsed-args resolved-query])]
     (if (can-skip-insert? parsed-args resolved-query)
       (do
-        (u/println-debug "Query has no changes, skipping update")
+        (log/debugf :compile "Query has no changes, skipping update")
         ;; TODO -- not sure this is the right thing to do
         (rf (rf)))
-      (u/with-debug-result ["Inserting %s rows into %s" (if (seq rows) (count rows) "?") model]
+      (do
+        (log/debugf :compile "Inserting %s rows into %s" (if (seq rows) (count rows) "?") model)
         (next-method rf query-type model parsed-args resolved-query)))))
 
 ;;; The code for building an INSERT query as Honey SQL lives in [[toucan2.map-backend.honeysql2]]

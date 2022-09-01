@@ -10,6 +10,7 @@
    [eftest.report.pretty]
    [eftest.report.progress]
    [eftest.runner]
+   [environ.core :as env]
    [pjstadig.humane-test-output :as humane-test-output]
    [toucan2.test :as test]))
 
@@ -71,7 +72,7 @@
 (alter-var-root #'eftest.runner/synchronized?
                 (constantly (complement test/parallel?)))
 
-(def ^:private ci? (some-> (System/getenv "CI") str/lower-case parse-boolean))
+(def ^:private ci? (some-> (env/env :ci) str/lower-case parse-boolean))
 
 (defn- reporter
   "Create a new test reporter/event handler, a function with the signature `(handle-event event)` that gets called once
@@ -103,7 +104,7 @@
         (eftest.runner/run-tests
          test-vars
          (merge
-          {:capture-output? false
+          {:capture-output? true
            :multithread?    :vars
            :report          (reporter)}
           options))

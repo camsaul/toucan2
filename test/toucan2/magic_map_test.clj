@@ -2,8 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
-   [toucan2.magic-map :as magic-map]
-   [toucan2.util :as u])
+   [toucan2.magic-map :as magic-map])
   (:import
    (java.util Locale)))
 
@@ -129,16 +128,14 @@
 
 (deftest pretty-print-test
   (testing "Should pretty-print"
-    (testing "default output"
-      (is (= (pr-str {:id 1})
-             (pr-str (magic-map/magic-map {:id 1})))))
-    (testing "output with debugging enabled"
-      (binding [u/*debug* true]
-        (is (= (pr-str (list
-                        'toucan2.magic-map/magic-map
-                        {:id 1}
-                        #'toucan2.magic-map/kebab-case-xform))
-               (pr-str (magic-map/magic-map {:id 1}))))))))
+    (are [print-magic-maps expected] (= expected
+                                        (binding [magic-map/*print-magic-maps* print-magic-maps]
+                                          (pr-str (magic-map/magic-map {:id 1}))))
+      true  (pr-str (list
+                     'toucan2.magic-map/magic-map
+                     {:id 1}
+                     #'toucan2.magic-map/kebab-case-xform))
+      false (pr-str {:id 1}))))
 
 (deftest transient-test
   (testing "key transforms should be applied"

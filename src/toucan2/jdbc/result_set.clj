@@ -5,6 +5,7 @@
    [pretty.core :as pretty]
    [toucan2.instance :as instance]
    [toucan2.jdbc.row :as jdbc.row]
+   [toucan2.log :as log]
    [toucan2.magic-map :as magic-map]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
@@ -29,23 +30,25 @@
   {:arglists '([^Connection conn model ^ResultSet rset ^ResultSetMetaData rsmeta ^Long i])}
   (fn [^Connection conn model _rset ^ResultSetMetaData rsmeta ^Long i]
     (let [col-type (.getColumnType rsmeta i)]
-      (u/println-debug ["Column %s %s is of JDBC type %s, native type %s"
-                        i
-                        (.getColumnLabel rsmeta i)
-                        (type-name col-type)
-                        (.getColumnTypeName rsmeta i)])
+      (log/debugf :results
+                  "Column %s %s is of JDBC type %s, native type %s"
+                  i
+                  (.getColumnLabel rsmeta i)
+                  (type-name col-type)
+                  (.getColumnTypeName rsmeta i))
       [(protocols/dispatch-value conn) (protocols/dispatch-value model) col-type])))
 
 (m/defmethod read-column-thunk :default
   [_conn _model ^ResultSet rset _rsmeta ^Long i]
-  (u/println-debug ["Fetching values in column %s with %s" i (list '.getObject 'rs i)])
+  (log/debugf :results "Fetching values in column %s with %s" i (list '.getObject 'rs i))
   (fn default-read-column-thunk []
     (.getObject rset i)))
 
 (defn get-object-of-class-thunk [^ResultSet rset ^Long i ^Class klass]
-  (u/println-debug ["Fetching values in column %s with %s"
-                    i
-                    (list '.getObject 'rs i (symbol (.getCanonicalName klass)))])
+  (log/debugf :results
+              "Fetching values in column %s with %s"
+              i
+              (list '.getObject 'rs i klass))
   (fn get-object-of-class-thunk []
     (.getObject rset i klass)))
 
@@ -56,11 +59,11 @@
   (range 1 (inc (.getColumnCount rsmeta))))
 
 (defn- row-instance [model col-name->thunk]
-  (let [row (jdbc.row/row col-name->thunk)]
-    (u/with-debug-result ["Creating new instance of %s, which has key transform fn %s"
-                          model
-                          (instance/key-transform-fn model)]
-      (instance/instance model row))))
+  (log/debugf :results
+              "Creating new instance of %s, which has key transform fn %s"
+              model
+              (instance/key-transform-fn model))
+  (instance/instance model (jdbc.row/row col-name->thunk)))
 
 (defn row-thunk
   "Return a thunk that when called fetched the current row from the cursor and returns it as a [[row-instance]]."
@@ -71,21 +74,24 @@
         key-xform        (instance/key-transform-fn model)
         ;; create a set of thunks to read each column. These thunks will call `read-column-thunk` to determine the
         ;; appropriate column-reading thunk the first time they are used.
-        col-name->thunk  (into {}
-                               (map (fn [^Long i]
-                                      (let [table-name    (.getTableName rsmeta i)
-                                            col-name      (.getColumnName rsmeta i)
-                                            table-ns-name (some-> (get table->namespace table-name) name)
-                                            col-key       (key-xform (keyword table-ns-name col-name))
-                                            ;; TODO -- add test to ensure we only resolve the read-column-thunk
-                                            ;; once even with multiple rows.
-                                            read-thunk   (delay (read-column-thunk conn model rset rsmeta i))
-                                            result-thunk (fn []
-                                                           (u/with-debug-result ["Realize column %s %s.%s as %s"
-                                                                                 i table-name col-name col-key]
-                                                             (next.jdbc.rs/read-column-by-index (@read-thunk) rsmeta i)))]
-                                        [col-key result-thunk])))
-                               (index-range rsmeta))]
+        col-name->thunk  (into
+                          {}
+                          (map (fn [^Long i]
+                                 (let [table-name    (.getTableName rsmeta i)
+                                       col-name      (.getColumnName rsmeta i)
+                                       table-ns-name (some-> (get table->namespace table-name) name)
+                                       col-key       (key-xform (keyword table-ns-name col-name))
+                                       ;; TODO -- add test to ensure we only resolve the read-column-thunk
+                                       ;; once even with multiple rows.
+                                       read-thunk   (delay (read-column-thunk conn model rset rsmeta i))
+                                       result-thunk (fn []
+                                                      (log/tracef :results "Realize column %s %s.%s as %s"
+                                                                  i table-name col-name col-key)
+                                                      (let [result (next.jdbc.rs/read-column-by-index (@read-thunk) rsmeta i)]
+                                                        (log/tracef :results "=> %s" result)
+                                                        result))]
+                                   [col-key result-thunk])))
+                          (index-range rsmeta))]
     (fn row-instance-thunk []
       (row-instance model col-name->thunk))))
 

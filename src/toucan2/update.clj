@@ -3,9 +3,9 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.log :as log]
    [toucan2.pipeline :as pipeline]
-   [toucan2.query :as query]
-   [toucan2.util :as u]))
+   [toucan2.query :as query]))
 
 ;;; this is basically the same as the args for `select` and `delete` but the difference is that it has an additional
 ;;; optional arg, `:pk`, as the second arg, and one additional optional arg, the `changes` map at the end
@@ -41,7 +41,7 @@
   [rf query-type model {:keys [changes], :as parsed-args} resolved-query]
   (if (empty? changes)
     (do
-      (u/println-debug "Query has no changes, skipping update")
+      (log/debugf :compile "Query has no changes, skipping update")
       ;; TODO -- not sure this is the right thing to do
       (rf (rf)))
     (next-method rf query-type model parsed-args resolved-query)))

@@ -2,6 +2,7 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.log :as log]
    [toucan2.map-backend :as map]
    [toucan2.model :as model]
    [toucan2.util :as u]))
@@ -80,22 +81,24 @@
 
   ([query-type spec unparsed-args]
    (u/try-with-error-context ["parse args" {::query-type query-type, ::unparsed-args unparsed-args}]
-     (u/with-debug-result (list `parse-args query-type unparsed-args)
-       (let [parsed (s/conform spec unparsed-args)]
-         (when (s/invalid? parsed)
-           (throw (ex-info (format "Don't know how to interpret %s args: %s"
-                                   (u/safe-pr-str query-type)
-                                   (s/explain-str spec unparsed-args))
-                           (s/explain-data spec unparsed-args))))
-         (doto (cond-> parsed
-                 (:modelable parsed)                 (merge (let [[modelable-type x] (:modelable parsed)]
-                                                              (case modelable-type
-                                                                :modelable         {:modelable x}
-                                                                :modelable-columns x)))
-                 (not (contains? parsed :queryable)) (assoc :queryable {})
-                 (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
-                                                                        (into {} (map (juxt :k :v)) kv-args))))
-           validate-parsed-args))))))
+     (log/debugf :compile "Parse args for query type %s %s" query-type unparsed-args)
+     (let [parsed (s/conform spec unparsed-args)]
+       (when (s/invalid? parsed)
+         (throw (ex-info (format "Don't know how to interpret %s args: %s"
+                                 (pr-str query-type)
+                                 (s/explain-str spec unparsed-args))
+                         (s/explain-data spec unparsed-args))))
+       (let [parsed (cond-> parsed
+                      (:modelable parsed)                 (merge (let [[modelable-type x] (:modelable parsed)]
+                                                                   (case modelable-type
+                                                                     :modelable         {:modelable x}
+                                                                     :modelable-columns x)))
+                      (not (contains? parsed :queryable)) (assoc :queryable {})
+                      (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
+                                                                             (into {} (map (juxt :k :v)) kv-args))))]
+         (log/debugf :compile "Parsed => %s" parsed)
+         (validate-parsed-args parsed)
+         parsed)))))
 
 
 ;;;; Part of the default [[pipeline/transduce-build]] for maps: applying key-value args
@@ -176,12 +179,13 @@
   ;; `fn-name` here would be if you passed something like `:toucan/pk [:in 1 2]` -- the fn name would be `:in` -- and we
   ;; pass that to [[condition->honeysql-where-clause]]
   (let [pk-columns (model/primary-keys model)]
-    (u/with-debug-result ["apply :toucan/pk %s for primary keys" v]
-      (if (= (count pk-columns) 1)
-        (apply-non-composite-toucan-pk model honeysql (first pk-columns) v)
-        (apply-composite-toucan-pk model honeysql pk-columns v)))))
+    (log/debugf :compile "apply :toucan/pk %s for primary keys" v)
+    (if (= (count pk-columns) 1)
+      (apply-non-composite-toucan-pk model honeysql (first pk-columns) v)
+      (apply-composite-toucan-pk model honeysql pk-columns v))))
 
 (defn apply-kv-args [model query kv-args]
+  (log/debugf :compile "Apply kv-args %s" kv-args)
   (reduce
    (fn [query [k v]]
      (apply-kv-arg model query k v))

@@ -2,6 +2,7 @@
   (:require
    [next.jdbc :as next.jdbc]
    [toucan2.jdbc.result-set :as jdbc.rs]
+   [toucan2.log :as log]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -20,15 +21,15 @@
 (defn reduce-jdbc-query [^java.sql.Connection conn model sql-args rf init extra-options]
   {:pre [(instance? java.sql.Connection conn) (sequential? sql-args) (string? (first sql-args)) (ifn? rf)]}
   (let [opts (merge (options) extra-options)]
-    (u/println-debug ["Preparing JDBC query with next.jdbc options %s" opts])
-    (u/try-with-error-context [(format "execute SQL with %s" (.getCanonicalName (class conn))) {::sql-args sql-args}]
+    (log/debugf :execute "Preparing JDBC query with next.jdbc options %s" opts)
+    (u/try-with-error-context [(format "execute SQL with %s" (class conn)) {::sql-args sql-args}]
       (with-open [stmt (next.jdbc/prepare conn sql-args opts)]
-        (u/println-debug ["Executing statement with %s" (symbol (.getCanonicalName (class conn)))])
+        (log/tracef :execute "Executing statement with %s" (class conn))
         (let [result-set? (.execute stmt)]
           (cond
             (:return-keys opts)
             (do
-              (u/println-debug ["Query was executed with %s; returning generated keys" :return-keys])
+              (log/debugf :execute "Query was executed with %s; returning generated keys" :return-keys)
               (with-open [rset (.getGeneratedKeys stmt)]
                 (reduce rf init (jdbc.rs/reducible-result-set conn model rset))))
 
@@ -38,5 +39,5 @@
 
             :else
             (do
-              (u/println-debug "Query did not return a ResultSet; nothing to reduce. Returning update count.")
+              (log/debugf :execute "Query did not return a ResultSet; nothing to reduce. Returning update count.")
               (reduce rf init [(.getUpdateCount stmt)]))))))))

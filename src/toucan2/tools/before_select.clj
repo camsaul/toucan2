@@ -2,6 +2,7 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.log :as log]
    [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
 
@@ -11,8 +12,10 @@
   "Impl for [[define-before-select]]. Don't call this directly."
   [model thunk]
   (u/try-with-error-context ["before select" {::model model}]
-    (u/with-debug-result ["%s %s" `define-before-select model]
-      (thunk))))
+    (log/debugf :compile "do before-select for %s" model)
+    (let [result (thunk)]
+      (log/debugf :compile "[before select] => %s" result)
+      result)))
 
 (defmacro define-before-select
   {:style/indent :defn}

@@ -110,11 +110,14 @@
   (:require
    [camel-snake-kebab.core :as csk]
    [methodical.core :as m]
+   [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.util :as u]))
+
+(swap! log/all-topics conj :hydrate)
 
 (m/defmulti can-hydrate-with-strategy?
   "Can we hydrate the key `k` in instances of `model` using a specific hydration `strategy`?
@@ -246,7 +249,7 @@
     (when-not (and (sequential? result)
                    (seq result)
                    (every? keyword? result))
-      (throw (ex-info (format "fk-keys-for-automagic-hydration should return a non-empty sequence of keywords. Got: %s" (u/safe-pr-str result))
+      (throw (ex-info (format "fk-keys-for-automagic-hydration should return a non-empty sequence of keywords. Got: %s" (pr-str result))
                       {:original-model original-model
                        :dest-key       dest-key
                        :hydrated-model hydrated-model
@@ -259,15 +262,15 @@
     (for [row results]
       (if (get row dest-key)
         (do
-          (u/println-debug ["Don't need to hydrate %s: already has %s" row dest-key])
+          (log/tracef :hydrate "Don't need to hydrate %s: already has %s" row dest-key)
           row)
         (let [fk-vals (get-fk-values row)]
           (if (every? some? fk-vals)
             (do
-              (u/println-debug ["Attempting to hydrate %s with values of %s %s" row fk-keys fk-vals])
+              (log/tracef :hydrate "Attempting to hydrate %s with values of %s %s" row fk-keys fk-vals)
               (assoc row ::fk fk-vals))
             (do
-              (u/println-debug ["Skipping %s: values of %s are %s" row fk-keys fk-vals])
+              (log/tracef :hydrate "Skipping %s: values of %s are %s" row fk-keys fk-vals)
               row)))))))
 
 (defn- automagic-batched-hydration-fetch-pk->instance [hydrating-model rows]
@@ -281,36 +284,36 @@
                             (if (> (count clauses) 1)
                               (cons :and clauses)
                               (first clauses)))}]
-        (u/with-debug-result ["Fetching %s with PKs %s %s" hydrating-model pk-keys query]
-          (select/select-pk->fn realize/realize hydrating-model query)))
-      (u/println-debug ["Not hydrating %s because no rows have non-nil FK values" hydrating-model]))))
+        (log/debugf :hydrate "Fetching %s with PKs %s %s" hydrating-model pk-keys query)
+        (select/select-pk->fn realize/realize hydrating-model query))
+      (log/debugf :hydrate "Not hydrating %s because no rows have non-nil FK values" hydrating-model))))
 
 (defn- do-automagic-batched-hydration [dest-key rows pk->fetched-instance]
-  (u/with-debug-result ["Attempting to hydrate %d/%d rows" (count (filter ::fk rows)) (count rows)]
-    (for [row rows]
-      (if-not (::fk row)
-        row
-        (let [fk-vals          (::fk row)
-              ;; convert fk to from [id] to id if it only has one key. This is what `select-pk->fn` returns.
-              fk-vals          (if (= (count fk-vals) 1)
-                                 (first fk-vals)
-                                 fk-vals)
-              fetched-instance (get pk->fetched-instance fk-vals)]
-          (u/with-debug-result ["Hydrate %s %s with %s" dest-key [row] (or fetched-instance
-                                                                           "nil (no matching fetched row)")]
-            (cond-> (dissoc row ::fk)
-              fetched-instance (assoc dest-key fetched-instance))))))))
+  (log/debugf :hydrate "Attempting to hydrate %s/%s rows" (count (filter ::fk rows)) (count rows))
+  (for [row rows]
+    (if-not (::fk row)
+      row
+      (let [fk-vals          (::fk row)
+            ;; convert fk to from [id] to id if it only has one key. This is what `select-pk->fn` returns.
+            fk-vals          (if (= (count fk-vals) 1)
+                               (first fk-vals)
+                               fk-vals)
+            fetched-instance (get pk->fetched-instance fk-vals)]
+        (log/tracef :hydrate "Hydrate %s %s with %s" dest-key [row] (or fetched-instance
+                                                                        "nil (no matching fetched row)"))
+        (cond-> (dissoc row ::fk)
+          fetched-instance (assoc dest-key fetched-instance))))))
 
 (m/defmethod hydrate-with-strategy ::automagic-batched
   [model _strategy dest-key rows]
   (u/try-with-error-context ["automagic batched hydration" {::model model, ::dest-key dest-key}]
     (let [hydrating-model      (model-for-automagic-hydration model dest-key)
-          _                    (u/println-debug ["Hydrating %s key %s with rows from %s" (or model "map") dest-key hydrating-model])
+          _                    (log/debugf :hydrate "Hydrating %s key %s with rows from %s" (or model "map") dest-key hydrating-model)
           fk-keys              (fk-keys-for-automagic-hydration model dest-key hydrating-model)
-          _                    (u/println-debug ["Hydrating with FKs %s" fk-keys])
+          _                    (log/debugf :hydrate "Hydrating with FKs %s" fk-keys)
           rows                 (automagic-batched-hydration-add-fks dest-key rows fk-keys)
           pk->fetched-instance (automagic-batched-hydration-fetch-pk->instance hydrating-model rows)]
-      (u/println-debug ["Fetched %d rows of %s" (count pk->fetched-instance) hydrating-model])
+      (log/debugf :hydrate "Fetched %s rows of %s" (count pk->fetched-instance) hydrating-model)
       (do-automagic-batched-hydration dest-key rows pk->fetched-instance))))
 
 
@@ -417,10 +420,10 @@
   [model rows k]
   (if-let [strategy (hydration-strategy model k)]
     (u/try-with-error-context ["hydrate key" {:model model, :key k, :strategy strategy}]
-      (u/with-debug-result ["Hydrating %s %s with strategy %s" (or model "map") k strategy]
-        (hydrate-with-strategy model strategy k rows)))
+      (log/debugf :hydrate "Hydrating %s %s with strategy %s" (or model "map") k strategy)
+      (hydrate-with-strategy model strategy k rows))
     (do
-      (u/println-debug ["Don't know how to hydrate %s for model %s rows %s" k model (take 1 rows)])
+      (log/warnf :hydrate "Don't know how to hydrate %s for model %s rows %s" k model (take 1 rows))
       (when (error-on-unknown-key?)
         (throw (ex-info (format "Don't know how to hydrate %s" (pr-str k))
                         {:model model, :rows rows, :k k})))
@@ -494,7 +497,7 @@
 (defn- hydrate-one-form
   "Hydrate for a single hydration key or form `k`."
   [model results k]
-  (u/println-debug ["hydrate %s for model %s rows %s" k model (take 1 results)])
+  (log/debugf :hydrate "hydrate %s for model %s rows %s" k model (take 1 results))
   (cond
     (and (sequential? results)
          (empty? results))

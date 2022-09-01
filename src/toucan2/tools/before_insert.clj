@@ -2,6 +2,7 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.log :as log]
    [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
 
@@ -13,8 +14,10 @@
   (mapv
    (fn [row]
      (u/try-with-error-context [`before-insert {::model model, ::row row}]
-       (u/with-debug-result ["Do before-insert to %s" row]
-         (before-insert model row))))
+       (log/tracef :compile "Do before-insert for %s %s" model row)
+       (let [result (before-insert model row)]
+         (log/tracef :compile "[before insert] => %s" row)
+         result)))
    rows))
 
 ;;; make sure we transform rows whether it's in the parsed args or in the resolved query.

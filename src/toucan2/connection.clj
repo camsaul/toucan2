@@ -5,6 +5,7 @@
    [next.jdbc :as next.jdbc]
    [next.jdbc.transaction :as next.jdbc.transaction]
    [pretty.core :as pretty]
+   [toucan2.log :as log]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
@@ -29,15 +30,17 @@
 (m/defmethod do-with-connection :around ::default
   [connectable f]
   (assert (fn? f))
-  ;; add the connection class and connectable dispatch value rather than the connection type itself to avoid leaking
-  ;; sensitive creds
-  (u/try-with-error-context ["resolve connection" {::connectable (if (instance? pretty.core.PrettyPrintable connectable)
-                                                                   (pretty/pretty connectable)
-                                                                   (protocols/dispatch-value connectable))}]
-    bound-fn*
-    (next-method connectable (^:once fn* [conn]
-                              (binding [*current-connectable* conn]
-                                (f conn))))))
+  ;; add the connection class or pretty representation rather than the connection type itself to avoid leaking sensitive
+  ;; creds
+  (let [connectable-class (if (instance? pretty.core.PrettyPrintable connectable)
+                            (pretty/pretty connectable)
+                            (protocols/dispatch-value connectable))]
+    (log/debugf :execute "Resolve connection %s" connectable-class)
+    (u/try-with-error-context ["resolve connection" {::connectable connectable-class}]
+      bound-fn*
+      (next-method connectable (^:once fn* [conn]
+                                (binding [*current-connectable* conn]
+                                  (f conn)))))))
 
 (defmacro with-connection
   {:arglists '([[connection-binding connectable] & body]
@@ -60,7 +63,7 @@
   [connectable _f]
   (throw (ex-info (format "Don't know how to get a connection from ^%s %s. Do you need to implement %s for %s?"
                           (some-> connectable class .getCanonicalName)
-                          (u/safe-pr-str connectable)
+                          (pr-str connectable)
                           `do-with-connection
                           (protocols/dispatch-value connectable))
                   {:connectable connectable})))
@@ -133,22 +136,20 @@
 
 (m/defmethod do-with-transaction :around ::default
   [connection options f]
-  (u/with-debug-result (list `do-with-transaction
-                             options
-                             (some-> connection class .getCanonicalName symbol))
-    (let [f* (^:once fn* [conn]
-              (binding [*current-connectable* conn]
-                (f conn)))]
-      (next-method connection options f*))))
+  (log/debugf :execute "do with transaction %s %s" options (some-> connection class .getCanonicalName symbol))
+  (let [f* (^:once fn* [conn]
+            (binding [*current-connectable* conn]
+              (f conn)))]
+    (next-method connection options f*)))
 
 (m/defmethod do-with-transaction java.sql.Connection
   [^java.sql.Connection conn options f]
   (let [nested-tx-rule (get options :nested-transaction-rule :allow)
         options        (dissoc options :nested-transaction-rule)]
-    (u/with-debug-result ["do with transaction (nested rule: %s) with options %s" nested-tx-rule options]
-      (binding [next.jdbc.transaction/*nested-tx* nested-tx-rule]
-        (next.jdbc/with-transaction [t-conn conn options]
-          (f t-conn))))))
+    (log/debugf :execute "do with JDBC transaction (nested rule: %s) with options %s" nested-tx-rule options)
+    (binding [next.jdbc.transaction/*nested-tx* nested-tx-rule]
+      (next.jdbc/with-transaction [t-conn conn options]
+        (f t-conn)))))
 
 (defmacro with-transaction
   "Gets a connection with [[with-connection]], and executes `body` within that transaction.

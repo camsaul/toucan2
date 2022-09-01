@@ -11,6 +11,14 @@
 
 (csk.macros/defconversion "kebab-case" u/lower-case-en u/lower-case-en "-")
 
+(defonce print-magic-maps (atom true))
+(def ^:dynamic *print-magic-maps* nil)
+
+(defn- print-magic-maps? []
+  (if (some? *print-magic-maps*)
+    *print-magic-maps*
+    @print-magic-maps))
+
 (defn kebab-case-xform
   "The default magic map transform function."
   [k]
@@ -75,7 +83,7 @@
 
   pretty/PrettyPrintable
   (pretty [_this]
-    (if-not u/*debug*
+    (if-not (print-magic-maps?)
       m
       (list `magic-map
             (cond-> m

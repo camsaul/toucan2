@@ -1,9 +1,10 @@
 (ns toucan2.jdbc.row
-  (:require [potemkin :as p]
-            [pretty.core :as pretty]
-            [toucan2.realize :as realize]
-            #_[toucan2.result-row :as result-row]
-            [toucan2.util :as u]))
+  (:require
+   [potemkin :as p]
+   [pretty.core :as pretty]
+   [toucan2.log :as log]
+   [toucan2.realize :as realize]
+   [toucan2.util :as u]))
 
 (defn- realize-column-with-thunk [k thunk]
   (u/try-with-error-context ["realize column with thunk" {::k k, ::thunk thunk}]
@@ -39,10 +40,10 @@
 
   realize/Realize
   (realize [_this]
-    (u/with-debug-result "Realize entire row"
-      (-> (into {} (for [[col-name thunk] col-name->thunk]
-                     [col-name (realize-column-with-thunk col-name thunk)]))
-          (with-meta mta))))
+    (log/tracef :results "Realize entire row")
+    (-> (into {} (for [[col-name thunk] col-name->thunk]
+                   [col-name (realize-column-with-thunk col-name thunk)]))
+        (with-meta mta)))
 
   pretty/PrettyPrintable
   (pretty [_]
