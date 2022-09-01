@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [namespace])
   (:require
    [methodical.core :as m]
+   [toucan2.log :as log]
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
@@ -16,7 +17,7 @@
 (m/defmethod resolve-model :around :default
   [modelable]
   (let [model (next-method modelable)]
-    (u/println-debug ["Resolved modelable %s => model %s" modelable model])
+    (log/debugf :compile "Resolved modelable %s => model %s" modelable model)
     model))
 
 (m/defmulti default-connectable
@@ -40,7 +41,7 @@
   [model]
   (if (instance? clojure.lang.Named model)
     ((m/effective-method table-name clojure.lang.Named) model)
-    (throw (ex-info (format "Invalid model %s: don't know how to get its table name." (u/safe-pr-str model))
+    (throw (ex-info (format "Invalid model %s: don't know how to get its table name." (pr-str model))
                     {:model model}))))
 
 (m/defmethod table-name clojure.lang.Named
@@ -78,8 +79,8 @@
     (when-not (every? keyword? pks)
       (throw (ex-info (format "Bad %s for model %s: should return keyword or sequence of keywords, got %s"
                               `primary-keys
-                              (u/safe-pr-str model)
-                              (u/safe-pr-str pk-or-pks))
+                              (pr-str model)
+                              (pr-str pk-or-pks))
                       {:model model, :result pk-or-pks})))
     pks))
 

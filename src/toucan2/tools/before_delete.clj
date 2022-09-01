@@ -3,6 +3,7 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.connection :as conn]
+   [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
@@ -15,8 +16,8 @@
 
 (m/defmethod before-delete :around :default
   [model instance]
-  (u/with-debug-result (list `before-delete model instance)
-    (next-method model instance)))
+  (log/tracef :compile "Do before-delete for %s %s" model instance)
+  (next-method model instance))
 
 (def ^:private ^:dynamic *in-before-delete* false)
 

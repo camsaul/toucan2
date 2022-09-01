@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [count])
   (:require
    [methodical.core :as m]
+   [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.realize :as realize]
@@ -104,7 +105,7 @@
 
 (m/defmethod count* :default
   [model unparsed-args]
-  (u/println-debug ["No efficient implementation of count* for %s, doing reducible-select and counting the rows..." model])
+  (log/debugf :compile "No efficient implementation of count* for %s, doing reducible-select and counting the rows..." model)
   (reduce
    (fn [acc _]
      (inc acc))
@@ -123,7 +124,7 @@
 
 (m/defmethod exists?* :default
   [model unparsed-args]
-  (u/println-debug ["No efficient implementation of exists?* for %s, doing reducible-select and seeing if it returns a row..." model])
+  (log/debugf :compile "No efficient implementation of exists?* for %s, doing reducible-select and seeing if it returns a row..." model)
   (transduce
    (take 1)
    (fn

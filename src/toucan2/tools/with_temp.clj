@@ -5,8 +5,11 @@
    [methodical.core :as m]
    [toucan2.delete :as delete]
    [toucan2.insert :as insert]
+   [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.util :as u]))
+
+(swap! log/all-topics conj :with-temp)
 
 (m/defmulti with-temp-defaults
   {:arglists '([model])}
@@ -48,11 +51,11 @@
                                             ::explicit-attributes explicit-attributes
                                             ::default-attributes  defaults
                                             ::merged-attributes   merged-attributes}]
-      (let [temp-object (u/with-debug-result ["Create temporary %s with attributes %s" model merged-attributes]
-                          (first (insert/insert-returning-instances! model merged-attributes)))]
-
+      (log/debugf :with-temp "Create temporary %s with attributes %s" model merged-attributes)
+      (let [temp-object (first (insert/insert-returning-instances! model merged-attributes))]
+        (log/debugf :with-temp "[with-temp] => %s" temp-object)
         (try
-          (t/testing (format "with temporary %s with attributes %s" (u/safe-pr-str model) (u/safe-pr-str merged-attributes))
+          (t/testing (format "with temporary %s with attributes %s" (pr-str model) (pr-str merged-attributes))
             (f temp-object))
           (finally
             (delete/delete! model :toucan/pk ((model/select-pks-fn model) temp-object))))))))

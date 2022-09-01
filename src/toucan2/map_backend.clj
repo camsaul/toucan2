@@ -1,6 +1,7 @@
 (ns toucan2.map-backend
   "Map query build/compilation backend"
-  (:require [methodical.core :as m]))
+  (:require [methodical.core :as m]
+            [toucan2.log :as log]))
 
 (def default-backend (atom :toucan.map-backend/honeysql2))
 
@@ -25,6 +26,7 @@
     (assert (isa? bckend :toucan.map-backend/*)
             (format "Invalid map backend %s: map backends must derive from :toucan.map-backend/*"
                     (pr-str bckend)))
+    (log/debugf :compile "Using map backend %s" bckend)
     bckend))
 
 (defn available-backends

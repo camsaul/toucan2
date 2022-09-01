@@ -18,7 +18,9 @@
              clojure.pprint                pprint
              clojure.spec.alpha            s
              clojure.string                str
+             clojure.tools.logging         tools.log
              clojure.walk                  walk
+             environ.core                  env
              honey.sql                     hsql
              honey.sql.helpers             hsql.helpers
              methodical.core               m
@@ -36,6 +38,7 @@
              toucan2.jdbc.query            jdbc.query
              toucan2.jdbc.result-set       jdbc.rs
              toucan2.jdbc.row              jdbc.row
+             toucan2.log                   log
              toucan2.magic-map             magic-map
              toucan2.map-backend           map
              toucan2.map-backend.honeysql2 map.honeysql

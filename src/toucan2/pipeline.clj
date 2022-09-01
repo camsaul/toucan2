@@ -19,6 +19,7 @@
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
    [toucan2.jdbc.query :as jdbc.query]
+   [toucan2.log :as log]
    [toucan2.map-backend :as map]
    [toucan2.model :as model]
    [toucan2.query :as query]
@@ -148,8 +149,12 @@
 (m/defmethod transduce-execute-with-connection :around :default
   [rf conn query-type model compiled-query]
   {:pre [(ifn? rf) (some? conn) (query-type? query-type) (some? compiled-query)]}
-  (u/println-debug ["transduce query with %s connection" (symbol (.getCanonicalName (class conn)))])
-  (u/try-with-error-context ["with connection" {:connection (symbol (.getCanonicalName (class conn)))}]
+  (log/tracef :execute
+              "In %s with dispatch value %s"
+              `transduce-execute-with-connection
+              (m/dispatch-value transduce-execute-with-connection rf conn query-type model compiled-query))
+  (log/debugf :execute "transduce query with %s connection" (class conn))
+  (u/try-with-error-context ["with connection" {:connection (class conn)}]
     (next-method rf conn query-type model compiled-query)))
 
 ;;;; [[transduce-execute]]
@@ -178,7 +183,11 @@
 (m/defmethod transduce-execute :around :default
   [rf query-type model compiled-query]
   {:pre [(ifn? rf) (query-type? query-type) (some? compiled-query)]}
-  (u/println-debug ["transduce compiled query %s" compiled-query])
+  (log/tracef :execute
+              "In %s with dispatch value %s"
+              `transduce-execute
+              (m/dispatch-value transduce-execute rf query-type model compiled-query))
+  (log/debugf :execute "Execute %s" compiled-query)
   (u/try-with-error-context ["with compiled query" {:compiled-query compiled-query}]
     (next-method rf query-type model compiled-query)))
 
@@ -228,7 +237,11 @@
 (m/defmethod transduce-compile :around :default
   [rf query-type model built-query]
   {:pre [(ifn? rf) (query-type? query-type) (some? built-query)]}
-  (u/println-debug ["transduce built query %s" built-query])
+  (log/tracef :compile
+              "In %s with dispatch value %s"
+              `transduce-compile
+              (m/dispatch-value transduce-compile rf query-type model built-query))
+  (log/debugf :compile "Compile %s" built-query)
   (u/try-with-error-context ["with built query" {:query-type query-type, :built-query built-query}]
     ;; keep the original info around as metadata in case someone needs it later (they will)
     (binding [*built-query* built-query]
@@ -241,7 +254,7 @@
                    (seq query)))
           (format "Compiled query should not be nil/empty. Got: %s" (pr-str query)))
   (let [query (vary-meta query (fn [metta]
-                                 (merge (meta *built-query*) metta)))]
+                                 (merge (dissoc (meta *built-query*) :type) metta)))]
     (transduce-execute rf query-type model query)))
 
 ;;; TODO -- this is a little JDBC-specific. What if some other query engine wants to run plain string queries without us
@@ -282,11 +295,13 @@
 (m/defmethod transduce-build :around :default
   [rf query-type model parsed-args resolved-query]
   {:pre [(ifn? rf) (query-type? query-type) (map? parsed-args)]}
-  ;; disabled for now since it breaks [[toucan2.no-jdbc-poc-test]]... but we should figure out how to fix that and
-  ;; then reenable this.
+  (log/tracef :compile
+              "In %s with dispatch value %s"
+              `transduce-build
+              (m/dispatch-value transduce-build rf query-type model parsed-args resolved-query))
+  (log/debugf :compile "Build %s" resolved-query)
   (assert (not (keyword? resolved-query))
           (format "This doesn't look like a resolved query: %s" resolved-query))
-  (u/println-debug ["transduce resolved query %s" resolved-query])
   (u/try-with-error-context ["with resolved query" {:query-type     query-type
                                                     :resolved-query resolved-query
                                                     :parsed-args    parsed-args}]
@@ -376,7 +391,11 @@
 (m/defmethod transduce-resolve :around :default
   [rf query-type model parsed-args unresolved-query]
   {:pre [(ifn? rf) (query-type? query-type) (map? parsed-args)]}
-  (u/println-debug ["transduce unresolved query %s" unresolved-query])
+  (log/tracef :compile
+              "In %s with dispatch value %s"
+              `transduce-resolve
+              (m/dispatch-value transduce-resolve rf query-type model parsed-args unresolved-query))
+  (log/debugf :compile "Resolve %s" unresolved-query)
   (u/try-with-error-context ["with unresolved query" {:query-type query-type
                                                       :unresolved-query unresolved-query
                                                       :parsed-args      parsed-args}]
@@ -409,6 +428,10 @@
 (m/defmethod transduce-with-model :around :default
   [rf query-type model parsed-args]
   {:pre [(ifn? rf) (query-type? query-type) (map? parsed-args)]}
+  (log/tracef :compile
+              "In %s with dispatch value %s"
+              `transduce-with-model
+              (m/dispatch-value transduce-with-model rf query-type model parsed-args))
   (u/try-with-error-context ["with model" {:model model}]
     (next-method rf query-type model parsed-args)))
 
@@ -447,7 +470,10 @@
 (m/defmethod transduce-parsed :around :default
   [rf query-type parsed-args]
   {:pre [(ifn? rf) (query-type? query-type) (map? parsed-args)]}
-  (u/println-debug ["transduce parsed args %s" parsed-args])
+  (log/tracef :compile
+              "In %s with dispatch value %s"
+              `transduce-parsed
+              (m/dispatch-value transduce-parsed rf query-type parsed-args))
   (u/try-with-error-context ["with parsed args" {:parsed-args parsed-args}]
     (next-method rf query-type parsed-args)))
 
@@ -480,7 +506,10 @@
 (m/defmethod transduce-unparsed :around :default
   [rf query-type unparsed]
   {:pre [(ifn? rf) (query-type? query-type) (sequential? unparsed)]}
-  (u/println-debug ["transduce unparsed %s args %s" query-type unparsed])
+  (log/tracef :compile
+              "In %s with dispatch value %s"
+              `transduce-unparsed
+              (m/dispatch-value transduce-unparsed rf query-type unparsed))
   (u/try-with-error-context ["transduce results" {:query-type query-type, :unparsed unparsed}]
     (next-method rf query-type unparsed)))
 

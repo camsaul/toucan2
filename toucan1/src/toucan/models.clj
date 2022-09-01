@@ -64,7 +64,7 @@
     (isa? model :toucan1/model) model
     (vector? model)             (resolve-model (first model))
     (symbol? model)             (resolve-model-from-symbol model)
-    :else                       (throw (ex-info (str "Invalid model: " (u/safe-pr-str model))
+    :else                       (throw (ex-info (str "Invalid model: " (pr-str model))
                                                 {:model model}))))
 
 (m/defmethod pipeline/transduce-with-model [#_query-type :default #_model clojure.lang.Symbol]

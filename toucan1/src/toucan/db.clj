@@ -13,6 +13,7 @@
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.jdbc.query :as jdbc.query]
+   [toucan2.log :as log]
    [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -79,9 +80,9 @@
 
 (m/defmethod pipeline/transduce-with-model [#_query-type :default #_model :toucan1/model]
   [rf query-type model parsed-args]
-  (u/with-debug-result ["Compiling Honey SQL query for legacy Toucan 1 model %s" model]
-    (binding [map.honeysql/*options* (honeysql-options)]
-      (next-method rf query-type model parsed-args))))
+  (log/debugf :compile "Compiling Honey SQL query for legacy Toucan 1 model %s" model)
+  (binding [map.honeysql/*options* (honeysql-options)]
+    (next-method rf query-type model parsed-args)))
 
 ;; replaces `*db-connection*`
 (p/import-vars [conn *current-connectable*])
@@ -138,13 +139,14 @@
   [honeysql-form]
   (pipeline/compile :default :default honeysql-form))
 
+;;; TODO -- are we sure we need to do things this way? Can't this stuff be bound in a pipeline method?
 (deftype ^:no-doc Toucan1ReducibleQuery [honeysql-form jdbc-options]
   clojure.lang.IReduceInit
   (reduce [this rf init]
-    (u/with-debug-result ["reduce Toucan 1 reducible query %s" this]
-      (binding [jdbc.query/*options*    (merge jdbc.query/*options* jdbc-options)
-                map.honeysql/*options* (honeysql-options)]
-        (reduce rf init (execute/reducible-query nil honeysql-form)))))
+    (log/debugf :results "reduce Toucan 1 reducible query %s" this)
+    (binding [jdbc.query/*options*    (merge jdbc.query/*options* jdbc-options)
+              map.honeysql/*options* (honeysql-options)]
+      (reduce rf init (execute/reducible-query nil honeysql-form))))
 
   pretty/PrettyPrintable
   (pretty [_this]

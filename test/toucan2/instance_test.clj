@@ -3,10 +3,10 @@
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.instance :as instance]
+   [toucan2.magic-map :as magic-map]
    [toucan2.protocols :as protocols]
    [toucan2.select :as select]
-   [toucan2.test :as test]
-   [toucan2.util :as u])
+   [toucan2.test :as test])
   (:import
    (java.time LocalDateTime)))
 
@@ -217,19 +217,17 @@
 
 (deftest pretty-print-test
   (testing "Should pretty-print"
-    (testing "Normal output"
-      (is (= (pr-str '(toucan2.instance/instance :venues {:id 1}))
-             (pr-str (instance/instance :venues {:id 1})))))
-    (testing "output with debugging enabled"
-      (binding [u/*debug* true]
-        (is (= (pr-str (list
-                        'toucan2.instance/instance
-                        :venues
-                        (list
-                         'toucan2.magic-map/magic-map
-                         {:id 1}
-                         (symbol "#'toucan2.magic-map/kebab-case-xform"))))
-               (pr-str (instance/instance :venues {:id 1}))))))))
+    (are [print-magic-maps expected] (= expected
+                                        (binding [magic-map/*print-magic-maps* print-magic-maps]
+                                          (pr-str (instance/instance :venues {:id 1}))))
+      true  (pr-str (list
+                     'toucan2.instance/instance
+                     :venues
+                     (list
+                      'toucan2.magic-map/magic-map
+                      {:id 1}
+                      (symbol "#'toucan2.magic-map/kebab-case-xform"))))
+      false (pr-str '(toucan2.instance/instance :venues {:id 1})))))
 
 (deftest reset-original-test
   (let [m  (assoc (instance/instance :wow {:a 100}) :b 200)

@@ -5,10 +5,13 @@
    [clojure.string :as str]
    [clojure.template :as clojure.template]
    [clojure.test :as t]
+   [environ.core :as env]
    [honey.sql :as hsql]
    [methodical.core :as m]
    [pjstadig.humane-test-output :as humane-test-output]
+   [puget.printer :as puget]
    [toucan2.connection :as conn]
+   [toucan2.log :as log]
    [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]))
 
@@ -29,6 +32,19 @@
              `(t/testing '~spliced
                 (t/is ~spliced)))))))
 
+(defn is-or-testing-form? [form]
+  (and (seq? form)
+       (symbol? (first form))
+       (#{#'clojure.test/is
+          #'clojure.test/testing}
+        (resolve (first form)))))
+
+(s/fdef t/are
+  :args (s/cat :bindings vector?
+               :expr     (complement is-or-testing-form?)
+               :args     (s/+ any?))
+  :ret any?)
+
 (doto #'t/are
   (alter-var-root (constantly @#'are+))
   (alter-meta! merge (select-keys (meta #'are+) [:ns :name :file :column :line])))
@@ -48,8 +64,7 @@
 
 (defn- db-types-from-env
   ([]
-   (db-types-from-env (or (System/getenv "TEST_DBS")
-                          (System/getProperty "test.dbs"))))
+   (db-types-from-env (env/env :test-dbs)))
   ([s]
    (when (string? s)
      (not-empty (set (for [s (str/split (str/lower-case (str/trim s)) #"\s*,\s*")
@@ -173,8 +188,8 @@
   "jdbc:h2:mem:toucan2;DB_CLOSE_DELAY=-1")
 
 (defn- test-db-url [db-type]
-  (let [env-var (format "JDBC_URL_%s" (str/upper-case (name db-type)))]
-    (or (System/getenv env-var)
+  (let [env-var (keyword (format "jdbc-url-%s" (name db-type)))]
+    (or (env/env env-var)
         (default-test-db-url db-type))))
 
 ;;;; creating test tables, and the default test models.
@@ -313,12 +328,22 @@
 
 ;;;; misc print methods
 
-(defmethod print-dup java.time.LocalDateTime
-  [t writer]
-  (print-dup (list 'java.time.LocalDateTime/parse (str t))
-             writer))
-
 (defmethod print-method java.time.LocalDateTime
   [t writer]
   (print-method (list 'java.time.LocalDateTime/parse (str t))
                 writer))
+
+(defmethod print-method java.time.OffsetDateTime
+  [t writer]
+  (print-method (list 'java.time.OffsetDateTime/parse (str t))
+                writer))
+
+(defmethod log/print-handler java.time.LocalDateTime
+  [_klass]
+  (fn [printer t]
+    (puget/format-doc printer (list 'java.time.LocalDateTime/parse (str t)))))
+
+(defmethod log/print-handler java.time.OffsetDateTime
+  [_klass]
+  (fn [printer t]
+    (puget/format-doc printer (list 'java.time.OffsetDateTime/parse (str t)))))

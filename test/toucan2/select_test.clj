@@ -65,7 +65,7 @@
               :where  [:and [:= :a :b] [:= :id 1]]}
              (pipeline/build :toucan.query-type/select.* :default {:kv-args {:id 1}} {:where [:= :a :b]}))))))
 
-(m/defmethod query/apply-kv-arg [:default clojure.lang.IPersistentMap ::custom.limit]
+(m/defmethod query/apply-kv-arg [#_model :default #_query :toucan.map-backend/honeysql2 #_k ::custom.limit]
   [_model honeysql-form _k limit]
   (assoc honeysql-form :limit limit))
 

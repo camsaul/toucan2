@@ -2,6 +2,7 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.log :as log]
    [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
 
@@ -14,10 +15,12 @@
 (m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.result-type/instances
                                                     #_model      ::default-fields]
   [_rf _query-type model parsed-args]
-  (u/with-debug-result ["add default fields for %s" model]
-    (update parsed-args :columns (fn [columns]
-                                   (or (not-empty columns)
-                                       (default-fields model))))))
+  (log/debugf :compile "add default fields for %s" model)
+  (let [result (update parsed-args :columns (fn [columns]
+                                              (or (not-empty columns)
+                                                  (default-fields model))))]
+    (log/debugf :compile "[add default fields] => %s" result)
+    result))
 
 (defmacro define-default-fields {:style/indent :defn} [model & body]
   `(let [model# ~model]

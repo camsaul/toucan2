@@ -2,6 +2,7 @@
   (:require
    [next.jdbc.result-set :as next.jdbc.rs]
    [potemkin :as p]
+   [toucan2.log :as log]
    [toucan2.util :as u])
   (:import
    (next.jdbc.result_set DatafiableRow)))
@@ -15,14 +16,14 @@
     "Fully realize either a reducible query, or a result row from that query."))
 
 (defn- realize-IReduceInit [this]
-  (u/with-debug-result ["%s %s" `realize (symbol (.getCanonicalName (class this))) #_this]
-    (u/try-with-error-context ["realize IReduceInit" {::reducible this}]
-      (into []
-            (map (fn [row]
-                   (u/with-debug-result (list `realize (some-> row class .getCanonicalName symbol) row)
-                     (u/try-with-error-context ["realize row" {::row row}]
-                       (realize row)))))
-            this))))
+  (log/tracef :results "realize IReduceInit %s" (symbol (.getCanonicalName (class this))))
+  (u/try-with-error-context ["realize IReduceInit" {::reducible this}]
+    (into []
+          (map (fn [row]
+                 (log/tracef :results "realize row ^%s %s" (some-> row class .getCanonicalName symbol) row)
+                 (u/try-with-error-context ["realize row" {::row row}]
+                   (realize row))))
+          this)))
 
 (extend-protocol Realize
   Object

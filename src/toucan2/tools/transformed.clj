@@ -5,6 +5,7 @@
    [methodical.core :as m]
    [methodical.impl.combo.operator :as m.combo.operator]
    [toucan2.instance :as instance]
+   [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
@@ -137,7 +138,7 @@
           (nil? v))
     (next-method model query k v)
     (let [[k v*] (query/apply-kv-arg model (->RecordTypeForInterceptingApplyKVArgCalls) k v)]
-      #_(printf "Intercepted apply-kv-arg %s %s => %s\n" k (u/safe-pr-str v) (u/safe-pr-str v*))
+      #_(printf "Intercepted apply-kv-arg %s %s => %s\n" k (pr-str v) (pr-str v*))
       (binding [*already-transformed* true]
         (next-method model query k v*)))))
 
@@ -153,7 +154,7 @@
    instance
    (fn [row]
      (assert (map? row)
-             (format "%s expected map rows, got %s" `apply-result-row-transform (u/safe-pr-str row)))
+             (format "%s expected map rows, got %s" `apply-result-row-transform (pr-str row)))
      ;; Special Optimization 2: if the underlying original/current maps of `instance` are instances of `IRow` (which
      ;; themselves have underlying key->value thunks) we can compose the thunk itself rather than immediately
      ;; realizing and transforming the value. This means transforms don't get applied to values that are never
@@ -165,13 +166,13 @@
          (result-row/with-thunks row (update thunks k (fn [thunk]
                                                         (comp xform thunk))))
          (update row k xform))
-     (u/with-debug-result ["Transform %s %s" k (get row k)]
-       (u/try-with-error-context ["Transform result column" {::k k, ::xform xform, ::row row}]
-         (doto (update row k xform)
-           ((fn [row]
-              (assert (map? row)
-                      (format "%s: expected row transform function to return a map, got %s"
-                              `apply-result-row-transform (u/safe-pr-str row)))))))))))
+     (log/tracef :results "Transform %s %s" k (get row k))
+     (u/try-with-error-context ["Transform result column" {::k k, ::xform xform, ::row row}]
+       (doto (update row k xform)
+         ((fn [row]
+            (assert (map? row)
+                    (format "%s: expected row transform function to return a map, got %s"
+                            `apply-result-row-transform (pr-str row))))))))))
 
 (defn- out-transforms [model]
   (wrapped-transforms model :out))
@@ -212,9 +213,11 @@
   (if-let [k->transform (not-empty (out-transforms model))]
     (map (let [f (result-row-transform-fn k->transform)]
            (fn [row]
-             (u/with-debug-result ["Transform %s row %s" model row]
-               (u/try-with-error-context ["transform result row" {::model model, ::row row}]
-                 (f row))))))
+             (log/tracef :results "Transform %s row %s" model row)
+             (let [result (u/try-with-error-context ["transform result row" {::model model, ::row row}]
+                            (f row))]
+               (log/tracef :results "[transform] => %s" result)
+               result))))
     identity))
 
 (m/defmethod pipeline/transduce-with-model [#_query-type :toucan.result-type/instances
@@ -270,7 +273,7 @@
     (map row-xform rows)))
 
 (m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/insert.*
-                                                     #_model      ::transformed.model]
+                                                    #_model      ::transformed.model]
   [_rf query-type model parsed-args]
   (assert (isa? model ::transformed.model))
   (b/cond
@@ -287,10 +290,10 @@
                                                                             ::model       model
                                                                             ::parsed-args parsed-args
                                                                             ::transforms  k->transform}]
-      (u/with-debug-result ["Apply %s transforms to %s" k->transform parsed-args]
-        (-> parsed-args
-            (update :rows transform-insert-rows k->transform)
-            (assoc ::already-transformed? true))))))
+      (log/debugf :compile "Apply %s transforms to %s" k->transform parsed-args)
+      (-> parsed-args
+          (update :rows transform-insert-rows k->transform)
+          (assoc ::already-transformed? true)))))
 
 ;;;; after insert
 
@@ -301,10 +304,12 @@
         rf*     ((comp
                   ;; 1. convert result PKs to a map of PK key -> value
                   (map (fn [pk-or-pks]
-                         (u/with-debug-result ["convert result PKs %s to map of PK key -> value" pk-or-pks]
-                           (zipmap pk-keys (if (sequential? pk-or-pks)
-                                             pk-or-pks
-                                             [pk-or-pks])))))
+                         (log/tracef :compile "convert result PKs %s to map of PK key -> value" pk-or-pks)
+                         (let [m (zipmap pk-keys (if (sequential? pk-or-pks)
+                                                   pk-or-pks
+                                                   [pk-or-pks]))]
+                           (log/tracef :compile "=> %s" pk-or-pks)
+                           m)))
                   ;; 2. transform the PK results using the model's [[out-transforms]]
                   (transform-result-rows-transducer model)
                   ;; 3. Now flatten the maps of PK key -> value back into plain PK values or vectors of plain PK values
@@ -313,8 +318,10 @@
                                  (first pk-keys)
                                  (juxt pk-keys))]
                          (fn [row]
-                           (u/with-debug-result "convert PKs map back to flat PKs"
-                             (f row))))))
+                           (log/tracef :results "convert PKs map back to flat PKs")
+                           (let [row (f row)]
+                             (log/tracef :results "=> %s" row)
+                             row)))))
                  rf)]
     (next-method rf* query-type model parsed-args)))
 
