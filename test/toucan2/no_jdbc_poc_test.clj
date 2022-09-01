@@ -20,7 +20,7 @@
      [(into {} (for [k ks]
                  [(keyword k) (System/getProperty (name k))]))])))
 
-(deftest select-test
+(deftest ^:parallel select-test
   (is (= [{:user.language "en"}]
          (select/select ::system-properties :user.language)))
   (is (= [{:user.language "en", :line.separator "\n"}]

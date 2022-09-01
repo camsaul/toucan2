@@ -3,6 +3,7 @@
    [clojure.string :as str]
    [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -20,23 +21,16 @@
 (derive ::people ::test/people)
 
 (deftest ^:parallel parse-args-test
-  (doseq [[args expected] {[:model 1]
-                           {:modelable :model, :queryable 1}
-
-                           [:model :id 1]
-                           {:modelable :model, :kv-args {:id 1}, :queryable {}}
-
-                           [:model {:where [:= :id 1]}]
-                           {:modelable :model, :queryable {:where [:= :id 1]}}
-
-                           [:model :name "Cam" {:where [:= :id 1]}]
-                           {:modelable :model, :kv-args {:name "Cam"}, :queryable {:where [:= :id 1]}}
-
-                           [:model ::my-query]
-                           {:modelable :model, :queryable ::my-query}}]
-    (testing `(query/parse-args :toucan.query-type/select.* ~args)
-      (is (= expected
-             (query/parse-args :toucan.query-type/select.* args))))))
+  (are [args expected] (= expected
+                          (query/parse-args :toucan.query-type/select.* args))
+    [:model 1]                               {:modelable :model, :queryable 1}
+    [:model :id 1]                           {:modelable :model, :kv-args {:id 1}, :queryable {}}
+    [:model {:where [:= :id 1]}]             {:modelable :model, :queryable {:where [:= :id 1]}}
+    [:model :name "Cam" {:where [:= :id 1]}] {:modelable :model, :kv-args {:name "Cam"}, :queryable {:where [:= :id 1]}}
+    [:model ::my-query]                      {:modelable :model, :queryable ::my-query}
+    [:conn :db :model]                       {:connectable :db, :modelable :model, :queryable {}}
+    [:conn :db :model ::my-query]            {:connectable :db, :modelable :model, :queryable ::my-query}
+    [:conn :db :model :id 1]                 {:connectable :db, :modelable :model, :kv-args {:id 1}, :queryable {}}))
 
 (deftest ^:parallel default-build-query-test
   (is (= {:select [:*]
@@ -69,14 +63,14 @@
   [_model honeysql-form _k limit]
   (assoc honeysql-form :limit limit))
 
-(deftest custom-condition-test
+(deftest ^:parallel custom-condition-test
   (is (= {:select [:*]
           :from   [[:default]]
           :limit  100}
          (pipeline/build :toucan.query-type/select.* :default {:kv-args {::custom.limit 100}} {})
          (pipeline/build :toucan.query-type/select.* :default {:kv-args {::custom.limit 100}} {:limit 1}))))
 
-(deftest built-in-pk-condition-test
+(deftest ^:parallel built-in-pk-condition-test
   (is (= {:select [:*], :from [[:default]], :where [:= :id 1]}
          (pipeline/build :toucan.query-type/select.* :default {:kv-args {:toucan/pk 1}} {})))
   (is (= {:select [:*], :from [[:default]], :where [:and
@@ -84,7 +78,7 @@
                                                     [:= :id 1]]}
          (pipeline/build :toucan.query-type/select.* :default {:kv-args {:toucan/pk 1}} {:where [:= :name "Cam"]}))))
 
-(deftest select-test
+(deftest ^:parallel select-test
   (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]]
     (testing "plain SQL"
       (is (= expected
@@ -105,7 +99,7 @@
       (is (= [(instance/instance ::test/people {:id 1})]
              (select/select [::test/people :id] :id 1))))))
 
-(deftest select-test-2
+(deftest ^:parallel select-test-2
   (let [all-rows [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}
                   {:id 2, :name "Sam", :created-at (OffsetDateTime/parse "2019-01-11T23:56:00Z")}
                   {:id 3, :name "Pam", :created-at (OffsetDateTime/parse "2020-01-01T21:56:00Z")}
@@ -139,7 +133,7 @@
   {:select [[:%count.* :count]]
    :from   [(keyword (model/table-name &model))]})
 
-(deftest named-query-test
+(deftest ^:parallel named-query-test
   (testing "venues"
     (is (= [{:count 3}]
            (select/select ::test/venues ::count-query))))
@@ -162,7 +156,7 @@
   [_model]
   [:id :name])
 
-(deftest select-non-integer-pks-test
+(deftest ^:parallel select-non-integer-pks-test
   (testing "non-integer PK"
     (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
            (select/select ::people.name-is-pk :toucan/pk "Cam"))))
@@ -192,12 +186,12 @@
              rf)]
     (next-method rf* query-type model parsed-args)))
 
-(deftest default-query-test
+(deftest ^:parallel default-query-test
   (testing "Should be able to set some defaults by implementing `select*`"
     (is (= [(instance/instance ::people.no-timestamps {:id 1, :name "Cam", :after-select? true})]
            (select/select ::people.no-timestamps 1)))))
 
-(deftest post-select-test
+(deftest ^:parallel post-select-test
   (testing "Should be able to do cool stuff in (select* :after)"
     (testing (str \newline '(ancestors ::people.no-timestamps) " => " (pr-str (ancestors ::people.no-timestamps)))
       (is (= [(instance/instance ::people.no-timestamps {:id 1, :name "Cam", :after-select? true})
@@ -215,7 +209,7 @@
   [_rf _query-type _model built-query]
   (assoc built-query :limit 2))
 
-(deftest pre-select-test
+(deftest ^:parallel pre-select-test
   (testing "Should be able to do cool stuff in pre-select (select* :before)"
     (is (= [(instance/instance ::people.limit-2 {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})
             (instance/instance ::people.limit-2 {:id 2, :name "Sam", :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")})]
@@ -224,13 +218,13 @@
 (derive ::people.no-timestamps-limit-2 ::people.no-timestamps)
 (derive ::people.no-timestamps-limit-2 ::people.limit-2)
 
-(deftest combine-aux-methods-test
+(deftest ^:parallel combine-aux-methods-test
   (testing (str \newline '(ancestors ::people.no-timestamps-limit-2) " => " (pr-str (ancestors ::people.no-timestamps-limit-2)))
     (is (= [(instance/instance ::people.no-timestamps-limit-2 {:id 1, :name "Cam", :after-select? true})
             (instance/instance ::people.no-timestamps-limit-2 {:id 2, :name "Sam", :after-select? true})]
            (select/select ::people.no-timestamps-limit-2)))))
 
-(deftest select-one-test
+(deftest ^:parallel select-one-test
   (is (= (instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})
          (select/select-one ::test/people 1)))
   (is (= nil
@@ -239,7 +233,7 @@
 ;;; TODO -- a test to make sure this doesn't fetch a second row even if query would return multiple rows. A test with a
 ;;; SQL query.
 
-(deftest select-fn-test
+(deftest ^:parallel select-fn-test
   (testing "Equivalent of Toucan select-field"
     (is (= #{1 2 3 4}
            (select/select-fn-set :id ::test/people))))
@@ -261,11 +255,11 @@
     (is (nil? (select/select-fn-set :id ::test/people :id 100)))
     (is (nil? (select/select-fn-vec :id ::test/people :id 100)))))
 
-(deftest select-one-fn-test
+(deftest ^:parallel select-one-fn-test
   (is (= 1
          (select/select-one-fn :id ::test/people :name "Cam"))))
 
-(deftest select-pks-test
+(deftest ^:parallel select-pks-test
   (is (= #{1 2 3 4}
          (select/select-pks-set ::test/people)))
   (is (= [1 2 3 4]
@@ -284,7 +278,7 @@
     (is (nil? (select/select-pks-set ::test/people :id 100)))
     (is (nil? (select/select-pks-vec ::test/people :id 100)))))
 
-(deftest select-one-pk-test
+(deftest ^:parallel select-one-pk-test
   (is (= 1
          (select/select-one-pk ::test/people :name "Cam")))
   (testing "non-integer PK"
@@ -294,7 +288,7 @@
     (is (= [1 "Cam"]
            (select/select-one-pk ::people.composite-pk :id 1)))))
 
-(deftest select-fn->fn-test
+(deftest ^:parallel select-fn->fn-test
   (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
          (select/select-fn->fn :id :name ::test/people)))
   (is (= {2 "cam", 3 "sam", 4 "pam", 5 "tam"}
@@ -302,7 +296,7 @@
   (testing "Should return nil if the result is empty"
     (is (nil? (select/select-fn->fn :id :name ::test/people :id 100)))))
 
-(deftest select-pk->fn-test
+(deftest ^:parallel select-pk->fn-test
   (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
          (select/select-pk->fn :name ::test/people)))
   (is (= {1 "cam", 2 "sam", 3 "pam", 4 "tam"}
@@ -313,7 +307,7 @@
   (testing "Should return nil if the result is empty"
     (is (nil? (select/select-pk->fn :name ::test/people :id 100)))))
 
-(deftest select-fn->pk-test
+(deftest ^:parallel select-fn->pk-test
   (is (= {"Cam" 1, "Sam" 2, "Pam" 3, "Tam" 4}
          (select/select-fn->pk :name ::test/people)))
   (is (= {"cam" 1, "sam" 2, "pam" 3, "tam" 4}
@@ -324,7 +318,7 @@
            (select/select-fn->pk :name ::people.composite-pk))))
     (is (nil? (select/select-fn->pk :name ::people.composite-pk :id 100)))))
 
-(deftest count-test
+(deftest ^:parallel count-test
   (is (= 4
          (select/count ::test/people)))
   (is (= 1
@@ -334,7 +328,7 @@
   (is (= 2
          (select/count ::test/venues :category "bar"))))
 
-(deftest exists?-test
+(deftest ^:parallel exists?-test
   (is (= true
          (select/exists? ::test/people :name "Cam")))
   (is (= false
@@ -350,14 +344,14 @@
   [_ _ _ m _ metta]
   (with-meta m metta))
 
-#_(deftest custom-instance-type-test
+#_(deftest ^:parallel custom-instance-type-test
   (let [m (select/select-one ::people.custom-instance-type 1)]
     (is (= {:id 1, :name "Cam", :created_at (OffsetDateTime/parse "2020-04-21T23:56Z")}
            m))
     (is (map? m))
     (is (not (instance/toucan2-instance? m)))))
 
-(deftest dont-add-from-if-it-already-exists-test
+(deftest ^:parallel dont-add-from-if-it-already-exists-test
   (testing "Select shouldn't add a :from clause if one is passed in explicitly already"
     (is (= (instance/instance ::test/people {:id 1})
            (select/select-one ::test/people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]})))
@@ -368,7 +362,7 @@
            (tools.compile/compile
              (select/select-one :people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]}))))))
 
-(deftest select-nil-test
+(deftest ^:parallel select-nil-test
   (testing "(select model nil) should basically be the same as (select model :toucan/pk nil)"
     (let [parsed-args (query/parse-args :toucan.query-type/select.* [::test/venues nil])]
       (is (= {:modelable ::test/venues, :queryable nil}
@@ -390,7 +384,7 @@
            (select/select-one-fn :id ::test/venues nil)
            (select/select-one-fn int ::test/venues nil)))))
 
-(deftest select-join-test
+(deftest ^:parallel select-join-test
   (testing "Extra columns from joined tables should come back"
     (is (= (instance/instance ::test/venues
                               {:id              1
@@ -419,7 +413,7 @@
         resolved-query  (assoc resolved-query :left-join [:category [:= venues-category :category.name]])]
     (next-method rf query-type model parsed-args resolved-query)))
 
-(deftest joined-model-test
+(deftest ^:parallel joined-model-test
   (is (= (instance/instance ::venues.with-category
                             {:id              1
                              :name            "bar"
@@ -437,7 +431,7 @@
   [_model]
   {::venues.namespaced :venue})
 
-(deftest namespaced-test
+(deftest ^:parallel namespaced-test
   (is (= {"venues" :venue}
          (model/table-name->namespace ::venues.namespaced)))
   (is (= {:select    [:*]
@@ -463,7 +457,7 @@
   {::test/venues     :venue
    ::test/categories :category})
 
-(deftest namespaced-with-joins-test
+(deftest ^:parallel namespaced-with-joins-test
   (is (= {:select    [:*]
           :from      [[:venues :venue]]
           :order-by  [[:id :asc]]
@@ -482,7 +476,7 @@
            :category/parent-category nil})
          (select/select-one ::venues.namespaced.with-category {:order-by [[:id :asc]]}))))
 
-(deftest namespaced-with-joins-columns-test
+(deftest ^:parallel namespaced-with-joins-columns-test
   (is (= :venue
          (model/namespace ::venues.namespaced.with-category)))
   (is (= {:select    [:venue/id :venue/name :category/name]
@@ -496,3 +490,33 @@
                             {:venue/id 1, :venue/name "Tempest", :category/name "bar"})
          (select/select-one [::venues.namespaced.with-category :venue/id :venue/name :category/name]
                             {:order-by [[:id :asc]]}))))
+
+(deftest ^:parallel positional-connectable-test
+  (testing "Support :conn positional connectable arg"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"No default Toucan connection defined"
+         (select/select-one [:venues :id :name] 1)))
+    (is (= [{:id 1, :name "Tempest"}]
+           (select/select :conn ::test/db [:venues :id :name] 1)))
+    (is (= [{:id 1, :name "Tempest"}]
+           (select/select :conn ::test/db [:venues :id :name] 1)))
+    (is (= {:id 1, :name "Tempest"}
+           (select/select-one :conn ::test/db [:venues :id :name] 1)))
+    (is (= 1
+           (select/count :conn ::test/db [:venues :id :name] 1)))
+    (is (= true
+           (select/exists? :conn ::test/db [:venues :id :name] 1)))
+    (testing "nil :conn should not override current connectable"
+      (binding [conn/*current-connectable* ::test/db]
+        (is (= [{:id 1, :name "Tempest"}]
+               (select/select :conn nil [:venues :id :name] 1)))))
+    (testing "Explicit connectable should override current connectable"
+      (binding [conn/*current-connectable* :fake-db]
+        (is (= true
+               (select/exists? :conn ::test/db [:venues :id :name] 1)))))
+    (testing "Explicit connectable should override model default connectable"
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Don't know how to get a connection from .* :fake-db"
+           (select/exists? :conn :fake-db [::test/venues :id :name] 1))))))

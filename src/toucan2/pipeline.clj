@@ -478,9 +478,14 @@
     (next-method rf query-type parsed-args)))
 
 (m/defmethod transduce-parsed :default
-  [rf query-type {:keys [modelable], :as parsed-args}]
-  (let [model (model/resolve-model modelable)]
-    (transduce-with-model rf query-type model (dissoc parsed-args :modelable))))
+  [rf query-type {:keys [modelable connectable], :as parsed-args}]
+  (let [model (model/resolve-model modelable)
+        thunk (^:once fn* []
+               (transduce-with-model rf query-type model (dissoc parsed-args :modelable :connectable)))]
+    (if connectable
+      (binding [conn/*current-connectable* connectable]
+        (thunk))
+      (thunk))))
 
 ;;;; [[transduce-unparsed]]
 
@@ -645,8 +650,8 @@
 ;;;; default JDBC impls. Not convinced they belong here.
 
 (m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
-                                                       #_query-type :default
-                                                       #_model      :default]
+                                                #_query-type :default
+                                                #_model      :default]
   [rf conn query-type model sql-args]
   (increment-call-count!)
   ;; `:return-keys` is passed in this way instead of binding a dynamic var because we don't want any additional queries
@@ -660,8 +665,8 @@
 ;;; to set the `next.jdbc` option `:return-keys true`
 
 (m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
-                                                       #_query-type :toucan.result-type/pks
-                                                       #_model      :default]
+                                                #_query-type :toucan.result-type/pks
+                                                #_model      :default]
   [rf conn query-type model sql-args]
   (let [rf* ((map (model/select-pks-fn model))
              rf)]
@@ -674,12 +679,6 @@
 
 ;;; this is here in case we need to differentiate it from a regular select for some reason or another
 (derive ::select.instances-from-pks :toucan.query-type/select.instances)
-
-;; (s/def ::pk.raw-value (complement coll?))
-
-;; (s/def ::pk  (s/alt :raw-value ::pk.raw-value
-;;                     :compound  (s/coll-of ::pk.raw-value)))
-;; (s/def ::pks (s/nilable (s/coll-of ::pk)))
 
 (defn- transduce-instances-from-pks
   [rf model columns pks]
@@ -696,8 +695,8 @@
       (transduce-with-model rf ::select.instances-from-pks model parsed-args))))
 
 (m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
-                                                       #_query-type :toucan.result-type/instances
-                                                       #_model      :default]
+                                                #_query-type :toucan.result-type/instances
+                                                #_model      :default]
   [rf conn query-type model sql-args]
   ;; for non-DML stuff (ie `SELECT`) JDBC can actually return instances with zero special magic, so we can just let the
   ;; next method do it's thing. Presumably if we end up here with something that is neither DML or DQL, but maybe

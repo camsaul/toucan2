@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -15,23 +16,24 @@
 
 (set! *warn-on-reflection* true)
 
-(deftest parse-update-args-test
-  (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
-         (update/parse-update-args :toucan.query-type/update.* [:model 1 {:a 1}])))
-  (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk nil}, :queryable {}}
-         (update/parse-update-args :toucan.query-type/update.* [:model nil {:a 1}])))
-  (is (= {:modelable :model, :kv-args {:id 1}, :changes {:a 1}, :queryable {}}
-         (update/parse-update-args :toucan.query-type/update.* [:model :id 1 {:a 1}])))
-  (testing "composite PK"
-    (is (= {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk [1 2]}, :queryable {}}
-           (update/parse-update-args :toucan.query-type/update.* [:model [1 2] {:a 1}]))))
-  (testing "key-value conditions"
-    (is (= {:modelable :model, :kv-args {:name "Cam", :toucan/pk 1}, :changes {:a 1}, :queryable {}}
-           (update/parse-update-args :toucan.query-type/update.* [:model 1 :name "Cam" {:a 1}]))))
-  (is (= {:modelable :model, :changes {:name "Hi-Dive"}, :queryable {:id 1}}
-         (update/parse-update-args :toucan.query-type/update.* [:model {:id 1} {:name "Hi-Dive"}]))))
+(deftest ^:parallel parse-update-args-test
+  (are [args expected] (= expected
+                          (update/parse-update-args :toucan.query-type/update.* args))
 
-(deftest build-test
+    [:model 1 {:a 1}]                            {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
+    [:model nil {:a 1}]                          {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk nil}, :queryable {}}
+    [:model :id 1 {:a 1}]                        {:modelable :model, :kv-args {:id 1}, :changes {:a 1}, :queryable {}}
+    [:model [1 2] {:a 1}]                        {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk [1 2]}, :queryable {}}
+    [:model 1 :name "Cam" {:a 1}]                {:modelable :model, :kv-args {:name "Cam", :toucan/pk 1}, :changes {:a 1}, :queryable {}}
+    [:model {:id 1} {:name "Hi-Dive"}]           {:modelable :model, :changes {:name "Hi-Dive"}, :queryable {:id 1}}
+    [:conn :db :model 1 {:a 1}]                  {:connectable :db, :modelable :model, :changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
+    [:conn :db :model nil {:a 1}]                {:connectable :db, :modelable :model, :changes {:a 1}, :kv-args {:toucan/pk nil}, :queryable {}}
+    [:conn :db :model :id 1 {:a 1}]              {:connectable :db, :modelable :model, :kv-args {:id 1}, :changes {:a 1}, :queryable {}}
+    [:conn :db :model [1 2] {:a 1}]              {:connectable :db, :modelable :model, :changes {:a 1}, :kv-args {:toucan/pk [1 2]}, :queryable {}}
+    [:conn :db :model 1 :name "Cam" {:a 1}]      {:connectable :db, :modelable :model, :kv-args {:name "Cam", :toucan/pk 1}, :changes {:a 1}, :queryable {}}
+    [:conn :db :model {:id 1} {:name "Hi-Dive"}] {:connectable :db, :modelable :model, :changes {:name "Hi-Dive"}, :queryable {:id 1}}))
+
+(deftest ^:parallel build-test
   (is (= {:update [:venues]
           :set    {:name "Hi-Dive"}
           :where  [:and
@@ -143,3 +145,26 @@
                  :name     "Grant & Green"
                  :category "bar"})
                (select/select-one [::test/venues :id :name :category] :id 3)))))))
+
+(deftest positional-connectable-test
+  (testing "Support :conn positional connectable arg"
+    (test/with-discarded-table-changes :venues
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"No default Toucan connection defined"
+           (update/update! :venues 1 {:name "Hi-Dive"})))
+      (is (= 1
+             (update/update! :conn ::test/db :venues 1 {:name "Hi-Dive"})))
+      (testing "nil :conn should not override current connectable"
+        (binding [conn/*current-connectable* ::test/db]
+          (is (= 1
+                 (update/update! :conn nil :venues 1 {:name "Hi-Dive"})))))
+      (testing "Explicit connectable should override current connectable"
+        (binding [conn/*current-connectable* :fake-db]
+          (is (= 1
+                 (update/update! :conn ::test/db :venues 1 {:name "Hi-Dive"})))))
+      (testing "Explicit connectable should override model default connectable"
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Don't know how to get a connection from .* :fake-db"
+             (update/update! :conn :fake-db ::test/venues 1 {:name "Hi-Dive"})))))))

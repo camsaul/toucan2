@@ -12,7 +12,7 @@
 
 (set! *warn-on-reflection* true)
 
-(deftest instance-test
+(deftest ^:parallel instance-test
   (let [m (assoc (instance/instance :wow {:a 100}) :b 200)]
     (is (= {:a 100, :b 200}
            m))
@@ -41,7 +41,7 @@
              (protocols/current m)))
       (is (not (instance/instance? (protocols/current m)))))))
 
-(deftest no-changes-return-this-test
+(deftest ^:parallel no-changes-return-this-test
   (testing "Operations that result in no changes to the underlying map should return instance as-is, rather than a new copy."
     ;; this is mostly important because we do optimizations in cases where `original` and `current` are identical objects.
     (let [m (instance/instance :bird {:a 100})]
@@ -68,7 +68,7 @@
         (let [m2 (protocols/with-model m (protocols/model m))]
           (is (identical? m m2)))))))
 
-(deftest changes-test
+(deftest ^:parallel changes-test
   (is (= {:name "Hi-Dive"}
          (-> (instance/instance :venues {:id 1, :name "Tempest", :category "bar"})
              (assoc :name "Hi-Dive")
@@ -79,14 +79,14 @@
                (assoc :name "Tempest")
                protocols/changes)))))
 
-(deftest contains-key-test
+(deftest ^:parallel contains-key-test
   (is (= true
          (.containsKey (instance/instance :wow {:some-key true}) :some-key)))
   (testing "unnormalized keys"
     (is (= true
            (.containsKey (instance/instance :wow {:some-key true}) :SOME_KEY)))))
 
-(deftest equality-test
+(deftest ^:parallel equality-test
   (testing "equality"
     (testing "two instances with the same Table should be equal"
       (is (= (instance/instance :wow {:a 100})
@@ -102,7 +102,7 @@
         (is (= (instance/instance :wow {:a 100})
                {:a 100}))))))
 
-(deftest instance-test-2
+(deftest ^:parallel instance-test-2
   (is (= {}
          (instance/instance ::MyModel)))
   (is (= {}
@@ -136,7 +136,7 @@
       (is (= nil
              (protocols/original nil))))))
 
-(deftest transient-test
+(deftest ^:parallel transient-test
   (let [m  (transient (instance/instance :wow {:a 100}))
         m' (-> m
                (assoc! :b 200)
@@ -148,7 +148,7 @@
 
 ;;;; Magic Map stuff.
 
-(deftest magic-create-test
+(deftest ^:parallel magic-create-test
   (let [m (instance/instance nil {:snake/snake_case 1, "SCREAMING_SNAKE_CASE" 2, :lisp-case 3, :ANGRY/LISP-CASE 4})]
     (is (= (instance/instance nil {:snake/snake-case 1, "screaming-snake-case" 2, :lisp-case 3, :angry/lisp-case 4})
            m)))
@@ -162,7 +162,7 @@
            #_{:x 100, :type :x}         ; TODO -- not sure Toucan should set `:type` metadata
            (meta (instance/instance :x (with-meta {} {:x 100})))))))
 
-(deftest magic-keys-test
+(deftest ^:parallel magic-keys-test
   (testing "keys"
     (let [m (instance/instance nil {:db_id 1, :table_id 2})]
       (testing "get keys"
@@ -185,7 +185,7 @@
           (is (= (instance/instance nil {:db-id 2, :table-id 2})
                  (update m :db_id inc))))))))
 
-(deftest magic-equality-test
+(deftest ^:parallel magic-equality-test
   (testing "Two maps created with different key cases should be equal"
     (is (= (instance/instance nil {:db-id 1, :table-id 2})
            (instance/instance nil {:db_id 1, :table_id 2}))))
@@ -205,7 +205,7 @@
 
 (derive ::venues.no-key-transform ::test/venues)
 
-(deftest no-key-xform-test
+(deftest ^:parallel no-key-xform-test
   (is (= (instance/instance ::test/venues {:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")})
          (select/select-one ::test/venues {:select [:id :created-at]})))
   (testing "Should be able to disable key transforms by overriding `key-transform-fn*`"
@@ -215,7 +215,7 @@
       (is (= {id 1, created-at (LocalDateTime/parse "2017-01-01T00:00")}
              (select/select-one ::venues.no-key-transform {:select [:id :created-at]}))))))
 
-(deftest pretty-print-test
+(deftest ^:parallel pretty-print-test
   (testing "Should pretty-print"
     (are [print-magic-maps expected] (= expected
                                         (binding [magic-map/*print-magic-maps* print-magic-maps]
@@ -229,7 +229,7 @@
                       (symbol "#'toucan2.magic-map/kebab-case-xform"))))
       false (pr-str '(toucan2.instance/instance :venues {:id 1})))))
 
-(deftest reset-original-test
+(deftest ^:parallel reset-original-test
   (let [m  (assoc (instance/instance :wow {:a 100}) :b 200)
         m2 (instance/reset-original m)]
     (is (= {:a 100, :b 200}
@@ -246,7 +246,7 @@
              (protocols/original result)))
       (is (not (instance/instance? result))))))
 
-(deftest update-original-test
+(deftest ^:parallel update-original-test
   (let [m (-> (instance/instance :x :a 1)
               (assoc :b 2)
               (instance/update-original assoc :c 3))]
@@ -265,7 +265,7 @@
                (protocols/original result)))
         (is (not (instance/instance? result)))))))
 
-(deftest update-original-and-current-test
+(deftest ^:parallel update-original-and-current-test
   (let [m (-> (instance/instance :x :a 1)
               (assoc :b 2)
               (instance/update-original-and-current assoc :c 3))]
@@ -293,14 +293,14 @@
           (is (identical? (protocols/original m2)
                           (protocols/current m2))))))))
 
-(deftest dispatch-value-test
+(deftest ^:parallel dispatch-value-test
   (testing "Instance should implement dispatch-value"
     (is (= :wow
            (protocols/dispatch-value (instance/instance :wow {}))))))
 
 (derive ::toucan ::bird)
 
-(deftest instance-of?-test
+(deftest ^:parallel instance-of?-test
   (is (instance/instance? (instance/instance ::toucan {})))
   (is (instance/instance-of? ::bird (instance/instance ::toucan {})))
   (are [x] (not (instance/instance-of? ::toucan x))
@@ -309,7 +309,7 @@
     {}
     (instance/instance ::shoe {})))
 
-(deftest no-nil-maps-test
+(deftest ^:parallel no-nil-maps-test
   (testing "Shouldn't be able to make the maps in an instance nil"
     (let [m1 (instance/instance ::birbs {:a 1})]
       (is (= {:a 1}
@@ -325,7 +325,7 @@
             (is (= {}
                    (protocols/current m2)))))))))
 
-(deftest validate-new-maps-test
+(deftest ^:parallel validate-new-maps-test
   (testing "Shouldn't be able to make the maps something invalid"
     (let [m1 (instance/instance ::birbs {:a 1})]
       (is (= {:a 1}
@@ -343,7 +343,7 @@
                #"Assert failed: \(map\? new-current\)"
                (protocols/with-current m1 1))))))))
 
-(deftest dont-create-new-map-if-model-is-same-test
+(deftest ^:parallel dont-create-new-map-if-model-is-same-test
   (let [m1 (instance/instance ::birbs {:a 1})
         m2 (instance/instance ::birbs m1)]
     (is (identical? m1 m2))))

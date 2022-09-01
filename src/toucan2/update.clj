@@ -11,15 +11,16 @@
 ;;; optional arg, `:pk`, as the second arg, and one additional optional arg, the `changes` map at the end
 (s/def ::args
   (s/cat
-   :modelable ::query/default-args.modelable
-   :pk        (s/? (complement (some-fn keyword? map?)))
+   :connectable ::query/default-args.connectable
+   :modelable   ::query/default-args.modelable
+   :pk          (s/? (complement (some-fn keyword? map?)))
    ;; these are treated as CONDITIONS
-   :kv-args   ::query/default-args.kv-args
+   :kv-args     ::query/default-args.kv-args
    ;; by default, assuming this resolves to a map query, is treated as a map of conditions.
-   :queryable ::query/default-args.queryable
+   :queryable   ::query/default-args.queryable
    ;; TODO -- we should introduce some sort of `do-with-update-changes` method so it's possible to use named update maps
    ;; here.
-   :changes map?))
+   :changes     map?))
 
 (defn parse-update-args
   [query-type unparsed-args]

@@ -7,7 +7,7 @@
 
 (derive ::insert-type :toucan.query-type/insert.instances)
 
-(deftest base-query-type-test
+(deftest ^:parallel base-query-type-test
   (are [query-type] (= :toucan.query-type/insert.*
                        (pipeline/base-query-type query-type))
     :toucan.query-type/insert.*
@@ -20,7 +20,7 @@
     :toucan.query-type/*
     :toucan.result-type/instances))
 
-(deftest similar-query-type-returning-test
+(deftest ^:parallel similar-query-type-returning-test
   (are [query-type] (= :toucan.query-type/insert.pks
                        (pipeline/similar-query-type-returning query-type :toucan.result-type/pks))
     :toucan.query-type/insert.*
@@ -36,7 +36,7 @@
     :toucan.result-type/pks
     :toucan.result-type/instances))
 
-(deftest build-test
+(deftest ^:parallel build-test
   (is (= {:where [:= :a 1]}
          (pipeline/build :toucan.query-type/* nil {:kv-args {:a 1}} {}))))
 
@@ -44,7 +44,7 @@
   [_model]
   [:uuid])
 
-(deftest build-query-for-int-test
+(deftest ^:parallel build-query-for-int-test
   (testing "Raw integer PK as query"
     (is (= {:where [:= :id 1]}
            (pipeline/build :toucan.query-type/* nil {} 1)
@@ -54,7 +54,7 @@
            (pipeline/build :toucan.query-type/* ::model-with-non-id-pk {} 1)
            (pipeline/build :toucan.query-type/* ::model-with-non-id-pk {:kv-args {:toucan/pk 1}} {})))))
 
-(deftest plain-sql-query-test
+(deftest ^:parallel plain-sql-query-test
   (doseq [query ["SELECT *"
                  ["SELECT *"]]]
     (testing (pr-str query)

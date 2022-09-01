@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.connection :as conn]
    [toucan2.execute :as execute]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
@@ -18,7 +19,7 @@
 
 (defrecord MyRecordType [x])
 
-(deftest parse-args-test
+(deftest ^:parallel parse-args-test
   (testing "single map row"
     (is (= {:modelable :model, :rows [{:row 1}]}
            (insert/parse-insert-args :toucan.query-type/insert.* [:model {:row 1}]))))
@@ -51,9 +52,12 @@
            (insert/parse-insert-args :toucan.query-type/insert.* [:model ::named-rows]))))
   (testing "record type"
     (is (= {:modelable :model, :rows [(->MyRecordType 1)]}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:model (->MyRecordType 1)])))))
+           (insert/parse-insert-args :toucan.query-type/insert.* [:model (->MyRecordType 1)]))))
+  (testing "positional connectable"
+    (is (= {:connectable :db, :modelable :model, :rows [{:row 1}]}
+           (insert/parse-insert-args :toucan.query-type/insert.* [:conn :db :model {:row 1}])))))
 
-(deftest build-query-test
+(deftest ^:parallel build-query-test
   (doseq [rows-fn [list vector]
           :let    [rows (rows-fn {:name "Grant & Green", :category "bar"})]]
     (testing (pr-str (list 'build :toucan.query-type/insert.* ::test/venues rows))
@@ -288,3 +292,26 @@
                  :name     "Grant & Green"
                  :category "bar"})
                (select/select-one [::test/venues :id :name :category] :id 4)))))))
+
+(deftest positional-connectable-test
+  (testing "Support :conn positional connectable arg"
+    (test/with-discarded-table-changes :venues
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"No default Toucan connection defined"
+           (insert/insert! :venues {:name "Grant & Green", :category "bar"})))
+      (is (= 1
+             (insert/insert! :conn ::test/db :venues {:name "Grant & Green", :category "bar"})))
+      (testing "nil :conn should not override current connectable"
+        (binding [conn/*current-connectable* ::test/db]
+          (is (= 1
+                 (insert/insert! :conn nil :venues {:name "Grant & Green 2", :category "bar"})))))
+      (testing "Explicit connectable should override current connectable"
+        (binding [conn/*current-connectable* :fake-db]
+          (is (= 1
+                 (insert/insert! :conn ::test/db :venues {:name "Grant & Green 3", :category "bar"})))))
+      (testing "Explicit connectable should override model default connectable"
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Don't know how to get a connection from .* :fake-db"
+             (insert/insert! :conn :fake-db ::test/venues {:name "Grant & Green", :category "bar"})))))))

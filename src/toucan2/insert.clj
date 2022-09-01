@@ -17,15 +17,16 @@
 
 (s/def ::args
   (s/cat
+   :connectable       ::query/default-args.connectable
    :modelable         ::query/default-args.modelable
    :rows-or-queryable (s/alt :rows      ::args.rows
                              :queryable some?)))
 
-(defn parse-insert-args
+(defn ^:no-doc parse-insert-args
   [query-type unparsed-args]
   (let [parsed                               (query/parse-args query-type ::args unparsed-args)
         [rows-queryable-type rows-queryable] (:rows-or-queryable parsed)
-        parsed                               (select-keys parsed [:modelable :columns])]
+        parsed                               (select-keys parsed [:modelable :columns :connectable])]
     (case rows-queryable-type
       :queryable
       (assoc parsed :queryable rows-queryable)
@@ -53,9 +54,7 @@
                 (empty? (:rows resolved-query)))
            (nil? resolved-query))))
 
-(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/insert.*
-                                                #_model      :default
-                                                #_query      :default]
+(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/insert.* #_model :default #_query :default]
   [rf query-type model parsed-args resolved-query]
   (let [rows (some (comp not-empty :rows) [parsed-args resolved-query])]
     (if (can-skip-insert? parsed-args resolved-query)

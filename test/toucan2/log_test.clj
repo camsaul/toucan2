@@ -6,7 +6,7 @@
 
 (set! *warn-on-reflection* true)
 
-(deftest env-var-topics-test
+(deftest ^:parallel env-var-topics-test
   (are [s expected] (= expected
                        (#'log/env-var-topics s))
     nil       nil
@@ -20,7 +20,7 @@
     (reset! is-realized? true)
     (reduce rf init [])))
 
-(deftest pprint-doc-test
+(deftest ^:parallel pprint-doc-test
   (testing "Pretty-printing an clojure.lang.IReduceInit should not realize it. Top-level object:"
     (binding [log/*color* false]
       (doseq [f [identity
@@ -40,7 +40,7 @@
             (is (string? (#'log/pprint-doc-to-str x)))
             (is (false? @is-realized?))))))))
 
-(deftest interleave-all-test
+(deftest ^:parallel interleave-all-test
   (are [x y expected] (= expected
                          (#'log/interleave-all x y))
     [1 2 3] [:a :b :c] [1 :a 2 :b 3 :c]
@@ -49,12 +49,12 @@
     [1]     [:a :b :c] [1 :a :b :c]
     []      [:a :b :c] [:a :b :c]))
 
-(deftest build-doc-test
+(deftest ^:parallel build-doc-test
   (testing "Text after the last argument should be included"
     (is (= `(log/->Doc [(log/->Text "") ~'x (log/->Text "") ~'y (log/->Text " returning instances")])
            (#'log/build-doc "%s %s returning instances" 'x 'y)))))
 
-(deftest enable-level-test
+(deftest ^:parallel enable-level-test
   (binding [log/*level* :info]
     (are [level expected] (= expected
                              (log/enable-level? level))
@@ -66,7 +66,7 @@
       nil    false
       :fake  false)))
 
-(deftest log-macro-validation-test
+(deftest ^:parallel log-macro-validation-test
   (testing "valid forms"
     (is (some? (macroexpand `(log/infof :compile "VERY NICE MESSAGE %s" 100))))
     (is (some? (macroexpand `(log/infof :compile ~'e "VERY NICE MESSAGE %s" 100)))))

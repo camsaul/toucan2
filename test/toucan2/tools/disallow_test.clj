@@ -11,7 +11,7 @@
 (derive ::venues.no-select ::test/venues)
 (derive ::venues.no-select ::disallow/select)
 
-(deftest disallow-select-test
+(deftest ^:parallel disallow-select-test
   (is (thrown-with-msg?
        Exception
        #"You cannot select :toucan2.tools.disallow-test/venues.no-select"
@@ -20,7 +20,7 @@
 (derive ::venues.no-delete ::test/venues)
 (derive ::venues.no-delete ::disallow/delete)
 
-(deftest disallow-delete-test
+(deftest ^:parallel disallow-delete-test
   (is (thrown-with-msg?
        Exception
        #"You cannot delete instances of :toucan2.tools.disallow-test/venues.no-delete"
@@ -29,7 +29,7 @@
 (derive ::venues.no-insert ::test/venues)
 (derive ::venues.no-insert ::disallow/insert)
 
-(deftest disallow-insert-test
+(deftest ^:parallel disallow-insert-test
   (is (thrown-with-msg?
        Exception
        #"You cannot create new instances of :toucan2.tools.disallow-test/venues.no-insert"
@@ -38,7 +38,7 @@
 (derive ::venues.no-update ::test/venues)
 (derive ::venues.no-update ::disallow/update)
 
-(deftest disallow-update-test
+(deftest ^:parallel disallow-update-test
   (is (thrown-with-msg?
        Exception
        #"You cannot update a :toucan2.tools.disallow-test/venues.no-update after it has been created"

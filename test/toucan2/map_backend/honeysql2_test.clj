@@ -24,7 +24,7 @@
   [_model]
   {::test/venues :venue})
 
-(deftest table-and-alias-test
+(deftest ^:parallel table-and-alias-test
   (are [model expected] (= expected
                            (map.honeysql/table-and-alias model))
     ::test/venues       [:venues]

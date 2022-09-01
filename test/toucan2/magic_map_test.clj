@@ -20,14 +20,14 @@
         (finally
           (Locale/setDefault original-locale))))))
 
-(deftest contains-key-test
+(deftest ^:parallel contains-key-test
   (is (= true
          (.containsKey (magic-map/magic-map {:some-key true}) :some-key)))
   (testing "unnormalized keys"
     (is (= true
            (.containsKey (magic-map/magic-map {:some-key true}) :SOME_KEY)))))
 
-(deftest kebab-case-xform-test
+(deftest ^:parallel kebab-case-xform-test
   (doseq [k-str  ["my-key" "my_key"]
           k-str  [k-str (str/upper-case k-str)]
           ns-str [nil "my-ns" "my_ns"]
@@ -44,7 +44,7 @@
       (is (= expected
              (magic-map/kebab-case-xform k))))))
 
-(deftest kebab-case-xform-test-2
+(deftest ^:parallel kebab-case-xform-test-2
   (are [k expected] (= expected
                        (magic-map/kebab-case-xform k))
     :my_col              :my-col
@@ -55,7 +55,7 @@
     "my_col"             :my-col
     'my_namespace/my_col :my-namespace/my-col))
 
-(deftest normalize-map-test
+(deftest ^:parallel normalize-map-test
   (testing "Should normalize keys"
     (is (= {:abc 100, :d-ef 200}
            (magic-map/normalize-map magic-map/kebab-case-xform {:ABC 100, "dEf" 200}))))
@@ -63,7 +63,7 @@
     (is (= true
            (:wow (meta (magic-map/normalize-map magic-map/kebab-case-xform (with-meta {} {:wow true}))))))))
 
-(deftest magic-create-test
+(deftest ^:parallel magic-create-test
   (let [m (magic-map/magic-map {:snake/snake_case 1, "SCREAMING_SNAKE_CASE" 2, :lisp-case 3, :ANGRY/LISP-CASE 4})]
     (testing "keys"
       (is (= [:snake/snake-case :screaming-snake-case :lisp-case :angry/lisp-case]
@@ -74,7 +74,7 @@
     (is (= {:x 100}
            (meta (magic-map/magic-map (with-meta {} {:x 100})))))))
 
-(deftest into-test
+(deftest ^:parallel into-test
   (let [m (into (magic-map/magic-map) {:snake/snake-case 1, "screaming-snake-case" 2, :lisp-case 3, :angry/lisp-case 4})]
     (testing "keys"
       (is (= [:snake/snake-case :screaming-snake-case :lisp-case :angry/lisp-case]
@@ -82,7 +82,7 @@
     (is (= {:snake/snake-case 1, :screaming-snake-case 2, :lisp-case 3, :angry/lisp-case 4}
            m))))
 
-(deftest magic-keys-test
+(deftest ^:parallel magic-keys-test
   (testing "keys"
     (let [m (magic-map/magic-map {:db_id 1, :table_id 2})]
       (testing "get keys"
@@ -105,7 +105,7 @@
           (is (= (magic-map/magic-map {:db-id 2, :table-id 2})
                  (update m :db_id inc))))))))
 
-(deftest magic-equality-test
+(deftest ^:parallel magic-equality-test
   (testing "Two maps created with different key cases should be equal"
     (is (= (magic-map/magic-map {:db-id 1, :table-id 2})
            (magic-map/magic-map {:db_id 1, :table_id 2}))))
@@ -119,14 +119,14 @@
     (is (= {}
            (magic-map/magic-map {})))))
 
-(deftest no-key-xform-test
+(deftest ^:parallel no-key-xform-test
   (testing "Should be able to disable key transforms by passing in a different key transform function"
     (is (= {:id 1, :created-at 2}
            (magic-map/magic-map {:id 1, :created_at 2})))
     (is (= {:id 1, :created_at 2}
            (magic-map/magic-map {:id 1, :created_at 2} identity)))))
 
-(deftest pretty-print-test
+(deftest ^:parallel pretty-print-test
   (testing "Should pretty-print"
     (are [print-magic-maps expected] (= expected
                                         (binding [magic-map/*print-magic-maps* print-magic-maps]
@@ -137,7 +137,7 @@
                      #'toucan2.magic-map/kebab-case-xform))
       false (pr-str {:id 1}))))
 
-(deftest transient-test
+(deftest ^:parallel transient-test
   (testing "key transforms should be applied"
     (let [transient-map (magic-map/->TransientMagicMap (transient {}) magic-map/kebab-case-xform {})]
       (is (instance? clojure.lang.ITransientMap transient-map))

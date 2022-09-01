@@ -44,7 +44,7 @@
   {:id {:in  parse-int
         :out str}})
 
-(deftest select-in-test
+(deftest ^:parallel select-in-test
   (testing "select should transform values going in"
     (testing "key-value condition"
       (is (= [{:id 1, :name "Tempest", :category :bar}
@@ -65,7 +65,7 @@
         (is (= [{:id "1", :name "Tempest", :category :bar}]
                (select/select ::venues.string-id-and-category-keyword :toucan/pk ["1"] {:select [:id :name :category]})))))))
 
-(deftest select-out-test
+(deftest ^:parallel select-out-test
   (testing "select should transform values coming out"
     (is (= [{:id 1, :name "Tempest", :category :bar}
             {:id 2, :name "Ho's Tavern", :category :bar}
@@ -102,10 +102,7 @@
   [_model]
   {:un_normalized {:in name, :out keyword}})
 
-(deftest normalize-transform-keys-test
-  (testing "Should work if transform keys are defined in snake_case or whatever (for legacy compatibility purposes)"))
-
-(deftest apply-row-transform-test
+(deftest ^:parallel apply-row-transform-test
   (doseq [[message m] {"plain map" {:id 1}
                        "Instance"  (instance/instance :x {:id 1})
                        ;; TODO

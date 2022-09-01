@@ -15,7 +15,7 @@
 (default-fields/define-default-fields ::venues.default-fields
   [:id :name :category])
 
-(deftest select-test
+(deftest ^:parallel select-test
   (is (= {:select [:id :name :category], :from [[:venues]]}
          (pipeline/build :toucan.query-type/select.instances ::venues.default-fields {} {})))
   (is (= [(instance/instance ::venues.default-fields
@@ -46,7 +46,7 @@
     ::venues.anaphor.id       [:id :name]
     ::venues.anaphor.category [:category :name]))
 
-(deftest anaphor-test
+(deftest ^:parallel anaphor-test
   (testing "define-default-fields should introduce an &model anaphor"
     (are [model expected] (= expected
                              (select/select-one model 1))

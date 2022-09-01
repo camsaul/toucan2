@@ -17,15 +17,14 @@
   an explicit will connectable will use it rather than the `:default` connection."
   nil)
 
-;;; TODO -- Should this have an additional `options` parameter like [[with-connection]] does? Or is the current strategy
-;;; of using a dynamic var working ok? If this has an options parameter then that would tend to bubble up and pretty
-;;; soon everything has an options parameter which ruins our life (speaking from pre-rewrite version of Toucan 2 where
-;;; originally everything did have an options parameter)
-
-(m/defmulti do-with-connection
-  {:arglists '([connectable₁ f])}
-  u/dispatch-on-first-arg
-  :default-value ::default)
+;;; This is an UNCACHED multimethod for now because of the upstream bug https://github.com/camsaul/methodical/issues/112
+;;; Once that bug is fixed we can turn this back into a normal cached multimethod.
+(def ^{:arglists '([connectable₁ f]), :name 'do-with-connection} do-with-connection
+  (m/uncached-multifn
+   (m/standard-multifn-impl
+    (m/thread-last-method-combination)
+    (m/multi-default-dispatcher u/dispatch-on-first-arg :default-value ::default)
+    (m/standard-method-table))))
 
 (m/defmethod do-with-connection :around ::default
   [connectable f]
@@ -37,10 +36,11 @@
                             (protocols/dispatch-value connectable))]
     (log/debugf :execute "Resolve connection %s" connectable-class)
     (u/try-with-error-context ["resolve connection" {::connectable connectable-class}]
-      bound-fn*
       (next-method connectable (^:once fn* [conn]
+                                (println "conn:" conn) ; NOCOMMIT
                                 (binding [*current-connectable* conn]
                                   (f conn)))))))
+
 
 (defmacro with-connection
   {:arglists '([[connection-binding connectable] & body]
