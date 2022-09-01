@@ -1,6 +1,7 @@
 (ns toucan2.save
   (:require
    [methodical.core :as m]
+   [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.log :as log]
    [toucan2.model :as model]
@@ -10,12 +11,12 @@
 
 (set! *warn-on-reflection* true)
 
-(m/defmulti save!
+(m/defmulti save!*
   {:arglists '([object])}
   (fn [object]
     (protocols/dispatch-value (protocols/model object))))
 
-(m/defmethod save! :around :default
+(m/defmethod save!* :around :default
   [object]
   (u/try-with-error-context ["save changes" {::model   (protocols/model object)
                                              ::object  object
@@ -23,7 +24,7 @@
     (log/debugf :compile "Save %s %s changes %s" (protocols/model object) object (protocols/changes object))
     (next-method object)))
 
-(m/defmethod save! :default
+(m/defmethod save!* :default
   [object]
   (assert (instance/instance? object)
           (format "Don't know how to save something that's not a Toucan instance. Got: ^%s %s"
@@ -43,3 +44,12 @@
         (log/warnf :results "Warning: more than 1 row affected when saving %s with primary key %s" model pk-values))
       (instance/reset-original object))
     object))
+
+(defn save!
+  ([object]
+   (save!* object))
+  ([connectable object]
+   (if connectable
+     (binding [conn/*current-connectable* connectable]
+       (save!* object))
+     (save!* object))))

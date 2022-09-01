@@ -10,7 +10,7 @@
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.named-query :as tools.named-query]))
 
-(deftest query-test
+(deftest ^:parallel query-test
   (is (= [[1 2]
           [:a :b]]
          (execute/query (identity-query/identity-query [[1 2] [:a :b]])))))
@@ -19,7 +19,7 @@
   (identity-query/identity-query [{:id 1, :name "Parroty"}
                                   {:id 2, :name "Green Friend"}]))
 
-(deftest select-test
+(deftest ^:parallel select-test
   (is (= [(instance/instance ::parrot {:id 1, :name "Parroty"})
           (instance/instance ::parrot {:id 2, :name "Green Friend"})]
          (select/select ::parrot parrot-query))))
@@ -28,21 +28,21 @@
   (identity-query/identity-query [{:id 1, :name "Parroty"}
                                   {:id 2, :name "Green Friend"}]))
 
-(deftest named-query-test
+(deftest ^:parallel named-query-test
   (is (= [(instance/instance ::parrot {:id 1, :name "Parroty"})
           (instance/instance ::parrot {:id 2, :name "Green Friend"})]
          (select/select ::parrot ::parrot-query))))
 
-(deftest select-test-2
+(deftest ^:parallel select-test-2
   (is (= [(instance/instance ::birb {:id 1, :name "Parroty"})
           (instance/instance ::birb {:id 2, :name "Green Friend"})]
          (select/select ::birb parrot-query))))
 
-(deftest select-fn-test
+(deftest ^:parallel select-fn-test
   (is (= #{"Parroty" "Green Friend"}
          (select/select-fn-set :name ::birb parrot-query))))
 
-(deftest select-one-test
+(deftest ^:parallel select-one-test
   (is (= [(instance/instance ::venues {:id 1, :name "No Category", :category nil})]
          (select/select ::venues (identity-query/identity-query
                                   [{:id 1, :name "No Category", :category nil}])))))
@@ -59,7 +59,7 @@
                                  model
                                  {:queryable (identity-query/identity-query rows)}))
 
-(deftest do-after-select-test
+(deftest ^:parallel do-after-select-test
   (testing "Can we use `identity-query` to build some sort of abomination like Toucan 1 do-post-select?"
     (let [reducible (select/reducible-select [::test/venues :id :name] {:order-by [[:id :asc]], :limit 2})]
       (is (= [(instance/instance ::my-after-select {:id 1, :name "Tempest", :after-select? true})
@@ -67,7 +67,7 @@
              (do-after-select ::my-after-select reducible)
              (into [] (do-after-reducible-select ::my-after-select reducible)))))))
 
-(deftest identity-query-as-model-test
+(deftest ^:parallel identity-query-as-model-test
   (testing "Can we use identity-query as an 'identity model'?"
     (let [query   (identity-query/identity-query [{:a 1, :b 2} {:a 3, :b 4}])
           results (select/select query)]
@@ -77,7 +77,7 @@
       (testing "Return plain rows, not instances"
         (is (not (instance/instance? (first results))))))))
 
-;; (deftest insert-test
+;; (deftest ^:parallel insert-test
 ;;   (testing "Can we use identity-query with insert?"
 ;;     (is (= [(instance/instance :venues {:a 1})]
 ;;            (insert/insert-returning-instances!
@@ -88,7 +88,7 @@
 ;;   [m]
 ;;   (assoc m :after-insert? true))
 
-;; (deftest after-insert-test
+;; (deftest ^:parallel after-insert-test
 ;;   (testing "sanity check"
 ;;     (is (isa? :toucan.query-type/insert.instances
 ;;               :toucan2.tools.after/query-type))
@@ -105,7 +105,7 @@
 ;;   [m]
 ;;   (assoc m :before-insert? true))
 
-;; (deftest before-insert-test
+;; (deftest ^:parallel before-insert-test
 ;;   (binding [conn/*current-connectable* (identity-query/identity-connection [{:a 2}])]
 ;;     (is (= [(instance/instance ::model.before-insert
 ;;                                {:a 2, :before-insert? true})]

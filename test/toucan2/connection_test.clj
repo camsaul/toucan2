@@ -27,7 +27,7 @@
   (is (instance? java.sql.Connection conn))
   (test-current-connection-bound?))
 
-(deftest with-connection-test
+(deftest ^:parallel with-connection-test
   (testing "Connection from keyword"
     (conn/with-connection [conn-from-keyword ::test/db]
       (test-connection conn-from-keyword)
@@ -83,7 +83,7 @@
          (is (= "Tin Vietnamese"
                 (select/select-one-fn :name ::test/venues 1)))))))
 
-(deftest jdbc-spec-test
+(deftest ^:parallel jdbc-spec-test
   (conn/with-connection [conn {:dbtype   "h2:mem"
                                :dbname   "spec_test"}]
     (is (instance? org.h2.jdbc.JdbcConnection conn))))

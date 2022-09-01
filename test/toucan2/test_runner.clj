@@ -124,6 +124,6 @@
     (println "Running tests with options" (pr-str options))
     (pprint/pprint summary)
     (printf "Ran %d tests in parallel, %d single-threaded.\n" (:parallel summary 0) (:single-threaded summary 0))
-    (printf "Finding and running tests took %d ms.\n" (- (System/currentTimeMillis) start-time-ms))
+    (printf "Finding and running tests took %.1f seconds.\n" (/ (- (System/currentTimeMillis) start-time-ms) 1000.0))
     (println (if fail? "Tests failed." "All tests passed."))
     (System/exit (if fail? 1 0))))

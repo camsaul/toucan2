@@ -113,6 +113,8 @@
 (defn parallel? [test-var]
   (:parallel (meta test-var)))
 
+(def ^:private ^:dynamic *parallel-test* false)
+
 (defn- wrap-test-var!
   "Swaps out the `:test` metadata for var so testing it will run the test against all the dbs we're testing."
   [varr]
@@ -121,10 +123,11 @@
                         (assoc mta ::original-test (:test mta)))))
   (let [orig    (get (meta varr) ::original-test)
         wrapped (fn wrapped-test-fn []
-                  (doseq [db-type (db-types)]
-                    (binding [*current-db-type* db-type]
-                      (t/testing (str db-type \newline)
-                        (orig)))))]
+                  (binding [*parallel-test* (when (parallel? varr) varr)]
+                    (doseq [db-type (db-types)]
+                      (binding [*current-db-type* db-type]
+                        (t/testing (str db-type \newline)
+                          (orig))))))]
     (alter-meta! varr assoc :test wrapped)))
 
 (defn- test-var*
@@ -268,14 +271,16 @@
 
 (defn- set-up-test-db! [db-type]
   (when-not (contains? @initialized-test-dbs db-type)
-    #_(println "Set up" db-type "test DB")
-    (with-open [conn (java.sql.DriverManager/getConnection (test-db-url db-type))]
-      (doseq [table-name [:people
-                          :venues
-                          :birds
-                          :categories]]
-        (create-table! db-type conn table-name)))
-    (swap! initialized-test-dbs conj db-type)))
+    (locking initialized-test-dbs
+      (when-not (contains? @initialized-test-dbs db-type)
+        #_(println "Set up" db-type "test DB")
+        (with-open [conn (java.sql.DriverManager/getConnection (test-db-url db-type))]
+          (doseq [table-name [:people
+                              :venues
+                              :birds
+                              :categories]]
+            (create-table! db-type conn table-name)))
+        (swap! initialized-test-dbs conj db-type)))))
 
 (m/defmethod conn/do-with-connection ::db
   [_connectable f]
@@ -284,6 +289,8 @@
     (conn/do-with-connection (test-db-url db-type) f)))
 
 (defn do-with-discarded-table-changes [_db-type table-name thunk]
+  (assert (not *parallel-test*) (format "with-discarded-table-changes is not allowed inside parallel tests. Test: %s"
+                                        *parallel-test*))
   (try
     (thunk)
     (finally

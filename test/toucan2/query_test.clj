@@ -7,16 +7,21 @@
    [toucan2.query :as query]
    [toucan2.test :as test]))
 
-(deftest default-parse-args-test
+(deftest ^:parallel default-parse-args-test
   (are [args expected] (= expected
                           (query/parse-args :default args))
-    [:model]               {:modelable :model, :queryable {}}
-    [:model {}]            {:modelable :model, :queryable {}}
-    [:model nil]           {:modelable :model, :queryable nil}
-    [[:model] {}]          {:modelable :model, :queryable {}}
-    [[:model :a :b :c] {}] {:modelable :model, :columns [:a :b :c], :queryable {}}
-    [:model :k :v]         {:modelable :model, :kv-args {:k :v}, :queryable {}}
-    [:model :k :v {}]      {:modelable :model, :kv-args {:k :v}, :queryable {}}))
+    [:model]                       {:modelable :model, :queryable {}}
+    [:model {}]                    {:modelable :model, :queryable {}}
+    [:model nil]                   {:modelable :model, :queryable nil}
+    [[:model] {}]                  {:modelable :model, :queryable {}}
+    [[:model :a :b :c] {}]         {:modelable :model, :columns [:a :b :c], :queryable {}}
+    [:model :k :v]                 {:modelable :model, :kv-args {:k :v}, :queryable {}}
+    [:model :k :v {}]              {:modelable :model, :kv-args {:k :v}, :queryable {}}
+    [:conn :db :model]             {:connectable :db, :modelable :model, :queryable {}}
+    [:conn :db :model :query]      {:connectable :db, :modelable :model, :queryable :query}
+    [:conn :db [:model]]           {:connectable :db, :modelable :model, :queryable {}}
+    [:conn :db [:model :a] :query] {:connectable :db, :modelable :model, :columns [:a], :queryable :query}
+    [:conn :db :model :id 1]       {:connectable :db, :modelable :model, :kv-args {:id 1}, :queryable {}}))
 
 (derive ::venues.compound-pk ::test/venues)
 
@@ -24,7 +29,7 @@
   [_model]
   [:id :name])
 
-(deftest toucan-pk-vector-forms-test
+(deftest ^:parallel toucan-pk-vector-forms-test
   (testing ":toucan/pk should work with vector forms like `:in`"
     (are [model arg expected] (= {:select [:*]
                                   :from   [[:venues]]
@@ -51,7 +56,7 @@
   [_model]
   {::test/venues :venue})
 
-(deftest namespaced-toucan-pk-test
+(deftest ^:parallel namespaced-toucan-pk-test
   (is (= {:select [:*]
           :from   [[:venues :venue]]
           :where  [:= :venue/id 1]}

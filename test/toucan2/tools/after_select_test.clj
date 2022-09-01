@@ -24,7 +24,7 @@
   [venue]
   (assoc venue :short-name (str/join (take 4 (:name venue)))))
 
-(deftest columns-added-by-after-select-should-not-be-considered-part-of-changes-test
+(deftest ^:parallel columns-added-by-after-select-should-not-be-considered-part-of-changes-test
   (let [instance (select/select-one ::venues.short-name 1)]
     (is (= (instance/instance ::venues.short-name
                               {:id         1
@@ -83,7 +83,7 @@
   [venue]
   (assoc venue :composed? true))
 
-(deftest compose-test
+(deftest ^:parallel compose-test
   (testing "after-select should compose"
     (is (= [(instance/instance ::venues.short-name.composed
                                {:id 1, :name "Tempest", :short-name "Temp", :composed? true})]

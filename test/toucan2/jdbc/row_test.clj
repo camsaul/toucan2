@@ -3,7 +3,7 @@
             [toucan2.jdbc.row :as jdbc.row]
             #_[toucan2.result-row :as result-row]))
 
-(deftest row-test
+(deftest ^:parallel row-test
   (testing "Basic map operations on a row"
     (let [c-realized? (atom false)
           col->thunk  {:a (constantly 100)
@@ -23,7 +23,7 @@
         (is (= (.col-name->thunk ^toucan2.jdbc.row.Row row)
                (result-row/thunks row)))))))
 
-(deftest cache-results-test
+(deftest ^:parallel cache-results-test
   (testing "row should only call a column thunk the first time the column value is fetched"
     (let [calls      (atom 0)
           col->thunk {:id (fn []

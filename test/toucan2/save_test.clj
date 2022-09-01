@@ -1,6 +1,7 @@
 (ns toucan2.save-test
   (:require
    [clojure.test :refer :all]
+   [toucan2.connection :as conn]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.protocols :as protocols]
@@ -86,3 +87,19 @@
                   :category   "bar"
                   :created-at (LocalDateTime/parse "2017-01-01T00:00")}
                  (dissoc (save/save! (assoc venue :id "1")) :updated-at)))))))
+
+(deftest positional-connectable-test
+  (testing "Support :conn positional connectable arg"
+    (let [venue (instance/instance :venues (select/select-one ::test/venues 1))]
+      (test/with-discarded-table-changes :venues
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"No default Toucan connection defined"
+             (save/save! (assoc venue :name "Grant & Green"))))
+        (is (some? (save/save! ::test/db (assoc venue :name "Grant & Green"))))
+        (testing "nil :conn should not override current connectable"
+          (binding [conn/*current-connectable* ::test/db]
+            (is (some? (save/save! nil (assoc venue :name "Grant & Green 2"))))))
+        (testing "Explicit connectable should override current connectable"
+          (binding [conn/*current-connectable* :fake-db]
+            (is (some? (save/save! ::test/db (assoc venue :name "Grant & Green"))))))))))

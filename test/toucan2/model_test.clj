@@ -9,7 +9,7 @@
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]))
 
-(deftest primary-keys-test
+(deftest ^:parallel primary-keys-test
   (testing "default implementation"
     (is (= [:id]
            (model/primary-keys ::some-default-model)))))
@@ -26,7 +26,7 @@
   [_model]
   [:name nil])
 
-(deftest primary-keys-wrap-results-test
+(deftest ^:parallel primary-keys-wrap-results-test
   (testing "primary-keys should wrap results in a vector if needed, and validate"
     (is (= [:name]
            (model/primary-keys ::primary-keys.returns-bare-keyword)))
@@ -37,7 +37,7 @@
          #"Bad toucan2.model/primary-keys for model .* should return keyword or sequence of keywords, got .*"
          (model/primary-keys ::primary-keys.returns-invalid)))))
 
-(deftest ^:parallel table-name-test
+(deftest ^:parallel ^:parallel table-name-test
   (doseq [[model expected] {"ABC"    "ABC"
                             :abc     "abc"
                             :ns/abc  "abc"
@@ -54,7 +54,7 @@
   (binding [map.honeysql/*options* {:quoted false}]
     (next-method rf query-type model parsed-args)))
 
-(deftest default-honeysql-options-for-a-model-test
+(deftest ^:parallel default-honeysql-options-for-a-model-test
   (testing "There should be a way to specify 'default options' for a specific model"
     (is (= ["SELECT * FROM people WHERE id = ?" 1]
            (tools.compile/compile
@@ -72,14 +72,14 @@
   {::venues.namespaced :venue
    ::test/categories   :category})
 
-(deftest model->namespace-test
+(deftest ^:parallel model->namespace-test
   (are [model expected] (= expected
                            (model/model->namespace model))
     ::venues.namespaced {::venues.namespaced :venue, ::test/categories :category}
     :venues             nil
     nil                 nil))
 
-(deftest table-name->namespace-test
+(deftest ^:parallel table-name->namespace-test
   (are [model expected] (= expected
                            (model/table-name->namespace model))
     ::venues.namespaced {"venues" :venue, "category" :category}
@@ -88,7 +88,7 @@
 
 (derive ::venues.namespaced.child ::venues.namespaced)
 
-(deftest namespace-test
+(deftest ^:parallel namespace-test
   (are [model expected] (= expected
                            (model/namespace model))
     ::venues.namespaced       :venue
@@ -96,6 +96,6 @@
     :venues                   nil
     nil                       nil))
 
-(deftest namespaced-default-primary-keys-test
+(deftest ^:parallel namespaced-default-primary-keys-test
   (is (= [:venue/id]
          (model/primary-keys ::venues.namespaced))))

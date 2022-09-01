@@ -3,7 +3,7 @@
    [clojure.test :refer :all]
    [toucan2.realize :as realize]))
 
-(deftest realize-test
+(deftest ^:parallel realize-test
   (is (= [:a :b [:a :b :c]]
          (realize/realize (reify clojure.lang.IReduceInit
                             (reduce [_this rf init]

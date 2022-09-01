@@ -17,7 +17,7 @@
 ;; TODO -- not 100% sure it makes sense for Toucan to be doing the magic key transformations automatically here without
 ;; us even asking!
 
-(deftest reducible-query-test
+(deftest ^:parallel reducible-query-test
   (testing "raw SQL"
     (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56-00:00")}
             {:id 2, :name "Sam", :created-at (OffsetDateTime/parse "2019-01-11T23:56-00:00")}
@@ -36,7 +36,7 @@
             []
             (execute/reducible-query ::test/db ["SELECT * FROM people WHERE id = ?" 1]))))))
 
-(deftest reducible-query-test-2
+(deftest ^:parallel reducible-query-test-2
   (is (= [{:count 4}]
          (let [query (execute/reducible-query ::test/db "SELECT count(*) AS \"count\" FROM people;")]
            (into [] (map realize/realize) query))))
@@ -73,7 +73,7 @@
                    (take 1))
              (execute/reducible-query ::test/db "SELECT * FROM people;")))))))
 
-(deftest query-test
+(deftest ^:parallel query-test
   (let [expected [{:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")}
                   {:id 2, :created-at (LocalDateTime/parse "2017-01-01T00:00")}
                   {:id 3, :created-at (LocalDateTime/parse "2017-01-01T00:00")}]]
@@ -86,7 +86,7 @@
 (tools.named-query/define-named-query ::named-query
   ["SELECT count(*) AS \"count\" FROM people;"])
 
-(deftest query-test-2
+(deftest ^:parallel query-test-2
   (is (= [{:count 4}]
          (execute/query ::test/db "SELECT count(*) AS \"count\" FROM people;")))
   (testing "with current connection"
@@ -100,12 +100,12 @@
             {:id 4, :name "Tam", :created-at (OffsetDateTime/parse "2020-05-25T19:56Z")}]
            (execute/query ::test/db {:select [:*], :from [:people]})))))
 
-(deftest execute-named-query-test
+(deftest ^:parallel execute-named-query-test
   (testing "named query"
     (is (= [{:count 4}]
            (execute/query ::test/db ::named-query)))))
 
-(deftest query-one-test
+(deftest ^:parallel query-one-test
   (is (= {:count 4}
          (execute/query-one ::test/db "SELECT count(*) AS \"count\" FROM people")))
 
@@ -114,11 +114,11 @@
       (is (= {:count 4}
              (execute/query-one "SELECT count(*) AS \"count\" FROM people;"))))))
 
-(deftest reducible-query-as-test
+(deftest ^:parallel reducible-query-as-test
   (is (= [(instance/instance :people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]
          (realize/realize (execute/reducible-query ::test/db :people "SELECT * FROM people WHERE id = 1;")))))
 
-(deftest query-as-test
+(deftest ^:parallel query-as-test
   (is (= [(instance/instance :people {:id 1, :name "Cam"})
           (instance/instance :people {:id 2, :name "Sam"})
           (instance/instance :people {:id 3, :name "Pam"})
@@ -141,7 +141,7 @@
   [rf _conn _query-type _model [{k :key}, :as _compiled-query]]
   (reduce rf (rf) [{k 1} {k 2} {k 3}]))
 
-(deftest wow-dont-even-need-to-use-jdbc-test
+(deftest ^:parallel wow-dont-even-need-to-use-jdbc-test
   (is (= [{:a 1} {:a 2} {:a 3}]
          (execute/query ::connectable.not-even-jdbc [{:key :a}]))))
 
@@ -158,11 +158,11 @@
   [rf _conn _query-type _model {k :key, :as _compiled-query}]
   (reduce rf (rf) [{k 4} {k 5} {k 6}]))
 
-(deftest wow-dont-even-need-to-use-jdbc-custom-model-test
+(deftest ^:parallel wow-dont-even-need-to-use-jdbc-custom-model-test
   (is (= [{:a 4} {:a 5} {:a 6}]
          (execute/query ::connectable.not-even-jdbc ::model.not-even-jdbc {:key :a}))))
 
-(deftest execute!-test
+(deftest ^:parallel execute!-test
   (try
     (is (= 0
            (execute/query-one ::test/db "CREATE TABLE execute_test_table (id INTEGER NOT NULL);")))
@@ -171,7 +171,7 @@
     (finally
       (execute/query ::test/db "DROP TABLE IF EXISTS execute_test_table;"))))
 
-(deftest with-call-counts-test
+(deftest ^:parallel with-call-counts-test
   (execute/with-call-count [call-count]
     (is (= 0
            (call-count)))
@@ -195,7 +195,7 @@
     (is (= 3
            (call-count)))))
 
-(deftest current-connectable-test
+(deftest ^:parallel current-connectable-test
   (binding [conn/*current-connectable* ::test/db]
     (is (= [{:one 1}]
            (execute/query "SELECT 1 AS one;")))))
@@ -208,21 +208,26 @@
       (is (= [1]
              (execute/query nil ::test/venues "DELETE FROM venues WHERE id = 1;"))))))
 
+(deftest ^:parallel explicit-connectable-should-override-default-test
+  (binding [conn/*current-connectable* :fake-db]
+    (is (= [{:one 1}]
+           (execute/query ::test/db "SELECT 1 AS one;")))))
+
 ;;; TODO
 #_(deftest readable-column-test
-  (testing "Toucan 2 should call next.jdbc.result-set/read-column-by-index"
-    (is (= [{:n 100.0M}]
-           (execute/query ::test/db "SELECT '100.0'::decimal AS n;")))
-    (try
-      (extend-protocol next.jdbc.rs/ReadableColumn
-        java.math.BigDecimal
-        (read-column-by-index [n _ _]
-          (str n)))
-      (is (= [{:n "100.0"}]
+    (testing "Toucan 2 should call next.jdbc.result-set/read-column-by-index"
+      (is (= [{:n 100.0M}]
              (execute/query ::test/db "SELECT '100.0'::decimal AS n;")))
-      (finally
-        ;; reverse the changes.
+      (try
         (extend-protocol next.jdbc.rs/ReadableColumn
           java.math.BigDecimal
           (read-column-by-index [n _ _]
-            n))))))
+            (str n)))
+        (is (= [{:n "100.0"}]
+               (execute/query ::test/db "SELECT '100.0'::decimal AS n;")))
+        (finally
+          ;; reverse the changes.
+          (extend-protocol next.jdbc.rs/ReadableColumn
+            java.math.BigDecimal
+            (read-column-by-index [n _ _]
+              n))))))

@@ -12,7 +12,7 @@
 
 (comment test/keep-me)
 
-(deftest compile-test
+(deftest ^:parallel compile-test
   (execute/with-call-count [call-count]
     (is (= [(case (test/current-db-type)
               :h2       "SELECT * FROM \"PEOPLE\" WHERE \"ID\" > ?"
@@ -43,7 +43,7 @@
       (is (= 0
              (call-count))))))
 
-(deftest build-test
+(deftest ^:parallel build-test
   (execute/with-call-count [call-count]
     (is (= {:select [:*], :from [[:people]], :where [:> :id 1]}
            (tools.compile/build
@@ -69,7 +69,7 @@
 ;;   [_model _queryable f]
 ;;   (f {:select [[:count.* :count]]}))
 
-;; (deftest resolved-test
+;; (deftest ^:parallel resolved-test
 ;;   (execute/with-call-count [call-count]
 ;;     (is (= {:select [[:count.* :count]]}
 ;;            (tools.compile/resolved

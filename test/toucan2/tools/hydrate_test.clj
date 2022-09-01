@@ -32,7 +32,7 @@
   [_original-model _k]
   ::venues.category-keyword)
 
-(deftest fk-keys-for-automagic-hydration-test
+(deftest ^:parallel fk-keys-for-automagic-hydration-test
   (testing "Should use hydrated key + `-id` by default"
     (is (= [:user-id]
            (hydrate/fk-keys-for-automagic-hydration :checkins :user :users)))
@@ -40,7 +40,7 @@
       (is (= [:venue-id]
              (hydrate/fk-keys-for-automagic-hydration :checkins ::venue :venues))))))
 
-(deftest can-hydrate-with-strategy-test
+(deftest ^:parallel can-hydrate-with-strategy-test
   (testing "should fail for unknown keys"
     (is (= false
            (hydrate/can-hydrate-with-strategy? nil ::hydrate/automagic-batched :a)))))
@@ -55,7 +55,7 @@
   [_original-model _dest-key _hydrated-model]
   [:venue_id])
 
-(deftest automagic-hydration-test
+(deftest ^:parallel automagic-hydration-test
   (letfn [(remove-venues-timestamps [rows]
             (for [result rows]
               (update result ::venue #(dissoc % :updated-at :created-at))))]
@@ -128,7 +128,7 @@
   (assoc row ::z (vec (for [i (range n)]
                         {:id i}))))
 
-(deftest hydrate-key-seq-test
+(deftest ^:parallel hydrate-key-seq-test
   (testing "check with a nested hydration that returns one result"
     (is (= [{:f {:id 1, ::x 1}}]
            (#'hydrate/hydrate-key-seq
@@ -150,7 +150,7 @@
                   {:id 3}]}]
             [:f ::x])))))
 
-(deftest hydrate-key-test
+(deftest ^:parallel hydrate-key-test
   (is (= [{:id 1, ::x 1}
           {:id 2, ::x 2}
           {:id 3, ::x 3}]
@@ -160,7 +160,7 @@
            {:id 2}
            {:id 3}] ::x))))
 
-(deftest hydrate-test-2
+(deftest ^:parallel hydrate-test-2
   (testing "make sure we can do basic hydration"
     (is (= {:a 1, :id 2, ::x 2}
            (hydrate/hydrate {:a 1, :id 2}
@@ -308,7 +308,7 @@
   (for [row rows]
     (assoc row ::is-bird? true)))
 
-(deftest batched-hydration-test
+(deftest ^:parallel batched-hydration-test
   (testing "Check that batched hydration doesn't try to hydrate fields that already exist and are not delays"
     (is (= (instance/instance :user {:user-id 1, :user "OK <3"})
            (hydrate/hydrate (instance/instance :user {:user_id 1
@@ -334,7 +334,7 @@
   [_original-model _dest-key _hydrated-model]
   [:person-id :person-name])
 
-(deftest automagic-batched-hydration-composite-pks-test
+(deftest ^:parallel automagic-batched-hydration-composite-pks-test
   (is (= [(instance/instance nil {:person-id   1
                                   :person-name "Cam"
                                   ::people     (instance/instance
@@ -357,7 +357,7 @@
                            {:persion-id nil, :person-name "Pam"}]
                           ::people))))
 
-(deftest automagic-batch-hydration-composite-pks-dont-fetch-nil-test
+(deftest ^:parallel automagic-batch-hydration-composite-pks-dont-fetch-nil-test
   (testing "automagic batched hydration should not try to fetch objects when some or all FK keys are nil"
     (testing "sanity check"
       (execute/with-call-count [call-count]
@@ -396,7 +396,7 @@
   [_original-model _dest-key _hydrated-model]
   [:good-bird?])
 
-(deftest automagic-batched-hydration-truthiness-test
+(deftest ^:parallel automagic-batched-hydration-truthiness-test
   (testing "Make sure automagic batched hydration compares things with some? (should work with false values)")
   (conn/with-connection [_conn ::test/db]
     (let [results                      [{:good-bird? true}
@@ -426,7 +426,7 @@
         (is (= {:good-bird? nil}
                no-bird))))))
 
-(deftest unnest-first-result-test
+(deftest ^:parallel unnest-first-result-test
   (are [coll expected] (= expected
                           (#'hydrate/unnest-first-result coll))
     nil        nil
@@ -441,7 +441,7 @@
   [_model k m]
   (assoc m k 5))
 
-(deftest nested-hydrate-sequence-test
+(deftest ^:parallel nested-hydrate-sequence-test
   (testing "Should be able to do nested hydration for sequences"
     (is (= {:m [(instance/instance ::m.hydrate-sequence {:a 1, ::k 5})
                 (instance/instance ::m.hydrate-sequence {:a 2, ::k 5})]}
@@ -454,7 +454,7 @@
   [_model k m]
   (assoc m k 1000))
 
-(deftest hydrate-sequence-dispatch-on-model-test
+(deftest ^:parallel hydrate-sequence-dispatch-on-model-test
   (testing "We should dispatch on the model of the first instance when hydrating a sequence"
     (is (= [(instance/instance ::m.hydrate-sequence {:a 1, ::model.x 1000})
             (instance/instance ::m.hydrate-sequence {:a 2, ::model.x 1000})]
@@ -470,7 +470,7 @@
                    (instance/instance ::m.hydrate-sequence {:a 2})]}
               [:m ::model.x]))))))
 
-(deftest flatten-unflatten-test
+(deftest ^:parallel flatten-unflatten-test
   (are [form] (= form
                  (#'hydrate/unflatten-collection (#'hydrate/flatten-collection form)))
     nil
@@ -489,7 +489,7 @@
     '(((())))
     [[[[{:a 1} {:b 2}] {:c 3} {:d 4} {:e 5} {:f 6}] {:g 7} {:h 8}]]))
 
-(deftest preserve-shape-test
+(deftest ^:parallel preserve-shape-test
   (testing "hydration should preserve the shape/nesting of the original form"
     (are [form expected] (= expected
                             (hydrate/hydrate form ::k))

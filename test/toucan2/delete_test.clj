@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
+   [toucan2.connection :as conn]
    [toucan2.delete :as delete]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -10,9 +11,11 @@
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]))
 
-(deftest parse-args-test
-  (is (= {:modelable :model, :queryable 1}
-         (query/parse-args ::delete [:model 1]))))
+(deftest ^:parallel parse-args-test
+  ;; these are basically the same as the select args so we don't need a ton of coverage here.
+  (are [args expected] (= expected
+                          (query/parse-args ::delete args))
+    [:model 1] {:modelable :model, :queryable 1}))
 
 (deftest row-by-pk-test
   (test/with-discarded-table-changes :venues
@@ -97,3 +100,21 @@
            (delete/delete! ::venues.namespaced :venue/id 3)))
     (is (= nil
            (select/select-one [::test/venues :id :name :category] :id 3)))))
+
+(deftest positional-connectable-test
+  (testing "Support :conn positional connectable arg"
+    (test/with-discarded-table-changes :venues
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"No default Toucan connection defined"
+           (delete/delete! :venues 1)))
+      (is (= 1
+             (delete/delete! :conn ::test/db :venues 1)))
+      (testing "nil :conn should not override current connectable"
+        (binding [conn/*current-connectable* ::test/db]
+          (is (= 1
+                 (delete/delete! :conn nil :venues 2)))))
+      (testing "Explicit connectable should override current connectable"
+        (binding [conn/*current-connectable* :fake-db]
+          (is (= 1
+                 (delete/delete! :conn ::test/db :venues 3))))))))

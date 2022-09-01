@@ -9,6 +9,10 @@
 
 ;;;; [[parse-args]]
 
+(s/def ::default-args.connectable
+  (s/? (s/cat :key         (partial = :conn)
+              :connectable any?)))
+
 (s/def ::default-args.modelable
   (s/or
    :modelable         (complement sequential?)
@@ -31,9 +35,10 @@
 
 (s/def ::default-args
   (s/cat
-   :modelable ::default-args.modelable
-   :kv-args   ::default-args.kv-args
-   :queryable ::default-args.queryable))
+   :connectable ::default-args.connectable
+   :modelable   ::default-args.modelable
+   :kv-args     ::default-args.kv-args
+   :queryable   ::default-args.queryable))
 
 (s/def :toucan2.query.parsed-args/modelable
   some?)
@@ -88,11 +93,13 @@
                                  (pr-str query-type)
                                  (s/explain-str spec unparsed-args))
                          (s/explain-data spec unparsed-args))))
+       (log/tracef :compile "Conformed args: %s" parsed)
        (let [parsed (cond-> parsed
                       (:modelable parsed)                 (merge (let [[modelable-type x] (:modelable parsed)]
                                                                    (case modelable-type
                                                                      :modelable         {:modelable x}
                                                                      :modelable-columns x)))
+                      (:connectable parsed)               (update :connectable :connectable)
                       (not (contains? parsed :queryable)) (assoc :queryable {})
                       (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
                                                                              (into {} (map (juxt :k :v)) kv-args))))]
