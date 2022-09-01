@@ -99,7 +99,7 @@
 ;;; [[reducible-select]] by default so it can handle the parsing and stuff.
 
 (m/defmulti count*
-  {:arglists '([model unparsed-args])}
+  {:arglists '([model₁ unparsed-args])}
   u/dispatch-on-first-arg)
 
 (m/defmethod count* :default
@@ -114,11 +114,11 @@
 (defn count
   {:arglists '([modelable & kv-args? query?])}
   [modelable & unparsed-args]
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     (count* model unparsed-args)))
 
 (m/defmulti exists?*
-  {:arglists '([model unparsed-args])}
+  {:arglists '([model₁ unparsed-args])}
   u/dispatch-on-first-arg)
 
 (m/defmethod exists?* :default
@@ -137,5 +137,5 @@
 (defn exists?
   {:arglists '([modelable & kv-args? query?])}
   [modelable & unparsed-args]
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     (exists?* model unparsed-args)))

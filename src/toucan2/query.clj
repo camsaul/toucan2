@@ -63,7 +63,7 @@
   build to leverage them:
 
   * `:modelable` -- usually the first of the `unparsed-args`, this is the thing that should get resolved to a model
-     with [[toucan2.model/with-model]].
+     with [[toucan2.model/resolve-model]].
 
   * `:queryable` -- something that can be resolved to a query, for example a map or integer or 'named query' keyword.
     The resolved query is ultimately combined with other parsed args and built into something like a Honey SQL map, then

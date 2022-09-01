@@ -9,6 +9,7 @@
    [potemkin :as p]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.select :as select]
    [toucan2.tools.after-insert :as after-insert]
@@ -34,7 +35,7 @@
 (defn set-root-namespace!
   "DEPRECATED: In Toucan 2, models do not get resolved from namespaces the way they did in Toucan 1. You generally do not
   need to resolve models, since they are generally just keywords. If you want to introduce special model resolution
-  code, you can provide an aux method for [[model/with-model]]."
+  code, you can provide an aux method for [[toucan2.pipeline/transduce-with-model]]."
   [new-root-namespace]
   {:pre [(symbol? new-root-namespace)]}
   (reset! -root-namespace new-root-namespace))
@@ -56,7 +57,7 @@
             (ns-resolve model-ns symb)))))
 
 (defn resolve-model
-  "Deprecated: use [[toucan2.model/with-model]] to resolve models instead."
+  "Deprecated: use [[toucan2.model/resolve-model]] to resolve models instead."
   [model]
   {:post [(isa? % :toucan1/model)]}
   (cond
@@ -66,9 +67,11 @@
     :else                       (throw (ex-info (str "Invalid model: " (u/safe-pr-str model))
                                                 {:model model}))))
 
-(m/defmethod model/do-with-model clojure.lang.Symbol
-  [symb f]
-  (model/do-with-model (resolve-model-from-symbol symb) f))
+(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model clojure.lang.Symbol]
+  [rf query-type symb parsed-args]
+  (let [model (resolve-model-from-symbol symb)]
+    (assert (not (symbol? model)))
+    (pipeline/transduce-with-model rf query-type model parsed-args)))
 
 (defn model?
   "Is model a legacy-compatibility model defined with [[defmodel]]?
@@ -129,7 +132,7 @@
 (defn properties
   "Return a map of properties added by [[add-property!]] for this model."
   [modelable]
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     (not-empty (into {}
                      (comp (filter (fn [k]
                                      (and (isa? k ::property)
@@ -144,7 +147,7 @@
   DEPRECATED: you can derive your model directly from properties using [[clojure.core/derive]] instead."
   {:style/indent [:form]}
   [modelable properties-map]
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     (doseq [[k v] properties-map]
       ;; do we *really* need to enforce this?
       (assert (and (keyword? k)
@@ -237,17 +240,17 @@
   {:style/indent [:form]}
   [modelable column->k]
   (let [column->direction->fn (into {}
-                               (map (fn [[column k]]
-                                      [column (type-name->direction->resolving-fn k)]))
-                               column->k)]
-    (model/with-model [model modelable]
-      (transformed/deftransforms model
-        column->direction->fn))))
+                                    (map (fn [[column k]]
+                                           [column (type-name->direction->resolving-fn k)]))
+                                    column->k)
+        model                 (model/resolve-model modelable)]
+    (transformed/deftransforms model
+        column->direction->fn)))
 
 (defn types
   "Get the transforms associated with a model. Returns map of `column name => direction => fn`."
   [modelable]
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     (into {} (for [[column direction->fn] (transformed/transforms model)
                    :let                   [{type-name ::type} (meta direction->fn)]
                    :when                  type-name]
@@ -258,12 +261,12 @@
 (defn primary-key
   "DEPRECATED: use [[toucan2.model/primary-keys]] instead."
   [modelable]
-  (let [modelable (resolve-model modelable)]
-    (model/with-model [model modelable]
-      (first (model/primary-keys model)))))
+  (let [modelable (resolve-model modelable)
+        model (model/resolve-model modelable)]
+    (first (model/primary-keys model))))
 
 (defn define-primary-key [modelable pk]
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     (m/defmethod model/primary-keys model
       [_model]
       [pk])))
@@ -274,7 +277,7 @@
   "Do [[toucan2.tools.after-select]] stuff for row map `object` using methods for `modelable`."
   [modelable row-map]
   {:pre [(map? row-map)]}
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     (select/select-one model (identity-query/identity-query [row-map]))))
 
 (defn post-select
@@ -290,7 +293,7 @@
 ;;   "Do the [[toucan2.tools.before-insert]] stuff for a `row-map` using the methods for `modelable`."
 ;;   [modelable row-map]
 ;;   {:pre [(map? row-map)]}
-;;   (model/with-model [model modelable]
+;;   (let [model (model/resolve-model modelable]
 ;;     (-> (tools.compile/build
 ;;           (insert/insert! model row-map))
 ;;         :values
@@ -319,7 +322,7 @@
 ;;   "Do [[toucan2.tools.before-update]] stuff for a `changes-map` using the methods for `modelable`."
 ;;   [modelable changes-map]
 ;;   {:pre [(map? changes-map)]}
-;;   (model/with-model [model modelable]
+;;   (let [model (model/resolve-model modelable]
 ;;     (binding [
 ;;               pipeline/transduce-compile (fn [rf query-type model built-query]
 ;;                                                  (println "built-query:" built-query) ; NOCOMMIT
@@ -375,7 +378,7 @@
   (hydration-keys Venue) => [:venue :location]
   ```"
   [modelable]
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     ;; programatically try all the hydration methods with `[:default <k>]` dispatch values and see which of them returns
     ;; our `model` when invoked. This is a totally wacky way of doing this. But it lets us introspect things even if
     ;; they weren't defined with [[define-hydration-keys]].
@@ -399,7 +402,7 @@
   {:style/indent [:form]}
   [modelable ks]
   {:pre [(sequential? ks) (every? keyword? ks)]}
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     (doseq [k ks]
       (m/defmethod hydrate/model-for-automagic-hydration [:default k]
         [_original-model _k]

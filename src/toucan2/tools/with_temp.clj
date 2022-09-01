@@ -58,7 +58,7 @@
             (delete/delete! model :toucan/pk ((model/select-pks-fn model) temp-object))))))))
 
 (defn do-with-temp [modelable attributes f]
-  (model/with-model [model modelable]
+  (let [model (model/resolve-model modelable)]
     (do-with-temp* model attributes f)))
 
 (defmacro with-temp

@@ -117,17 +117,13 @@
 
 (def ^:dynamic *options* nil)
 
-;;; TODO -- should there be a model-specific HoneySQL options method as well? Or can model just bind
-;;; [[*options*]] inside of [[toucan2.model/with-model]] if they need to do something special? I'm leaning
-;;; towards the latter.
-
 (m/defmethod pipeline/transduce-compile [#_query-type :default
-                                             #_model      :default
-                                             #_query      :toucan.map-backend/honeysql2]
+                                         #_model      :default
+                                         #_query      :toucan.map-backend/honeysql2]
   [rf query-type model honeysql]
   (let [options  (merge @global-options
                         *options*)
         _        (u/println-debug ["Compiling Honey SQL 2 with options %s" options])
         sql-args (u/try-with-error-context ["compile Honey SQL query" {::honeysql honeysql, ::options options}]
-                                           (hsql/format honeysql options))]
+                   (hsql/format honeysql options))]
     (next-method rf query-type model sql-args)))
