@@ -11,13 +11,14 @@
    [eftest.report.progress]
    [eftest.runner]
    [environ.core :as env]
+   [humane-are.core :as humane-are]
    [pjstadig.humane-test-output :as humane-test-output]
    [toucan2.test :as test]))
 
 (set! *warn-on-reflection* true)
 
-;; initialize Humane Test Output if it's not already initialized.
 (humane-test-output/activate!)
+(humane-are/install!)
 
 (defmulti ^:private find-tests
   "Find test vars in `arg`, which can be a string directory name, symbol naming a specific namespace or test, or a

@@ -3,10 +3,10 @@
    [clojure.java.io :as io]
    [clojure.spec.alpha :as s]
    [clojure.string :as str]
-   [clojure.template :as clojure.template]
    [clojure.test :as t]
    [environ.core :as env]
    [honey.sql :as hsql]
+   [humane-are.core :as humane-are]
    [methodical.core :as m]
    [pjstadig.humane-test-output :as humane-test-output]
    [puget.printer :as puget]
@@ -17,39 +17,8 @@
 
 (set! *warn-on-reflection* true)
 
+(humane-are/install!)
 (humane-test-output/activate!)
-
-;; replace [[t/are]] with a version that includes the actual form being tested as `testing` context. It's a
-;; lot easier to debug that way. It expands things exactly the same way tho (using [[clojure.template]]) so there is
-;; zero difference for anything but the test output.
-
-(defmacro are+ [bindings assertion & args]
-  {:pre [(every? symbol? bindings)]}
-  (let [tuples (partition-all (count bindings) args)]
-    `(do
-       ~@(for [tuple tuples]
-           (let [spliced (clojure.template/apply-template bindings assertion tuple)]
-             `(t/testing '~spliced
-                (t/is ~spliced)))))))
-
-(defn is-or-testing-form? [form]
-  (and (seq? form)
-       (symbol? (first form))
-       (#{#'clojure.test/is
-          #'clojure.test/testing}
-        (resolve (first form)))))
-
-(s/fdef t/are
-  :args (s/cat :bindings vector?
-               :expr     (complement is-or-testing-form?)
-               :args     (s/+ any?))
-  :ret any?)
-
-(doto #'t/are
-  (alter-var-root (constantly @#'are+))
-  (alter-meta! merge (select-keys (meta #'are+) [:ns :name :file :column :line])))
-
-(println "Installed" #'are+)
 
 ;;;; test [[db-types]] and tooling
 
