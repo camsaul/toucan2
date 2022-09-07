@@ -9,6 +9,7 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.query :as query]
+   [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
@@ -144,6 +145,33 @@
     (is (= [{:count 1}]
            (select/select ::test/venues :id 1 ::count-query)))))
 
+(deftest ^:parallel reducible-select-test
+  (is (= ["Cam" "Sam" "Pam" "Tam"]
+         (into [] (map :name) (select/reducible-select ::test/people {:order-by [[:id :asc]]}))))
+  (are [form] (= [{:id         1
+                   :name       "Cam"
+                   :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}
+                  {:id         2
+                   :name       "Sam"
+                   :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")}
+                  {:id         3
+                   :name       "Pam"
+                   :created-at (OffsetDateTime/parse "2020-01-01T21:56Z")}
+                  {:id         4
+                   :name       "Tam"
+                   :created-at (OffsetDateTime/parse "2020-05-25T19:56Z")}]
+                 form)
+    (into [] (map realize/realize) (select/reducible-select ::test/people {:order-by [[:id :asc]]}))
+    (into [] (eduction
+              (map realize/realize)
+              (select/reducible-select ::test/people {:order-by [[:id :asc]]})))
+    (transduce
+     (map identity)
+     conj
+     (eduction
+      (map realize/realize)
+      (select/reducible-select ::test/people {:order-by [[:id :asc]]})))))
+
 (derive ::people.name-is-pk ::people)
 
 (m/defmethod model/primary-keys ::people.name-is-pk
@@ -170,35 +198,36 @@
 
 (derive ::people.no-timestamps ::people)
 
-(m/defmethod pipeline/transduce-with-model :before [:toucan.query-type/select.* ::people.no-timestamps]
+(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/select.* #_model ::people.no-timestamps]
   [_rf _query-type _model parsed-args]
   (update parsed-args :columns (fn [columns]
                                  (or columns [:id :name]))))
 
-(m/defmethod pipeline/transduce-with-model [:toucan.query-type/select.instances ::people.no-timestamps]
+(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.query-type/select.instances #_model ::people.no-timestamps]
   [rf query-type model parsed-args]
   (let [rf* ((map (fn [person]
-                    (testing "select* :after should see Toucan 2 instances"
-                      (is (instance/instance? person)))
-                    (testing "instance table should be a ::people.no-timestamps"
-                      (is (isa? (protocols/model person) ::people.no-timestamps)))
+                    (testing (format "\nperson = ^%s %s" (some-> person class .getCanonicalName) (pr-str person))
+                      ;; (testing "\nreducing function should see Toucan 2 instances"
+                      ;;   (is (instance/instance? person)))
+                      (testing "\ninstance table should be a ::people.no-timestamps"
+                        (is (isa? (protocols/model person) ::people.no-timestamps))))
                     (assoc person :after-select? true)))
              rf)]
     (next-method rf* query-type model parsed-args)))
 
 (deftest ^:parallel default-query-test
-  (testing "Should be able to set some defaults by implementing `select*`"
+  (testing "Should be able to set some defaults by implementing transduce-with-model"
     (is (= [(instance/instance ::people.no-timestamps {:id 1, :name "Cam", :after-select? true})]
            (select/select ::people.no-timestamps 1)))))
 
 (deftest ^:parallel post-select-test
-  (testing "Should be able to do cool stuff in (select* :after)"
+  (testing "Should be able to do cool stuff in reducing function"
     (testing (str \newline '(ancestors ::people.no-timestamps) " => " (pr-str (ancestors ::people.no-timestamps)))
       (is (= [(instance/instance ::people.no-timestamps {:id 1, :name "Cam", :after-select? true})
               (instance/instance ::people.no-timestamps {:id 2, :name "Sam", :after-select? true})
               (instance/instance ::people.no-timestamps {:id 3, :name "Pam", :after-select? true})
               (instance/instance ::people.no-timestamps {:id 4, :name "Tam", :after-select? true})]
-             (select/select ::people.no-timestamps))))))
+             (select/select ::people.no-timestamps {:order-by [[:id :asc]]}))))))
 
 (derive ::people.limit-2 ::people)
 
@@ -239,18 +268,18 @@
            (select/select-fn-set :id ::test/people))))
   (testing "Return vector instead of a set"
     (is (= [1 2 3 4]
-           (select/select-fn-vec :id ::test/people))))
+           (select/select-fn-vec :id ::test/people {:order-by [[:id :asc]]}))))
   (testing "Arbitrary function instead of a key"
     (is (= [2 3 4 5]
-           (select/select-fn-vec (comp inc :id) ::test/people))))
+           (select/select-fn-vec (comp inc :id) ::test/people {:order-by [[:id :asc]]}))))
   (testing "Should work with magical keys"
-    (doseq [k [:created-at :created_at]]
-      (testing k
-        (is (= [(OffsetDateTime/parse "2020-04-21T23:56Z")
-                (OffsetDateTime/parse "2019-01-11T23:56Z")
-                (OffsetDateTime/parse "2020-01-01T21:56Z")
-                (OffsetDateTime/parse "2020-05-25T19:56Z")]
-               (select/select-fn-vec k ::test/people {:order-by [[:id :asc]]}))))))
+    (are [k] (= [(OffsetDateTime/parse "2020-04-21T23:56Z")
+                 (OffsetDateTime/parse "2019-01-11T23:56Z")
+                 (OffsetDateTime/parse "2020-01-01T21:56Z")
+                 (OffsetDateTime/parse "2020-05-25T19:56Z")]
+                (select/select-fn-vec k ::test/people {:order-by [[:id :asc]]}))
+      :created-at
+      :created_at))
   (testing "Should return nil if the result is empty"
     (is (nil? (select/select-fn-set :id ::test/people :id 100)))
     (is (nil? (select/select-fn-vec :id ::test/people :id 100)))))

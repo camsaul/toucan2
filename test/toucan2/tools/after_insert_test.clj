@@ -3,6 +3,8 @@
    [clojure.test :refer :all]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
+   [toucan2.protocols :as protocols]
+   [toucan2.realize :as realize]
    [toucan2.test :as test]
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-select :as after-select])
@@ -19,8 +21,11 @@
   [venue]
   ;; make sure this is treated as a REAL function tail.
   {:pre [(map? venue)], :post [(:awaiting-moderation? %)]}
+  (testing (format "venue = %s" (pr-str venue))
+    (is (isa? (protocols/model venue) ::test/venues))
+    #_(is (instance/instance-of? ::test/venues venue)))
   (when *venues-awaiting-moderation*
-    (swap! *venues-awaiting-moderation* conj venue))
+    (swap! *venues-awaiting-moderation* conj (realize/realize venue)))
   (assoc venue :awaiting-moderation? true))
 
 (derive ::venues.after-insert.composed ::venues.after-insert)

@@ -37,7 +37,6 @@
              toucan2.instance              instance
              toucan2.jdbc.query            jdbc.query
              toucan2.jdbc.result-set       jdbc.rs
-             toucan2.jdbc.row              jdbc.row
              toucan2.log                   log
              toucan2.magic-map             magic-map
              toucan2.map-backend           map

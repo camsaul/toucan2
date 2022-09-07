@@ -9,23 +9,23 @@
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
+(set! *warn-on-reflection* true)
+
 (m/defmulti before-update
   {:arglists '([model row])}
   u/dispatch-on-first-arg)
 
 (m/defmethod before-update :around :default
   [model row]
+  (assert (map? row) (format "Expected a map row, got ^%s %s" (some-> row class .getCanonicalName) (pr-str row)))
   (log/debugf :compile "before-update %s %s" model row)
   (let [result (next-method model row)]
-    (assert (map? result) (format "%s for %s should return a map, got %s"
-                                  `before-update
-                                  model
-                                  (pr-str result)))
+    (assert (map? result) (format "%s for %s should return a map, got %s" `before-update model (pr-str result)))
     (log/debugf :compile "[before-update] => %s" result)
     result))
 
 (defn- changes->affected-pk-maps-rf [model changes]
-  {:pre [(map? changes)]}
+  (assert (map? changes) (format "Expected changes to be a map, got %s" (pr-str changes)))
   (fn
     ([] {})
     ([m]
@@ -35,6 +35,7 @@
      (assert (map? changes->pks))
      (assert (map? row) (format "%s expected a map row, got %s" `changes->affected-pk-maps (pr-str row)))
      (let [row     (merge row changes)
+           _       (assert (map? row))
            row     (before-update model row)
            changes (protocols/changes row)]
        (cond-> changes->pks

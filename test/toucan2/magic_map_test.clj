@@ -2,6 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
+   [toucan2.instance :as instance]
    [toucan2.magic-map :as magic-map])
   (:import
    (java.util Locale)))
@@ -153,3 +154,14 @@
                persistent!)]
     (is (= {:b 200, :c 300}
            m'))))
+
+(deftest magic-map?-test
+  (are [m expected] (= expected
+                       (magic-map/magic-map? m))
+    nil                            false
+    100                            false
+    (Object.)                      false
+    {}                             false
+    (instance/instance :venues)    false
+    (magic-map/magic-map)          true
+    (magic-map/magic-map {:a 100}) true))

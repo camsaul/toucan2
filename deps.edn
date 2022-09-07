@@ -4,7 +4,7 @@
  :deps
  {better-cond/better-cond             {:mvn/version "2.1.5"}
   camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-  com.github.seancorfield/honeysql    {:mvn/version "2.3.999-SNAPSHOT"} ; we need to use a snapshot version to get the fix for https://github.com/seancorfield/honeysql/issues/401 -- once that's live we don't need to snapshot no mo
+  com.github.seancorfield/honeysql    {:mvn/version "2.3.928"}
   com.github.seancorfield/next.jdbc   {:mvn/version "1.2.796"}
   environ/environ                     {:mvn/version "1.2.0"}
   methodical/methodical               {:mvn/version "0.13.1"}

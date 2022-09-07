@@ -20,7 +20,7 @@
     @print-magic-maps))
 
 (defn kebab-case-xform
-  "The default magic map transform function."
+  "The default magic map transform function. Converts things to `kebab-case`, preserving namespaces."
   [k]
   (when k
     (if (and (clojure.core/instance? clojure.lang.Named k) (namespace k))
@@ -122,3 +122,6 @@
    (->MagicMap (normalize-map key-xform m)
                key-xform
                metta)))
+
+(defn magic-map? [m]
+  (instance? toucan2.magic_map.MagicMap m))

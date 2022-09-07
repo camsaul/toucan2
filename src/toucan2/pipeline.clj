@@ -23,6 +23,7 @@
    [toucan2.map-backend :as map]
    [toucan2.model :as model]
    [toucan2.query :as query]
+   [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -545,7 +546,7 @@
 
 (m/defmethod default-rf :toucan.result-type/*
   [_query-type]
-  conj)
+  ((map realize/realize) conj))
 
 ;;; This doesn't work for things that return update counts!
 (defn first-result-rf [rf]
@@ -658,7 +659,7 @@
   ;; happening inside of the `rf` to return keys or whatever.
   (let [extra-options (when (isa? query-type :toucan.result-type/pks)
                         {:return-keys true})
-        result        (jdbc.query/reduce-jdbc-query conn model sql-args rf (rf) extra-options)]
+        result        (jdbc.query/reduce-jdbc-query rf (rf) conn model sql-args extra-options)]
     (rf result)))
 
 ;;; To get Databases to return the generated primary keys rather than the update count for SELECT/UPDATE/DELETE we need
@@ -702,8 +703,8 @@
   ;; next method do it's thing. Presumably if we end up here with something that is neither DML or DQL, but maybe
   ;; something like a DDL `CREATE TABLE` statement, we probably don't want to assume it has the possibility to have it
   ;; return generated PKs.
-  (let [dml?          (isa? query-type :toucan.statement-type/DML)
-        pk-query-type (when dml?
+  (let [DML?          (isa? query-type :toucan.statement-type/DML)
+        pk-query-type (when DML?
                         (similar-query-type-returning query-type :toucan.result-type/pks))]
     (if-not pk-query-type
       ;; non-DML query or if we don't know how to do magic, let the `next-method` do it's thing.

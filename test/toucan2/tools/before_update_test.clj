@@ -23,6 +23,7 @@
 
 (before-update/define-before-update ::venues.before-update
   [venue]
+  (assert (map? venue) (format "Expected venue to be a map, got ^%s %s" (some-> venue class .getCanonicalName) (pr-str venue)))
   (is (instance/instance? venue))
   (is (isa? (protocols/model venue) ::venues.before-update))
   (when *updated-venues*
@@ -33,17 +34,21 @@
 
 (before-update/define-before-update ::venues.update-updated-at
   [venue]
+  (assert (map? venue) (format "Expected venue to be a map, got ^%s %s" (some-> venue class .getCanonicalName) (pr-str venue)))
+  (is (isa? (protocols/model venue) ::venues.before-update))
   (assoc venue :updated-at (LocalDateTime/parse "2021-06-09T15:18:00")))
 
 (derive ::venues.discard-category-change ::venues.before-update)
 
 (before-update/define-before-update ::venues.discard-category-change
   [venue]
+  (assert (map? venue) (format "Expected venue to be a map, got ^%s %s" (some-> venue class .getCanonicalName) (pr-str venue)))
+  (is (isa? (protocols/model venue) ::venues.before-update))
   (assoc venue :category (:category (protocols/original venue))))
 
 (deftest before-update-test
   (testing "Updates returned by the before-update method should actually be applied"
-    (testing "f adds changes"
+    (testing "method adds changes"
       (test/with-discarded-table-changes :venues
         (is (= 1
                (update/update! ::venues.update-updated-at 1 {:name "Kennedy's Irish Pub and Curry House"})))
@@ -53,7 +58,7 @@
                 :created-at (LocalDateTime/parse "2017-01-01T00:00")
                 :updated-at (LocalDateTime/parse "2021-06-09T15:18:00")}
                (select/select-one ::venues.update-updated-at 1)))))
-    (testing "f discards changes"
+    (testing "method discards changes"
       (test/with-discarded-table-changes :venues
         (is (= 1
                (update/update! ::venues.discard-category-change 1 {:name     "Kennedy's Irish Pub and Curry House"
@@ -274,7 +279,7 @@
 
 (before-update/define-before-update ::venues.disallow-stores
   [venue]
-  (assert (map? venue))
+  (assert (map? venue) (format "Expected venue to be a map, got ^%s %s" (some-> venue class .getCanonicalName) (pr-str venue)))
   (assert (:category venue))
   (cond-> venue
     (= (:category venue) "store")

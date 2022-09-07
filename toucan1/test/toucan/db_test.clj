@@ -115,9 +115,9 @@
     (binding [conn/*current-connectable* ::test-setup/db]
       (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}]
              (t1.db/query {:select   [:*]
-                        :from     [:t1_users]
-                        :order-by [:id]
-                        :limit    1}))))))
+                           :from     [:t1_users]
+                           :order-by [:id]
+                           :limit    1}))))))
 
 (deftest lower-case-identifiers-test
   ;; only test postgres, since H2 has uppercase identifiers
@@ -146,9 +146,9 @@
     (testing "Test query-reducible"
       (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
              (transduce-to-set (t1.db/reducible-query {:select   [:*]
-                                                    :from     [:t1_users]
-                                                    :order-by [:id]
-                                                    :limit    1})))))))
+                                                       :from     [:t1_users]
+                                                       :order-by [:id]
+                                                       :limit    1})))))))
 
 (deftest qualify-test
   (is (= :t1_users.first-name
@@ -235,14 +235,14 @@
 (deftest update-non-nil-keys!-test
   (test/with-discarded-table-changes User
     (t1.db/update-non-nil-keys! User 2
-                             :first-name nil
-                             :last-name "Can")
+                                :first-name nil
+                                :last-name "Can")
     (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
            (t1.db/select-one User 2))))
   (test/with-discarded-table-changes User
     (t1.db/update-non-nil-keys! User 2
-                             {:first-name nil
-                              :last-name  "Can"})
+                                {:first-name nil
+                                 :last-name  "Can"})
     (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
            (t1.db/select-one User 2)))))
 
@@ -255,14 +255,14 @@
     (test/with-discarded-table-changes User
       (is (= [4 5]
              (t1.db/simple-insert-many! User [{:first-name "Grass" :last-name (hsql/call :upper "Hopper")}
-                                           {:first-name "Ko" :last-name "Libri"}]))))))
+                                              {:first-name "Ko" :last-name "Libri"}]))))))
 
 (deftest insert-many!-test
   (testing "It must return the inserted ids, it must not fail when using SQL function calls."
     (test/with-discarded-table-changes User
       (is (= [4 5]
              (t1.db/insert-many! User [{:first-name "Grass" :last-name (hsql/call :upper "Hopper")}
-                                    {:first-name "Ko" :last-name "Libri"}])))))
+                                       {:first-name "Ko" :last-name "Libri"}])))))
   (testing "It must call pre-insert hooks"
     (test/with-discarded-table-changes Category
       (is (thrown-with-msg?
@@ -322,8 +322,8 @@
   (is (= [{:id 2, :first-name "Rasta", :last-name "Toucan"}
           {:id 3, :first-name "Lucky", :last-name "Bird"}]
          (t1.db/select User
-                    :first-name [:not= "Cam"]
-                    {:order-by [:id]})))
+                       :first-name [:not= "Cam"]
+                       {:order-by [:id]})))
   (is (= [{:first-name "Cam", :last-name "Saul"}
           {:first-name "Rasta", :last-name "Toucan"}
           {:first-name "Lucky", :last-name "Bird"}]

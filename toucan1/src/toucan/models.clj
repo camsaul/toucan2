@@ -11,6 +11,7 @@
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
+   [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-select :as after-select]
@@ -325,7 +326,6 @@
 ;;   (let [model (model/resolve-model modelable]
 ;;     (binding [
 ;;               pipeline/transduce-compile (fn [rf query-type model built-query]
-;;                                                  (println "built-query:" built-query) ; NOCOMMIT
 ;;                                                  (if (isa? query-type :toucan.query-type/select.*)
 ;;                                                    (pipeline/transduce-compile rf query-type model built-query)
 ;;                                                    (binding [conn/*current-connectable* (identity-query/identity-connection nil)]
@@ -427,25 +427,25 @@
   [_k model f]
   (after-insert/define-after-insert model
     [row]
-    (f row)))
+    (f (realize/realize row))))
 
 (defmethod define-method-with-IModel-method :post-select
   [_k model f]
   (after-select/define-after-select model
     [row]
-    (f row)))
+    (f (realize/realize row))))
 
 (defmethod define-method-with-IModel-method :post-update
   [_k model f]
   (after-update/define-after-update model
     [row]
-    (f row)))
+    (f (realize/realize row))))
 
 (defmethod define-method-with-IModel-method :pre-delete
   [_k model f]
   (before-delete/define-before-delete model
     [row]
-    (f row)))
+    (f (realize/realize row))))
 
 (defmethod define-method-with-IModel-method :pre-insert
   [_k model f]
@@ -457,7 +457,7 @@
   [_k model f]
   (before-update/define-before-update model
     [row]
-    (f row)))
+    (f (realize/realize row))))
 
 (defmethod define-method-with-IModel-method :primary-key
   [_k model f]
