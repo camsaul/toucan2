@@ -101,3 +101,8 @@
                                           :form        seqable?)
                :body               (s/+ any?))
   :ret  any?)
+
+(defn ensure-persistent! [x]
+  (if (instance? clojure.lang.ITransientCollection x)
+    (persistent! x)
+    x))

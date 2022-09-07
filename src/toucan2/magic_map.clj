@@ -9,6 +9,13 @@
 
 (set! *warn-on-reflection* true)
 
+;;; These declarations are to stop Kondo from complaining. See
+;;; https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md#unresolved-symbol
+(declare ->kebab-case)
+(declare ->kebab-case-keyword)
+(declare ->kebab-case-string)
+(declare ->kebab-case-symbol)
+
 (csk.macros/defconversion "kebab-case" u/lower-case-en u/lower-case-en "-")
 
 (defonce print-magic-maps (atom true))
@@ -109,6 +116,8 @@
     (.valAt m k))
   (valAt [_this k not-found]
     (.valAt m k not-found))
+  (count [_this]
+    (count m))
 
   pretty/PrettyPrintable
   (pretty [_this]

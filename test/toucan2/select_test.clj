@@ -13,7 +13,8 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
-   [toucan2.tools.named-query :as tools.named-query])
+   [toucan2.tools.named-query :as tools.named-query]
+   [toucan2.test.track-realized-columns :as test.track-realized])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -282,7 +283,37 @@
       :created_at))
   (testing "Should return nil if the result is empty"
     (is (nil? (select/select-fn-set :id ::test/people :id 100)))
-    (is (nil? (select/select-fn-vec :id ::test/people :id 100)))))
+    (is (nil? (select/select-fn-vec :id ::test/people :id 100))))
+  (testing "Only realize the columns we actually fetch."
+    (testing "simple function"
+      (test.track-realized/with-realized-columns [realized-columns]
+        (is (= #{1 2 3}
+               (select/select-fn-set :id ::test.track-realized/venues)))
+        (is (= #{:venues/id}
+               (realized-columns)))))
+    (testing `juxt
+      (test.track-realized/with-realized-columns [realized-columns]
+        (is (= #{[1 "Tempest"]
+                 [2 "Ho's Tavern"]
+                 [3 "BevMo"]}
+               (select/select-fn-set (juxt :id :name) ::test.track-realized/venues)))
+        (is (= #{:venues/id :venues/name}
+               (realized-columns)))))
+    (testing `comp
+      (test.track-realized/with-realized-columns [realized-columns]
+        (is (= #{0 1 2}
+               (select/select-fn-set (comp dec :id) ::test.track-realized/venues)))
+        (is (= #{:venues/id}
+               (realized-columns)))))
+    (testing "fancy function"
+      (test.track-realized/with-realized-columns [realized-columns]
+        (is (= #{{:id 1, :x true} {:id 2, :x true} {:id 3, :x true}}
+               (select/select-fn-set (fn [m]
+                                       (-> (select-keys m [:id])
+                                           (assoc :x true)))
+                                     ::test.track-realized/venues)))
+        (is (= #{:venues/id}
+               (realized-columns)))))))
 
 (deftest ^:parallel select-one-fn-test
   (is (= 1
@@ -415,9 +446,10 @@
 
 (deftest ^:parallel select-join-test
   (testing "Extra columns from joined tables should come back"
+    ;; we should fetch `venues.name` first and skip fetching `category.name` since we already have a `:name`
     (is (= (instance/instance ::test/venues
                               {:id              1
-                               :name            "bar"
+                               :name            "Tempest"
                                :category        "bar"
                                :created-at      (LocalDateTime/parse "2017-01-01T00:00")
                                :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
@@ -427,7 +459,7 @@
                               {:left-join [[:category :c] [:= :venues.category :c.name]]
                                :order-by  [[:id :asc]]})))))
 
-(derive ::venues.with-category ::test/venues)
+(derive ::venues.with-category ::test.track-realized/venues)
 
 (m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/select.*
                                        #_model      ::venues.with-category
@@ -443,16 +475,26 @@
     (next-method rf query-type model parsed-args resolved-query)))
 
 (deftest ^:parallel joined-model-test
-  (is (= (instance/instance ::venues.with-category
-                            {:id              1
-                             :name            "bar"
-                             :category        "bar"
-                             :created-at      (LocalDateTime/parse "2017-01-01T00:00")
-                             :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
-                             :slug            "bar_01"
-                             :parent-category nil})
-         (select/select-one ::venues.with-category
-                            {:order-by [[:id :asc]]}))))
+  (test.track-realized/with-realized-columns [realized-columns]
+    (is (= (instance/instance ::venues.with-category
+                              {:id              1
+                               :name            "Tempest"
+                               :category        "bar"
+                               :created-at      (LocalDateTime/parse "2017-01-01T00:00")
+                               :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
+                               :slug            "bar_01"
+                               :parent-category nil})
+           (select/select-one ::venues.with-category
+                              {:order-by [[:id :asc]]})))
+    (testing "We should fetch venues.name first, and skip fetching category.name entirely since we already have a `:name`"
+      (is (= #{:venues/id
+               :venues/name
+               :venues/category
+               :venues/created-at
+               :venues/updated-at
+               :category/slug
+               :category/parent-category}
+             (realized-columns))))))
 
 (derive ::venues.namespaced ::test/venues)
 

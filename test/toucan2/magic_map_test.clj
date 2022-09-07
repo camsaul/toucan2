@@ -155,6 +155,30 @@
     (is (= {:b 200, :c 300}
            m'))))
 
+(deftest ^:parallel transient-val-at-test
+  (let [^clojure.lang.ITransientMap m (transient (magic-map/magic-map {:a 100}))]
+    (assoc! m :b 200)
+    (is (= 100
+           (.valAt m :a)))
+    (is (= 200
+           (.valAt m :b)))
+    (is (= nil
+           (.valAt m :c)))
+    (is (= 100
+           (.valAt m :a ::not-found)))
+    (is (= 200
+           (.valAt m :b ::not-found)))
+    (is (= ::not-found
+           (.valAt m :c ::not-found)))))
+
+(deftest ^:parallel transient-count-test
+  (let [^clojure.lang.ITransientMap m (transient (magic-map/magic-map {:a 100}))]
+    (is (= 1
+           (count m)))
+    (assoc! m :b 200)
+    (is (= 2
+           (count m)))))
+
 (deftest magic-map?-test
   (are [m expected] (= expected
                        (magic-map/magic-map? m))

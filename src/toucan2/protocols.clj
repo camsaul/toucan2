@@ -111,3 +111,14 @@
                          (dispatch-value (.unwrap conn java.sql.Connection))
                          (catch Throwable _
                            c3p0-connection-class)))}))
+
+(p/defprotocol+ IRealizedKeys
+  (realized-keys [m]
+    "Return the keys in map `m` that have already been fully realized (e.g., fetched from a Database)."))
+
+(extend-protocol IRealizedKeys
+  nil
+  (realized-keys [_this] nil)
+
+  clojure.lang.IPersistentMap
+  (realized-keys [this] (keys this)))

@@ -6,11 +6,12 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.default-fields :as default-fields]))
 
 (set! *warn-on-reflection* true)
 
-(derive ::venues.default-fields ::test/venues)
+(derive ::venues.default-fields ::test.track-realized/venues)
 
 (default-fields/define-default-fields ::venues.default-fields
   [:id :name :category])
@@ -18,19 +19,23 @@
 (deftest ^:parallel select-test
   (is (= {:select [:id :name :category], :from [[:venues]]}
          (pipeline/build :toucan.query-type/select.instances ::venues.default-fields {} {})))
-  (is (= [(instance/instance ::venues.default-fields
-                             {:id 1, :name "Tempest", :category "bar"})
-          (instance/instance ::venues.default-fields
-                             {:id 2, :name "Ho's Tavern", :category "bar"})
-          (instance/instance ::venues.default-fields
-                             {:id 3, :name "BevMo", :category "store"})]
-         (select/select ::venues.default-fields)))
+  (test.track-realized/with-realized-columns [realized-columns]
+    (is (= [(instance/instance ::venues.default-fields
+                               {:id 1, :name "Tempest", :category "bar"})
+            (instance/instance ::venues.default-fields
+                               {:id 2, :name "Ho's Tavern", :category "bar"})
+            (instance/instance ::venues.default-fields
+                               {:id 3, :name "BevMo", :category "store"})]
+           (select/select ::venues.default-fields)))
+    (is (= #{:venues/name :venues/id :venues/category}
+           (realized-columns))
+        "Only realize the specific columns we've asked for."))
   (testing "should still be able to override default fields"
-      (is (= {:select [:id :name], :from [[:venues]]}
-             (pipeline/build :toucan.query-type/select.* ::venues.default-fields {:columns [:id :name]} {})))
-      (is (= (instance/instance ::venues.default-fields
-                                {:id 1, :name "Tempest"})
-             (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]})))))
+    (is (= {:select [:id :name], :from [[:venues]]}
+           (pipeline/build :toucan.query-type/select.* ::venues.default-fields {:columns [:id :name]} {})))
+    (is (= (instance/instance ::venues.default-fields
+                              {:id 1, :name "Tempest"})
+           (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]})))))
 
 (deftest insert-returning-instances-test
   (test/with-discarded-table-changes :venues

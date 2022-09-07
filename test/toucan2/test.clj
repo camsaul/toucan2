@@ -27,9 +27,6 @@
 ;;;
 ;;; [[db-types]] -- the set of all possible types that we can run tests against. Comes from `TEST_DBS`. In the REPL,
 ;;; change this with [[set-db-types!]].
-;;;
-;;; The macro [[do-db-types]] is used to write tests that run once for each enabled test DB type, optionally
-;;; restricted to some subset of the enabled types using a predicate function
 
 (defn- db-types-from-env
   ([]
