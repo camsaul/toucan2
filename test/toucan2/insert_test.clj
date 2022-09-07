@@ -11,7 +11,8 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
-   [toucan2.tools.named-query :as tools.named-query])
+   [toucan2.tools.named-query :as tools.named-query]
+   [toucan2.test.track-realized-columns :as test.track-realized])
   (:import
    (java.time LocalDateTime)))
 
@@ -315,3 +316,12 @@
              clojure.lang.ExceptionInfo
              #"Don't know how to get a connection from .* :fake-db"
              (insert/insert! :conn :fake-db ::test/venues {:name "Grant & Green", :category "bar"})))))))
+
+(deftest insert-returning-pks-should-not-realize-all-columns-test
+  (testing "insert-returning-pks! should only fetch the PK column(s) when fetching results"
+    (test/with-discarded-table-changes :venues
+      (test.track-realized/with-realized-columns [realized-columns]
+        (is (= [4]
+               (insert/insert-returning-pks! ::test.track-realized/venues {:name "Walgreens", :category "store"})))
+        (is (= #{:venues/id}
+               (realized-columns)))))))
