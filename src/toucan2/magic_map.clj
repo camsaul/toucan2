@@ -105,6 +105,10 @@
   (without [this k]
     (.without m (key-xform k))
     this)
+  (valAt [_this k]
+    (.valAt m k))
+  (valAt [_this k not-found]
+    (.valAt m k not-found))
 
   pretty/PrettyPrintable
   (pretty [_this]
