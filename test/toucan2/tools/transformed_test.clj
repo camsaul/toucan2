@@ -11,6 +11,7 @@
    [toucan2.save :as save]
    [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.transformed :as transformed]
@@ -463,3 +464,15 @@
          (select/select-one ::venues.namespaced.with-category
                             {:left-join [:category [:= :venue.category :category.name]]
                              :order-by  [[:id :asc]]}))))
+
+(doto ::venues.category-keyword.track-realized
+  (derive ::venues.category-keyword)
+  (derive ::test.track-realized/venues))
+
+(deftest do-not-realize-entire-row-test
+  (testing "transformed should only need to realize the columns that get transformed"
+    (test.track-realized/with-realized-columns [realized-columns]
+      (is (= :bar
+             (select/select-one-fn :category ::venues.category-keyword.track-realized 1)))
+      (is (= #{:venues/category}
+             (realized-columns))))))

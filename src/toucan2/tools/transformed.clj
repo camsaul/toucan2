@@ -10,7 +10,6 @@
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
-   [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -158,11 +157,7 @@
   ;; Special Optimization 1: if `instance` is an `IInstance`, and original and current are the same object, this only
   ;; applies `xform` once.
   (instance/update-original-and-current
-   ;; HACK HACK HACK
-   ;;
-   ;; We should not be realizing the entire row in order to apply transformations. If we want to transform one column,
-   ;; we should only need to realize that column.
-   (realize/realize instance)
+   instance
    (fn [row]
      ;; Special Optimization 2: if the underlying original/current maps of `instance` are instances of `IRow` (which
      ;; themselves have underlying key->value thunks) we can compose the thunk itself rather than immediately
