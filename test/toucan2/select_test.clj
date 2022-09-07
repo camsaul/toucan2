@@ -475,7 +475,10 @@
                                :venue/category   "bar"
                                :venue/created-at (LocalDateTime/parse "2017-01-01T00:00")
                                :venue/updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-           (select/select-one ::venues.namespaced {:order-by [[:id :asc]]})))))
+           (select/select-one ::venues.namespaced {:order-by [[:id :asc]]}))))
+  (testing `select/select-fn-set
+    (is (= #{"bar" "store"}
+           (select/select-fn-set :venue/category ::venues.namespaced)))))
 
 (doto ::venues.namespaced.with-category
   (derive ::venues.namespaced)
@@ -503,7 +506,12 @@
            :category/name            "bar"
            :category/slug            "bar_01"
            :category/parent-category nil})
-         (select/select-one ::venues.namespaced.with-category {:order-by [[:id :asc]]}))))
+         (select/select-one ::venues.namespaced.with-category {:order-by [[:id :asc]]})))
+  (testing `select/select-fn-set
+    (is (= #{"Tempest" "BevMo" "Ho's Tavern"}
+           (select/select-fn-set :venue/name ::venues.namespaced.with-category)))
+    (is (= #{"bar" "store"}
+           (select/select-fn-set :category/name ::venues.namespaced.with-category)))))
 
 (deftest ^:parallel namespaced-with-joins-columns-test
   (is (= :venue
