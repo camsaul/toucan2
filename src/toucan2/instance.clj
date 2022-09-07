@@ -174,12 +174,11 @@
   [_model]
   magic-map/*key-transform-fn*)
 
-(m/defmulti ^:deprecated empty-map
+;;; TODO -- consider whether or not we still need this. If you don't want to use Toucan 2 instances then you can supply
+;;; a different builder function or something. Maybe [[instance]] should actually be a multimethod instead.
+(m/defmulti empty-map
   "Return an empty map that should be used as the basis for creating new instances of a model. You can provide a custom
-  implementation if you want to use something other than the default [[toucan2.magic-map]] implementation.
-
-  DEPRECATED -- if you don't want to use Toucan 2 instances then you can supply a different builder function or
-  something. Maybe [[instance]] should actually be a multimethod instead."
+  implementation if you want to use something other than the default [[toucan2.magic-map]] implementation."
   {:arglists '([model])}
   u/dispatch-on-first-arg)
 

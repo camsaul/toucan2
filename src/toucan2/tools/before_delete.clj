@@ -6,8 +6,8 @@
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
-   [toucan2.util :as u]
-   [toucan2.realize :as realize]))
+   [toucan2.realize :as realize]
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
