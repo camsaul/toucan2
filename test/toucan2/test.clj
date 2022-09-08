@@ -286,7 +286,7 @@
       (create-table! table-name))))
 
 (s/fdef with-discarded-table-changes
-  :args (s/cat :table-name (some-fn symbol? keyword?)
+  :args (s/cat :table-name (some-fn symbol? keyword? string?)
                :body       (s/+ any?))
   :ret  any?)
 
