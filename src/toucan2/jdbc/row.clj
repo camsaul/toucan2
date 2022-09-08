@@ -17,7 +17,7 @@
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize])
   (:import
-   (java.sql ResultSet ResultSetMetaData)))
+   (java.sql ResultSet)))
 
 (set! *warn-on-reflection* true)
 
@@ -25,64 +25,49 @@
 
 (defn- fetch-column-with-name
   "Fetch the column with `column-name`. Returns `not-found` if no such column exists."
-  [builder i->thunk column-name not-found]
+  [column-name->index i->thunk column-name not-found]
   ;; this might get called with some other non-string or non-keyword key, in that case just return `not-found`
   ;; immediately since we're not going to find it by hitting the database.
-  (if (and (not (string? column-name))
-           (not (instance? clojure.lang.Named column-name)))
-    (do
-      (log/tracef :results "Can't fetch column with name %s. Returning not found value %s" column-name not-found)
-      not-found)
-    (let [label-fn     (get-in builder [:opts :label-fn])
-          _            (assert (fn? label-fn) "Builder should have :opts with :label-fn")
-          column-name' (keyword
-                        (when (instance? clojure.lang.Named column-name)
-                          (when-let [col-ns (namespace column-name)]
-                            (label-fn (name col-ns))))
-                        (label-fn (name column-name)))]
-      (log/tracef :results "Fetch column with name %s (originally %s)" column-name' column-name)
-      (let [i      (when column-name'
-                     (first (keep-indexed
-                             (fn [i col]
-                               (when (= col column-name')
-                                 (inc i)))
-                             (:cols builder))))
-            result (b/cond
-                     (not i)     not-found
-                     :let        [thunk (i->thunk i)]
-                     (not thunk) not-found
-                     :else       (thunk))]
-        (log/tracef :results "=> %s" result)
-        result))))
+  (let [i      (column-name->index column-name)
+        result (b/cond
+                 (not i)     not-found
+                 :let        [thunk (i->thunk i)]
+                 (not thunk) not-found
+                 :else       (thunk))]
+    (log/tracef :results "=> %s" result)
+    result))
 
 (def ^:private ^:dynamic *fetch-all-columns* true)
 
 ;;; One of these is built for every row in the results.
+;;;
+;;; TODO -- maybe we can combine the
 (deftype ^:no-doc TransientRow [model
                                 ^ResultSet rset
-                                ^ResultSetMetaData rsmeta
-                                current-row-num
                                 ;; [[next.jdbc]] result set builder, usually an instance
                                 ;; of [[toucan2.jdbc.result_set.InstanceBuilder]] or
                                 ;; whatever [[toucan2.jdbc.result-set/builder-fn]] returns. Should have the key `:cols`
                                 builder
-                                ;; an atom with a set of realized column names.
-                                realized-transient-keys
-                                ;; given a JDBC column index (starting at 1) return a thunk that can be used to fetch
-                                ;; the column. This usually comes from [[toucan2.jdbc.read/make-cached-i->thunk]].
+                                ;; a function that given a column name key will normalize it and return the
+                                ;; corresponding JDBC index. This should probably be memoized for the whole result set.
+                                column-name->index
+                                ;; an atom with a set of realized column name keywords.
+                                realized-keys
+                                ;; ATOM with map. Given a JDBC column index (starting at 1) return a thunk that can be
+                                ;; used to fetch the column. This usually comes
+                                ;; from [[toucan2.jdbc.read/make-cached-i->thunk]].
                                 i->thunk
                                 ;; underlying transient map representing this row.
                                 ^clojure.lang.ITransientMap transient-row
-                                ;; an atom recording whether we've already been realized. If we have, this contains a
-                                ;; stacktrace to the place that we got realized.
+                                ;; an atom recording whether we've already been realized.
                                 already-realized?
                                 ;; a delay that should return a persistent map for the current row. Once this is called
                                 ;; we should return the realized row directly and work with that going forward.
                                 realized-row]
   next.jdbc.result_set.InspectableMapifiedResultSet
-  (row-number   [_this] current-row-num)
+  (row-number   [_this] (.getRow rset))
   (column-names [_this] (:cols builder))
-  (metadata     [_this] (d/datafy rsmeta))
+  (metadata     [_this] (d/datafy (.getMetaData rset)))
 
   clojure.lang.IPersistentMap
   (assoc [this k v]
@@ -90,7 +75,7 @@
     (if @already-realized?
       (assoc @realized-row k v)
       (do
-        (swap! realized-transient-keys conj k)
+        (swap! realized-keys conj k)
         (assoc! transient-row k v)
         this)))
 ;;; TODO -- can we `assocEx` the transient row?
@@ -103,7 +88,7 @@
       (dissoc @realized-row k)
       (do
         (dissoc! transient-row k)
-        (swap! realized-transient-keys disj k)
+        (swap! realized-keys disj k)
         this)))
 
   ;; Java 7 compatible: no forEach / spliterator
@@ -115,15 +100,16 @@
     (.iterator ^java.lang.Iterable @realized-row))
 
   clojure.lang.Associative
-  (containsKey [this k]
+  (containsKey [_this k]
     (log/tracef :results ".containsKey %s" k)
-    (not= (.valAt this k ::not-found) ::not-found))
+    (boolean (column-name->index k)))
   (entryAt [this k]
     (log/tracef :results ".entryAt %s" k)
     (let [v (.valAt this k ::not-found)]
       (when-not (= v ::not-found)
         (clojure.lang.MapEntry. k v))))
 
+;;; TODO -- this should probably also include any extra keys added with `assoc` or whatever
   clojure.lang.Counted
   (count [_this]
     (log/tracef :results ".count")
@@ -165,7 +151,7 @@
 
       (number? k)
       (let [i (inc k)]
-        (if-let [thunk (i->thunk i)]
+        (if-let [thunk (@i->thunk i)]
           (thunk)
           not-found))
 
@@ -174,7 +160,7 @@
       (let [existing-value (.valAt transient-row k ::not-found)]
         (if-not (= existing-value ::not-found)
           existing-value
-          (let [fetched-value (fetch-column-with-name builder i->thunk k ::not-found)]
+          (let [fetched-value (fetch-column-with-name column-name->index @i->thunk k ::not-found)]
             (if (= fetched-value ::not-found)
               not-found
               (do
@@ -200,7 +186,7 @@
     (log/tracef :results ".seq")
     (seq @realized-row))
 
-  ;; calling `persistent!` on a transient row will convert it to a persistent object WITHOUT realizing all the columns.
+  ;; calling [[persistent!]] on a transient row will convert it to a persistent object WITHOUT realizing all the columns.
   clojure.lang.ITransientCollection
   (persistent [_this]
     (log/tracef :results ".persistent")
@@ -213,7 +199,7 @@
     ;; that they can be thrown when the actual functions are called
     (let [row   (try (.getRow rset)  (catch Throwable t t))
           cols  (try (:cols builder) (catch Throwable t t))
-          metta (try (d/datafy rsmeta) (catch Throwable t t))]
+          metta (try (d/datafy (.getMetaData rset)) (catch Throwable t t))]
       (vary-meta
        @realized-row
        assoc
@@ -227,9 +213,22 @@
   (model [_this]
     model)
 
-  protocols/IRealizedKeys
-  (realized-keys [_this]
-    @realized-transient-keys)
+  protocols/IDeferrableUpdate
+  (deferrable-update [this k f]
+    (log/tracef :results "Doing deferrable update of %s with %s" k f)
+    (let [col-index (column-name->index k)]
+      (assert col-index (format "No column named %s in results. Got: %s" (pr-str k) (pr-str (:cols builder))))
+      (swap! i->thunk (fn [i->thunk]
+                        (fn [i]
+                          (let [thunk (i->thunk i)]
+                            (if (= i col-index)
+                              (comp f thunk)
+                              thunk)))))
+      this))
+
+  ;; protocols/IRealizedKeys
+  ;; (realized-keys [_this]
+  ;;   @realized-keys)
 
   realize/Realize
   (realize [_this]
@@ -246,12 +245,12 @@
   'transient' mode."
   [^toucan2.jdbc.row.TransientRow row]
   (try
-    (let [transient-row           (.transient_row row)
-          realized-transient-keys (.realized_transient_keys row)]
+    (let [transient-row (.transient_row row)
+          realized-keys (.realized_keys row)]
       [(symbol (format "^%s " `TransientRow))
        ;; (instance? pretty.core.PrettyPrintable transient-row) (pretty/pretty transient-row)
-       (zipmap @realized-transient-keys
-               (map #(get transient-row %) @realized-transient-keys))])
+       (zipmap @realized-keys
+               (map #(get transient-row %) @realized-keys))])
     (catch Exception _
       ["unrealized result set {row} -- do you need to call toucan2.realize/realize ?"])))
 
@@ -279,33 +278,45 @@
 ;;; preferred to not have to do this but a lot of it was necessary to make things work in the Toucan 2 work. See this
 ;;; Slack thread for more information: https://clojurians.slack.com/archives/C1Q164V29/p1662494291800529
 
-(defn- fetch-all-columns! [builder transient-row]
+(defn- fetch-all-columns! [builder i->thunk transient-row]
   (log/tracef :results "Fetching all columns")
   (reduce (fn [^clojure.lang.ITransientMap transient-row i]
             ;; make sure the key is not already present. If it is we don't want to stomp over existing values.
             (let [col-name (nth (:cols builder) (dec i))]
               (if (= (.valAt transient-row col-name ::not-found) ::not-found)
-                (next.jdbc.rs/with-column builder transient-row i)
+                (let [thunk (@i->thunk i)]
+                  (assert (fn? thunk))
+                  (next.jdbc.rs/with-column-value builder transient-row col-name (thunk)))
                 transient-row)))
           transient-row
           (range 1 (inc (next.jdbc.rs/column-count builder)))))
 
-(defn- make-realized-row-delay [builder transient-row]
+(defn- make-realized-row-delay [builder i->thunk transient-row]
   (delay
     (log/tracef :results "Fully realizing row")
     (when *fetch-all-columns*
-      (fetch-all-columns! builder transient-row))
+      (fetch-all-columns! builder i->thunk transient-row))
     (next.jdbc.rs/row! builder transient-row)))
 
 (defn row
-  [model ^ResultSet rset i->thunk row-num opts]
+  [model ^ResultSet rset builder i->thunk col-name->index]
   (assert (not (.isClosed rset)) "ResultSet is already closed")
-  (let [rsmeta             (.getMetaData rset)
-        builder            ((get opts :builder-fn next.jdbc.rs/as-maps) rset opts)
-        transient-row      (next.jdbc.rs/->row builder)
-        realized-row-delay (make-realized-row-delay builder transient-row)
+  (assert (seq (:cols builder)) "builder must have :cols")
+  (let [transient-row      (next.jdbc.rs/->row builder)
+        i->thunk           (atom i->thunk)
+        realized-row-delay (make-realized-row-delay builder i->thunk transient-row)
         already-realized?  (atom false)
+        realized-keys      (atom #{})
         realized-row-delay (delay
                              (reset! already-realized? true)
                              @realized-row-delay)]
-    (->TransientRow model rset rsmeta row-num builder (atom #{}) i->thunk transient-row already-realized? realized-row-delay)))
+    ;; this is a gross amount of positional args. But using `reify` makes debugging things too hard IMO.
+    (->TransientRow model
+                    rset
+                    builder
+                    col-name->index
+                    realized-keys
+                    i->thunk
+                    transient-row
+                    already-realized?
+                    realized-row-delay)))

@@ -96,20 +96,21 @@
   [_conn _model rset _rsmeta i]
   (get-object-of-class-thunk rset i java.time.OffsetTime))
 
-(defn- make-column-thunk [conn model rset rsmeta i]
+(defn- make-column-thunk [conn model ^ResultSet rset i]
   (log/tracef :results "Building thunk to read column %s" i)
   (fn column-thunk []
-    (let [thunk (read-column-thunk conn model rset rsmeta i)
-          v     (thunk)]
+    (let [rsmeta (.getMetaData rset)
+          thunk  (read-column-thunk conn model rset rsmeta i)
+          v      (thunk)]
       (next.jdbc.rs/read-column-by-index v rsmeta i))))
 
-(defn- make-i->thunk [conn model rset rsmeta]
+(defn- make-i->thunk [conn model rset]
   (comp (memoize (fn [i]
-                   (make-column-thunk conn model rset rsmeta i)))
+                   (make-column-thunk conn model rset i)))
         int))
 
-(defn make-cached-row-num->i->thunk [conn model ^ResultSet rset rsmeta]
-  (let [i->thunk       (make-i->thunk conn model rset rsmeta)
+(defn make-cached-row-num->i->thunk [conn model ^ResultSet rset]
+  (let [i->thunk       (make-i->thunk conn model rset)
         cached-row-num (atom -1)
         cached-values  (atom {})]
     (fn row-num->i->thunk* [current-row-num]
@@ -144,9 +145,7 @@
   Values are cached for the current row -- fetching the same column twice for a given row will only result in fetching
   it from the database once."
   ([conn model ^ResultSet rset]
-   (let [rsmeta                   (.getMetaData rset)
-         cached-row-num->i->thunk (make-cached-row-num->i->thunk conn model rset rsmeta)]
-     (read-column-by-index-fn cached-row-num->i->thunk)))
+   (read-column-by-index-fn (make-cached-row-num->i->thunk conn model rset)))
 
   ([row-num->i->thunk]
    (fn read-column-by-index-fn* [_builder ^ResultSet rset ^Integer i]

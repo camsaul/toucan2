@@ -48,6 +48,26 @@
   (rs! [_this acc]
     (persistent! acc)))
 
+(defn- make-column-name->index [cols label-fn]
+  {:pre [(seq cols) (fn? label-fn)]}
+  (memoize
+   (fn [column-name]
+     (when (or (string? column-name)
+               (instance? clojure.lang.Named column-name))
+       (let [column-name' (keyword
+                           (when (instance? clojure.lang.Named column-name)
+                             (when-let [col-ns (namespace column-name)]
+                               (label-fn (name col-ns))))
+                           (label-fn (name column-name)))
+             i            (when column-name'
+                            (first (keep-indexed
+                                    (fn [i col]
+                                      (when (= col column-name')
+                                        (inc i)))
+                                    cols)))]
+         (log/tracef :results "Index of column named %s (originally %s) is %s" column-name' column-name i)
+         i)))))
+
 (defn instance-builder-fn
   "Create a result set map builder function appropriate for passing as the `:builder-fn` option to [[next.jdbc]] that will
   create [[toucan2.instance]]s of `model` using namespaces determined by [[toucan2.model/table-name->namespace]] and the
@@ -79,19 +99,26 @@
 
 (defn reduce-result-set [rf init conn model ^ResultSet rset opts]
   (log/debugf :execute "Reduce JDBC result set for model %s with rf %s and init %s" model rf init)
-  (let [row-num->i->thunk (jdbc.read/make-cached-row-num->i->thunk conn model rset (.getMetaData rset))
-        builder-fn*        (next.jdbc.rs/builder-adapter
-                            (builder-fn conn model rset opts)
-                            (jdbc.read/read-column-by-index-fn row-num->i->thunk))
-        opts              (merge {:builder-fn builder-fn*} opts)]
+  (let [row-num->i->thunk (jdbc.read/make-cached-row-num->i->thunk conn model rset)
+        builder-fn*       (next.jdbc.rs/builder-adapter
+                           (builder-fn conn model rset opts)
+                           (jdbc.read/read-column-by-index-fn row-num->i->thunk))
+        builder           (builder-fn* rset opts)
+        combined-opts     (merge (:opts builder) opts)
+        label-fn          (get combined-opts :label-fn)
+        _                 (assert (fn? label-fn) "Options must include :label-fn")
+        col-names         (get builder :cols (next.jdbc.rs/get-modified-column-names
+                                              (.getMetaData rset)
+                                              combined-opts))
+        col-name->index   (make-column-name->index col-names label-fn)]
     (loop [acc init]
       (b/cond
         (not (.next rset))
         acc
 
         :let [row-num  (.getRow rset)
-              i->thunk (row-num->i->thunk row-num->i->thunk)
-              row      (jdbc.row/row model rset i->thunk row-num opts)
+              i->thunk (row-num->i->thunk row-num)
+              row      (jdbc.row/row model rset builder i->thunk col-name->index)
               acc'     (rf acc row)]
 
         (reduced? acc')

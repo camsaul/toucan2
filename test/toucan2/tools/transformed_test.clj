@@ -21,8 +21,9 @@
 
 (set! *warn-on-reflection* true)
 
-(derive ::venues.category-keyword ::test/venues)
-(derive ::venues.category-keyword ::transformed/transformed.model)
+(doto ::venues.category-keyword
+  (derive ::test/venues)
+  (derive ::transformed/transformed.model))
 
 (m/defmethod transformed/transforms ::venues.category-keyword
   [_model]
@@ -465,14 +466,22 @@
                             {:left-join [:category [:= :venue.category :category.name]]
                              :order-by  [[:id :asc]]}))))
 
-(doto ::venues.category-keyword.track-realized
-  (derive ::venues.category-keyword)
-  (derive ::test.track-realized/venues))
-
 (deftest do-not-realize-entire-row-test
   (testing "transformed should only need to realize the columns that get transformed"
     (test.track-realized/with-realized-columns [realized-columns]
       (is (= :bar
              (select/select-one-fn :category ::venues.category-keyword.track-realized 1)))
       (is (= #{:venues/category}
+             (realized-columns))))))
+
+(doto ::venues.category-keyword.track-realized
+  (derive ::venues.category-keyword)
+  (derive ::test.track-realized/venues))
+
+(deftest do-not-realize-unselected-column-test
+  (testing "transformed should not realize columns that are transformed if we don't actually use them in the end"
+    (test.track-realized/with-realized-columns [realized-columns]
+      (is (= "Tempest"
+             (select/select-one-fn :name ::venues.category-keyword.track-realized 1)))
+      (is (= #{:venues/name}
              (realized-columns))))))

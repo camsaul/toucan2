@@ -9,6 +9,7 @@
    [toucan2.magic-map :as magic-map]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
+   [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.util :as u]))
 
@@ -172,7 +173,7 @@
          (update row k xform))
      (log/tracef :results "Transform %s %s" k (get row k))
      (u/try-with-error-context ["Transform result column" {::k k, ::xform xform, ::row row}]
-       (let [result (update row k xform)]
+       (let [result (protocols/deferrable-update row k xform)]
          (assert (map? row)
                  (format "%s: expected row transform function to return a map, got %s"
                          `apply-result-row-transform (pr-str row)))
