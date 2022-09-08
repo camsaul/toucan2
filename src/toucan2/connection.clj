@@ -17,14 +17,10 @@
   an explicit will connectable will use it rather than the `:default` connection."
   nil)
 
-;;; This is an UNCACHED multimethod for now because of the upstream bug https://github.com/camsaul/methodical/issues/112
-;;; Once that bug is fixed we can turn this back into a normal cached multimethod.
-(defonce ^{:arglists '([connectable₁ f]), :name 'do-with-connection} do-with-connection
-  (m/uncached-multifn
-   (m/standard-multifn-impl
-    (m/thread-last-method-combination)
-    (m/multi-default-dispatcher u/dispatch-on-first-arg :default-value ::default)
-    (m/standard-method-table))))
+(m/defmulti do-with-connection
+  {:arglists '([connectable₁ f])}
+  u/dispatch-on-first-arg
+  :default-value ::default)
 
 (m/defmethod do-with-connection :around ::default
   [connectable f]
