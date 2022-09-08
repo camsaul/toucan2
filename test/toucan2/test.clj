@@ -20,6 +20,17 @@
 (humane-are/install!)
 (humane-test-output/activate!)
 
+;;; make sure ALL of our tests are either marked `^:parallel` or `^:synchronized`, that way we can run things quick in
+;;; the test runner.
+
+(defn- has-parallel-or-synchronized-metadata? [symb]
+  ((some-fn :parallel :synchronized) (meta symb)))
+
+(s/fdef t/deftest
+  :args (s/cat :test-name (every-pred symbol? has-parallel-or-synchronized-metadata?)
+               :body      (s/+ any?))
+  :ret  any?)
+
 ;;;; test [[db-types]] and tooling
 
 ;;; The DB types stuff below is used to run tests against multiple types of DBs. It's similar to how the `DRIVERS` env
@@ -37,7 +48,7 @@
                            :when (seq s)]
                        (keyword s)))))))
 
-(t/deftest db-types-from-env-test
+(t/deftest ^:parallel db-types-from-env-test
   (t/are [s expected] (= expected
                          (db-types-from-env s))
     nil           nil
@@ -77,6 +88,8 @@
   nil)
 
 (defn parallel? [test-var]
+  (assert ((some-fn :parallel :synchronized) (meta test-var))
+          (format "Tests must have either ^:parallel or ^:synchronized metadata. Bad test: %s" (pr-str test-var)))
   (:parallel (meta test-var)))
 
 (def ^:private ^:dynamic *parallel-test* false)

@@ -160,24 +160,12 @@
   (instance/update-original-and-current
    instance
    (fn [row]
-     ;; Special Optimization 2: if the underlying original/current maps of `instance` are instances of `IRow` (which
-     ;; themselves have underlying key->value thunks) we can compose the thunk itself rather than immediately
-     ;; realizing and transforming the value. This means transforms don't get applied to values that are never
-     ;; realized.
-     ;;
-     ;; TODO FIXME -- need to copy over the magic result-row code from the old Toucan 2 codebase or figure out a
-     ;; different way to get this magical optimization.
-     #_(if-let [thunks (result-row/thunks row)]
-         (result-row/with-thunks row (update thunks k (fn [thunk]
-                                                        (comp xform thunk))))
-         (update row k xform))
+     ;; Special Optimization 2: if the underlying original/current maps of `instance` are instances of something
+     ;; like [[toucan2.jdbc.row/->TransientRow]] we can do a 'deferred update' that only applies the transform if and
+     ;; when the value is realized.
      (log/tracef :results "Transform %s %s" k (get row k))
      (u/try-with-error-context ["Transform result column" {::k k, ::xform xform, ::row row}]
-       (let [result (protocols/deferrable-update row k xform)]
-         (assert (map? row)
-                 (format "%s: expected row transform function to return a map, got %s"
-                         `apply-result-row-transform (pr-str row)))
-         result)))))
+       (protocols/deferrable-update row k xform)))))
 
 (defn- out-transforms [model]
   (wrapped-transforms model :out))

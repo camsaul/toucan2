@@ -162,7 +162,7 @@
   (is (= [{:a 4} {:a 5} {:a 6}]
          (execute/query ::connectable.not-even-jdbc ::model.not-even-jdbc {:key :a}))))
 
-(deftest ^:parallel execute!-test
+(deftest ^:synchronized execute!-test
   (try
     (is (= 0
            (execute/query-one ::test/db "CREATE TABLE execute_test_table (id INTEGER NOT NULL);")))
@@ -200,7 +200,7 @@
     (is (= [{:one 1}]
            (execute/query "SELECT 1 AS one;")))))
 
-(deftest default-connectable-for-model-test
+(deftest ^:synchronized default-connectable-for-model-test
   (testing "Should be able to query things using the default connectables for a model"
     (is (= [{:one 1}]
            (execute/query nil ::test/venues "SELECT 1 AS one;")))

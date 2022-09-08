@@ -74,7 +74,7 @@
    map.honeysql/*options*
    (when-let [style (quoting-style)]
      {:dialect style})
-   (when-let [convert? (automatically-convert-dashes-and-underscores?)]
+   (let [convert? (automatically-convert-dashes-and-underscores?)]
      (when (some? convert?)
        {:quoted-snake convert?}))))
 

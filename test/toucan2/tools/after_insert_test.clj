@@ -34,7 +34,7 @@
   [venue]
   (assoc venue :composed? true))
 
-(deftest after-insert-test
+(deftest ^:synchronized after-insert-test
   (doseq [f     [#'insert/insert!
                  #'insert/insert-returning-pks!
                  #'insert/insert-returning-instances!]
@@ -75,7 +75,7 @@
   [venue]
   (assoc venue :after-select? true))
 
-(deftest dont-do-after-select-test
+(deftest ^:synchronized dont-do-after-select-test
   (testing "After-insert should not do after-select stuff"
     (test/with-discarded-table-changes :venues
       (binding [*venues-awaiting-moderation* (atom [])]

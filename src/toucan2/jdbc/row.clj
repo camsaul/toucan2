@@ -77,8 +77,14 @@
       (do
         (swap! realized-keys conj k)
         (assoc! transient-row k v)
+        (assert (= (.valAt transient-row k) v)
+                (format "assoc! did not do what we expected. k = %s v = %s row = %s .valAt = %s"
+                        (pr-str k)
+                        (pr-str v)
+                        (pr-str transient-row)
+                        (pr-str (.valAt transient-row k))))
         this)))
-;;; TODO -- can we `assocEx` the transient row?
+  ;; TODO -- can we `assocEx` the transient row?
   (assocEx [_this k v]
     (log/tracef :results ".assocEx %s %s" k v)
     (.assocEx ^clojure.lang.IPersistentMap @realized-row k v))
@@ -216,15 +222,27 @@
   protocols/IDeferrableUpdate
   (deferrable-update [this k f]
     (log/tracef :results "Doing deferrable update of %s with %s" k f)
-    (let [col-index (column-name->index k)]
-      (assert col-index (format "No column named %s in results. Got: %s" (pr-str k) (pr-str (:cols builder))))
-      (swap! i->thunk (fn [i->thunk]
-                        (fn [i]
-                          (let [thunk (i->thunk i)]
-                            (if (= i col-index)
-                              (comp f thunk)
-                              thunk)))))
-      this))
+    (b/cond
+      @already-realized?
+      (update @realized-row k f)
+
+      :let [existing-value (.valAt transient-row k ::not-found)]
+
+      ;; value already exists: update the value in the transient row and call it a day
+      (not= existing-value ::not-found)
+      (assoc this k (f existing-value))
+
+      ;; otherwise compose the column thunk with `f`
+      :else
+      (let [col-index (column-name->index k)]
+        (assert col-index (format "No column named %s in results. Got: %s" (pr-str k) (pr-str (:cols builder))))
+        (swap! i->thunk (fn [i->thunk]
+                          (fn [i]
+                            (let [thunk (i->thunk i)]
+                              (if (= i col-index)
+                                (comp f thunk)
+                                thunk)))))
+        this)))
 
   ;; protocols/IRealizedKeys
   ;; (realized-keys [_this]

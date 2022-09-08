@@ -9,7 +9,7 @@
 
 (set! *warn-on-reflection* true)
 
-(deftest kebab-case-xform-turkish-test
+(deftest ^:synchronized kebab-case-xform-turkish-test
   (testing "Test that identifiers are correctly lower cased in Turkish locale"
     (let [original-locale (Locale/getDefault)]
       (try
@@ -169,7 +169,18 @@
     (is (= 200
            (.valAt m :b ::not-found)))
     (is (= ::not-found
-           (.valAt m :c ::not-found)))))
+           (.valAt m :c ::not-found))))
+  (testing "transformed keys"
+    (let [^clojure.lang.ITransientMap m (transient (magic-map/magic-map))]
+      (assoc! m :my_key 1)
+      (is (= 1
+             (.valAt m :my_key)
+             (.valAt m :my-key)))))
+  (testing "namespaced keys"
+    (let [^clojure.lang.ITransientMap m (transient (magic-map/magic-map))]
+      (assoc! m ::key [1])
+      (is (= [1]
+             (.valAt m ::key))))))
 
 (deftest ^:parallel transient-count-test
   (let [^clojure.lang.ITransientMap m (transient (magic-map/magic-map {:a 100}))]
@@ -179,7 +190,7 @@
     (is (= 2
            (count m)))))
 
-(deftest magic-map?-test
+(deftest ^:parallel magic-map?-test
   (are [m expected] (= expected
                        (magic-map/magic-map? m))
     nil                            false

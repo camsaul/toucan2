@@ -23,7 +23,7 @@
     (swap! *deleted-venues* conj (dissoc venue :created-at :updated-at)))
   nil)
 
-(deftest before-delete-test
+(deftest ^:synchronized before-delete-test
   (test/with-discarded-table-changes :venues
     (binding [*deleted-venues* (atom [])]
       (execute/with-call-count [call-count]
@@ -67,7 +67,7 @@
   (when (= (:id venue) 3)
     (update/update! ::test/venues 3 {:id 1})))
 
-(deftest before-delete-exception-test
+(deftest ^:synchronized before-delete-exception-test
   (doseq [model [::venues.before-delete-exception.clojure-land
                  ::venues.before-delete-exception.db-land]]
     (testing (format "Model = %s" model)
@@ -111,7 +111,7 @@
     (swap! *deleted-venues-2* conj (dissoc venue :created-at :updated-at)))
   nil)
 
-(deftest compose-test
+(deftest ^:synchronized compose-test
   (test/with-discarded-table-changes :venues
     (binding [*deleted-venues*   (atom [])
               *deleted-venues-2* (atom [])]

@@ -99,7 +99,8 @@
   :warn-on-reflection                    {:level :warning}
   ;; :docstring-no-summary                 {:level :warning}
   ;; :missing-docstring                     {:level :warning}
-  }
+
+  :toucan2/validate-deftest {:level :warning}}
 
  :lint-as
  {potemkin/def-map-type clojure.core/defrecord
@@ -109,7 +110,7 @@
 
  :hooks
  {:analyze-call
-  {}
+  {clojure.test/deftest hooks.clojure.test/deftest}
 
   :macroexpand
   {toucan2.test.track-realized-columns/with-realized-columns macros.toucan2.test.track-realized-columns/with-realized-columns}}

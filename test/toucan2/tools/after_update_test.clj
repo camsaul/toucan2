@@ -21,7 +21,7 @@
     (swap! *venues-awaiting-moderation* conj (u/ensure-persistent! (select-keys venue [:id :name :category]))))
   nil)
 
-(deftest after-update-test
+(deftest ^:synchronized after-update-test
   (doseq [f [#'update/update!
              #'update/update-returning-pks!]]
     (testing f
@@ -53,7 +53,7 @@
     (swap! *recently-updated-venues* conj (u/ensure-persistent! (select-keys venue [:id :name]))))
   venue)
 
-(deftest compose-test
+(deftest ^:synchronized compose-test
   (testing "after-update should compose"
     (test/with-discarded-table-changes :venues
       (binding [*venues-awaiting-moderation* (atom [])

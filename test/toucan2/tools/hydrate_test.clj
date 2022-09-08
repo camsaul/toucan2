@@ -6,11 +6,14 @@
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.test.track-realized-columns :as test.track-realized]
+   [toucan2.tools.after-select :as after-select]
    [toucan2.tools.hydrate :as hydrate]
    [toucan2.tools.transformed :as transformed])
   (:import
-   (java.time OffsetDateTime)))
+   (java.time LocalDateTime OffsetDateTime)))
 
 (set! *warn-on-reflection* true)
 
@@ -24,11 +27,11 @@
   {:category {:in  name
               :out keyword}})
 
-(m/defmethod hydrate/model-for-automagic-hydration [:default ::user]
+(m/defmethod hydrate/model-for-automagic-hydration [#_original-model :default #_k ::user]
   [_original-model _k]
   :user)
 
-(m/defmethod hydrate/model-for-automagic-hydration [:default ::venue]
+(m/defmethod hydrate/model-for-automagic-hydration [#_original-model :default #_k ::venue]
   [_original-model _k]
   ::venues.category-keyword)
 
@@ -45,44 +48,51 @@
     (is (= false
            (hydrate/can-hydrate-with-strategy? nil ::hydrate/automagic-batched :a)))))
 
-;; custom automagic hydration
+;;; custom automagic hydration
 
-(m/defmethod hydrate/model-for-automagic-hydration [::hydrate-venue-with-people ::venue]
+;;; `::hydrate-venue-with-people` in this case means hydrate the `::venue` key based on the value of `:venue-id` with
+;;; the corresponding row from the `:people` table.
+
+(m/defmethod hydrate/model-for-automagic-hydration [#_original-model ::hydrate-venue-with-people #_k ::venue]
   [_original-model _k]
   ::people)
 
-(m/defmethod hydrate/fk-keys-for-automagic-hydration [::hydrate-venue-with-people :default :default]
+(m/defmethod hydrate/fk-keys-for-automagic-hydration [#_original-model ::hydrate-venue-with-people
+                                                      #_dest-key       :default
+                                                      #_hydrated-model :default]
   [_original-model _dest-key _hydrated-model]
   [:venue_id])
 
-(deftest ^:parallel automagic-hydration-test
-  (letfn [(remove-venues-timestamps [rows]
-            (for [result rows]
-              (update result ::venue #(dissoc % :updated-at :created-at))))]
-    (is (= [{:venue-id 1
-             ::venue   {:category :bar, :name "Tempest", :id 1}}
-            {:venue-id 2
-             ::venue   {:category :bar, :name "Ho's Tavern", :id 2}}]
-           (remove-venues-timestamps
-            (hydrate/hydrate [{:venue-id 1} {:venue-id 2}] ::venue))))
+(defn- remove-venues-timestamps [rows]
+  (for [result rows]
+    (update result ::venue #(dissoc % :updated-at :created-at))))
 
-    (testing "dispatch off of model -- hydrate different Tables for different instances"
-      (is (= [(instance/instance :a-place {:venue-id 1
-                                           ::venue   {:category :bar, :name "Tempest", :id 1}})
-              (instance/instance :a-place {:venue-id 2
-                                           ::venue   {:category :bar, :name "Ho's Tavern", :id 2}})]
-             (remove-venues-timestamps
-              (hydrate/hydrate [(instance/instance :a-place {:venue_id 1})
-                                (instance/instance :a-place {:venue-id 2})]
-                               ::venue))))
-      (is (= [(instance/instance ::hydrate-venue-with-people
-                                 {:venue-id 1, ::venue (instance/instance ::people {:id 1, :name "Cam"})})
-              (instance/instance ::hydrate-venue-with-people
-                                 {:venue-id 1000, ::venue nil})]
-             (remove-venues-timestamps
-              (hydrate/hydrate [(instance/instance ::hydrate-venue-with-people {:venue_id 1})
-                                (instance/instance ::hydrate-venue-with-people {:venue-id 1000})]
-                               ::venue)))))))
+(deftest ^:parallel automagic-hydration-test
+  (is (= [{:venue-id 1
+           ::venue   {:category :bar, :name "Tempest", :id 1}}
+          {:venue-id 2
+           ::venue   {:category :bar, :name "Ho's Tavern", :id 2}}]
+         (remove-venues-timestamps
+          (hydrate/hydrate [{:venue-id 1} {:venue-id 2}] ::venue)))))
+
+(deftest ^:parallel automagic-hydration-dispatch-off-model-test
+  (testing "dispatch off of model -- hydrate different Tables for different instances"
+    (is (= [(instance/instance :a-place {:venue-id 1
+                                         ::venue   {:category :bar, :name "Tempest", :id 1}})
+            (instance/instance :a-place {:venue-id 2
+                                         ::venue   {:category :bar, :name "Ho's Tavern", :id 2}})]
+           (remove-venues-timestamps
+            (hydrate/hydrate [(instance/instance :a-place {:venue_id 1})
+                              (instance/instance :a-place {:venue-id 2})]
+                             ::venue))))
+    (is (= [(instance/instance ::hydrate-venue-with-people
+                               {:venue-id 1, ::venue (instance/instance ::people {:id 1, :name "Cam"})})
+            (instance/instance ::hydrate-venue-with-people
+                               {:venue-id 1000, ::venue nil})]
+           (remove-venues-timestamps
+            (hydrate/hydrate [(instance/instance ::hydrate-venue-with-people {:venue_id 1})
+                              (instance/instance ::hydrate-venue-with-people {:venue-id 1000})]
+                             ::venue))))))
 
 (defn- valid-form? [form]
   (try
@@ -94,7 +104,7 @@
     (catch Throwable _e
       false)))
 
-(deftest valid-form-test
+(deftest ^:FIXME-not-parallel ^:synchronized valid-form-test
   (testing "invalid forms"
     (doseq [form ["k"
                   'k
@@ -454,7 +464,7 @@
   [_model k m]
   (assoc m k 1000))
 
-(deftest ^:parallel hydrate-sequence-dispatch-on-model-test
+(deftest ^:FIXME-not-parallel ^:synchronized hydrate-sequence-dispatch-on-model-test
   (testing "We should dispatch on the model of the first instance when hydrating a sequence"
     (is (= [(instance/instance ::m.hydrate-sequence {:a 1, ::model.x 1000})
             (instance/instance ::m.hydrate-sequence {:a 2, ::model.x 1000})]
@@ -511,7 +521,7 @@
       [[[[{:a 1} {:b 2}] {:c 3} {:d 4}] {:e 5} {:f 6}] {:g 7} {:h 8}]
       [[[[{:a 1, ::k 5} {:b 2, ::k 5}] {:c 3, ::k 5} {:d 4, ::k 5}] {:e 5, ::k 5} {:f 6, ::k 5}] {:g 7, ::k 5} {:h 8, ::k 5}])))
 
-(deftest error-on-unknown-key-test
+(deftest ^:synchronized error-on-unknown-key-test
   (let [original-global-value @@#'hydrate/global-error-on-unknown-key]
     (try
       (hydrate/set-error-on-unknown-key! false)
@@ -535,3 +545,35 @@
                  (hydrate/hydrate {} ::unknown-key)))))
       (finally
         (reset! @#'hydrate/global-error-on-unknown-key original-global-value)))))
+
+(derive ::venues.hydrate-in-after-select ::test.track-realized/venues)
+
+(m/defmethod hydrate/model-for-automagic-hydration [#_original-model :default #_k ::person]
+  [_original-model _k]
+  ::test.track-realized/people)
+
+(after-select/define-after-select ::venues.hydrate-in-after-select
+  [venue]
+  (hydrate/hydrate (assoc venue :person-id 1, :person-name "Cam") ::person))
+
+(deftest ^:parallel hydrate-in-after-select-test []
+  (is (= {:id          1
+          :person-id   1
+          :person-name "Cam"
+          ::person     {:id         1
+                        :name       "Cam"
+                        :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}
+          :name        "Tempest"
+          :category    "bar"
+          :created-at  (LocalDateTime/parse "2017-01-01T00:00")
+          :updated-at  (LocalDateTime/parse "2017-01-01T00:00")}
+         (select/select-one ::venues.hydrate-in-after-select 1)))
+  (testing "Don't force realization of other columns."
+    (test.track-realized/with-realized-columns [realized-columns]
+      ;; should only realize the bar column since that's all we fetch.
+      (is (= "bar"
+             (select/select-one-fn :category ::venues.hydrate-in-after-select 1)))
+      ;; FIXME -- this should only realize `venues/category`, since we never even actually use `::people` at all.
+      (is (= #_#{:venues/category}
+             #{:people/id :people/created-at :venues/category :people/name}
+             (realized-columns))))))

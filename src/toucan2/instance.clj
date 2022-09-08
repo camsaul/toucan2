@@ -187,6 +187,9 @@
   (magic-map/magic-map {} (key-transform-fn model)))
 
 (defn instance
+  (^toucan2.instance.Instance []
+   (instance nil))
+
   (^toucan2.instance.Instance [model]
    (instance model (empty-map model)))
 

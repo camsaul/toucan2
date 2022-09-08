@@ -37,7 +37,7 @@
                               {:id 1, :name "Tempest"})
            (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]})))))
 
-(deftest insert-returning-instances-test
+(deftest ^:synchronized insert-returning-instances-test
   (test/with-discarded-table-changes :venues
     (is (= [(instance/instance ::venues.default-fields {:id 4, :name "BevLess", :category "store"})]
            (insert/insert-returning-instances! ::venues.default-fields [{:name "BevLess", :category "store"}])))))

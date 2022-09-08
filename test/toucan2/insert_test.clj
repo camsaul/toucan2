@@ -77,7 +77,7 @@
       (test/with-discarded-table-changes :venues
         (f returning-keys? insert!)))))
 
-(deftest insert-single-row-test
+(deftest ^:synchronized insert-single-row-test
   (do-both-types-of-insert
    (fn [returning-keys? insert!]
      (is (= (if returning-keys?
@@ -92,7 +92,7 @@
                                                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
               (select/select-one ::test/venues 4)))))))
 
-(deftest multiple-rows-test
+(deftest ^:synchronized multiple-rows-test
   (doseq [rows-fn [#'list #'vector]
           :let    [rows (rows-fn
                          {:name "Black Horse London Pub", :category "bar"}
@@ -117,7 +117,7 @@
                                                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
                   (select/select ::test/venues :id [:>= 4] {:order-by [[:id :asc]]})))))))))
 
-(deftest key-values-test
+(deftest ^:synchronized key-values-test
   (do-both-types-of-insert
    (fn [returning-keys? insert!]
      (is (= (if returning-keys?
@@ -132,7 +132,7 @@
                                                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
               (select/select-one ::test/venues :id 4)))))))
 
-(deftest multiple-rows-with-column-names-test
+(deftest ^:synchronized multiple-rows-with-column-names-test
   (do-both-types-of-insert
    (fn [returning-keys? insert!]
      (testing "Insert multiple rows with column names"
@@ -152,7 +152,7 @@
   [_model]
   [:id :name])
 
-(deftest insert-returning-pks!-composite-pk-test
+(deftest ^:synchronized insert-returning-pks!-composite-pk-test
   ;; TODO FIXME -- insert-returning-pks! currently only works for Postgres, at least with the venues table that doesn't
   ;; ACTUALLY have a composite PK. H2 only returns the actual generated PK value, `:id`. Maybe we can create a new test
   ;; table or something in order to test this against H2
@@ -161,13 +161,13 @@
       (is (= [[4 "Grant & Green"]]
              (insert/insert-returning-pks! ::venues.composite-pk {:name "Grant & Green", :category "bar"}))))))
 
-(deftest insert!-no-changes-no-op-test
+(deftest ^:synchronized insert!-no-changes-no-op-test
   (test/with-discarded-table-changes :venues
     (testing "If there are no rows, insert! should no-op and return zero"
       (is (= 0
              (insert/insert! ::test/venues []))))))
 
-(deftest insert-returning-instances-test
+(deftest ^:synchronized insert-returning-instances-test
   (test/with-discarded-table-changes :venues
     (is (= [(instance/instance
              ::test/venues
@@ -202,7 +202,7 @@
               [{:name "Grant & Green", :category "bar"}
                {:name "North Beach Cantina", :category "restaurant"}]))))))
 
-(deftest empty-row-test
+(deftest ^:synchronized empty-row-test
   (testing "Should be able to insert an empty row."
     (doseq [row-or-rows [{}
                          [{}]]]
@@ -217,7 +217,7 @@
           (is (= 1
                  (insert/insert! ::test/birds row-or-rows))))))))
 
-(deftest empty-rows-no-op-test
+(deftest ^:synchronized empty-rows-no-op-test
   (testing "insert! empty rows should no-op"
     (doseq [insert!     [#'insert/insert!
                          #'insert/insert-returning-pks!
@@ -241,7 +241,7 @@
   {:rows [{:name "Grant & Green", :category "bar"}
           {:name "North Beach Cantina", :category "restaurant"}]})
 
-(deftest named-query-test
+(deftest ^:synchronized named-query-test
   (doseq [insert! [#'insert/insert!
                    #'insert/insert-returning-pks!
                    #'insert/insert-returning-instances!]]
@@ -272,7 +272,7 @@
   [_model]
   {::test/venues :venue})
 
-(deftest namespaced-test
+(deftest ^:synchronized namespaced-test
   (doseq [insert! [#'insert/insert!
                    #'insert/insert-returning-pks!
                    #'insert/insert-returning-instances!]]
@@ -294,7 +294,7 @@
                  :category "bar"})
                (select/select-one [::test/venues :id :name :category] :id 4)))))))
 
-(deftest positional-connectable-test
+(deftest ^:synchronized positional-connectable-test
   (testing "Support :conn positional connectable arg"
     (test/with-discarded-table-changes :venues
       (is (thrown-with-msg?
@@ -317,7 +317,7 @@
              #"Don't know how to get a connection from .* :fake-db"
              (insert/insert! :conn :fake-db ::test/venues {:name "Grant & Green", :category "bar"})))))))
 
-(deftest insert-returning-pks-should-not-realize-all-columns-test
+(deftest ^:synchronized insert-returning-pks-should-not-realize-all-columns-test
   (testing "insert-returning-pks! should only fetch the PK column(s) when fetching results"
     (test/with-discarded-table-changes :venues
       (test.track-realized/with-realized-columns [realized-columns]

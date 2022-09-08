@@ -112,10 +112,10 @@
   (without [this k]
     (.without m (key-xform k))
     this)
-  (valAt [_this k]
-    (.valAt m k))
+  (valAt [this k]
+    (.valAt this k nil))
   (valAt [_this k not-found]
-    (.valAt m k not-found))
+    (.valAt m (key-xform k) not-found))
   (count [_this]
     (count m))
 

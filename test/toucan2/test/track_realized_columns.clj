@@ -11,9 +11,15 @@
 
 (def ^:dynamic ^:private *realized-columns* nil)
 
-(derive ::venues ::test/venues)
+(doto ::venues
+  (derive ::test/venues)
+  (derive ::track-realized))
 
-(m/defmethod jdbc.read/read-column-thunk :before [#_conn :default #_model ::venues :default]
+(doto ::people
+  (derive ::test/people)
+  (derive ::track-realized))
+
+(m/defmethod jdbc.read/read-column-thunk :before [#_conn :default #_model ::track-realized #_col-type :default]
   [_conn _model _rset ^java.sql.ResultSetMetaData rsmeta ^Integer i]
   (when *realized-columns*
     (let [table-name (magic-map/->kebab-case-string (.getTableName rsmeta i))

@@ -160,7 +160,12 @@
     (is (= 200
            (.valAt m :b ::not-found)))
     (is (= ::not-found
-           (.valAt m :c ::not-found)))))
+           (.valAt m :c ::not-found))))
+  (testing "namespaced keys"
+    (let [^clojure.lang.ITransientMap m (transient (instance/instance))]
+      (assoc! m ::key [1])
+      (is (= [1]
+             (.valAt m ::key))))))
 
 (deftest ^:parallel transient-count-test
   (let [^clojure.lang.ITransientMap m (transient (instance/instance :wow {:a 100}))]
