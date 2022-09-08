@@ -64,18 +64,16 @@
                        row))))]
     ((map row-fn) rf)))
 
-(m/defmethod pipeline/transduce-execute [#_query-type     ::query-type
-                                                #_model          ::model
-                                                #_compiled-query :default]
+(m/defmethod pipeline/transduce-execute [#_query-type ::query-type #_model ::model #_compiled-query :default]
   [rf query-type model sql-args]
   (let [upgraded-type (pipeline/similar-query-type-returning query-type :toucan.result-type/instances)
         _             (assert upgraded-type (format "Don't know how to upgrade a %s query to one returning instances"
                                                     query-type))
         rf*           (result-type-rf query-type model rf)
-        m             (if (= query-type upgraded-type)
+        methodd       (if (= query-type upgraded-type)
                         next-method
                         pipeline/transduce-execute)]
-    (m rf* upgraded-type model sql-args)))
+    (methodd rf* upgraded-type model sql-args)))
 
 (defn ^:no-doc ^{:style/indent [:form]} define-after-impl
   [next-method query-type model row-fn]

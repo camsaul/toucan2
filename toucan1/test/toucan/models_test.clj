@@ -23,7 +23,7 @@
 
 (use-fixtures :each test-setup/do-with-quoted-snake-disabled)
 
-(deftest resolve-model-test
+(deftest ^:parallel resolve-model-test
   (are [x] (= :toucan.test-models.category/Category
               (t1.models/resolve-model x))
     Category
@@ -39,19 +39,19 @@
        #"Invalid model: :some-other-keyword"
        (t1.models/resolve-model :some-other-keyword))))
 
-(deftest properties-test
+(deftest ^:parallel properties-test
   (is (= {:toucan.test-models.venue/timestamped? true}
          (t1.models/properties Venue)))
   (is (= nil
          (t1.models/properties Category))))
 
-(deftest primary-key-test
+(deftest ^:parallel primary-key-test
   (is (= :id
          (t1.models/primary-key Venue)))
   (is (= :number
          (t1.models/primary-key PhoneNumber))))
 
-(deftest types-test
+(deftest ^:synchronized types-test
   (testing ":bar should come back as a Keyword even though it's a VARCHAR in the DB, just like :name"
     (doseq [model [Venue
                    'Venue]
@@ -76,7 +76,7 @@
       (is (= {:category :bar/dive-bar, :name "Tempest", :id 1}
              (t1.db/select-one Venue :id 1))))))
 
-(deftest types-fn-test
+(deftest ^:parallel types-fn-test
   (testing `t1.models/types
     (is (= {:name :lowercase-string}
            (t1.models/types Category)))
@@ -109,7 +109,7 @@
                (f 100)
                (f 100.0)))))))
 
-(deftest custom-types-test
+(deftest ^:synchronized custom-types-test
   (testing (str "Test custom types. Category.name is a custom type, :lowercase-string, that automatically "
                 "lowercases strings as they come in")
     (test/with-discarded-table-changes Category
@@ -121,7 +121,7 @@
       (is (= {:id 1, :name "bar-or-club", :parent-category-id nil}
              (t1.db/select-one Category 1))))))
 
-(deftest do-post-select-test
+(deftest ^:parallel do-post-select-test
   (testing `t1.models/post-select
     ;; needs to pick up transforms AND `after-select`
     (after-select/define-after-select ::PostSelect
@@ -139,7 +139,7 @@
 (defn- timestamp-after-jan-first? [^LocalDateTime t]
   (.isAfter t (LocalDateTime/parse "2017-01-01T00:00:00")))
 
-(deftest insert!-properties-test
+(deftest ^:synchronized insert!-properties-test
   (testing (str "calling insert! for Venue should trigger the :timestamped? :insert function which should set an "
                 "appropriate :created-at and :updated-at value")
     (test/with-discarded-table-changes Venue
@@ -149,7 +149,7 @@
                  (update :created-at timestamp-after-jan-first?)
                  (update :updated-at timestamp-after-jan-first?)))))))
 
-(deftest update!-properties-test
+(deftest ^:synchronized update!-properties-test
   (testing (str "calling update! for Venue should trigger the :timestamped? :insert function which in this case "
                 "updates :updated-at (but not :created-at)")
     (test/with-discarded-table-changes Venue
@@ -163,7 +163,7 @@
 ;; for Category, we set up `pre-insert` and `pre-update` to assert that a Category with `parent-category-id` exists
 ;; before setting it.
 
-(deftest pre-insert-test
+(deftest ^:synchronized pre-insert-test
   (is (thrown-with-msg?
        Exception
        #"A category with ID 100 does not exist"
@@ -190,7 +190,7 @@
 ;;       (is (= {:name "BEVMO", :before-insert? true}
 ;;              (t1.models/pre-insert (instance/instance ::BeforeInsert {:name "BevMo"})))))))
 
-(deftest pre-update-test
+(deftest ^:synchronized pre-update-test
   (test/with-discarded-table-changes Category
     (is (thrown-with-msg?
          Exception
@@ -217,7 +217,7 @@
 ;; Categories adds the IDs of recently created Categories to a "moderation queue" as part of its `post-insert`
 ;; implementation; check that creating a new Category results in the ID of the new Category being at the front of the
 ;; queue
-(deftest post-insert-test
+(deftest ^:synchronized post-insert-test
   (test/with-discarded-table-changes Category
     (binding [category/*categories-awaiting-moderation* (atom (clojure.lang.PersistentQueue/EMPTY))]
       (is (= (instance/instance Category {:id 5, :name "toucannery", :parent-category-id nil})
@@ -252,7 +252,7 @@
 ;; Categories adds the IDs of recently updated Categories to a "update queue" as part of its `post-update`
 ;; implementation; check that updating a Category results in the ID of the updated Category being at the front of the
 ;; queue
-(deftest post-update-test
+(deftest ^:synchronized post-update-test
   (test/with-discarded-table-changes Category
     (binding [category/*categories-recently-updated* (atom (clojure.lang.PersistentQueue/EMPTY))]
       (is (= true
@@ -281,7 +281,7 @@
 ;;              (t1.models/post-update (instance/instance ::PostUpdate {:name "BevMo"})))))))
 
 ;; For Category, deleting a parent category should also delete any child categories.
-(deftest pre-delete-test
+(deftest ^:synchronized pre-delete-test
   (test/with-discarded-table-changes Category
     (is (= true
            (t1.db/delete! Category :id 1)))
@@ -316,16 +316,16 @@
 ;;     (is (= [(instance/instance ::BeforeDelete {:name "bevmo", :before-delete? true})]
 ;;            @pre-deleted))))
 
-(deftest default-fields-test
+(deftest ^:parallel default-fields-test
   (testing "check that we can still override default-fields"
     (is (= {:created-at (LocalDateTime/parse "2017-01-01T00:00:00")}
            (t1.db/select-one [Venue :created-at] :id 1)))))
 
-(deftest default-fields-fn-test
+(deftest ^:parallel default-fields-fn-test
   (is (= [:id :name :category]
          (t1.models/default-fields Venue))))
 
-(deftest model-in-honeysql-test
+(deftest ^:parallel model-in-honeysql-test
   (testing "Test using model in HoneySQL form"
     (is (= [{:id 1, :name "Tempest"}
             {:id 2, :name "Ho's Tavern"}
@@ -335,16 +335,16 @@
                            :from     [(keyword (model/table-name Venue))]
                            :order-by [:id]}))))))
 
-(deftest empty-test
+(deftest ^:parallel empty-test
   (testing "Test (empty)"
     (is (= {}
            (empty (t1.db/select-one Venue :name "BevMo"))))))
 
 (t1.models/define-hydration-keys ::FakeModel [::database ::db])
 
-(deftest hydration-keys-test
-  (is (= [::database ::db]
-         (t1.models/hydration-keys ::FakeModel)))
+(deftest ^:parallel hydration-keys-test
+  (is (= #{::database ::db}
+         (set (t1.models/hydration-keys ::FakeModel))))
   (are [k] (= ::FakeModel
               (hydrate/model-for-automagic-hydration :default k))
     ::database

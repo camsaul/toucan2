@@ -1,16 +1,12 @@
 (ns toucan2.realize
   (:require
-   [next.jdbc.result-set :as next.jdbc.rs]
    [potemkin :as p]
    [toucan2.log :as log]
-   [toucan2.util :as u])
-  (:import
-   (next.jdbc.result_set DatafiableRow)))
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
-(comment next.jdbc.rs/keep-me)
-
+;;;; TODO -- this should probably be moved to [[toucan2.protocols]], and be renamed `IRealize` for consistency.
 (p/defprotocol+ Realize
   (realize [x]
     "Fully realize either a reducible query, or a result row from that query."))
@@ -28,6 +24,7 @@
 (extend-protocol Realize
   Object
   (realize [this]
+    (log/tracef :execute "Already realized: %s" (class this))
     this)
 
   ;; Eduction is assumed to be for query results.
@@ -39,11 +36,6 @@
   clojure.lang.IReduceInit
   (realize [this]
     (realize-IReduceInit this))
-
-  ;; TODO -- actually pass the real Connection somehow.
-  DatafiableRow
-  (realize [this]
-    (next.jdbc.rs/datafiable-row this nil nil))
 
   nil
   (realize [_]

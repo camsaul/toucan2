@@ -9,6 +9,13 @@
 
 (set! *warn-on-reflection* true)
 
+;;; These declarations are to stop Kondo from complaining. See
+;;; https://github.com/clj-kondo/clj-kondo/blob/master/doc/linters.md#unresolved-symbol
+(declare ->kebab-case)
+(declare ->kebab-case-keyword)
+(declare ->kebab-case-string)
+(declare ->kebab-case-symbol)
+
 (csk.macros/defconversion "kebab-case" u/lower-case-en u/lower-case-en "-")
 
 (defonce print-magic-maps (atom true))
@@ -20,7 +27,7 @@
     @print-magic-maps))
 
 (defn kebab-case-xform
-  "The default magic map transform function."
+  "The default magic map transform function. Converts things to `kebab-case`, preserving namespaces."
   [k]
   (when k
     (if (and (clojure.core/instance? clojure.lang.Named k) (namespace k))
@@ -105,6 +112,12 @@
   (without [this k]
     (.without m (key-xform k))
     this)
+  (valAt [this k]
+    (.valAt this k nil))
+  (valAt [_this k not-found]
+    (.valAt m (key-xform k) not-found))
+  (count [_this]
+    (count m))
 
   pretty/PrettyPrintable
   (pretty [_this]
@@ -122,3 +135,6 @@
    (->MagicMap (normalize-map key-xform m)
                key-xform
                metta)))
+
+(defn magic-map? [m]
+  (instance? toucan2.magic_map.MagicMap m))

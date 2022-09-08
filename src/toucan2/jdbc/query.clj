@@ -18,7 +18,7 @@
 (defn- options []
   (merge @global-options *options*))
 
-(defn reduce-jdbc-query [^java.sql.Connection conn model sql-args rf init extra-options]
+(defn reduce-jdbc-query [rf init ^java.sql.Connection conn model sql-args extra-options]
   {:pre [(instance? java.sql.Connection conn) (sequential? sql-args) (string? (first sql-args)) (ifn? rf)]}
   (let [opts (merge (options) extra-options)]
     (log/debugf :execute "Preparing JDBC query with next.jdbc options %s" opts)
@@ -31,11 +31,12 @@
             (do
               (log/debugf :execute "Query was executed with %s; returning generated keys" :return-keys)
               (with-open [rset (.getGeneratedKeys stmt)]
-                (reduce rf init (jdbc.rs/reducible-result-set conn model rset))))
+                (jdbc.rs/reduce-result-set rf init conn model rset opts)))
 
             result-set?
             (with-open [rset (.getResultSet stmt)]
-              (reduce rf init (jdbc.rs/reducible-result-set conn model rset)))
+              (log/debugf :execute "Query returned normal result set")
+              (jdbc.rs/reduce-result-set rf init conn model rset opts))
 
             :else
             (do

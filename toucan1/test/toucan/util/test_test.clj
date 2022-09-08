@@ -3,7 +3,7 @@
    [clojure.test :refer :all]
    [toucan.util.test :as t1.u.test]))
 
-(deftest valid-syntax-test
+(deftest ^:parallel valid-syntax-test
   (are [form] (seqable? (macroexpand-1 form))
     `(t1.u.test/with-temp model [~'_] :ok)
     `(t1.u.test/with-temp model [~'instance {}] :ok)

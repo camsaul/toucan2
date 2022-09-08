@@ -45,7 +45,7 @@
                           :kv-args {:name "Tempest"}}
                          {:id 1}))))
 
-(deftest pk-and-map-conditions-test
+(deftest ^:synchronized pk-and-map-conditions-test
   (test/with-discarded-table-changes :venues
     (is (= 1
            (update/update! ::test/venues 1 {:name "Hi-Dive"})))
@@ -56,7 +56,7 @@
                                              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
            (select/select-one ::test/venues 1)))))
 
-(deftest key-value-conditions-test
+(deftest ^:synchronized key-value-conditions-test
   (test/with-discarded-table-changes :venues
     (is (= 1
            (update/update! ::test/venues :name "Tempest" {:name "Hi-Dive"})))))
@@ -67,12 +67,12 @@
   [_model]
   [:id :name])
 
-(deftest composite-pk-test
+(deftest ^:synchronized composite-pk-test
   (test/with-discarded-table-changes :venues
     (is (= 1
            (update/update! ::venues.composite-pk [1 "Tempest"] {:name "Hi-Dive"})))))
 
-(deftest update!-no-changes-no-op-test
+(deftest ^:synchronized update!-no-changes-no-op-test
   (testing "If there are no changes, update! should no-op and return zero"
     (test/with-discarded-table-changes :venues
       (is (= 0
@@ -82,7 +82,7 @@
 (tools.named-query/define-named-query ::named-conditions
   {:id 1})
 
-(deftest named-conditions-test
+(deftest ^:synchronized named-conditions-test
   (test/with-discarded-table-changes :venues
     (is (= "Tempest"
            (select/select-one-fn :name ::test/venues 1)))
@@ -91,7 +91,7 @@
     (is (= "Grant & Green"
            (select/select-one-fn :name ::test/venues 1)))))
 
-(deftest update-returning-pks-test
+(deftest ^:synchronized update-returning-pks-test
   (test/with-discarded-table-changes :venues
     (is (= [1 2]
            ;; the order these come back in is indeterminate but as long as we get back a sequence of [1 2] we're fine
@@ -100,7 +100,7 @@
             (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
            (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]})))))
 
-(deftest update-nil-test
+(deftest ^:synchronized update-nil-test
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
     (let [parsed-args (update/parse-update-args :toucan.query-type/update.* [::test/venues nil {:name "Taco Bell"}])]
       (is (= {:modelable ::test/venues
@@ -130,7 +130,7 @@
   [_model]
   {::test/venues :venue})
 
-(deftest namespaced-test
+(deftest ^:synchronized namespaced-test
   (doseq [update! [#'update/update!
                    #'update/update-returning-pks!]]
     (test/with-discarded-table-changes :venues
@@ -146,7 +146,7 @@
                  :category "bar"})
                (select/select-one [::test/venues :id :name :category] :id 3)))))))
 
-(deftest positional-connectable-test
+(deftest ^:synchronized positional-connectable-test
   (testing "Support :conn positional connectable arg"
     (test/with-discarded-table-changes :venues
       (is (thrown-with-msg?

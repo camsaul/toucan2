@@ -17,7 +17,7 @@
                           (query/parse-args ::delete args))
     [:model 1] {:modelable :model, :queryable 1}))
 
-(deftest row-by-pk-test
+(deftest ^:synchronized row-by-pk-test
   (test/with-discarded-table-changes :venues
     (is (= 3
            (select/count ::test/venues)))
@@ -36,39 +36,39 @@
   [_model]
   [:id :name])
 
-(deftest row-by-composite-pk-test
+(deftest ^:synchronized row-by-composite-pk-test
   (test/with-discarded-table-changes :venues
     (is (= 1
            (delete/delete! ::venues.composite-pk :toucan/pk [1 "Tempest"])))
     (is (= []
            (select/select ::test/venues :id 1)))))
 
-(deftest row-by-kv-conditions-test
+(deftest ^:synchronized row-by-kv-conditions-test
   (test/with-discarded-table-changes :venues
     (is (= 1
            (delete/delete! ::test/venues :name "Tempest")))
     (is (= []
            (select/select ::test/venues :id 1)))))
 
-(deftest multiple-rows-by-kv-conditions-test
+(deftest ^:synchronized multiple-rows-by-kv-conditions-test
   (test/with-discarded-table-changes :venues
     (is (= 2
            (delete/delete! ::test/venues :category "bar")))
     (is (= #{"store"}
            (select/select-fn-set :category ::test/venues)))))
 
-(deftest toucan-style-kv-conditions-test
+(deftest ^:synchronized toucan-style-kv-conditions-test
   (testing "Toucan-style fn-args vector"
     (test/with-discarded-table-changes :venues
       (is (= 2
              (delete/delete! ::test/venues :id [:> 1]))))))
 
-(deftest honeysql-query-test
+(deftest ^:synchronized honeysql-query-test
   (test/with-discarded-table-changes :venues
     (is (= 2
            (delete/delete! ::test/venues {:where [:> :id 1]})))))
 
-(deftest delete-nil-test
+(deftest ^:synchronized delete-nil-test
   (testing "(delete! model nil) should basically be the same as (delete! model :toucan/pk nil)"
     (let [parsed-args (query/parse-args :toucan.query-type/delete.update-count [::test/venues nil])]
       (is (= {:modelable ::test/venues, :queryable nil}
@@ -94,14 +94,14 @@
   [_model]
   {::test/venues :venue})
 
-(deftest namespaced-test
+(deftest ^:synchronized namespaced-test
   (test/with-discarded-table-changes :venues
     (is (= 1
            (delete/delete! ::venues.namespaced :venue/id 3)))
     (is (= nil
            (select/select-one [::test/venues :id :name :category] :id 3)))))
 
-(deftest positional-connectable-test
+(deftest ^:synchronized positional-connectable-test
   (testing "Support :conn positional connectable arg"
     (test/with-discarded-table-changes :venues
       (is (thrown-with-msg?

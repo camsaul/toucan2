@@ -53,7 +53,7 @@
                 (is (instance? java.sql.Connection conn/*current-connectable*))
                 (test-connection conn/*current-connectable*)))))))))
 
-(deftest transaction-test
+(deftest ^:synchronized transaction-test
   (testing "nil connectable = current connection"
     (testing "nil second arg"
       (binding [conn/*current-connectable* ::test/db]

@@ -264,32 +264,31 @@
         (do
           (log/tracef :hydrate "Don't need to hydrate %s: already has %s" row dest-key)
           row)
-        (let [fk-vals (get-fk-values row)]
-          (if (every? some? fk-vals)
-            (do
-              (log/tracef :hydrate "Attempting to hydrate %s with values of %s %s" row fk-keys fk-vals)
-              (assoc row ::fk fk-vals))
-            (do
-              (log/tracef :hydrate "Skipping %s: values of %s are %s" row fk-keys fk-vals)
-              row)))))))
+        (do
+          (log/tracef :hydrate "Getting values of %s for row" fk-keys)
+          (let [fk-vals (get-fk-values row)]
+            (if (every? some? fk-vals)
+              (do
+                (log/tracef :hydrate "Attempting to hydrate %s with values of %s %s" row fk-keys fk-vals)
+                (assoc row ::fk fk-vals))
+              (do
+                (log/tracef :hydrate "Skipping %s: values of %s are %s" row fk-keys fk-vals)
+                row))))))))
 
 (defn- automagic-batched-hydration-fetch-pk->instance [hydrating-model rows]
   (let [pk-keys (model/primary-keys hydrating-model)]
     (assert (pos? (count pk-keys)))
     (if-let [fk-values-set (not-empty (set (filter some? (map ::fk rows))))]
-      (let [query {:where (let [clauses (map-indexed
-                                         (fn [i pk-key]
-                                           [:in pk-key (set (map #(nth % i) fk-values-set))])
-                                         pk-keys)]
-                            (if (> (count clauses) 1)
-                              (cons :and clauses)
-                              (first clauses)))}]
-        (log/debugf :hydrate "Fetching %s with PKs %s %s" hydrating-model pk-keys query)
-        (select/select-pk->fn realize/realize hydrating-model query))
+      (let [fk-values-set (if (= (count pk-keys) 1)
+                            (into #{} (map first) fk-values-set)
+                            fk-values-set)]
+        (log/debugf :hydrate "Fetching %s with PK columns %s values %s" hydrating-model pk-keys fk-values-set)
+        ;; TODO -- not sure if we need to be realizing stuff here?
+        (select/select-pk->fn realize/realize hydrating-model :toucan/pk [:in fk-values-set]))
       (log/debugf :hydrate "Not hydrating %s because no rows have non-nil FK values" hydrating-model))))
 
 (defn- do-automagic-batched-hydration [dest-key rows pk->fetched-instance]
-  (log/debugf :hydrate "Attempting to hydrate %s/%s rows" (count (filter ::fk rows)) (count rows))
+  (log/debugf :hydrate "Attempting to hydrate %s rows out of %s" (count (filter ::fk rows)) (count rows))
   (for [row rows]
     (if-not (::fk row)
       row

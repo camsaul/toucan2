@@ -41,12 +41,8 @@
         (reset! map.honeysql/global-options original-options)))))
 
 (defn do-with-quoted-snake-disabled [thunk]
-  (let [original-options @map.honeysql/global-options]
-    (try
-      (swap! map.honeysql/global-options assoc :quoted-snake false)
-      (thunk)
-      (finally
-        (reset! map.honeysql/global-options original-options)))))
+  (binding [t1.db/*automatically-convert-dashes-and-underscores* false]
+    (thunk)))
 
 (defn- reset-db! [db-type]
   (doseq [model [Address

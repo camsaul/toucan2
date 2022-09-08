@@ -22,7 +22,7 @@
   (cond-> venue
     (:name venue) (update :name str/upper-case)))
 
-(deftest before-insert-test
+(deftest ^:synchronized before-insert-test
   (test/with-discarded-table-changes :venues
     (is (= 1
            (insert/insert! ::venues.before-insert {:name "Tin Vietnamese", :category "restaurant"})))
@@ -35,7 +35,7 @@
   [venue]
   (update venue :category str/upper-case))
 
-(deftest compose-before-insert-test
+(deftest ^:synchronized compose-before-insert-test
   (testing "If a model has multiple before-inserts, they should compose"
     (test/with-discarded-table-changes :venues
       (is (= 1
@@ -56,7 +56,7 @@
           (format "Invalid category: %s" (pr-str category)))
   (assoc-in venue [:category :validated?] true))
 
-(deftest happens-before-transforms-test
+(deftest ^:synchronized happens-before-transforms-test
   (testing "before-insert has to happen *before* any transforms.\n"
     (doseq [insert! [#'insert/insert!
                      #'insert/insert-returning-pks!
@@ -80,9 +80,9 @@
   {:rows [{:name "Grant & Green", :category "bar"}
           {:name "North Beach Cantina", :category "restaurant"}]})
 
-(deftest named-query-test
-  (doseq [insert! [#_#'insert/insert!
-                   #_#'insert/insert-returning-pks!
+(deftest ^:synchronized named-query-test
+  (doseq [insert! [#'insert/insert!
+                   #'insert/insert-returning-pks!
                    #'insert/insert-returning-instances!]]
     (test/with-discarded-table-changes :venues
       (testing insert!

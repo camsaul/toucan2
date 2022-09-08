@@ -6,6 +6,7 @@
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
+   [toucan2.realize :as realize]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -35,7 +36,9 @@
         ;; select and transduce the matching rows and run their [[before-delete]] methods
         (pipeline/transduce-with-model
          ((map (fn [row]
-                 (before-delete model row)))
+                 ;; this is another case where we don't NEED to fully realize the rows but it's a big hassle for people
+                 ;; to use this if we don't. Let's be nice and realize things for people.
+                 (before-delete model (realize/realize row))))
           (constantly nil))
          :toucan.query-type/select.instances
          model

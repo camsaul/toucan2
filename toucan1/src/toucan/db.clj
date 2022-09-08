@@ -74,7 +74,7 @@
    map.honeysql/*options*
    (when-let [style (quoting-style)]
      {:dialect style})
-   (when-let [convert? (automatically-convert-dashes-and-underscores?)]
+   (let [convert? (automatically-convert-dashes-and-underscores?)]
      (when (some? convert?)
        {:quoted-snake convert?}))))
 
@@ -146,7 +146,7 @@
     (log/debugf :results "reduce Toucan 1 reducible query %s" this)
     (binding [jdbc.query/*options*    (merge jdbc.query/*options* jdbc-options)
               map.honeysql/*options* (honeysql-options)]
-      (reduce rf init (execute/reducible-query nil honeysql-form))))
+      (reduce ((map realize/realize) rf) init (execute/reducible-query nil honeysql-form))))
 
   pretty/PrettyPrintable
   (pretty [_this]
@@ -191,14 +191,18 @@
 (defn simple-select-reducible
   "DEPRECATED: Use [[toucan2.select/reducible-select]] instead."
   [modelable honeysql-form]
-  (select/reducible-select modelable honeysql-form))
+  (eduction
+   (map realize/realize)
+   (select/reducible-select modelable honeysql-form)))
 
 (defn select-reducible
   "DEPRECATED: Use [[toucan2.select/reducible-select]] instead."
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
   [& args]
-  (apply select/reducible-select args))
+  (eduction
+   (map realize/realize)
+   (apply select/reducible-select args)))
 
 (defn simple-select-one
   "DEPRECATED: use [[toucan2.select/select-one]] instead."

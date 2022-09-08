@@ -18,7 +18,7 @@
 (after-select/define-after-select ::people.id-and-name [person]
   (assoc person ::after-select? true))
 
-(deftest before-select-test
+(deftest ^:parallel before-select-test
   (is (= (instance/instance ::people.id-and-name {:id             1
                                                   :name           "Cam"
                                                   ::after-select? true})
@@ -30,7 +30,7 @@
   [args]
   (assoc-in args [:kv-args :name] "Cam"))
 
-(deftest add-kv-args-test
+(deftest ^:parallel add-kv-args-test
   (is (= [(instance/instance ::people.named-cam {:id 1, :name "Cam"})]
          (select/select [::people.named-cam :id :name]))))
 
@@ -38,6 +38,6 @@
   (derive ::people.named-cam)
   (derive ::people.id-and-name))
 
-(deftest compose-test
+(deftest ^:parallel compose-test
   (is (= [(instance/instance ::people.named-cam.id-and-name {:id 1, :name "Cam", ::after-select? true})]
          (select/select ::people.named-cam.id-and-name))))

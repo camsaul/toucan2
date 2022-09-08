@@ -8,64 +8,69 @@
 
   :unresolved-symbol
   {:exclude
-   [->kebab-case
+   [toucan2.magic-map/->kebab-case
+    toucan2.magic-map/->kebab-case-keyword
+    toucan2.magic-map/->kebab-case-string
+    toucan2.magic-map/->kebab-case-symbol
     (toucan2.tools.transformed-test/test-both-normal-and-magic-keys)]}
 
   :consistent-alias
-  {:aliases {clojure.data                  data
-             clojure.edn                   edn
-             clojure.java.io               io
-             clojure.pprint                pprint
-             clojure.spec.alpha            s
-             clojure.string                str
-             clojure.tools.logging         tools.log
-             clojure.walk                  walk
-             environ.core                  env
-             honey.sql                     hsql
-             honey.sql.helpers             hsql.helpers
-             methodical.core               m
-             next.jdbc                     next.jdbc
-             next.jdbc.result-set          next.jdbc.rs
-             potemkin                      p
-             toucan.db                     t1.db
-             toucan.models                 t1.models
-             toucan.util.test              t1.u.test
-             toucan2.connection            conn
-             toucan2.delete                delete
-             toucan2.execute               execute
-             toucan2.insert                insert
-             toucan2.instance              instance
-             toucan2.jdbc.query            jdbc.query
-             toucan2.jdbc.result-set       jdbc.rs
-             toucan2.jdbc.row              jdbc.row
-             toucan2.log                   log
-             toucan2.magic-map             magic-map
-             toucan2.map-backend           map
-             toucan2.map-backend.honeysql2 map.honeysql
-             toucan2.model                 model
-             toucan2.operation             op
-             toucan2.protocols             protocols
-             toucan2.query                 query
-             toucan2.realize               realize
-             toucan2.save                  save
-             toucan2.select                select
-             toucan2.tools.after           tools.after
-             toucan2.tools.after-insert    after-insert
-             toucan2.tools.after-select    after-select
-             toucan2.tools.after-update    after-update
-             toucan2.tools.before-delete   before-delete
-             toucan2.tools.before-insert   before-insert
-             toucan2.tools.before-select   before-select
-             toucan2.tools.before-update   before-update
-             toucan2.tools.compile         tools.compile
-             toucan2.tools.default-fields  default-fields
-             toucan2.tools.disallow        disallow
-             toucan2.tools.hydrate         hydrate
-             toucan2.tools.identity-query  identity-query
-             toucan2.tools.transformed     transformed
-             toucan2.tools.with-temp       with-temp
-             toucan2.update                update
-             toucan2.util                  u}}
+  {:aliases {clojure.data                        data
+             clojure.edn                         edn
+             clojure.java.io                     io
+             clojure.pprint                      pprint
+             clojure.spec.alpha                  s
+             clojure.string                      str
+             clojure.tools.logging               tools.log
+             clojure.walk                        walk
+             environ.core                        env
+             honey.sql                           hsql
+             honey.sql.helpers                   hsql.helpers
+             methodical.core                     m
+             next.jdbc                           next.jdbc
+             next.jdbc.result-set                next.jdbc.rs
+             potemkin                            p
+             toucan.db                           t1.db
+             toucan.models                       t1.models
+             toucan.util.test                    t1.u.test
+             toucan2.connection                  conn
+             toucan2.delete                      delete
+             toucan2.execute                     execute
+             toucan2.insert                      insert
+             toucan2.instance                    instance
+             toucan2.jdbc.query                  jdbc.query
+             toucan2.jdbc.read                   jdbc.read
+             toucan2.jdbc.result-set             jdbc.rs
+             toucan2.jdbc.row                    jdbc.row
+             toucan2.log                         log
+             toucan2.magic-map                   magic-map
+             toucan2.map-backend                 map
+             toucan2.map-backend.honeysql2       map.honeysql
+             toucan2.model                       model
+             toucan2.operation                   op
+             toucan2.protocols                   protocols
+             toucan2.query                       query
+             toucan2.realize                     realize
+             toucan2.save                        save
+             toucan2.select                      select
+             toucan2.test.track-realized-columns test.track-realized
+             toucan2.tools.after                 tools.after
+             toucan2.tools.after-insert          after-insert
+             toucan2.tools.after-select          after-select
+             toucan2.tools.after-update          after-update
+             toucan2.tools.before-delete         before-delete
+             toucan2.tools.before-insert         before-insert
+             toucan2.tools.before-select         before-select
+             toucan2.tools.before-update         before-update
+             toucan2.tools.compile               tools.compile
+             toucan2.tools.default-fields        default-fields
+             toucan2.tools.disallow              disallow
+             toucan2.tools.hydrate               hydrate
+             toucan2.tools.identity-query        identity-query
+             toucan2.tools.transformed           transformed
+             toucan2.tools.with-temp             with-temp
+             toucan2.update                      update
+             toucan2.util                        u}}
 
   :refer
   {:level   :warning
@@ -94,7 +99,8 @@
   :warn-on-reflection                    {:level :warning}
   ;; :docstring-no-summary                 {:level :warning}
   ;; :missing-docstring                     {:level :warning}
-  }
+
+  :toucan2/validate-deftest {:level :warning}}
 
  :lint-as
  {potemkin/def-map-type clojure.core/defrecord
@@ -104,10 +110,10 @@
 
  :hooks
  {:analyze-call
-  {}
+  {clojure.test/deftest hooks.clojure.test/deftest}
 
   :macroexpand
-  {toucan2.test/do-db-types macros.toucan2.test/do-db-types}}
+  {toucan2.test.track-realized-columns/with-realized-columns macros.toucan2.test.track-realized-columns/with-realized-columns}}
 
  :config-in-comment
  {:linters {:unresolved-symbol {:level :off}}}

@@ -13,7 +13,7 @@
 
 (set! *warn-on-reflection* true)
 
-(deftest save-test
+(deftest ^:synchronized save-test
   (test/with-discarded-table-changes :venues
     (let [venue (select/select-one ::test/venues 1)]
       (is (= nil
@@ -34,7 +34,7 @@
                                                :created-at (LocalDateTime/parse "2017-01-01T00:00")})
              (dissoc (select/select-one ::test/venues 1) :updated-at))))))
 
-(deftest magic-normalized-keys-test
+(deftest ^:synchronized magic-normalized-keys-test
   (testing "Should work for 'magic' normalized keys."
     (test/with-discarded-table-changes :venues
       (is (= {:id         1
@@ -52,7 +52,7 @@
                                                :updated-at (LocalDateTime/parse "2021-05-13T04:19:00")})
              (select/select-one ::test/venues 1))))))
 
-(deftest no-op-test
+(deftest ^:synchronized no-op-test
   (testing "If there are no changes, return object as-is"
     (let [venue (select/select-one ::test/venues 1)]
       (execute/with-call-count [call-count]
@@ -60,7 +60,7 @@
                         (save/save! venue)))
         (is (zero? (call-count)))))))
 
-(deftest no-matching-rows-test
+(deftest ^:synchronized no-matching-rows-test
   (testing "If no rows match the PK, save! should throw an Exception."
     (let [venue (assoc (instance/instance ::test/venues {:id 1000})
                        :name "Wow")]
@@ -88,7 +88,7 @@
                   :created-at (LocalDateTime/parse "2017-01-01T00:00")}
                  (dissoc (save/save! (assoc venue :id "1")) :updated-at)))))))
 
-(deftest positional-connectable-test
+(deftest ^:synchronized positional-connectable-test
   (testing "Support :conn positional connectable arg"
     (let [venue (instance/instance :venues (select/select-one ::test/venues 1))]
       (test/with-discarded-table-changes :venues

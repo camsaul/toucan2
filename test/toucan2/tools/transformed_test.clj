@@ -5,12 +5,14 @@
    [toucan2.delete :as delete]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
+   [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.save :as save]
    [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.transformed :as transformed]
@@ -20,8 +22,9 @@
 
 (set! *warn-on-reflection* true)
 
-(derive ::venues.category-keyword ::test/venues)
-(derive ::venues.category-keyword ::transformed/transformed.model)
+(doto ::venues.category-keyword
+  (derive ::test/venues)
+  (derive ::transformed/transformed.model))
 
 (m/defmethod transformed/transforms ::venues.category-keyword
   [_model]
@@ -131,52 +134,7 @@
           (is (identical? (protocols/current m2)
                           (protocols/original m2))))))))
 
-#_(derive ::venues.id-is-strin.string-id-and-category-keyword ::venues.string-id-and-category-keyword)
-
-#_(def ^:dynamic ^:private *thunk-resolve-counts* nil)
-#_(def ^:dynamic ^:private *col-read-counts* nil)
-
-#_(m/defmethod rs/read-column-thunk [:default ::venues.id-is-strin.string-id-and-category-keyword :default]
-    [connectable tableable rs ^java.sql.ResultSetMetaData rsmeta ^Long i options]
-    (when *thunk-resolve-counts*
-      (swap! *thunk-resolve-counts* update (.getColumnLabel rsmeta i) (fnil inc 0)))
-    (let [thunk (next-method connectable tableable rs rsmeta i options)]
-      (fn []
-        (when *col-read-counts*
-          (swap! *col-read-counts* update (.getColumnLabel rsmeta i) (fnil inc 0)))
-        (thunk))))
-
-#_(deftest select-out-only-transform-realized-columns-test
-  (testing "only columns that get realized should get transformed; don't realize others as a side-effect"
-    (testing "Realize both category and id"
-      (binding [*col-read-counts*      (atom nil)
-                *thunk-resolve-counts* (atom nil)]
-        (is (= [(instance/instance
-                 ::venues.id-is-strin.string-id-and-category-keyword
-                 {:id "1", :category :bar})
-                (instance/instance
-                 ::venues.id-is-strin.string-id-and-category-keyword
-                 {:id "2", :category :bar})]
-               (select/select ::venues.id-is-strin.string-id-and-category-keyword
-                              :id [:in ["1" "2"]]
-                              {:select [:id :category]})))
-        (is (= {"category" 1, "id" 1}
-               @*thunk-resolve-counts*))
-        (is (= {"category" 2, "id" 2}
-               @*col-read-counts*))))
-    (testing "Realize only id"
-      (binding [*col-read-counts*      (atom nil)
-                *thunk-resolve-counts* (atom nil)]
-        (is (= #{"1" "2"}
-               (select/select-pks-set ::venues.id-is-strin.string-id-and-category-keyword
-                                      :id [:in ["1" "2"]]
-                                      {:select [:id :category]})))
-        (is (= {"id" 1}
-               @*thunk-resolve-counts*))
-        (is (= {"id" 2}
-               @*col-read-counts*))))))
-
-(deftest update!-test
+(deftest ^:synchronized update!-test
   (testing "key-value conditions"
     (test/with-discarded-table-changes :venues
       (is (= 2
@@ -200,7 +158,7 @@
       (is (= "Wow"
              (select/select-one-fn :name ::venues.category-keyword 1))))))
 
-(deftest save!-test
+(deftest ^:synchronized save!-test
   (test/with-discarded-table-changes :venues
     (let [venue (select/select-one ::venues.category-keyword 1)]
       (is (= {:category :dive-bar}
@@ -218,7 +176,7 @@
               :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
              (select/select-one ::venues.category-keyword 1))))))
 
-(deftest insert!-test
+(deftest ^:synchronized insert!-test
   (doseq [insert! [#'insert/insert!
                    #'insert/insert-returning-pks!
                    #'insert/insert-returning-instances!]]
@@ -256,7 +214,7 @@
                                                            :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
                  (insert! ::venues.string-id-and-category-keyword [{:name "Hi-Dive", :category :bar}]))))))))
 
-(deftest transform-insert-returning-results-without-select-test
+(deftest ^:synchronized transform-insert-returning-results-without-select-test
   (testing "insert-returning-instances results should be transformed if they come directly from the DB (not via select)"
     (test/with-discarded-table-changes :venues
       (binding [pipeline/transduce-build (fn [rf _query-type _model {:keys [rows]} _resolved-query]
@@ -275,7 +233,7 @@
         (is (= 3
                (select/count ::test/venues)))))))
 
-(deftest delete!-test
+(deftest ^:synchronized delete!-test
   (testing `pipeline/build
     (is (= {:delete-from [:venues]
             :where       [:= :category "bar"]}
@@ -301,7 +259,7 @@
         (is (= []
                (select/select ::venues.category-keyword :category :bar)))))))
 
-(deftest no-npes-test
+(deftest ^:synchronized no-npes-test
   (testing "Don't apply transforms to values that are nil (avoid NPEs)\n"
     (testing "in"
       (testing "insert rows"
@@ -331,7 +289,7 @@
 (transformed/deftransforms ::venues-transform-out-only
   {:category {:out keyword}})
 
-(deftest one-way-transforms-test
+(deftest ^:synchronized one-way-transforms-test
   (testing "Transforms should still work if you only specify `:in` or only specify `:out`"
     (testing "in"
       (testing "insert rows"
@@ -359,7 +317,7 @@
   {:id {:in  parse-int
         :out str}})
 
-(deftest deftransforms-test
+(deftest ^:parallel deftransforms-test
   (is (= (instance/instance
           ::transformed-venues
           {:id         "1"
@@ -379,7 +337,7 @@
 ;;; Once https://github.com/camsaul/methodical/issues/97 is in place this should no longer be needed.
 (m/prefer-method! transformed/transforms ::transformed-venues-2 ::transformed-venues)
 
-(deftest compose-deftransforms-test
+(deftest ^:parallel compose-deftransforms-test
   (is (= {:id {:in parse-int, :out str}}
          (transformed/transforms ::transformed-venues)))
   (is (= {:category {:in name, :out keyword}}
@@ -402,7 +360,7 @@
   [_model]
   {})
 
-(deftest compose-deftransforms-override-test
+(deftest ^:parallel compose-deftransforms-override-test
   (is (= {}
          (transformed/transforms ::venues.override-transforms)))
   (is (= (instance/instance
@@ -441,7 +399,7 @@
   {::venues.namespaced.category-keyword     :venue
    ::categories.namespaced.category-keyword :category})
 
-(deftest namespaced-test
+(deftest ^:parallel namespaced-test
   (is (= {:select    [:*]
           :from      [[:venues :venue]]
           :left-join [:category [:= :venue.category :category.name]]
@@ -463,3 +421,32 @@
          (select/select-one ::venues.namespaced.with-category
                             {:left-join [:category [:= :venue.category :category.name]]
                              :order-by  [[:id :asc]]}))))
+
+(deftest ^:parallel do-not-realize-entire-row-test
+  (testing "transformed should only need to realize the columns that get transformed"
+    (test.track-realized/with-realized-columns [realized-columns]
+      (is (= :bar
+             (select/select-one-fn :category ::venues.category-keyword.track-realized 1)))
+      (is (= #{:venues/category}
+             (realized-columns))))))
+
+(doto ::venues.category-keyword.track-realized
+  (derive ::venues.category-keyword)
+  (derive ::test.track-realized/venues))
+
+(deftest ^:parallel do-not-realize-unselected-column-test
+  (testing "transformed should not realize columns that are transformed if we don't actually use them in the end"
+    (test.track-realized/with-realized-columns [realized-columns]
+      (is (= "Tempest"
+             (select/select-one-fn :name ::venues.category-keyword.track-realized 1)))
+      (is (= #{:venues/name}
+             (realized-columns))))))
+
+(deftest ^:synchronized debug-logging-test
+  (testing "Debug logging should not affect transforms"
+    (is (= :bar
+           (select/select-one-fn :category ::venues.category-keyword 1)))
+    (binding [log/*level* :trace]
+      (with-redefs [log/pprint-doc (constantly nil)]
+        (is (= :bar
+               (select/select-one-fn :category ::venues.category-keyword 1)))))))

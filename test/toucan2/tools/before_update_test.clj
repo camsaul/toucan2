@@ -9,6 +9,7 @@
    [toucan2.protocols :as protocols]
    [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.before-update :as before-update]
    [toucan2.update :as update])
@@ -19,11 +20,12 @@
 
 (def ^:dynamic ^:private *updated-venues* nil)
 
-(derive ::venues.before-update ::test/venues)
+(derive ::venues.before-update ::test.track-realized/venues)
 
 (before-update/define-before-update ::venues.before-update
   [venue]
-  (is (instance/instance? venue))
+  (assert (map? venue) (format "Expected venue to be a map, got ^%s %s" (some-> venue class .getCanonicalName) (pr-str venue)))
+  #_(is (instance/instance? venue))
   (is (isa? (protocols/model venue) ::venues.before-update))
   (when *updated-venues*
     (swap! *updated-venues* conj venue))
@@ -33,31 +35,50 @@
 
 (before-update/define-before-update ::venues.update-updated-at
   [venue]
+  (assert (map? venue) (format "Expected venue to be a map, got ^%s %s" (some-> venue class .getCanonicalName) (pr-str venue)))
+  (is (isa? (protocols/model venue) ::venues.before-update))
   (assoc venue :updated-at (LocalDateTime/parse "2021-06-09T15:18:00")))
 
-(derive ::venues.discard-category-change ::venues.before-update)
-
-(before-update/define-before-update ::venues.discard-category-change
-  [venue]
-  (assoc venue :category (:category (protocols/original venue))))
-
-(deftest before-update-test
+(deftest ^:synchronized add-changes-test
   (testing "Updates returned by the before-update method should actually be applied"
-    (testing "f adds changes"
+    (testing "method adds changes"
       (test/with-discarded-table-changes :venues
-        (is (= 1
-               (update/update! ::venues.update-updated-at 1 {:name "Kennedy's Irish Pub and Curry House"})))
+        (test.track-realized/with-realized-columns [_realized-columns]
+          (is (= 1
+                 (update/update! ::venues.update-updated-at 1 {:name "Kennedy's Irish Pub and Curry House"}))
+              "number of rows updated")
+          ;; disabled for now. We currently realize the entire row before doing before-update stuff... here we clearly
+          ;; could have got away without doing it but it means we have to be super careful everywhere else to make sure
+          ;; things work the way we want.
+          #_(testing "\nOnly name (which is the column updated here), and ID should be realized"
+              ;; It seems like `updated_at` should maybe get realized too so we can see if it changed, but it currently
+              ;; does not; that's probably fine for now tho. If that changes in the future we can update this test without
+              ;; worrying to much tho.
+              (is (= #{:venues/name :venues/id}
+                     (realized-columns)))))
         (is (= {:id         1
                 :name       "Kennedy's Irish Pub and Curry House"
                 :category   "bar"
                 :created-at (LocalDateTime/parse "2017-01-01T00:00")
                 :updated-at (LocalDateTime/parse "2021-06-09T15:18:00")}
-               (select/select-one ::venues.update-updated-at 1)))))
-    (testing "f discards changes"
+               (select/select-one ::venues.update-updated-at 1)))))))
+
+(derive ::venues.discard-category-change ::venues.before-update)
+
+(before-update/define-before-update ::venues.discard-category-change
+  [venue]
+  (assert (map? venue) (format "Expected venue to be a map, got ^%s %s" (some-> venue class .getCanonicalName) (pr-str venue)))
+  (is (isa? (protocols/model venue) ::venues.before-update))
+  (assoc venue :category (:category (protocols/original venue))))
+
+(deftest ^:synchronized discard-changes-test
+  (testing "Updates returned by the before-update method should actually be applied"
+    (testing "method discards changes"
       (test/with-discarded-table-changes :venues
         (is (= 1
                (update/update! ::venues.discard-category-change 1 {:name     "Kennedy's Irish Pub and Curry House"
-                                                                   :category "bar-plus-curry-house"})))
+                                                                   :category "bar-plus-curry-house"}))
+            "number of rows updated")
         (is (= {:id         1
                 :name       "Kennedy's Irish Pub and Curry House"
                 :category   "bar"
@@ -65,7 +86,7 @@
                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
                (select/select-one ::venues.discard-category-change 1)))))))
 
-(deftest before-update-pk-condition-test
+(deftest ^:synchronized before-update-pk-condition-test
   (testing "define-before-update should call its method with all objects that match update conditions"
     (testing "PK condition"
       (test/with-discarded-table-changes :venues
@@ -92,7 +113,7 @@
             (is (= [{:name "Kennedy's Irish Pub and Curry House"}]
                    (map protocols/changes @*updated-venues*)))))))))
 
-(deftest before-update-non-pk-condition-test
+(deftest ^:synchronized before-update-non-pk-condition-test
   (testing "define-before-update should call its method with all objects that match update conditions"
     (testing "non-PK condition"
       (test/with-discarded-table-changes :venues
@@ -119,7 +140,7 @@
                     {:category "not-store"}]
                    (map protocols/changes @*updated-venues*)))))))))
 
-(deftest before-update-pk-and-other-conditons-test
+(deftest ^:synchronized before-update-pk-and-other-conditons-test
   (testing "define-before-update should call its method with all objects that match update conditions"
     (testing "PK + other conditions"
       (test/with-discarded-table-changes :venues
@@ -139,7 +160,7 @@
             (is (= [{:category "not-bar"}]
                    (map protocols/changes @*updated-venues*)))))))))
 
-(deftest before-update-no-changes-test
+(deftest ^:synchronized before-update-no-changes-test
   (testing "No changes passed to update!* itself -- should no-op"
     (test/with-discarded-table-changes :venues
       (execute/with-call-count [call-count]
@@ -192,7 +213,7 @@
   [venue]
   (assoc venue :category (format "category-%d" (:id venue))))
 
-(deftest before-update-batch-updates-one-batch-test
+(deftest ^:synchronized before-update-batch-updates-one-batch-test
   (testing "Group together updates into one call per set of updates."
     (testing "Only one update needed"
       (test/with-discarded-table-changes :venues
@@ -209,7 +230,7 @@
                          :where  [:= :category "bar"]}]
                        @*venues-update-queries*))))))))))
 
-(deftest before-update-batch-updates-multiple-batches-test
+(deftest ^:synchronized before-update-batch-updates-multiple-batches-test
   (testing "Group together updates into one call per set of updates."
     (testing "Multiple updates needed"
       (test/with-discarded-table-changes :venues
@@ -261,7 +282,7 @@
 (m/prefer-method! #'before-update/before-update ::venues.upper-case-name ::venues.before-update)
 (m/prefer-method! #'before-update/before-update ::venues.add-unique-category ::venues.upper-case-name)
 
-(deftest before-update-should-compose-test
+(deftest ^:synchronized before-update-should-compose-test
   (testing "Make sure define-before-update composes"
     (test/with-discarded-table-changes :venues
       (is (= 1
@@ -274,7 +295,7 @@
 
 (before-update/define-before-update ::venues.disallow-stores
   [venue]
-  (assert (map? venue))
+  (assert (map? venue) (format "Expected venue to be a map, got ^%s %s" (some-> venue class .getCanonicalName) (pr-str venue)))
   (assert (:category venue))
   (cond-> venue
     (= (:category venue) "store")
@@ -285,7 +306,7 @@
 
 (m/prefer-method! #'before-update/before-update ::venues.upper-case-name ::venues.disallow-stores)
 
-(deftest before-update-transaction-test
+(deftest ^:synchronized before-update-transaction-test
   (testing "before-update should run in a transaction; an error during some part should cause all updates to be discarded"
     (testing "Do something that will have to do one updates for each row"
       (test/with-discarded-table-changes :venues
@@ -319,12 +340,12 @@
   [venue]
   (update venue :name str/upper-case))
 
-(deftest before-update-ignore-columns-added-by-after-select-test
+(deftest ^:synchronized before-update-ignore-columns-added-by-after-select-test
   (test/with-discarded-table-changes :venues
     (is (= 1
            (update/update! ::venues.short-name 3 {:name "BevLess"})))))
 
-(deftest preserve-model-test
+(deftest ^:parallel preserve-model-test
   (testing "If before-update is called with an instance of a different model, preserve its model"
     (doseq [m    [{}
                   (instance/instance ::venues.short-name)

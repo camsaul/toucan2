@@ -6,10 +6,14 @@
    [methodical.impl.combo.operator :as m.combo.operator]
    [toucan2.instance :as instance]
    [toucan2.log :as log]
+   [toucan2.magic-map :as magic-map]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
+   [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.util :as u]))
+
+(set! *warn-on-reflection* true)
 
 ;;; HACK Once https://github.com/camsaul/methodical/issues/96 is fixed we can remove this.
 (alter-meta! #'m.combo.operator/combine-methods-with-operator assoc :private false)
@@ -145,6 +149,9 @@
 ;;;; after select (or other things returning instances)
 
 (defn- apply-result-row-transform [instance k xform]
+  (assert (and (map? instance)
+               (not (magic-map/magic-map? instance)))
+          (format "%s expected map rows, got %s" `apply-result-row-transform (pr-str instance)))
   ;; The "Special Optimizations" below *should* be the default case, but if some other aux methods are in place or
   ;; custom impls it might not be; things should still work normally either way.
   ;;
@@ -153,26 +160,12 @@
   (instance/update-original-and-current
    instance
    (fn [row]
-     (assert (map? row)
-             (format "%s expected map rows, got %s" `apply-result-row-transform (pr-str row)))
-     ;; Special Optimization 2: if the underlying original/current maps of `instance` are instances of `IRow` (which
-     ;; themselves have underlying key->value thunks) we can compose the thunk itself rather than immediately
-     ;; realizing and transforming the value. This means transforms don't get applied to values that are never
-     ;; realized.
-     ;;
-     ;; TODO FIXME -- need to copy over the magic result-row code from the old Toucan 2 codebase or figure out a
-     ;; different way to get this magical optimization.
-     #_(if-let [thunks (result-row/thunks row)]
-         (result-row/with-thunks row (update thunks k (fn [thunk]
-                                                        (comp xform thunk))))
-         (update row k xform))
+     ;; Special Optimization 2: if the underlying original/current maps of `instance` are instances of something
+     ;; like [[toucan2.jdbc.row/->TransientRow]] we can do a 'deferred update' that only applies the transform if and
+     ;; when the value is realized.
      (log/tracef :results "Transform %s %s" k (get row k))
      (u/try-with-error-context ["Transform result column" {::k k, ::xform xform, ::row row}]
-       (doto (update row k xform)
-         ((fn [row]
-            (assert (map? row)
-                    (format "%s: expected row transform function to return a map, got %s"
-                            `apply-result-row-transform (pr-str row))))))))))
+       (protocols/deferrable-update row k xform)))))
 
 (defn- out-transforms [model]
   (wrapped-transforms model :out))
@@ -213,6 +206,7 @@
   (if-let [k->transform (not-empty (out-transforms model))]
     (map (let [f (result-row-transform-fn k->transform)]
            (fn [row]
+             (assert (map? row) (format "Expected map row, got ^%s %s" (some-> row class .getCanonicalName) (pr-str row)))
              (log/tracef :results "Transform %s row %s" model row)
              (let [result (u/try-with-error-context ["transform result row" {::model model, ::row row}]
                             (f row))]
@@ -220,8 +214,7 @@
                result))))
     identity))
 
-(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.result-type/instances
-                                             #_model      ::transformed.model]
+(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.result-type/instances #_model ::transformed.model]
   [rf query-type model parsed-args]
   ;; don't try to transform stuff when we're doing SELECT directly with PKs (e.g. to fake INSERT returning instances),
   ;; we're not doing transforms on the way out so we don't need to do them on the way in
@@ -241,8 +234,7 @@
                     (xform v)
                     v))])))
 
-(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/update.*
-                                                    #_model      ::transformed.model]
+(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/update.* #_model ::transformed.model]
   [_rf _query-type model {:keys [changes], :as parsed-args}]
   (b/cond
     (not (map? changes))
@@ -272,8 +264,7 @@
         row-xform  (apply comp row-xforms)]
     (map row-xform rows)))
 
-(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/insert.*
-                                                    #_model      ::transformed.model]
+(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/insert.* #_model ::transformed.model]
   [_rf query-type model parsed-args]
   (assert (isa? model ::transformed.model))
   (b/cond
@@ -297,8 +288,7 @@
 
 ;;;; after insert
 
-(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.query-type/insert.pks
-                                            #_model      ::transformed.model]
+(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.query-type/insert.pks #_model ::transformed.model]
   [rf query-type model parsed-args]
   (let [pk-keys (model/primary-keys model)
         rf*     ((comp

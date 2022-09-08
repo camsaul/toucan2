@@ -9,8 +9,10 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.query :as query]
+   [toucan2.realize :as realize]
    [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.named-query :as tools.named-query])
   (:import
@@ -144,6 +146,33 @@
     (is (= [{:count 1}]
            (select/select ::test/venues :id 1 ::count-query)))))
 
+(deftest ^:parallel reducible-select-test
+  (is (= ["Cam" "Sam" "Pam" "Tam"]
+         (into [] (map :name) (select/reducible-select ::test/people {:order-by [[:id :asc]]}))))
+  (are [form] (= [{:id         1
+                   :name       "Cam"
+                   :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}
+                  {:id         2
+                   :name       "Sam"
+                   :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")}
+                  {:id         3
+                   :name       "Pam"
+                   :created-at (OffsetDateTime/parse "2020-01-01T21:56Z")}
+                  {:id         4
+                   :name       "Tam"
+                   :created-at (OffsetDateTime/parse "2020-05-25T19:56Z")}]
+                 form)
+    (into [] (map realize/realize) (select/reducible-select ::test/people {:order-by [[:id :asc]]}))
+    (into [] (eduction
+              (map realize/realize)
+              (select/reducible-select ::test/people {:order-by [[:id :asc]]})))
+    (transduce
+     (map identity)
+     conj
+     (eduction
+      (map realize/realize)
+      (select/reducible-select ::test/people {:order-by [[:id :asc]]})))))
+
 (derive ::people.name-is-pk ::people)
 
 (m/defmethod model/primary-keys ::people.name-is-pk
@@ -170,35 +199,36 @@
 
 (derive ::people.no-timestamps ::people)
 
-(m/defmethod pipeline/transduce-with-model :before [:toucan.query-type/select.* ::people.no-timestamps]
+(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/select.* #_model ::people.no-timestamps]
   [_rf _query-type _model parsed-args]
   (update parsed-args :columns (fn [columns]
                                  (or columns [:id :name]))))
 
-(m/defmethod pipeline/transduce-with-model [:toucan.query-type/select.instances ::people.no-timestamps]
+(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.query-type/select.instances #_model ::people.no-timestamps]
   [rf query-type model parsed-args]
   (let [rf* ((map (fn [person]
-                    (testing "select* :after should see Toucan 2 instances"
-                      (is (instance/instance? person)))
-                    (testing "instance table should be a ::people.no-timestamps"
-                      (is (isa? (protocols/model person) ::people.no-timestamps)))
+                    (testing (format "\nperson = ^%s %s" (some-> person class .getCanonicalName) (pr-str person))
+                      ;; (testing "\nreducing function should see Toucan 2 instances"
+                      ;;   (is (instance/instance? person)))
+                      (testing "\ninstance table should be a ::people.no-timestamps"
+                        (is (isa? (protocols/model person) ::people.no-timestamps))))
                     (assoc person :after-select? true)))
              rf)]
     (next-method rf* query-type model parsed-args)))
 
 (deftest ^:parallel default-query-test
-  (testing "Should be able to set some defaults by implementing `select*`"
+  (testing "Should be able to set some defaults by implementing transduce-with-model"
     (is (= [(instance/instance ::people.no-timestamps {:id 1, :name "Cam", :after-select? true})]
            (select/select ::people.no-timestamps 1)))))
 
 (deftest ^:parallel post-select-test
-  (testing "Should be able to do cool stuff in (select* :after)"
+  (testing "Should be able to do cool stuff in reducing function"
     (testing (str \newline '(ancestors ::people.no-timestamps) " => " (pr-str (ancestors ::people.no-timestamps)))
       (is (= [(instance/instance ::people.no-timestamps {:id 1, :name "Cam", :after-select? true})
               (instance/instance ::people.no-timestamps {:id 2, :name "Sam", :after-select? true})
               (instance/instance ::people.no-timestamps {:id 3, :name "Pam", :after-select? true})
               (instance/instance ::people.no-timestamps {:id 4, :name "Tam", :after-select? true})]
-             (select/select ::people.no-timestamps))))))
+             (select/select ::people.no-timestamps {:order-by [[:id :asc]]}))))))
 
 (derive ::people.limit-2 ::people)
 
@@ -239,21 +269,51 @@
            (select/select-fn-set :id ::test/people))))
   (testing "Return vector instead of a set"
     (is (= [1 2 3 4]
-           (select/select-fn-vec :id ::test/people))))
+           (select/select-fn-vec :id ::test/people {:order-by [[:id :asc]]}))))
   (testing "Arbitrary function instead of a key"
     (is (= [2 3 4 5]
-           (select/select-fn-vec (comp inc :id) ::test/people))))
+           (select/select-fn-vec (comp inc :id) ::test/people {:order-by [[:id :asc]]}))))
   (testing "Should work with magical keys"
-    (doseq [k [:created-at :created_at]]
-      (testing k
-        (is (= [(OffsetDateTime/parse "2020-04-21T23:56Z")
-                (OffsetDateTime/parse "2019-01-11T23:56Z")
-                (OffsetDateTime/parse "2020-01-01T21:56Z")
-                (OffsetDateTime/parse "2020-05-25T19:56Z")]
-               (select/select-fn-vec k ::test/people {:order-by [[:id :asc]]}))))))
+    (are [k] (= [(OffsetDateTime/parse "2020-04-21T23:56Z")
+                 (OffsetDateTime/parse "2019-01-11T23:56Z")
+                 (OffsetDateTime/parse "2020-01-01T21:56Z")
+                 (OffsetDateTime/parse "2020-05-25T19:56Z")]
+                (select/select-fn-vec k ::test/people {:order-by [[:id :asc]]}))
+      :created-at
+      :created_at))
   (testing "Should return nil if the result is empty"
     (is (nil? (select/select-fn-set :id ::test/people :id 100)))
-    (is (nil? (select/select-fn-vec :id ::test/people :id 100)))))
+    (is (nil? (select/select-fn-vec :id ::test/people :id 100))))
+  (testing "Only realize the columns we actually fetch."
+    (testing "simple function"
+      (test.track-realized/with-realized-columns [realized-columns]
+        (is (= #{1 2 3}
+               (select/select-fn-set :id ::test.track-realized/venues)))
+        (is (= #{:venues/id}
+               (realized-columns)))))
+    (testing `juxt
+      (test.track-realized/with-realized-columns [realized-columns]
+        (is (= #{[1 "Tempest"]
+                 [2 "Ho's Tavern"]
+                 [3 "BevMo"]}
+               (select/select-fn-set (juxt :id :name) ::test.track-realized/venues)))
+        (is (= #{:venues/id :venues/name}
+               (realized-columns)))))
+    (testing `comp
+      (test.track-realized/with-realized-columns [realized-columns]
+        (is (= #{0 1 2}
+               (select/select-fn-set (comp dec :id) ::test.track-realized/venues)))
+        (is (= #{:venues/id}
+               (realized-columns)))))
+    (testing "fancy function"
+      (test.track-realized/with-realized-columns [realized-columns]
+        (is (= #{{:id 1, :x true} {:id 2, :x true} {:id 3, :x true}}
+               (select/select-fn-set (fn [m]
+                                       (-> (select-keys m [:id])
+                                           (assoc :x true)))
+                                     ::test.track-realized/venues)))
+        (is (= #{:venues/id}
+               (realized-columns)))))))
 
 (deftest ^:parallel select-one-fn-test
   (is (= 1
@@ -386,9 +446,10 @@
 
 (deftest ^:parallel select-join-test
   (testing "Extra columns from joined tables should come back"
+    ;; we should fetch `venues.name` first and skip fetching `category.name` since we already have a `:name`
     (is (= (instance/instance ::test/venues
                               {:id              1
-                               :name            "bar"
+                               :name            "Tempest"
                                :category        "bar"
                                :created-at      (LocalDateTime/parse "2017-01-01T00:00")
                                :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
@@ -398,7 +459,7 @@
                               {:left-join [[:category :c] [:= :venues.category :c.name]]
                                :order-by  [[:id :asc]]})))))
 
-(derive ::venues.with-category ::test/venues)
+(derive ::venues.with-category ::test.track-realized/venues)
 
 (m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/select.*
                                        #_model      ::venues.with-category
@@ -414,16 +475,26 @@
     (next-method rf query-type model parsed-args resolved-query)))
 
 (deftest ^:parallel joined-model-test
-  (is (= (instance/instance ::venues.with-category
-                            {:id              1
-                             :name            "bar"
-                             :category        "bar"
-                             :created-at      (LocalDateTime/parse "2017-01-01T00:00")
-                             :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
-                             :slug            "bar_01"
-                             :parent-category nil})
-         (select/select-one ::venues.with-category
-                            {:order-by [[:id :asc]]}))))
+  (test.track-realized/with-realized-columns [realized-columns]
+    (is (= (instance/instance ::venues.with-category
+                              {:id              1
+                               :name            "Tempest"
+                               :category        "bar"
+                               :created-at      (LocalDateTime/parse "2017-01-01T00:00")
+                               :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
+                               :slug            "bar_01"
+                               :parent-category nil})
+           (select/select-one ::venues.with-category
+                              {:order-by [[:id :asc]]})))
+    (testing "We should fetch venues.name first, and skip fetching category.name entirely since we already have a `:name`"
+      (is (= #{:venues/id
+               :venues/name
+               :venues/category
+               :venues/created-at
+               :venues/updated-at
+               :category/slug
+               :category/parent-category}
+             (realized-columns))))))
 
 (derive ::venues.namespaced ::test/venues)
 
@@ -446,7 +517,10 @@
                                :venue/category   "bar"
                                :venue/created-at (LocalDateTime/parse "2017-01-01T00:00")
                                :venue/updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-           (select/select-one ::venues.namespaced {:order-by [[:id :asc]]})))))
+           (select/select-one ::venues.namespaced {:order-by [[:id :asc]]}))))
+  (testing `select/select-fn-set
+    (is (= #{"bar" "store"}
+           (select/select-fn-set :venue/category ::venues.namespaced)))))
 
 (doto ::venues.namespaced.with-category
   (derive ::venues.namespaced)
@@ -474,7 +548,12 @@
            :category/name            "bar"
            :category/slug            "bar_01"
            :category/parent-category nil})
-         (select/select-one ::venues.namespaced.with-category {:order-by [[:id :asc]]}))))
+         (select/select-one ::venues.namespaced.with-category {:order-by [[:id :asc]]})))
+  (testing `select/select-fn-set
+    (is (= #{"Tempest" "BevMo" "Ho's Tavern"}
+           (select/select-fn-set :venue/name ::venues.namespaced.with-category)))
+    (is (= #{"bar" "store"}
+           (select/select-fn-set :category/name ::venues.namespaced.with-category)))))
 
 (deftest ^:parallel namespaced-with-joins-columns-test
   (is (= :venue

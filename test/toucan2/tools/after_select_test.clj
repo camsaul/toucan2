@@ -42,7 +42,7 @@
   {:name {:in  identity
           :out identity}})
 
-(deftest after-select-should-not-affect-insert-test
+(deftest ^:synchronized after-select-should-not-affect-insert-test
   (doseq [model [::venues.short-name
                  ::venues.short-name-with-transforms]]
     (testing model
@@ -66,7 +66,7 @@
                                                    :name "Tin Vietnamese"
                                                    :category "restaurant")))))))
 
-(deftest after-select-should-not-affect-update-test
+(deftest ^:synchronized after-select-should-not-affect-update-test
   (doseq [model [::venues.short-name
                  ::venues.short-name-with-transforms]]
     (testing model

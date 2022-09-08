@@ -1,164 +1,128 @@
 (ns toucan2.jdbc.result-set
+  "Implementation of a custom [[next.jdbc]] result set builder function, [[builder-fn]], and the default
+  implementation; [[reduce-result-set]] which is used to reduce results from JDBC databases."
   (:require
+   [better-cond.core :as b]
    [methodical.core :as m]
    [next.jdbc.result-set :as next.jdbc.rs]
-   [pretty.core :as pretty]
    [toucan2.instance :as instance]
+   [toucan2.jdbc.read :as jdbc.read]
    [toucan2.jdbc.row :as jdbc.row]
    [toucan2.log :as log]
-   [toucan2.magic-map :as magic-map]
    [toucan2.model :as model]
-   [toucan2.protocols :as protocols]
    [toucan2.util :as u])
   (:import
-   (java.sql Connection ResultSet ResultSetMetaData Types)))
+   (java.sql ResultSet ResultSetMetaData)))
 
 (set! *warn-on-reflection* true)
 
-(def type-name
-  "Map of `java.sql.Types` enum integers (e.g. `java.sql.Types/FLOAT`, whose value is `6`) to the string type name e.g.
-  `FLOAT`.
+(m/defmulti builder-fn
+  {:arglists '([^java.sql.Connection conn₁ model₂ ^java.sql.ResultSet rset opts])}
+  u/dispatch-on-first-two-args)
 
-  ```clj
-  (type-name java.sql.Types/FLOAT) -> (type-name 6) -> \"FLOAT\"
-  ```"
-  (into {} (for [^java.lang.reflect.Field field (.getDeclaredFields Types)]
-             [(.getLong field Types) (.getName field)])))
+(defrecord ^:no-doc InstanceBuilder [model ^ResultSet rset ^ResultSetMetaData rsmeta cols]
+  next.jdbc.rs/RowBuilder
+  (->row [_this]
+    (log/tracef :results "Fetching row %s" (.getRow rset))
+    (transient (instance/instance model)))
+  (column-count [_this]
+    (count cols))
+  ;; this is purposefully not implemented because we should never get here; if we do it is an error and we want an
+  ;; Exception thrown.
+  #_(with-column [this row i]
+      (println (pr-str (list 'with-column 'this 'row i)))
+      (next.jdbc.rs/with-column-value this row (nth cols (dec i))
+        (next.jdbc.rs/read-column-by-index (.getObject rset ^Integer i) rsmeta i)))
+  (with-column-value [_this row col v]
+    (assert (some? col) "Invalid col")
+    (assoc! row col v))
+  (row! [_this row]
+    (log/tracef :results "Converting transient row to persistent row")
+    (persistent! row))
 
-(m/defmulti read-column-thunk
-  "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
-  {:arglists '([^Connection conn model ^ResultSet rset ^ResultSetMetaData rsmeta ^Long i])}
-  (fn [^Connection conn model _rset ^ResultSetMetaData rsmeta ^Long i]
-    (let [col-type (.getColumnType rsmeta i)]
-      (log/debugf :results
-                  "Column %s %s is of JDBC type %s, native type %s"
-                  i
-                  (.getColumnLabel rsmeta i)
-                  (type-name col-type)
-                  (.getColumnTypeName rsmeta i))
-      [(protocols/dispatch-value conn) (protocols/dispatch-value model) col-type])))
+  next.jdbc.rs/ResultSetBuilder
+  (->rs [_this]
+    (transient []))
+  (with-row [_this acc row]
+    (conj! acc row))
+  (rs! [_this acc]
+    (persistent! acc)))
 
-(m/defmethod read-column-thunk :default
-  [_conn _model ^ResultSet rset _rsmeta ^Long i]
-  (log/debugf :results "Fetching values in column %s with %s" i (list '.getObject 'rs i))
-  (fn default-read-column-thunk []
-    (.getObject rset i)))
+(defn- make-column-name->index [cols label-fn]
+  {:pre [(seq cols) (fn? label-fn)]}
+  (memoize
+   (fn [column-name]
+     (when (or (string? column-name)
+               (instance? clojure.lang.Named column-name))
+       (let [column-name' (keyword
+                           (when (instance? clojure.lang.Named column-name)
+                             (when-let [col-ns (namespace column-name)]
+                               (label-fn (name col-ns))))
+                           (label-fn (name column-name)))
+             i            (when column-name'
+                            (first (keep-indexed
+                                    (fn [i col]
+                                      (when (= col column-name')
+                                        (inc i)))
+                                    cols)))]
+         (log/tracef :results "Index of column named %s (originally %s) is %s" column-name' column-name i)
+         i)))))
 
-(defn get-object-of-class-thunk [^ResultSet rset ^Long i ^Class klass]
-  (log/debugf :results
-              "Fetching values in column %s with %s"
-              i
-              (list '.getObject 'rs i klass))
-  (fn get-object-of-class-thunk []
-    (.getObject rset i klass)))
+(defn instance-builder-fn
+  "Create a result set map builder function appropriate for passing as the `:builder-fn` option to [[next.jdbc]] that will
+  create [[toucan2.instance]]s of `model` using namespaces determined by [[toucan2.model/table-name->namespace]] and the
+  key transform [[toucan2.instance/key-transform-fn]]."
+  [model ^ResultSet rset opts]
+  (let [key-xform      (instance/key-transform-fn model)
+        _              (log/debugf :results "Using key xform fn %s" key-xform)
+        table-name->ns (model/table-name->namespace model)
+        _              (log/debugf :results "Using table namespaces %s" table-name->ns)
+        label-fn       (comp name key-xform)
+        qualifier-fn   (memoize
+                        (fn [table]
+                          (let [table    (name (key-xform table))
+                                table-ns (some-> (get table-name->ns table) name)]
+                            (log/tracef :results "Using namespace %s for columns in table %s" table-ns table)
+                            table-ns)))
+        opts           (merge {:label-fn     label-fn
+                               :qualifier-fn qualifier-fn}
+                              opts)
+        rsmeta         (.getMetaData rset)
+        col-names      (next.jdbc.rs/get-modified-column-names rsmeta opts)]
+    (log/tracef :results "Column names: %s" col-names)
+    (constantly
+     (assoc (->InstanceBuilder model rset rsmeta col-names) :opts opts))))
 
-(defn index-range
-  "Return a sequence of indecies for all the columns in a result set. (`ResultSet` column indecies start at one in an
-  effort to trip up developers.)"
-  [^ResultSetMetaData rsmeta]
-  (range 1 (inc (.getColumnCount rsmeta))))
+(m/defmethod builder-fn :default
+  [_conn model rset opts]
+  (instance-builder-fn model rset opts))
 
-(defn- row-instance [model col-name->thunk]
-  (log/debugf :results
-              "Creating new instance of %s, which has key transform fn %s"
-              model
-              (instance/key-transform-fn model))
-  (instance/instance model (jdbc.row/row col-name->thunk)))
+(defn reduce-result-set [rf init conn model ^ResultSet rset opts]
+  (log/debugf :execute "Reduce JDBC result set for model %s with rf %s and init %s" model rf init)
+  (let [row-num->i->thunk (jdbc.read/make-cached-row-num->i->thunk conn model rset)
+        builder-fn*       (next.jdbc.rs/builder-adapter
+                           (builder-fn conn model rset opts)
+                           (jdbc.read/read-column-by-index-fn row-num->i->thunk))
+        builder           (builder-fn* rset opts)
+        combined-opts     (merge (:opts builder) opts)
+        label-fn          (get combined-opts :label-fn)
+        _                 (assert (fn? label-fn) "Options must include :label-fn")
+        col-names         (get builder :cols (next.jdbc.rs/get-modified-column-names
+                                              (.getMetaData rset)
+                                              combined-opts))
+        col-name->index   (make-column-name->index col-names label-fn)]
+    (loop [acc init]
+      (b/cond
+        (not (.next rset))
+        acc
 
-(defn row-thunk
-  "Return a thunk that when called fetched the current row from the cursor and returns it as a [[row-instance]]."
-  [^Connection conn model ^ResultSet rset]
-  (let [rsmeta           (.getMetaData rset)
-        ;; do case-insensitive lookup.
-        table->namespace (some-> (model/table-name->namespace model) (magic-map/magic-map u/lower-case-en))
-        key-xform        (instance/key-transform-fn model)
-        ;; create a set of thunks to read each column. These thunks will call `read-column-thunk` to determine the
-        ;; appropriate column-reading thunk the first time they are used.
-        col-name->thunk  (into
-                          {}
-                          (map (fn [^Long i]
-                                 (let [table-name    (.getTableName rsmeta i)
-                                       col-name      (.getColumnName rsmeta i)
-                                       table-ns-name (some-> (get table->namespace table-name) name)
-                                       col-key       (key-xform (keyword table-ns-name col-name))
-                                       ;; TODO -- add test to ensure we only resolve the read-column-thunk
-                                       ;; once even with multiple rows.
-                                       read-thunk   (delay (read-column-thunk conn model rset rsmeta i))
-                                       result-thunk (fn []
-                                                      (log/tracef :results "Realize column %s %s.%s as %s"
-                                                                  i table-name col-name col-key)
-                                                      (let [result (next.jdbc.rs/read-column-by-index (@read-thunk) rsmeta i)]
-                                                        (log/tracef :results "=> %s" result)
-                                                        result))]
-                                   [col-key result-thunk])))
-                          (index-range rsmeta))]
-    (fn row-instance-thunk []
-      (row-instance model col-name->thunk))))
+        :let [row-num  (.getRow rset)
+              i->thunk (row-num->i->thunk row-num)
+              row      (jdbc.row/row model rset builder i->thunk col-name->index)
+              acc'     (rf acc row)]
 
-(deftype ^:no-doc ReducibleResultSet [^Connection conn model ^ResultSet rset]
-  clojure.lang.IReduceInit
-  (reduce [_this rf init]
-    (u/try-with-error-context [(format "reduce %s" `ReducibleResultSet) {::model model, ::rf rf, ::init init}]
-      (let [thunk (row-thunk conn model rset)]
-        (loop [acc init]
-          (cond
-            (reduced? acc)
-            @acc
+        (reduced? acc')
+        @acc'
 
-            (.next rset)
-            (recur (rf acc (thunk)))
-
-            :else
-            acc)))))
-
-  pretty/PrettyPrintable
-  (pretty [_this]
-    (list `reducible-result-set conn model rset)))
-
-(defn reducible-result-set [^Connection conn model rset]
-  (->ReducibleResultSet conn model rset))
-
-;;;; Default column read methods
-
-(m/defmethod read-column-thunk [:default :default Types/CLOB]
-  [_conn _model ^ResultSet rset _ ^Long i]
-  (fn get-string-thunk []
-    (.getString rset i)))
-
-(m/defmethod read-column-thunk [:default :default Types/TIMESTAMP]
-  [_conn _model rset _rsmeta i]
-  (get-object-of-class-thunk rset i java.time.LocalDateTime))
-
-(m/defmethod read-column-thunk [:default :default Types/TIMESTAMP]
-  [_conn _model rset _rsmeta i]
-  (get-object-of-class-thunk rset i java.time.LocalDateTime))
-
-(m/defmethod read-column-thunk [:default :default Types/TIMESTAMP_WITH_TIMEZONE]
-  [_conn _model rset _rsmeta i]
-  (get-object-of-class-thunk rset i java.time.OffsetDateTime))
-
-(m/defmethod read-column-thunk [:default :default Types/DATE]
-  [_conn _model rset _rsmeta i]
-  (get-object-of-class-thunk rset i java.time.LocalDate))
-
-(m/defmethod read-column-thunk [:default :default Types/TIME]
-  [_conn _model rset _rsmeta i]
-  (get-object-of-class-thunk rset i java.time.LocalTime))
-
-(m/defmethod read-column-thunk [:default :default Types/TIME_WITH_TIMEZONE]
-  [_conn _model rset _rsmeta i]
-  (get-object-of-class-thunk rset i java.time.OffsetTime))
-
-;;;; Postgres integration
-
-;;; TODO -- why is cljdoc picking this up?
-(when-let [pg-connection-class (try
-                                 (Class/forName "org.postgresql.jdbc.PgConnection")
-                                 (catch Throwable _
-                                   nil))]
-  (m/defmethod read-column-thunk [pg-connection-class :default Types/TIMESTAMP]
-    [_conn _model ^ResultSet rset ^ResultSetMetaData rsmeta ^Long i]
-    (let [^Class klass (if (= (u/lower-case-en (.getColumnTypeName rsmeta i)) "timestamptz")
-                         java.time.OffsetDateTime
-                         java.time.LocalDateTime)]
-      (get-object-of-class-thunk rset i klass))))
+        :else
+        (recur acc')))))

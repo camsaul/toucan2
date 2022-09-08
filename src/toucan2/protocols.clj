@@ -111,3 +111,29 @@
                          (dispatch-value (.unwrap conn java.sql.Connection))
                          (catch Throwable _
                            c3p0-connection-class)))}))
+
+;; (p/defprotocol+ IRealizedKeys
+;;   (realized-keys [m]
+;;     "Return the keys in map `m` that have already been fully realized (e.g., fetched from a Database)."))
+
+;; (extend-protocol IRealizedKeys
+;;   nil
+;;   (realized-keys [_this] nil)
+
+;;   clojure.lang.IPersistentMap
+;;   (realized-keys [this] (keys this)))
+
+(p/defprotocol+ IDeferrableUpdate
+  (deferrable-update [this k f]
+    "Like [[clojure.core/update]], but this update can be deferred until later. For things like transient rows where you
+  might want to apply transforms to values that ultimately get realized, but not *cause* them to be realized. Unlike
+  [[clojure.core/update]], does not support additional args to pass to `f`."))
+
+(extend-protocol IDeferrableUpdate
+  nil
+  (deferrable-update [_this k f]
+    (update nil k f))
+
+  clojure.lang.IPersistentMap
+  (deferrable-update [m k f]
+    (update m k f)))
