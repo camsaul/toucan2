@@ -57,7 +57,13 @@
       (testing "Toucan-style [f & args] condition"
         (is (= [{:id 1, :name "Tempest", :category :bar}
                 {:id 2, :name "Ho's Tavern", :category :bar}]
+               (select/select ::venues.category-keyword :category [:= :bar]
+                              {:select   [:id :name :category]
+                               :order-by [[:id :asc]]})
                (select/select ::venues.category-keyword :category [:in [:bar]]
+                              {:select   [:id :name :category]
+                               :order-by [[:id :asc]]})
+               (select/select ::venues.category-keyword :category [:in [:bar :saloon]]
                               {:select   [:id :name :category]
                                :order-by [[:id :asc]]})))))
     (testing "as the PK"
