@@ -74,16 +74,28 @@
     (log/tracef :results ".assoc %s %s" k v)
     (if @already-realized?
       (assoc @realized-row k v)
-      (do
+      (let [^clojure.lang.ITransientMap transient-row' (assoc! transient-row k v)]
         (swap! realized-keys conj k)
-        (assoc! transient-row k v)
-        (assert (= (.valAt transient-row k) v)
+        (assert (= (.valAt transient-row' k) v)
                 (format "assoc! did not do what we expected. k = %s v = %s row = %s .valAt = %s"
                         (pr-str k)
                         (pr-str v)
-                        (pr-str transient-row)
-                        (pr-str (.valAt transient-row k))))
-        this)))
+                        (pr-str transient-row')
+                        (pr-str (.valAt transient-row' k))))
+        ;; `assoc!` might return a different object. In practice, I think it usually doesn't; optimize for that case
+        ;; and return `this` rather than creating a new instance of `TransientRow`.
+        (if (identical? transient-row transient-row')
+          this
+          ;; If `assoc!` did return a different object, then we need to create a new `TransientRow` with the new value
+          (TransientRow. model
+                         rset
+                         builder
+                         column-name->index
+                         realized-keys
+                         i->thunk
+                         transient-row'
+                         already-realized?
+                         realized-row)))))
   ;; TODO -- can we `assocEx` the transient row?
   (assocEx [_this k v]
     (log/tracef :results ".assocEx %s %s" k v)
@@ -92,10 +104,21 @@
     (log/tracef :results ".without %s" k)
     (if @already-realized?
       (dissoc @realized-row k)
-      (do
-        (dissoc! transient-row k)
+      (let [transient-row' (dissoc! transient-row k)]
         (swap! realized-keys disj k)
-        this)))
+        ;; as in the `assoc` method above, we can optimize a bit and return `this` instead of creating a new object if
+        ;; `assoc!` returned the original `transient-row` rather than a different object
+        (if (identical? transient-row transient-row')
+          this
+          (TransientRow. model
+                         rset
+                         builder
+                         column-name->index
+                         realized-keys
+                         i->thunk
+                         transient-row'
+                         already-realized?
+                         realized-row)))))
 
   ;; Java 7 compatible: no forEach / spliterator
   ;;

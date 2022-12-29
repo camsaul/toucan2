@@ -93,10 +93,11 @@
 (deftest ^:parallel merge-test
   (do-with-row
    (fn [row]
-     (merge row {:k 1000})
-     (is (= #{:k}
-            (realized-keys row)))
-     (is (not (already-realized? row))))))
+     (let [row' (merge row {:k 1000})]
+       (doseq [row [row row']]
+         (is (= #{:k}
+                (realized-keys row)))
+         (is (not (already-realized? row))))))))
 
 (deftest ^:parallel contains?-test
   (do-with-row

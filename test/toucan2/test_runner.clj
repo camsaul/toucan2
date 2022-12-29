@@ -82,9 +82,11 @@
   (let [stdout-reporter (if ci?
                           eftest.report.pretty/report
                           eftest.report.progress/report)]
-    (fn handle-event [event]
-      #_(test-runner.junit/handle-event! event) ; TODO
-      (stdout-reporter event))))
+    stdout-reporter
+    ;; TODO -- JUnit support
+    #_(fn handle-event [event]
+        (test-runner.junit/handle-event! event)
+        (stdout-reporter event))))
 
 (defn run
   "Run `test-vars` with `options`, which are passed directly to [[eftest.runner/run-tests]].
