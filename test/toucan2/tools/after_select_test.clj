@@ -106,3 +106,15 @@
              (select/select-one [::people.increment-id :id :name] :id 1)))
       (is (= [1]
              @*selected-people*)))))
+
+(deftest ^:parallel reset-changes-test
+  (testing "Changes made inside after-select should not be considered part of the instance changes"
+    (let [person (select/select-one [::people.increment-id :id :name] :id 1)]
+      (is (= {:id 2, :name "Cam"}
+             person))
+      (testing `protocols/original
+        (is (= {:id 2, :name "Cam"}
+               (protocols/original person))))
+      (testing `protocols/changes
+        (is (= nil
+               (protocols/changes person)))))))
