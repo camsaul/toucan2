@@ -5,6 +5,7 @@
    [toucan2.instance :as instance]
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
+   [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-select :as after-select])
@@ -96,3 +97,24 @@
                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
                  @*venues-awaiting-moderation*)))))))
+
+(derive ::people.record-inserts ::test/people)
+
+(def ^:private ^:dynamic *inserted-people* nil)
+
+(after-insert/define-after-insert ::people.record-inserts
+  [person]
+  (when *inserted-people*
+    (swap! *inserted-people* conj (:name person)))
+  person)
+
+(deftest ^:synchronized only-call-once-test
+  (test/with-discarded-table-changes :people
+    (testing "after-insert method should be applied exactly once"
+      (binding [*inserted-people* (atom [])]
+        (is (= [5]
+               (insert/insert-returning-pks! ::people.record-inserts {:name "CAM"})))
+        (is (= ["CAM"]
+               @*inserted-people*))
+        (is (= {:name "CAM"}
+               (select/select-one [::people.record-inserts :name] 5)))))))

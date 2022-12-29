@@ -41,3 +41,21 @@
 (deftest ^:parallel compose-test
   (is (= [(instance/instance ::people.named-cam.id-and-name {:id 1, :name "Cam", ::after-select? true})]
          (select/select ::people.named-cam.id-and-name))))
+
+(derive ::people.increment-id ::test/people)
+
+(def ^:private ^:dynamic *select-calls* nil)
+
+(before-select/define-before-select ::people.increment-id
+  [args]
+  (when *select-calls*
+    (swap! *select-calls* conj (:kv-args args)))
+  (update-in args [:kv-args :id] inc))
+
+(deftest ^:parallel only-call-once-test
+  (testing "before-select method should be applied exactly once"
+    (binding [*select-calls* (atom [])]
+      (is (= {:id 2, :name "Sam"}
+             (select/select-one [::people.increment-id :id :name] :id 1)))
+      (is (= [{:id 1}]
+             @*select-calls*)))))

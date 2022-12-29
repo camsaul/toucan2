@@ -104,3 +104,25 @@
                                                          :created-at (LocalDateTime/parse "2017-01-01T00:00")
                                                          :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
                (insert! ::venues.before-insert ::named-rows)))))))
+
+(derive ::people.suffix-name ::test/people)
+
+(def ^:private ^:dynamic *inserted-people* nil)
+
+(before-insert/define-before-insert ::people.suffix-name
+  [person]
+  (when *inserted-people*
+    (swap! *inserted-people* conj (:name person)))
+  (cond-> person
+    (:name person) (update :name #(str % " 2.0"))))
+
+(deftest ^:synchronized only-call-once-test
+  (test/with-discarded-table-changes :people
+    (testing "before-insert method should be applied exactly once"
+      (binding [*inserted-people* (atom [])]
+        (is (= [5]
+               (insert/insert-returning-pks! ::people.suffix-name {:name "CAM"})))
+        (is (= ["CAM"]
+               @*inserted-people*))
+        (is (= {:name "CAM 2.0"}
+               (select/select-one [::people.suffix-name :name] 5)))))))

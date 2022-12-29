@@ -88,3 +88,21 @@
     (is (= [(instance/instance ::venues.short-name.composed
                                {:id 1, :name "Tempest", :short-name "Temp", :composed? true})]
            (select/select [::venues.short-name.composed :id :name] {:order-by [[:id :asc]], :limit 1})))))
+
+(derive ::people.increment-id ::test/people)
+
+(def ^:private ^:dynamic *selected-people* nil)
+
+(after-select/define-after-select ::people.increment-id
+  [person]
+  (when *selected-people*
+    (swap! *selected-people* conj (:id person)))
+  (update person :id inc))
+
+(deftest ^:parallel only-call-once-test
+  (testing "after-select method should be applied exactly once"
+    (binding [*selected-people* (atom [])]
+      (is (= {:id 2, :name "Cam"}
+             (select/select-one [::people.increment-id :id :name] :id 1)))
+      (is (= [1]
+             @*selected-people*)))))

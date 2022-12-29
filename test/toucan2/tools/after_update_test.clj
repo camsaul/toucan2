@@ -71,3 +71,24 @@
           (is (= [(instance/instance ::venues.after-update.composed {:id 1, :name "Tempest"})
                   (instance/instance ::venues.after-update.composed {:id 2, :name "Ho's Tavern"})]
                  @*recently-updated-venues*)))))))
+
+(derive ::people.record-updates ::test/people)
+
+(def ^:private ^:dynamic *updated-people*)
+
+(after-update/define-after-update ::people.record-updates
+  [person]
+  (when *updated-people*
+    (swap! *updated-people* conj (:id person)))
+  person)
+
+(deftest ^:synchronized only-call-once-test
+  (test/with-discarded-table-changes :people
+    (testing "after-update method should be applied exactly once"
+      (binding [*updated-people* (atom [])]
+        (is (= 1
+               (update/update! ::people.record-updates 1 {:name "CAM"})))
+        (is (= [1]
+               @*updated-people*))
+        (is (= {:id 1, :name "CAM"}
+               (select/select-one [::people.record-updates :id :name] 1)))))))
