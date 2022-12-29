@@ -168,3 +168,28 @@
                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
                    (select/select [model :id :name :updated-at]
                                   {:order-by [[:id :asc]]})))))))))
+
+(derive ::people.add-favorite-bird-type ::test/people)
+
+(after-insert/define-after-insert ::people.add-favorite-bird-type
+  [person]
+  (assoc person :favorite-bird-type "toucan"))
+
+(deftest ^:synchronized reset-changes-test
+  (test/with-discarded-table-changes :people
+    (testing "Changes made inside after-insert should not be considered part of the instance changes"
+      (let [[row] (insert/insert-returning-instances! ::people.add-favorite-bird-type {:name "Cam Era"})]
+        (is (= {:id                 5
+                :name               "Cam Era"
+                :created-at         nil
+                :favorite-bird-type "toucan"}
+               row))
+        (testing `protocols/original
+          (is (= {:id                 5
+                  :name               "Cam Era"
+                  :created-at         nil
+                  :favorite-bird-type "toucan"}
+                 (protocols/original row))))
+        (testing `protocols/changes
+          (is (= nil
+                 (protocols/changes row))))))))
