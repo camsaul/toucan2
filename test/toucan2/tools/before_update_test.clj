@@ -86,7 +86,7 @@
                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
                (select/select-one ::venues.discard-category-change 1)))))))
 
-(deftest ^:synchronized before-update-pk-condition-test
+(deftest ^:synchronized pk-condition-test
   (testing "define-before-update should call its method with all objects that match update conditions"
     (testing "PK condition"
       (test/with-discarded-table-changes :venues
@@ -113,7 +113,7 @@
             (is (= [{:name "Kennedy's Irish Pub and Curry House"}]
                    (map protocols/changes @*updated-venues*)))))))))
 
-(deftest ^:synchronized before-update-non-pk-condition-test
+(deftest ^:synchronized non-pk-condition-test
   (testing "define-before-update should call its method with all objects that match update conditions"
     (testing "non-PK condition"
       (test/with-discarded-table-changes :venues
@@ -140,7 +140,7 @@
                     {:category "not-store"}]
                    (map protocols/changes @*updated-venues*)))))))))
 
-(deftest ^:synchronized before-update-pk-and-other-conditons-test
+(deftest ^:synchronized pk-and-other-conditons-test
   (testing "define-before-update should call its method with all objects that match update conditions"
     (testing "PK + other conditions"
       (test/with-discarded-table-changes :venues
@@ -160,7 +160,7 @@
             (is (= [{:category "not-bar"}]
                    (map protocols/changes @*updated-venues*)))))))))
 
-(deftest ^:synchronized before-update-no-changes-test
+(deftest ^:synchronized no-changes-test
   (testing "No changes passed to update!* itself -- should no-op"
     (test/with-discarded-table-changes :venues
       (execute/with-call-count [call-count]
@@ -213,7 +213,7 @@
   [venue]
   (assoc venue :category (format "category-%d" (:id venue))))
 
-(deftest ^:synchronized before-update-batch-updates-one-batch-test
+(deftest ^:synchronized batch-updates-one-batch-test
   (testing "Group together updates into one call per set of updates."
     (testing "Only one update needed"
       (test/with-discarded-table-changes :venues
@@ -230,7 +230,7 @@
                          :where  [:= :category "bar"]}]
                        @*venues-update-queries*))))))))))
 
-(deftest ^:synchronized before-update-batch-updates-multiple-batches-test
+(deftest ^:synchronized batch-updates-multiple-batches-test
   (testing "Group together updates into one call per set of updates."
     (testing "Multiple updates needed"
       (test/with-discarded-table-changes :venues
@@ -282,7 +282,7 @@
 (m/prefer-method! #'before-update/before-update ::venues.upper-case-name ::venues.before-update)
 (m/prefer-method! #'before-update/before-update ::venues.add-unique-category ::venues.upper-case-name)
 
-(deftest ^:synchronized before-update-should-compose-test
+(deftest ^:synchronized should-compose-test
   (testing "Make sure define-before-update composes"
     (test/with-discarded-table-changes :venues
       (is (= 1
@@ -306,7 +306,7 @@
 
 (m/prefer-method! #'before-update/before-update ::venues.upper-case-name ::venues.disallow-stores)
 
-(deftest ^:synchronized before-update-transaction-test
+(deftest ^:synchronized transaction-test
   (testing "before-update should run in a transaction; an error during some part should cause all updates to be discarded"
     (testing "Do something that will have to do one updates for each row"
       (test/with-discarded-table-changes :venues
@@ -340,7 +340,7 @@
   [venue]
   (update venue :name str/upper-case))
 
-(deftest ^:synchronized before-update-ignore-columns-added-by-after-select-test
+(deftest ^:synchronized ignore-columns-added-by-after-select-test
   (test/with-discarded-table-changes :venues
     (is (= 1
            (update/update! ::venues.short-name 3 {:name "BevLess"})))))
