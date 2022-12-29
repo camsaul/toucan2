@@ -37,9 +37,9 @@ jobs:
         java-version: 17
         distribution: 'temurin'
     - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@9.5
+      uses: DeLaGuardo/setup-clojure@10.1
       with:
-        cli: 1.11.1.1155
+        cli: 1.11.1.1208
     - name: Restore cache
       uses: actions/cache@v3
       with:
@@ -64,9 +64,9 @@ jobs:
         java-version: 17
         distribution: 'temurin'
     - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@9.5
+      uses: DeLaGuardo/setup-clojure@10.1
       with:
-        cli: 1.11.1.1155
+        cli: 1.11.1.1208
     - name: Restore cache
       uses: actions/cache@v3
       with:
@@ -90,9 +90,9 @@ jobs:
         java-version: 17
         distribution: 'temurin'
     - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@9.5
+      uses: DeLaGuardo/setup-clojure@10.1
       with:
-        cli: 1.11.1.1155
+        cli: 1.11.1.1208
     - name: Restore cache
       uses: actions/cache@v3
       with:
@@ -114,9 +114,9 @@ jobs:
         java-version: 17
         distribution: 'temurin'
     - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@9.5
+      uses: DeLaGuardo/setup-clojure@10.1
       with:
-        cli: 1.11.1.1155
+        cli: 1.11.1.1208
     - name: Restore cache
       uses: actions/cache@v3
       with:
@@ -141,9 +141,9 @@ jobs:
         java-version: 17
         distribution: 'temurin'
     - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@9.5
+      uses: DeLaGuardo/setup-clojure@10.1
       with:
-        cli: 1.11.1.1155
+        cli: 1.11.1.1208
     - name: Restore cache
       uses: actions/cache@v3
       with:

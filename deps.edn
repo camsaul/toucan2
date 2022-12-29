@@ -4,25 +4,25 @@
  :deps
  {better-cond/better-cond             {:mvn/version "2.1.5"}
   camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-  com.github.seancorfield/honeysql    {:mvn/version "2.3.928"}
-  com.github.seancorfield/next.jdbc   {:mvn/version "1.2.796"}
+  com.github.seancorfield/honeysql    {:mvn/version "2.4.962"}
+  com.github.seancorfield/next.jdbc   {:mvn/version "1.3.847"}
   environ/environ                     {:mvn/version "1.2.0"}
-  methodical/methodical               {:mvn/version "0.13.2"}
-  mvxcvi/puget                        {:mvn/version "1.3.2"}
+  methodical/methodical               {:mvn/version "0.15.0.1"}
+  mvxcvi/puget                        {:mvn/version "1.3.4"}
   org.clojure/tools.logging           {:mvn/version "1.2.4"}
   org.clojure/tools.trace             {:mvn/version "0.7.11"}
-  potemkin/potemkin                   {:mvn/version "0.4.5"}
+  potemkin/potemkin                   {:mvn/version "0.4.6"}
   pretty/pretty                       {:mvn/version "1.0.5"}}
 
  :aliases
  {:dev
   {:extra-deps
    {com.h2database/h2            {:mvn/version "2.1.214"}
-    eftest/eftest                {:mvn/version "0.5.9"}
+    eftest/eftest                {:mvn/version "0.6.0"}
     io.github.camsaul/humane-are {:mvn/version "1.0.2"}
     org.clojure/java.classpath   {:mvn/version "1.0.0"}
     org.clojure/tools.namespace  {:mvn/version "1.3.0"}
-    org.postgresql/postgresql    {:mvn/version "42.5.0"}
+    org.postgresql/postgresql    {:mvn/version "42.5.1"}
     pjstadig/humane-test-output  {:mvn/version "0.11.0"}}
 
    :extra-paths
@@ -112,5 +112,5 @@
 
   ;; clojure -T:build
   :build
-  {:deps       {io.github.seancorfield/build-clj {:git/tag "v0.8.3", :git/sha "7ac1f8d"}}
+  {:deps       {io.github.seancorfield/build-clj {:git/tag "v0.9.0", :git/sha "d758807"}}
    :ns-default build}}}
