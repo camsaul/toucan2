@@ -335,7 +335,7 @@
 (derive ::venues.composed-deftransform ::transformed-venues-2)
 
 ;;; Once https://github.com/camsaul/methodical/issues/97 is in place this should no longer be needed.
-(m/prefer-method! transformed/transforms ::transformed-venues-2 ::transformed-venues)
+(m/prefer-method! #'transformed/transforms ::transformed-venues-2 ::transformed-venues)
 
 (deftest ^:parallel compose-deftransforms-test
   (is (= {:id {:in parse-int, :out str}}
