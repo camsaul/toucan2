@@ -404,11 +404,11 @@
 ;;; TODO -- consider renaming this to `*error-on-unknown-key-override*`
 (def ^:dynamic *error-on-unknown-key* nil)
 
-(defonce ^:private global-error-on-unknown-key (atom false))
-
-;;; TODO -- maybe we should just make [[global-error-on-unknown-key]] public so we don't need this separate function.
-(defn set-error-on-unknown-key! [new-value]
-  (reset! global-error-on-unknown-key new-value))
+(defonce ^{:doc "Whether hydration should error when it encounters a key that has no hydration methods associated with
+  it (default: `false`). Global default value. You can bind [[*error-on-unknown-key*]] to temporarily override this
+  value."}
+  global-error-on-unknown-key
+  (atom false))
 
 (defn ^:no-doc error-on-unknown-key? []
   (if (some? *error-on-unknown-key*)
