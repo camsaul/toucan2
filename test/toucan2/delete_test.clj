@@ -9,7 +9,8 @@
    [toucan2.query :as query]
    [toucan2.select :as select]
    [toucan2.test :as test]
-   [toucan2.tools.compile :as tools.compile]))
+   [toucan2.tools.compile :as tools.compile]
+   [toucan2.tools.named-query :as tools.named-query]))
 
 (deftest ^:parallel parse-args-test
   ;; these are basically the same as the select args so we don't need a ton of coverage here.
@@ -123,3 +124,13 @@
              clojure.lang.ExceptionInfo
              #"Don't know how to get a connection from .* :fake-db"
              (delete/delete! :conn :fake-db ::test/venues 3)))))))
+
+(tools.named-query/define-named-query ::bars
+  {:where [:= :category "bar"]})
+
+(deftest ^:synchronized named-query-test
+  (test/with-discarded-table-changes :venues
+    (is (= 2
+           (delete/delete! ::test/venues ::bars)))
+    (is (= [{:id 3, :name "BevMo", :category "store"}]
+           (select/select [::test/venues :id :name :category] {:order-by [[:id :asc]]})))))

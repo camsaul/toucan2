@@ -168,3 +168,26 @@
              clojure.lang.ExceptionInfo
              #"Don't know how to get a connection from .* :fake-db"
              (update/update! :conn :fake-db ::test/venues 1 {:name "Hi-Dive"})))))))
+
+(tools.named-query/define-named-query ::bars
+  {:category "bar"})
+
+(deftest ^:synchronized named-query-test
+  (doseq [update! [#'update/update!
+                   #'update/update-returning-pks!]]
+    (testing update!
+      (test/with-discarded-table-changes :venues
+        (let [result (update! ::test/venues ::bars {:category "saloon"})]
+          (condp = update!
+            #'update/update!
+            (is (= 2
+                   result))
+
+            ;; for whatever reason the order returned here is different between H2 and Postgres
+            #'update/update-returning-pks!
+            (is (= #{1 2}
+                   (set result)))))
+        (is (= [{:id 1, :name "Tempest", :category "saloon"}
+                {:id 2, :name "Ho's Tavern", :category "saloon"}
+                {:id 3, :name "BevMo", :category "store"}]
+               (select/select [::test/venues :id :name :category] {:order-by [[:id :asc]]})))))))
