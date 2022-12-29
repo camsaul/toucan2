@@ -51,7 +51,7 @@
 (before-delete/define-before-delete ::venues.before-delete-exception.clojure-land
   [venue]
   (when *before-delete-calls*
-    (swap! *before-delete-calls* conj ::venues.before-delete-exception.clojure-land))
+    (swap! *before-delete-calls* conj [::venues.before-delete-exception.clojure-land (:id venue)]))
   (update/update! ::test/venues (:id venue) {:updated-at (LocalDateTime/parse "2022-08-16T14:22:00")})
   (when (= (:category venue) "store")
     (throw (ex-info "Don't delete a store!" {:venue venue}))))
@@ -61,7 +61,7 @@
 (before-delete/define-before-delete ::venues.before-delete-exception.db-land
   [venue]
   (when *before-delete-calls*
-    (swap! *before-delete-calls* conj ::venues.before-delete-exception.db-land))
+    (swap! *before-delete-calls* conj [::venues.before-delete-exception.db-land (:id venue)]))
   (when (= (:id venue) 2)
     (delete/delete! ::test/venues 2))
   (when (= (:id venue) 3)
@@ -82,9 +82,10 @@
                                                                    :postgres #"ERROR: duplicate key value violates unique constraint"
                                                                    :h2       #"Unique index or primary key violation"))
                  (delete/delete! model)))
-            #_FIXME
-            #_(is (= [model]
-                     @*before-delete-calls*))
+            (is (= [[model 1]
+                    [model 2]
+                    [model 3]]
+                   @*before-delete-calls*))
             (testing "\nShould be done inside a transaction"
               (is (= [(instance/instance model
                                          {:id         1
@@ -132,3 +133,20 @@
                                       :name     "Ho's Tavern"
                                       :category "bar"})]
                  @@varr)))))))
+
+(derive ::venues.record-before-delete ::test/venues)
+
+(before-delete/define-before-delete ::venues.record-before-delete
+  [venue]
+  (when *deleted-venues*
+    (swap! *deleted-venues* conj (:id venue)))
+  venue)
+
+(deftest ^:synchronized only-call-once-test
+  (testing "before-delete should only be called once"
+    (test/with-discarded-table-changes :venues
+      (binding [*deleted-venues* (atom [])]
+        (is (= 1
+               (delete/delete! ::venues.record-before-delete :id 1)))
+        (is (= [1]
+               @*deleted-venues*))))))

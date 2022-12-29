@@ -5,6 +5,8 @@
 
 (derive :toucan.query-type/update.* ::tools.after/query-type)
 
+;;; The value of this is ultimately ignored, but when composing multiple `after-update` methods the values after each
+;;; method are threaded thru, so this should return the updated row
 (defmacro define-after-update
   {:style/indent :defn}
   [model [instance-binding] & body]

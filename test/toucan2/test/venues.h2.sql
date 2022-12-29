@@ -10,6 +10,6 @@ CREATE TABLE venues (
 
 INSERT INTO venues (name, category)
 VALUES
-('Tempest', 'bar'),
-('Ho''s Tavern', 'bar'),
-('BevMo', 'store');
+('Tempest', 'bar'),      -- 1
+('Ho''s Tavern', 'bar'), -- 2
+('BevMo', 'store');      -- 3

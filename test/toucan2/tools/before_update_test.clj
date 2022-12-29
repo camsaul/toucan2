@@ -197,8 +197,8 @@
 (derive ::venues.capture-updates ::venues.before-update)
 
 (m/defmethod pipeline/transduce-compile [#_query-type :toucan.query-type/update.*
-                                             #_model      ::venues.capture-updates
-                                             #_query      :default]
+                                         #_model      ::venues.capture-updates
+                                         #_query      :default]
   [rf query-type model built-query]
   (when *venues-update-queries*
     (swap! *venues-update-queries* conj built-query))
@@ -357,3 +357,25 @@
              actual))
       (is (= (protocols/model expected)
              (protocols/model actual))))))
+
+(derive ::people.suffix-name ::test/people)
+
+(def ^:private ^:dynamic *updated-people*)
+
+(before-update/define-before-update ::people.suffix-name
+  [person]
+  (when *updated-people*
+    (swap! *updated-people* conj (:id person)))
+  (cond-> person
+    (:name person) (update :name #(str % " 2.0"))))
+
+(deftest ^:synchronized only-call-once-test
+  (test/with-discarded-table-changes :people
+    (testing "before-update method should be applied exactly once"
+      (binding [*updated-people* (atom [])]
+        (is (= 1
+               (update/update! ::people.suffix-name 1 {:name "CAM"})))
+        (is (= [1]
+               @*updated-people*))
+        (is (= {:id 1, :name "CAM 2.0"}
+               (select/select-one [::people.suffix-name :id :name] 1)))))))
