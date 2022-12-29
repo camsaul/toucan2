@@ -522,9 +522,9 @@
       [[[[{:a 1, ::k 5} {:b 2, ::k 5}] {:c 3, ::k 5} {:d 4, ::k 5}] {:e 5, ::k 5} {:f 6, ::k 5}] {:g 7, ::k 5} {:h 8, ::k 5}])))
 
 (deftest ^:synchronized error-on-unknown-key-test
-  (let [original-global-value @@#'hydrate/global-error-on-unknown-key]
+  (let [original-global-value @hydrate/global-error-on-unknown-key]
     (try
-      (hydrate/set-error-on-unknown-key! false)
+      (reset! hydrate/global-error-on-unknown-key false)
       (is (= {}
              (hydrate/hydrate {} ::unknown-key)))
       (testing "dynamic var"
@@ -534,7 +534,7 @@
                #"Don't know how to hydrate :toucan2.tools.hydrate-test/unknown-key"
                (hydrate/hydrate {} ::unknown-key)))))
       (testing "global setting"
-        (hydrate/set-error-on-unknown-key! true)
+        (reset! hydrate/global-error-on-unknown-key true)
         (is (thrown-with-msg?
              Exception
              #"Don't know how to hydrate :toucan2.tools.hydrate-test/unknown-key"
@@ -544,7 +544,7 @@
           (is (= {}
                  (hydrate/hydrate {} ::unknown-key)))))
       (finally
-        (reset! @#'hydrate/global-error-on-unknown-key original-global-value)))))
+        (reset! hydrate/global-error-on-unknown-key original-global-value)))))
 
 (derive ::venues.hydrate-in-after-select ::test.track-realized/venues)
 
