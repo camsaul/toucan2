@@ -125,7 +125,7 @@
 
 ;;;; [[transduce-execute-with-connection]]
 
-(m/defmulti ^:dynamic transduce-execute-with-connection
+(m/defmulti ^:dynamic #_{:clj-kondo/ignore [:dynamic-var-not-earmuffed]} transduce-execute-with-connection
   "The eighth and final step in the query execution pipeline. Called with a fully compiled query that can be executed
   natively, and an open connection for executing it.
 
@@ -160,7 +160,7 @@
 
 ;;;; [[transduce-execute]]
 
-(m/defmulti ^:dynamic transduce-execute
+(m/defmulti ^:dynamic #_{:clj-kondo/ignore [:dynamic-var-not-earmuffed]} transduce-execute
   "The seventh step in the query execution pipeline. Called with a compiled query that is ready to be executed natively, for
   example a `[sql & args]` vector, immediately before opening a connection.
 
@@ -212,7 +212,7 @@
 
 ;;;; [[transduce-compile]]
 
-(m/defmulti ^:dynamic transduce-compile
+(m/defmulti ^:dynamic #_{:clj-kondo/ignore [:dynamic-var-not-earmuffed]} transduce-compile
   "The sixth step in the query execution pipeline. Called with a query that is ready to be compiled, e.g. a fully-formed
   Honey SQL form.
 
@@ -272,7 +272,7 @@
 
 ;;;; [[transduce-build]]
 
-(m/defmulti ^:dynamic transduce-build
+(m/defmulti ^:dynamic #_{:clj-kondo/ignore [:dynamic-var-not-earmuffed]} transduce-build
   "The fifth step in the query execution pipeline. Called with a resolved query immediately before 'building' it.
 
   ```
@@ -370,7 +370,7 @@
 
 ;;;; [[transduce-resolve]]
 
-(m/defmulti ^:dynamic transduce-resolve
+(m/defmulti ^:dynamic #_{:clj-kondo/ignore [:dynamic-var-not-earmuffed]} transduce-resolve
   "The fourth step in the query execution pipeline.
 
   ```
@@ -408,7 +408,7 @@
 
 ;;;; [[transduce-with-model]]
 
-(m/defmulti ^:dynamic transduce-with-model
+(m/defmulti ^:dynamic #_{:clj-kondo/ignore [:dynamic-var-not-earmuffed]} transduce-with-model
   "The third step in the query execution pipeline. This is the first step that dispatches off of resolved model.
 
   ```
@@ -447,7 +447,7 @@
 
 ;;;; [[transduce-parsed]]
 
-(m/defmulti ^:dynamic transduce-parsed
+(m/defmulti ^:dynamic #_{:clj-kondo/ignore [:dynamic-var-not-earmuffed]} transduce-parsed
   "The second step in the query execution pipeline. Called with args as parsed by something like
   [[toucan2.query/parse-args]].
 
@@ -490,7 +490,7 @@
 
 ;;;; [[transduce-unparsed]]
 
-(m/defmulti ^:dynamic transduce-unparsed
+(m/defmulti ^:dynamic #_{:clj-kondo/ignore [:dynamic-var-not-earmuffed]} transduce-unparsed
   "The first step in the query execution pipeline. Called with the unparsed args as passed to something
   like [[toucan2.select/select]], before parsing the args.
 
@@ -534,7 +534,7 @@
     ([x]   (rf x))
     ([x y] (rf x y))))
 
-(m/defmulti ^:dynamic default-rf
+(m/defmulti ^:dynamic #_{:clj-kondo/ignore [:dynamic-var-not-earmuffed]} default-rf
   {:arglists '([query-type])}
   keyword)
 

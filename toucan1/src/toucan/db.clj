@@ -39,7 +39,6 @@
 (defn set-default-quoting-style!
   "Set the default [[quoting-style]]. DEPRECATED: set [[toucan2.map-backend.honeysql2/global-options]] directly."
   [new-quoting-style]
-  map.honeysql/global-options
   (swap! map.honeysql/global-options assoc :dialect new-quoting-style, :quoted (boolean new-quoting-style)))
 
 (defn quoting-style
