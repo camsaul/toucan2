@@ -7,7 +7,9 @@
    [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.after-update :as after-update]
    [toucan2.update :as update]
-   [toucan2.util :as u]))
+   [toucan2.util :as u])
+  (:import
+   (java.time LocalDateTime)))
 
 (set! *warn-on-reflection* true)
 
@@ -92,3 +94,53 @@
                @*updated-people*))
         (is (= {:id 1, :name "CAM"}
                (select/select-one [::people.record-updates :id :name] 1)))))))
+
+(derive ::venues.exception.clojure-land ::test/venues)
+
+(after-update/define-after-update ::venues.exception.clojure-land
+  [venue]
+  (update/update! ::test/venues 1 {:category "place"})
+  ;; trigger a Clojure-land error
+  (when (= (:category venue) "store")
+    (throw (ex-info "Don't update a store!" {:venue venue})))
+  venue)
+
+(derive ::venues.exception.db-land ::test/venues)
+
+(after-update/define-after-update ::venues.exception.db-land
+  [venue]
+  (update/update! ::test/venues 1 {:category "place"})
+  ;; trigger a DB-land error
+  (when (= (:category venue) "store")
+    (update/update! ::test/venues 1 {:venue_name "this column doesn't exist"}))
+  venue)
+
+(deftest ^:synchronized exception-test
+  (doseq [model [::venues.exception.clojure-land
+                 ::venues.exception.db-land]]
+    (testing (format "Model = %s" model)
+      (testing "\nexception in after-update"
+        (test/with-discarded-table-changes :venues
+          (is (thrown-with-msg?
+               clojure.lang.ExceptionInfo
+               (case model
+                 ::venues.exception.clojure-land #"Don't update a store"
+                 ::venues.exception.db-land      (case (test/current-db-type)
+                                                   :postgres #"ERROR: column \"venue_name\" of relation \"venues\" does not exist"
+                                                   :h2       #"Column \"VENUE_NAME\" not found"))
+               (update/update! model 2 {:category "store", :name "My Store"})))
+          (testing "\nShould be done inside a transaction"
+            (is (= [(instance/instance model
+                                       {:id         1
+                                        :name       "Tempest"
+                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                    (instance/instance model
+                                       {:id         2
+                                        :name       "Ho's Tavern"
+                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                    (instance/instance model
+                                       {:id         3
+                                        :name       "BevMo"
+                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                   (select/select [model :id :name :updated-at]
+                                  {:order-by [[:id :asc]]})))))))))

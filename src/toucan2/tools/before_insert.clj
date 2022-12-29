@@ -2,7 +2,9 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.connection :as conn]
    [toucan2.log :as log]
+   [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
 
@@ -22,11 +24,16 @@
 
 ;;; make sure we transform rows whether it's in the parsed args or in the resolved query.
 
-(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/insert.*
-                                                     #_model      ::before-insert]
-  [_rf _query-type model parsed-args]
-  (cond-> parsed-args
-    (:rows parsed-args) (update :rows do-before-insert-to-rows model)))
+(m/defmethod pipeline/transduce-with-model :around [#_query-type :toucan.query-type/insert.*
+                                                    #_model      ::before-insert]
+  [rf query-type model parsed-args]
+  (conn/with-transaction [_conn
+                          (or conn/*current-connectable*
+                              (model/default-connectable model))
+                          {:nested-transaction-rule :ignore}]
+    (let [parsed-args (cond-> parsed-args
+                        (:rows parsed-args) (update :rows do-before-insert-to-rows model))]
+      (next-method rf query-type model parsed-args))))
 
 (m/defmethod pipeline/transduce-build :before [#_query-type :toucan.query-type/insert.*
                                                #_model      ::before-insert

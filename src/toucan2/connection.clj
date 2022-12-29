@@ -153,8 +153,8 @@
   level and what not). One key, `:nested-transaction-rule`, is handled directly in Toucan 2; other options are passed
   directly to the underlying implementation, such as [[next.jdbc.transaction]].
 
-  `:nested-transaction-rule` must be one of `#{:allow :ignore :prohibit}`, a set of possibilities shamelessly borrowed
-  from `next.jdbc`. For non-JDBC implementations, you should treat `:allow` as the default behavior if unspecified."
+  `:nested-transaction-rule` must be one of `#{:allow :ignore :prohibit}`, a set of possibilities borrowed from
+  [[next.jdbc]]. For non-JDBC implementations, you should treat `:allow` as the default behavior if unspecified."
   {:style/indent 1, :arglists '([[conn-binding connectable options?] & body])}
   [[conn-binding connectable options] & body]
   `(with-connection [conn# ~connectable]

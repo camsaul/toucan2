@@ -126,3 +126,52 @@
                @*inserted-people*))
         (is (= {:name "CAM 2.0"}
                (select/select-one [::people.suffix-name :name] 5)))))))
+
+(derive ::venues.exception.clojure-land ::test/venues)
+
+(before-insert/define-before-insert ::venues.exception.clojure-land
+  [venue]
+  (insert/insert! ::test/venues {:name "ANOTHER STORE", :category "bar"})
+  ;; trigger a Clojure-land error
+  (when (= (:category venue) "store")
+    (throw (ex-info "Don't insert a store!" {:venue venue})))
+  venue)
+
+(derive ::venues.exception.db-land ::test/venues)
+
+(before-insert/define-before-insert ::venues.exception.db-land
+  [venue]
+  (insert/insert! ::test/venues {:name "ANOTHER STORE", :category "bar"})
+  ;; trigger a DB-land error
+  (cond-> venue
+    (= (:category venue) "store") (assoc :id 1)))
+
+(deftest ^:synchronized exception-test
+  (doseq [model [::venues.exception.clojure-land
+                 ::venues.exception.db-land]]
+    (testing (format "Model = %s" model)
+      (testing "\nexception in before-insert"
+        (test/with-discarded-table-changes :venues
+          (is (thrown-with-msg?
+               clojure.lang.ExceptionInfo
+               (case model
+                 ::venues.exception.clojure-land #"Don't insert a store"
+                 ::venues.exception.db-land      (case (test/current-db-type)
+                                                   :postgres #"ERROR: duplicate key value violates unique constraint"
+                                                   :h2       #"Unique index or primary key violation"))
+               (insert/insert! model {:category "store", :name "My Store"})))
+          (testing "\nShould be done inside a transaction"
+            (is (= [(instance/instance model
+                                       {:id         1
+                                        :name       "Tempest"
+                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                    (instance/instance model
+                                       {:id         2
+                                        :name       "Ho's Tavern"
+                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                    (instance/instance model
+                                       {:id         3
+                                        :name       "BevMo"
+                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                   (select/select [model :id :name :updated-at]
+                                  {:order-by [[:id :asc]]})))))))))
