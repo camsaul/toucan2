@@ -96,10 +96,12 @@
                          transient-row'
                          already-realized?
                          realized-row)))))
+
   ;; TODO -- can we `assocEx` the transient row?
   (assocEx [_this k v]
     (log/tracef :results ".assocEx %s %s" k v)
     (.assocEx ^clojure.lang.IPersistentMap @realized-row k v))
+
   (without [this k]
     (log/tracef :results ".without %s" k)
     (if @already-realized?
@@ -132,6 +134,7 @@
   (containsKey [_this k]
     (log/tracef :results ".containsKey %s" k)
     (boolean (column-name->index k)))
+
   (entryAt [this k]
     (log/tracef :results ".entryAt %s" k)
     (let [v (.valAt this k ::not-found)]
@@ -160,9 +163,11 @@
       (if-let [[k v] (seq o)]
         (assoc this k v)
         this)))
+
   (empty [_this]
     (log/tracef :results ".empty")
     (instance/empty-map model))
+
   (equiv [_this obj]
     (log/tracef :results ".equiv %s" obj)
     (.equiv ^clojure.lang.IPersistentCollection @realized-row obj))
@@ -172,6 +177,7 @@
   (valAt [this k]
     (log/tracef :results ".valAt %s" k)
     (.valAt this k nil))
+
   (valAt [this k not-found]
     (log/tracef :results ".valAt %s %s" k not-found)
     (cond
@@ -319,25 +325,28 @@
 ;;; preferred to not have to do this but a lot of it was necessary to make things work in the Toucan 2 work. See this
 ;;; Slack thread for more information: https://clojurians.slack.com/archives/C1Q164V29/p1662494291800529
 
+(defn- fetch-column! [builder i->thunk ^clojure.lang.ITransientMap transient-row i]
+  ;; make sure the key is not already present. If it is we don't want to stomp over existing values.
+  (let [col-name (nth (:cols builder) (dec i))]
+    (if (= (.valAt transient-row col-name ::not-found) ::not-found)
+      (let [thunk (@i->thunk i)]
+        (assert (fn? thunk))
+        (next.jdbc.rs/with-column-value builder transient-row col-name (thunk)))
+      transient-row)))
+
 (defn- fetch-all-columns! [builder i->thunk transient-row]
   (log/tracef :results "Fetching all columns")
-  (reduce (fn [^clojure.lang.ITransientMap transient-row i]
-            ;; make sure the key is not already present. If it is we don't want to stomp over existing values.
-            (let [col-name (nth (:cols builder) (dec i))]
-              (if (= (.valAt transient-row col-name ::not-found) ::not-found)
-                (let [thunk (@i->thunk i)]
-                  (assert (fn? thunk))
-                  (next.jdbc.rs/with-column-value builder transient-row col-name (thunk)))
-                transient-row)))
-          transient-row
-          (range 1 (inc (next.jdbc.rs/column-count builder)))))
+  (reduce
+   (partial fetch-column! builder i->thunk)
+   transient-row
+   (range 1 (inc (next.jdbc.rs/column-count builder)))))
 
 (defn- make-realized-row-delay [builder i->thunk transient-row]
   (delay
-    (log/tracef :results "Fully realizing row")
-    (when *fetch-all-columns*
-      (fetch-all-columns! builder i->thunk transient-row))
-    (next.jdbc.rs/row! builder transient-row)))
+    (log/tracef :results "Fully realizing row. *fetch-all-columns* = %s" *fetch-all-columns*)
+    (let [row (cond->> transient-row
+                *fetch-all-columns* (fetch-all-columns! builder i->thunk))]
+      (next.jdbc.rs/row! builder row))))
 
 (defn row
   [model ^ResultSet rset builder i->thunk col-name->index]

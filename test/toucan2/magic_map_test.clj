@@ -204,3 +204,38 @@
     (instance/instance :venues)    false
     (magic-map/magic-map)          true
     (magic-map/magic-map {:a 100}) true))
+
+(deftest ^:parallel lots-of-keys-test
+  (testing "Make sure things still work when we pass the threshold from ArrayMap -> HashMap"
+    (let [m {:date_joined   :%now
+             :email         "nobody@nowhere.com"
+             :first_name    "No"
+             :is_active     true
+             :is_superuser  false
+             :last_login    nil
+             :last_name     "Body"
+             :password      "$2a$10$B/Cu7Nva.Ad.0gtu5g3o7udSbBl2r4YG.jRnxvIUWuNzmO7LCu2Cy"
+             :password_salt "c4467d75-59d2-41a5-9499-e6c5d8db923b"
+             :updated_at    :%now}]
+      (testing `magic-map/magic-map
+        (is (= m
+               (magic-map/magic-map
+                m
+                magic-map/kebab-case-xform))))
+      (testing `into
+        (is (= m
+               (into (magic-map/magic-map {})
+                     m)))))))
+
+(deftest ^:parallel transient-assoc-dissoc-test
+  (testing "Make sure transient `assoc!` and `dissoc!` do the right thing with keys that get transformed"
+    (let [m (reduce (fn [m n]
+                      (assoc! m (str n) n))
+                    (transient (magic-map/magic-map))
+                    (range 15))
+          m (reduce (fn [m n]
+                      (dissoc! m (str n)))
+                    m
+                    (range 15))]
+      (is (= {}
+             (persistent! m))))))

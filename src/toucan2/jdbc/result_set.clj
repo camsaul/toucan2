@@ -25,17 +25,21 @@
   (->row [_this]
     (log/tracef :results "Fetching row %s" (.getRow rset))
     (transient (instance/instance model)))
+
   (column-count [_this]
     (count cols))
+
   ;; this is purposefully not implemented because we should never get here; if we do it is an error and we want an
   ;; Exception thrown.
   #_(with-column [this row i]
       (println (pr-str (list 'with-column 'this 'row i)))
       (next.jdbc.rs/with-column-value this row (nth cols (dec i))
         (next.jdbc.rs/read-column-by-index (.getObject rset ^Integer i) rsmeta i)))
+
   (with-column-value [_this row col v]
     (assert (some? col) "Invalid col")
     (assoc! row col v))
+
   (row! [_this row]
     (log/tracef :results "Converting transient row to persistent row")
     (persistent! row))
@@ -43,8 +47,10 @@
   next.jdbc.rs/ResultSetBuilder
   (->rs [_this]
     (transient []))
+
   (with-row [_this acc row]
     (conj! acc row))
+
   (rs! [_this acc]
     (persistent! acc)))
 

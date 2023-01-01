@@ -17,7 +17,7 @@
    [toucan2.tools.hydrate :as hydrate]
    [toucan2.tools.transformed :as transformed])
   (:import
-   (java.time LocalDateTime)))
+   (java.time LocalDateTime OffsetDateTime)))
 
 (set! *warn-on-reflection* true)
 
@@ -349,3 +349,34 @@
               (hydrate/model-for-automagic-hydration :default k))
     ::database
     ::db))
+
+(derive ::people.default-values ::test/people)
+
+(defn- person-add-default-values
+  [person]
+  (merge
+   {:name "Default Person"}
+   person))
+
+(t1.models/add-property! ::created-at-timestamped
+  :insert (fn [instance]
+            (merge
+             {:created_at (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")}
+             instance)))
+
+(t1.models/define-methods-with-IModel-method-map
+ ::people.default-values
+ {:pre-insert person-add-default-values
+  :properties (constantly {::created-at-timestamped true})})
+
+(deftest ^:synchronized default-values-test
+  (test/with-discarded-table-changes :people
+    (let [expected {:id         6
+                    :name       "Default Person"
+                    :created-at (case (test/current-db-type)
+                                  :h2       (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")
+                                  :postgres (OffsetDateTime/parse "2023-01-01T01:26Z"))}]
+      (is (= expected
+             (t1.db/insert! ::people.default-values {:id 6})))
+      (is (= expected
+             (t1.db/select-one ::people.default-values :id 6))))))

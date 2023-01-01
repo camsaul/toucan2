@@ -26,7 +26,7 @@
 
   ```clj
   (m/defmethod do-with-temp* :before :default
-    [model attributes f]
+    [_model _explicit-attributes f]
     (set-up-db!)
     f)
   ```
@@ -37,7 +37,7 @@
   ```clj
   (merge {} (with-temp-defaults model) explict-attributes)
   ```"
-  {:arglists '([model explicit-attributes f])}
+  {:arglists '([model₁ explicit-attributes f])}
   u/dispatch-on-first-arg)
 
 (m/defmethod do-with-temp* :default
