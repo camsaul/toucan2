@@ -556,7 +556,7 @@
   [venue]
   (hydrate/hydrate (assoc venue :person-id 1, :person-name "Cam") ::person))
 
-(deftest ^:parallel hydrate-in-after-select-test []
+(deftest ^:parallel hydrate-in-after-select-test
   (is (= {:id          1
           :person-id   1
           :person-name "Cam"

@@ -105,23 +105,29 @@
       (if (identical? m m')
         this
         (TransientMagicMap. m' key-xform mta))))
+
   (persistent [_this]
     (let [m (persistent! m)]
       (MagicMap. m key-xform mta)))
+
   (assoc [this k v]
     (let [m' (assoc! m (key-xform k) v)]
       (if (identical? m m')
         this
         (TransientMagicMap. m' key-xform mta))))
+
   (without [this k]
-    (let [m' (dissoc! m k)]
+    (let [m' (dissoc! m (key-xform k))]
       (if (identical? m m')
         this
         (TransientMagicMap. m' key-xform mta))))
+
   (valAt [this k]
     (.valAt this k nil))
+
   (valAt [_this k not-found]
     (.valAt m (key-xform k) not-found))
+
   (count [_this]
     (count m))
 

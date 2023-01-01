@@ -226,3 +226,16 @@
         (is (= m
                (into (magic-map/magic-map {})
                      m)))))))
+
+(deftest ^:parallel transient-assoc-dissoc-test
+  (testing "Make sure transient `assoc!` and `dissoc!` do the right thing with keys that get transformed"
+    (let [m (reduce (fn [m n]
+                      (assoc! m (str n) n))
+                    (transient (magic-map/magic-map))
+                    (range 15))
+          m (reduce (fn [m n]
+                      (dissoc! m (str n)))
+                    m
+                    (range 15))]
+      (is (= {}
+             (persistent! m))))))

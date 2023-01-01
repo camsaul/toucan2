@@ -44,16 +44,16 @@
     (get m k default-value))
 
   (assoc [this k v]
-    (let [new-m (assoc m k v)]
-      (if (identical? m new-m)
+    (let [m' (assoc m k v)]
+      (if (identical? m m')
         this
-        (Instance. model orig new-m mta))))
+        (Instance. model orig m' mta))))
 
   (dissoc [this k]
-    (let [new-m (dissoc m k)]
-      (if (identical? m new-m)
+    (let [m' (dissoc m k)]
+      (if (identical? m m')
         this
-        (Instance. model orig new-m mta))))
+        (Instance. model orig m' mta))))
 
   (keys [_this]
     (keys m))
@@ -147,23 +147,29 @@
       (if (identical? m m')
         this
         (TransientInstance. model m' mta))))
+
   (persistent [_this]
     (let [m (persistent! m)]
       (Instance. model m m mta)))
+
   (assoc [this k v]
     (let [m' (assoc! m k v)]
       (if (identical? m m')
         this
         (TransientInstance. model m' mta))))
+
   (without [this k]
     (let [m' (dissoc! m k)]
       (if (identical? m m')
         this
         (TransientInstance. model m' mta))))
+
   (valAt [_this k]
     (.valAt m k))
+
   (valAt [_this k not-found]
     (.valAt m k not-found))
+
   (count [_this]
     (count m))
 
