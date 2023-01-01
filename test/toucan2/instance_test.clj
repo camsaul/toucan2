@@ -379,3 +379,24 @@
   (let [m1 (instance/instance ::birbs {:a 1})
         m2 (instance/instance ::birbs m1)]
     (is (identical? m1 m2))))
+
+(deftest ^:parallel lots-of-keys-test
+  (testing "Make sure things still work when we pass the threshold from ArrayMap -> HashMap"
+    (let [m {:date_joined   :%now
+             :email         "nobody@nowhere.com"
+             :first_name    "No"
+             :is_active     true
+             :is_superuser  false
+             :last_login    nil
+             :last_name     "Body"
+             :password      "$2a$10$B/Cu7Nva.Ad.0gtu5g3o7udSbBl2r4YG.jRnxvIUWuNzmO7LCu2Cy"
+             :password_salt "c4467d75-59d2-41a5-9499-e6c5d8db923b"
+             :updated_at    :%now}]
+      (testing `instance/instance
+        (is (= m
+               (instance/instance
+                :models/User
+                m))))
+      (testing `into
+        (is (= m
+              (into (instance/instance :models/User) m)))))))

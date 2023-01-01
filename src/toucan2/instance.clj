@@ -143,17 +143,23 @@
 (deftype ^:no-doc TransientInstance [model ^clojure.lang.ITransientMap m mta]
   clojure.lang.ITransientMap
   (conj [this v]
-    (.conj m v)
-    this)
+    (let [m' (conj! m v)]
+      (if (identical? m m')
+        this
+        (TransientInstance. model m' mta))))
   (persistent [_this]
     (let [m (persistent! m)]
       (Instance. model m m mta)))
   (assoc [this k v]
-    (.assoc m k v)
-    this)
+    (let [m' (assoc! m k v)]
+      (if (identical? m m')
+        this
+        (TransientInstance. model m' mta))))
   (without [this k]
-    (.without m k)
-    this)
+    (let [m' (dissoc! m k)]
+      (if (identical? m m')
+        this
+        (TransientInstance. model m' mta))))
   (valAt [_this k]
     (.valAt m k))
   (valAt [_this k not-found]

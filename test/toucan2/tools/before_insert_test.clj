@@ -11,7 +11,7 @@
    [toucan2.tools.named-query :as tools.named-query]
    [toucan2.tools.transformed :as transformed])
   (:import
-   (java.time LocalDateTime)))
+   (java.time LocalDateTime OffsetDateTime)))
 
 (set! *warn-on-reflection* true)
 
@@ -175,3 +175,23 @@
                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
                    (select/select [model :id :name :updated-at]
                                   {:order-by [[:id :asc]]})))))))))
+
+(derive ::people.default-values ::test/people)
+
+(before-insert/define-before-insert ::people.default-values
+  [person]
+  (merge
+   {:name       "Default Person"
+    :created_at (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")}
+   person))
+
+(deftest ^:synchronized default-values-test
+  (test/with-discarded-table-changes :people
+    (is (= 1
+           (insert/insert! ::people.default-values {})))
+    (is (= {:id         5
+            :name       "Default Person"
+            :created-at (case (test/current-db-type)
+                          :h2       (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")
+                          :postgres (OffsetDateTime/parse "2023-01-01T01:26Z"))}
+           (select/select-one ::people.default-values 5)))))

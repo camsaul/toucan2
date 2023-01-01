@@ -246,7 +246,7 @@
                                     column->k)
         model                 (model/resolve-model modelable)]
     (transformed/deftransforms model
-        column->direction->fn)))
+      column->direction->fn)))
 
 (defn types
   "Get the transforms associated with a model. Returns map of `column name => direction => fn`."

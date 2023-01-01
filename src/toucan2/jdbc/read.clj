@@ -161,7 +161,7 @@
 
 ;;; TODO -- why is cljdoc picking this up?
 (when-let [pg-connection-class (try
-                                 (Class/forName "org.postgresql.jdbc.PgConnection")
+                                 (Class/forName "org.postgresql.jdbc.PgConnection") ; TODO -- or is this `org.postgresql.PGConnection`
                                  (catch Throwable _
                                    nil))]
   (m/defmethod read-column-thunk [pg-connection-class :default Types/TIMESTAMP]

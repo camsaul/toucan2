@@ -38,7 +38,7 @@
 
 
 (defmacro with-connection
-  {:arglists '([[connection-binding connectable] & body]
+  {:arglists '([[connection-binding]             & body]
                [[connection-binding connectable] & body])}
   [[connection-binding connectable] & body]
   `(do-with-connection

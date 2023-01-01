@@ -50,16 +50,16 @@
     (get m (key-xform k) default-value))
 
   (assoc [this k v]
-    (let [new-m (assoc m (key-xform k) v)]
-      (if (identical? m new-m)
+    (let [m' (assoc m (key-xform k) v)]
+      (if (identical? m m')
         this
-        (MagicMap. new-m key-xform mta))))
+        (MagicMap. m' key-xform mta))))
 
   (dissoc [this k]
-    (let [new-m (dissoc m (key-xform k))]
-      (if (identical? m new-m)
+    (let [m' (dissoc m (key-xform k))]
+      (if (identical? m m')
         this
-        (MagicMap. new-m key-xform mta))))
+        (MagicMap. m' key-xform mta))))
 
   (keys [_this]
     (keys m))
@@ -101,17 +101,23 @@
 (deftype ^:no-doc TransientMagicMap [^clojure.lang.ITransientMap m key-xform mta]
   clojure.lang.ITransientMap
   (conj [this [k v]]
-    (.conj m [(key-xform k) v])
-    this)
+    (let [m' (conj! m [(key-xform k) v])]
+      (if (identical? m m')
+        this
+        (TransientMagicMap. m' key-xform mta))))
   (persistent [_this]
     (let [m (persistent! m)]
       (MagicMap. m key-xform mta)))
   (assoc [this k v]
-    (.assoc m (key-xform k) v)
-    this)
+    (let [m' (assoc! m (key-xform k) v)]
+      (if (identical? m m')
+        this
+        (TransientMagicMap. m' key-xform mta))))
   (without [this k]
-    (.without m (key-xform k))
-    this)
+    (let [m' (dissoc! m k)]
+      (if (identical? m m')
+        this
+        (TransientMagicMap. m' key-xform mta))))
   (valAt [this k]
     (.valAt this k nil))
   (valAt [_this k not-found]
