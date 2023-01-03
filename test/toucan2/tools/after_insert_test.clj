@@ -8,7 +8,9 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-insert :as after-insert]
-   [toucan2.tools.after-select :as after-select])
+   [toucan2.tools.after-select :as after-select]
+   [toucan2.tools.after-update :as after-update]
+   [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
 
@@ -193,3 +195,21 @@
         (testing `protocols/changes
           (is (= nil
                  (protocols/changes row))))))))
+
+;;; the [[update-test]] bug below was only triggering if at least one after-update method was defined.
+
+(derive ::venues.after-update ::test/venues)
+
+(after-update/define-after-update ::venues.after-update
+  [venue]
+  venue)
+
+(deftest ^:synchronized update-test
+  (testing "You should be able to do update! if you have an after-insert method defined, but no after-update defined"
+    (doseq [f [#'update/update!
+               #'update/update-returning-pks!]]
+      (testing f
+        (test/with-discarded-table-changes :venues
+          (is (some? (f ::venues.after-insert 1 {:name "Lombard Heights Market", :category "liquor-store"})))
+          (is (= {:name "Lombard Heights Market"}
+                 (select/select-one [::venues.after-insert :name] 1))))))))
