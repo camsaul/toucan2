@@ -400,3 +400,14 @@
       (testing `into
         (is (= m
               (into (instance/instance :models/User) m)))))))
+
+(deftest ^:parallel empty-test
+  (testing "(empty instance) should return an empty instance of the same model"
+    (let [instance (instance/instance ::venues {:id 1, :name "Tempest", :category "bar"})]
+      (is (= {:id 1, :name "Tempest", :category "bar"}
+             instance))
+      (let [empty-instance (empty instance)]
+        (is (= {}
+               empty-instance))
+        (is (instance/instance? empty-instance))
+        (is (instance/instance-of? ::venues empty-instance))))))
