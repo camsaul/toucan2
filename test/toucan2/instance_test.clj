@@ -258,7 +258,7 @@
                      (list
                       'toucan2.magic-map/magic-map
                       {:id 1}
-                      (symbol "#'toucan2.magic-map/kebab-case-xform"))))
+                      #_(symbol "#'toucan2.magic-map/kebab-case-xform"))))
       false (pr-str '(toucan2.instance/instance :venues {:id 1})))))
 
 (deftest ^:parallel reset-original-test
@@ -400,3 +400,14 @@
       (testing `into
         (is (= m
               (into (instance/instance :models/User) m)))))))
+
+(deftest ^:parallel empty-test
+  (testing "(empty instance) should return an empty instance of the same model"
+    (let [instance (instance/instance ::venues {:id 1, :name "Tempest", :category "bar"})]
+      (is (= {:id 1, :name "Tempest", :category "bar"}
+             instance))
+      (let [empty-instance (empty instance)]
+        (is (= {}
+               empty-instance))
+        (is (instance/instance? empty-instance))
+        (is (instance/instance-of? ::venues empty-instance))))))

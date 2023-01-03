@@ -36,7 +36,7 @@
   [f & args]
   (eduction
    (map f)
-   (apply reducible-select args)))
+   (pipeline/reducible-unparsed :toucan.query-type/select.instances.fns args)))
 
 (defn select-fn-set
   "Like `select`, but returns a set of values of `(f instance)` for the results. Returns `nil` if the set is empty."

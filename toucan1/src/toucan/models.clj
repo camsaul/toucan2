@@ -8,6 +8,7 @@
    [methodical.core :as m]
    [potemkin :as p]
    [toucan2.instance :as instance]
+   [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
@@ -221,9 +222,10 @@
 
 (defn- resolving-type-fn
   "Return a function that when invoked will invoke the matching function from [[transforms-registry]]"
-  [k direction]
+  [type-name direction]
   (fn [x]
-    ((type-fn k direction) x)))
+    (log/tracef :results "Using type function %s" type-name)
+    ((type-fn type-name direction) x)))
 
 (defn- type-name->direction->resolving-fn
   "Returns map of `direction => resolving-fn`."
@@ -239,11 +241,11 @@
   (deftypes Venue {:category :keyword})
   ```"
   {:style/indent [:form]}
-  [modelable column->k]
+  [modelable column->type-name]
   (let [column->direction->fn (into {}
-                                    (map (fn [[column k]]
-                                           [column (type-name->direction->resolving-fn k)]))
-                                    column->k)
+                                    (map (fn [[column type-name]]
+                                           [column (type-name->direction->resolving-fn type-name)]))
+                                    column->type-name)
         model                 (model/resolve-model modelable)]
     (transformed/deftransforms model
       column->direction->fn)))

@@ -79,6 +79,9 @@
       :else
       false))
 
+  (empty [_this]
+    (Instance. model (empty orig) (empty m) mta))
+
   java.util.Map
   (containsKey [_this k]
     (.containsKey m k))

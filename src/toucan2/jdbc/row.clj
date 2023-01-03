@@ -166,7 +166,7 @@
 
   (empty [_this]
     (log/tracef :results ".empty")
-    (instance/empty-map model))
+    (instance/instance model))
 
   (equiv [_this obj]
     (log/tracef :results ".equiv %s" obj)

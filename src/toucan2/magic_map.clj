@@ -80,6 +80,9 @@
            ;; a plain non-Magic map should be equal to this if it's equal to us when you normalize it
            (= m (normalize-map key-xform x)))))
 
+  (empty [_this]
+    (MagicMap. (empty m) key-xform mta))
+
   java.util.Map
   (containsKey [_ k]
     (.containsKey m (key-xform k)))
@@ -96,7 +99,7 @@
             (cond-> m
               (instance? pretty.core.PrettyPrintable m)
               pretty/pretty)
-            key-xform))))
+            #_key-xform))))
 
 (deftype ^:no-doc TransientMagicMap [^clojure.lang.ITransientMap m key-xform mta]
   clojure.lang.ITransientMap

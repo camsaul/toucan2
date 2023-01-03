@@ -58,6 +58,10 @@
   (derive :toucan.query-type/select.*)
   (derive :toucan.result-type/instances))
 
+;;; [[toucan2.select/select-fn-set]] and [[toucan2.select/select-fn-vec]] queries -- we are applying a specific function
+;;; transform to the results, so we don't want to apply a default fields transform or other stuff like that.
+(derive :toucan.query-type/select.instances.fns :toucan.query-type/select.instances)
+
 (doto :toucan.query-type/insert.update-count
   (derive :toucan.query-type/insert.*)
   (derive :toucan.result-type/update-count))
@@ -300,7 +304,7 @@
               "In %s with dispatch value %s"
               `transduce-build
               (m/dispatch-value transduce-build rf query-type model parsed-args resolved-query))
-  (log/debugf :compile "Build %s" resolved-query)
+  (log/debugf :compile "Build query %s" resolved-query)
   (assert (not (keyword? resolved-query))
           (format "This doesn't look like a resolved query: %s" resolved-query))
   (u/try-with-error-context ["with resolved query" {:query-type     query-type
@@ -396,7 +400,7 @@
               "In %s with dispatch value %s"
               `transduce-resolve
               (m/dispatch-value transduce-resolve rf query-type model parsed-args unresolved-query))
-  (log/debugf :compile "Resolve %s" unresolved-query)
+  (log/debugf :compile "Resolve query %s" unresolved-query)
   (u/try-with-error-context ["with unresolved query" {:query-type query-type
                                                       :unresolved-query unresolved-query
                                                       :parsed-args      parsed-args}]

@@ -135,7 +135,7 @@
       true  (pr-str (list
                      'toucan2.magic-map/magic-map
                      {:id 1}
-                     #'toucan2.magic-map/kebab-case-xform))
+                     #_#'toucan2.magic-map/kebab-case-xform))
       false (pr-str {:id 1}))))
 
 (deftest ^:parallel transient-test
@@ -239,3 +239,13 @@
                     (range 15))]
       (is (= {}
              (persistent! m))))))
+
+(deftest ^:parallel empty-test
+  (testing "(empty instance) should return an empty instance of the same model"
+    (let [m (magic-map/magic-map {:id 1, :name "Tempest", :category "bar"})]
+      (is (= {:id 1, :name "Tempest", :category "bar"}
+             m))
+      (let [empty-m (empty m)]
+        (is (= {}
+               empty-m))
+        (is (magic-map/magic-map? empty-m))))))
