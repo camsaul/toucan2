@@ -258,7 +258,7 @@
                      (list
                       'toucan2.magic-map/magic-map
                       {:id 1}
-                      (symbol "#'toucan2.magic-map/kebab-case-xform"))))
+                      #_(symbol "#'toucan2.magic-map/kebab-case-xform"))))
       false (pr-str '(toucan2.instance/instance :venues {:id 1})))))
 
 (deftest ^:parallel reset-original-test
