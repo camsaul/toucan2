@@ -2,6 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
+   [toucan2.instance :as instance]
    [toucan2.log :as log]
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
@@ -138,3 +139,10 @@
        (let [row (protocols/deferrable-update row :name str/upper-case)]
          (is (= "TEMPEST"
                 (:name row))))))))
+
+(deftest ^:parallel empty-test
+  (do-with-row
+   (fn [row]
+     (let [empty-instance (empty row)]
+       (is (instance/instance? empty-instance))
+       (is (instance/instance-of? ::test/venues empty-instance))))))
