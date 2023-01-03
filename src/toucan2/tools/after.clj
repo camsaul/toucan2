@@ -66,14 +66,19 @@
 
 (m/defmethod pipeline/transduce-execute [#_query-type ::query-type #_model ::model #_compiled-query :default]
   [rf query-type model sql-args]
-  (let [upgraded-type (pipeline/similar-query-type-returning query-type :toucan.result-type/instances)
-        _             (assert upgraded-type (format "Don't know how to upgrade a %s query to one returning instances"
-                                                    query-type))
-        rf*           (result-type-rf query-type model rf)
-        methodd       (if (= query-type upgraded-type)
-                        next-method
-                        pipeline/transduce-execute)]
-    (methodd rf* upgraded-type model sql-args)))
+  ;; if there's no [[each-row-fn]] for this `query-type` then we don't want to "upgrade" the query. For example: maybe a
+  ;; model has an [[each-row-fn]] for `INSERT` queries, but not for `UPDATE`. Since the model derives from `::model`,
+  ;; we end up here either way. But if `query-type` is `UPDATE` we shouldn't touch the query.
+  (if (m/is-default-primary-method? each-row-fn [query-type model])
+    (next-method rf query-type model sql-args)
+    (let [upgraded-type (pipeline/similar-query-type-returning query-type :toucan.result-type/instances)
+          _             (assert upgraded-type (format "Don't know how to upgrade a %s query to one returning instances"
+                                                      query-type))
+          rf*           (result-type-rf query-type model rf)
+          methodd       (if (= query-type upgraded-type)
+                          next-method
+                          pipeline/transduce-execute)]
+      (methodd rf* upgraded-type model sql-args))))
 
 (defn ^:no-doc ^{:style/indent [:form]} define-after-impl
   [next-method query-type model row-fn]
