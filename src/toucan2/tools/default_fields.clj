@@ -39,9 +39,9 @@
                                               [k (f instance)]))))
                         (s/conform ::default-fields (default-fields model)))]
     (map (fn [instance]
-           (into {} (map (fn [field-fn]
-                           (field-fn instance))
-                         field-fns))))))
+           (into (empty instance) (map (fn [field-fn]
+                                         (field-fn instance))
+                                       field-fns))))))
 
 (m/defmethod pipeline/transduce-with-model :around [#_query-type :toucan.result-type/instances
                                                     #_model      ::default-fields]
