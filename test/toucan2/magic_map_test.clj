@@ -239,3 +239,13 @@
                     (range 15))]
       (is (= {}
              (persistent! m))))))
+
+(deftest ^:parallel empty-test
+  (testing "(empty instance) should return an empty instance of the same model"
+    (let [m (magic-map/magic-map {:id 1, :name "Tempest", :category "bar"})]
+      (is (= {:id 1, :name "Tempest", :category "bar"}
+             m))
+      (let [empty-m (empty m)]
+        (is (= {}
+               empty-m))
+        (is (magic-map/magic-map? empty-m))))))
