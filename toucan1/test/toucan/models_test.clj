@@ -11,6 +11,7 @@
    [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-select :as after-select]
@@ -319,7 +320,13 @@
 (deftest ^:parallel default-fields-test
   (testing "check that we can still override default-fields"
     (is (= {:created-at (LocalDateTime/parse "2017-01-01T00:00:00")}
-           (t1.db/select-one [Venue :created-at] :id 1)))))
+           (t1.db/select-one [Venue :created-at] :id 1)))
+    (testing `select/select-one-fn
+      (is (= (java.time.LocalDateTime/parse "2017-01-01T00:00")
+             (select/select-one-fn :created-at Venue 1))))
+    (testing `t1.db/select-one-field
+      (is (= (java.time.LocalDateTime/parse "2017-01-01T00:00")
+             (t1.db/select-one-field :created-at Venue :id 1))))))
 
 (deftest ^:parallel default-fields-fn-test
   (is (= [:id :name :category]

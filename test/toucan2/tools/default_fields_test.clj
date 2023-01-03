@@ -17,8 +17,9 @@
   [:id :name :category])
 
 (deftest ^:parallel select-test
-  (is (= {:select [:id :name :category], :from [[:venues]]}
-         (pipeline/build :toucan.query-type/select.instances ::venues.default-fields {} {})))
+  (testing "In Toucan 2, default fields SHOULD NOT rewrite the query."
+    (is (= {:select [:*], :from [[:venues]]}
+           (pipeline/build :toucan.query-type/select.instances ::venues.default-fields {} {}))))
   (test.track-realized/with-realized-columns [realized-columns]
     (is (= [(instance/instance ::venues.default-fields
                                {:id 1, :name "Tempest", :category "bar"})
@@ -35,7 +36,10 @@
            (pipeline/build :toucan.query-type/select.* ::venues.default-fields {:columns [:id :name]} {})))
     (is (= (instance/instance ::venues.default-fields
                               {:id 1, :name "Tempest"})
-           (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]})))))
+           (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]})))
+    (testing `select/select-one-fn
+      (is (= (java.time.LocalDateTime/parse "2017-01-01T00:00")
+             (select/select-one-fn :created-at ::venues.default-fields 1))))))
 
 (deftest ^:synchronized insert-returning-instances-test
   (test/with-discarded-table-changes :venues
@@ -57,3 +61,17 @@
                              (select/select-one model 1))
       ::venues.anaphor.id       {:name "Tempest", :id 1}
       ::venues.anaphor.category {:name "Tempest", :category "bar"})))
+
+(derive ::venues.default-fields-arbitrary-fns ::test/venues)
+
+(default-fields/define-default-fields ::venues.default-fields-arbitrary-fns
+  [:id
+   [(comp inc :id) ::incremented-id]
+   :name])
+
+(deftest ^:parallel arbitrary-fns-test
+  (testing "Should work with arbitrary functions"
+    (is (= {:id              1
+            ::incremented-id 2
+            :name            "Tempest"}
+           (select/select-one ::venues.default-fields-arbitrary-fns 1)))))
