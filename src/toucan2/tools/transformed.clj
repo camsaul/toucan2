@@ -72,7 +72,8 @@
     (sequential? v)
     (into [(first v)]
           (map (fn xform* [v]
-                 (if (sequential? v)
+                 (if (or (sequential? v)
+                         (set? v))
                    (mapv xform* v)
                    (xform v))))
           (rest v))
