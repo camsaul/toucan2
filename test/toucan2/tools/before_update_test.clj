@@ -160,6 +160,25 @@
             (is (= [{:category "not-bar"}]
                    (map protocols/changes @*updated-venues*)))))))))
 
+(deftest ^:synchronized conditions-map-test
+  (testing "Should work with conditions maps"
+    (test/with-discarded-table-changes :venues
+      (binding [*updated-venues* (atom [])]
+        (is (= 1
+               (update/update! ::venues.before-update {:id 3, :category [:not= "bar"]} {:category "not-bar"})))
+        (is (= "not-bar"
+               (select/select-one-fn :category ::venues.before-update 3)))
+        (testing "current"
+          (is (= [{:id         3
+                   :name       "BevMo"
+                   :category   "not-bar"
+                   :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                   :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
+                 @*updated-venues*)))
+        (testing "changes"
+          (is (= [{:category "not-bar"}]
+                 (map protocols/changes @*updated-venues*))))))))
+
 (deftest ^:synchronized no-changes-test
   (testing "No changes passed to update!* itself -- should no-op"
     (test/with-discarded-table-changes :venues

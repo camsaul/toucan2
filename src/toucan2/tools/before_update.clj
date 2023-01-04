@@ -66,7 +66,7 @@
     (when-let [changes->pk-maps (not-empty (let [rf (changes->affected-pk-maps-rf model changes)]
                                              (pipeline/transduce-with-model
                                               rf
-                                              :toucan.query-type/select.instances
+                                              :toucan.query-type/select.instances.from-update
                                               model
                                               parsed-args)))]
       (log/tracef :compile "changes->pk-maps = %s" changes->pk-maps)

@@ -104,15 +104,27 @@
 (m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/update.*
                                        #_model      :default
                                        #_query      :toucan.map-backend/honeysql2]
-  [rf query-type model {:keys [kv-args changes], :as parsed-args} query]
+  [rf query-type model {:keys [kv-args changes], :as parsed-args} conditions-map]
   (log/debugf :compile "Building UPDATE query for %s" model)
-  (let [parsed-args (assoc parsed-args :kv-args (merge kv-args query))
+  (let [parsed-args (assoc parsed-args :kv-args (merge kv-args conditions-map))
         built-query (-> {:update (table-and-alias model)
                          :set    changes}
-                        (with-meta (meta query)))]
+                        (with-meta (meta conditions-map)))]
     (log/debugf :compile "=> %s" built-query)
     ;; `:changes` are added to `parsed-args` so we can get the no-op behavior in the default method.
     (next-method rf query-type model (assoc parsed-args :changes changes) built-query)))
+
+;;; For building a SELECT query using the args passed to something like [[toucan2.update/update!]]. This is needed to
+;;; implement [[toucan2.tools.before-update]]. The main syntax difference is a map 'resolved-query' is supposed to be
+;;; treated as a conditions map for update instead of as a raw Honey SQL query.
+
+(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/select.instances.from-update
+                                       #_model      :default
+                                       #_query      :toucan.map-backend/honeysql2]
+  ;; treat the resolved query as a conditions map but otherwise behave the same as the
+  ;; `:toucan.query-type/select.instances` impl.
+  [rf query-type model parsed-args conditions-map]
+  (next-method rf query-type model (update parsed-args :kv-args #(merge % conditions-map)) {}))
 
 (m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/delete.*
                                        #_model      :default
