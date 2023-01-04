@@ -30,7 +30,7 @@
   "The default magic map transform function. Converts things to `kebab-case`, preserving namespaces."
   [k]
   (when k
-    (if (and (clojure.core/instance? clojure.lang.Named k) (namespace k))
+    (if (and (instance? clojure.lang.Named k) (namespace k))
       (keyword (->kebab-case (namespace k)) (->kebab-case (name k)))
       (keyword (->kebab-case (name k))))))
 

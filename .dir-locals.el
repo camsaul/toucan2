@@ -9,5 +9,6 @@
                   (eval . (put 'p/def-map-type 'clojure-doc-string-elt 2))
                   (eval . (put-clojure-indent 'p/defprotocol+ '(1 (:defn))))
                   (eval . (put-clojure-indent 'p/def-map-type '(2 nil nil (:defn))))
+                  (eval . (put-clojure-indent 'p/deftype+ '(2 nil nil (:defn))))
                   (eval . (put-clojure-indent 'with-meta '(:form)))
                   (eval . (put-clojure-indent 'with-bindings* '(:form))))))
