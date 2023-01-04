@@ -67,6 +67,22 @@
       (Instance. model orig m new-meta)))
 
   clojure.lang.IPersistentCollection
+  (cons [this o]
+    (cond
+      (map? o)
+      (reduce #(apply assoc %1 %2) this o)
+
+      (clojure.core/instance? java.util.Map o)
+      (reduce
+       #(apply assoc %1 %2)
+       this
+       (into {} o))
+
+      :else
+      (if-let [[k v] (seq o)]
+        (assoc this k v)
+        this)))
+
   (equiv [_this another]
     (cond
       (clojure.core/instance? toucan2.protocols.IModel another)

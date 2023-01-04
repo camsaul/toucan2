@@ -411,3 +411,10 @@
                empty-instance))
         (is (instance/instance? empty-instance))
         (is (instance/instance-of? ::venues empty-instance))))))
+
+(deftest ^:parallel merge-test
+  (let [m (instance/instance ::birds {:name "Parroty"})]
+    (are [m2 expected] (= expected
+                          (merge m m2))
+      {:type :parakeet} {:name "Parroty", :type :parakeet}
+      nil               {:name "Parroty"})))
