@@ -217,20 +217,31 @@
              (t1.db/select-one PhoneNumber :number id))))))
 
 (deftest ^:synchronized update-where!-test
-  (test/with-discarded-table-changes User
-    (t1.db/update-where! User {:first-name [:not= "Cam"]}
-                         :first-name "Cam")
-    (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
-            {:id 2, :first-name "Cam", :last-name "Toucan"}
-            {:id 3, :first-name "Cam", :last-name "Bird"}]
-           (t1.db/select User {:order-by [:id]}))))
-  (test/with-discarded-table-changes User
-    (t1.db/update-where! User {:first-name "Cam"}
-                         :first-name "Not Cam")
-    (is (= [{:id 1, :first-name "Not Cam", :last-name "Saul"}
-            {:id 2, :first-name "Rasta", :last-name "Toucan"}
-            {:id 3, :first-name "Lucky", :last-name "Bird"}]
-           (t1.db/select User {:order-by [:id]})))))
+  (testing :not=
+    (test/with-discarded-table-changes User
+      (t1.db/update-where! User {:first-name [:not= "Cam"]}
+                           :first-name "Cam")
+      (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
+              {:id 2, :first-name "Cam", :last-name "Toucan"}
+              {:id 3, :first-name "Cam", :last-name "Bird"}]
+             (t1.db/select User {:order-by [:id]})))))
+  (testing "simple condition"
+    (test/with-discarded-table-changes User
+      (t1.db/update-where! User {:first-name "Cam"}
+                           :first-name "Not Cam")
+      (is (= [{:id 1, :first-name "Not Cam", :last-name "Saul"}
+              {:id 2, :first-name "Rasta", :last-name "Toucan"}
+              {:id 3, :first-name "Lucky", :last-name "Bird"}]
+             (t1.db/select User {:order-by [:id]})))))
+  (testing "multiple conditions"
+    (test/with-discarded-table-changes User
+      (t1.db/update-where! User {:first-name "Cam"
+                                 :id         [:in #{1 2 3}]}
+                           :first-name "Not Cam")
+      (is (= [{:id 1, :first-name "Not Cam", :last-name "Saul"}
+              {:id 2, :first-name "Rasta", :last-name "Toucan"}
+              {:id 3, :first-name "Lucky", :last-name "Bird"}]
+             (t1.db/select User {:order-by [:id]}))))))
 
 (deftest ^:synchronized update-non-nil-keys!-test
   (test/with-discarded-table-changes User
