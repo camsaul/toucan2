@@ -248,6 +248,10 @@
   (model [_this]
     model)
 
+  protocols/IDispatchValue
+  (dispatch-value [_this]
+    (protocols/dispatch-value model))
+
   protocols/IDeferrableUpdate
   (deferrable-update [this k f]
     (log/tracef :results "Doing deferrable update of %s with %s" k f)

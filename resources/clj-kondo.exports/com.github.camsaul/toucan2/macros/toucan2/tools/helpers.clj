@@ -14,6 +14,7 @@
      ~model
      (fn [~(common/ignore-unused '&query-type)
           ~(common/ignore-unused '&model)
+          ~(common/ignore-unused '&parsed-args)
           ~instance-binding]
        ~@body)))
 

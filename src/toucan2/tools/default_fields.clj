@@ -43,8 +43,7 @@
                                          (field-fn instance))
                                        field-fns))))))
 
-(m/defmethod pipeline/transduce-with-model :around [#_query-type :toucan.result-type/instances
-                                                    #_model      ::default-fields]
+(m/defmethod pipeline/transduce-with-model :around [:toucan.result-type/instances ::default-fields]
   [rf query-type model parsed-args]
   (log/debugf :results "Model %s has default fields" model)
   (cond
@@ -67,6 +66,20 @@
       (let [xform (default-fields-xform model)
             rf'   (xform rf)]
         (next-method rf' query-type model parsed-args)))))
+
+;;; the `::default-fields` `:around` method should be considered more specific than the `:around` method used
+;;; by [[toucan2.tools.after-select]]. Less-specific `:around` methods are applied first, which means that the
+;;; `after-select` version should be applied around our method e.g.
+;;;
+;;;    (transduce-with-model
+;;;      (after-select
+;;;        (default-fields
+;;;          ...)))
+;;;
+;;; By doing this, after-select can add additional columns outside of those added by default-fields.
+(m/prefer-method! #'toucan2.pipeline/transduce-with-model
+                  [:toucan.result-type/instances ::default-fields]
+                  [:toucan.query-type/select.instances :toucan2.tools.after-select/after-select])
 
 (defmacro define-default-fields {:style/indent :defn} [model & body]
   `(let [model# ~model]

@@ -8,6 +8,7 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
+   [toucan2.tools.after-select :as after-select]
    [toucan2.tools.default-fields :as default-fields]))
 
 (set! *warn-on-reflection* true)
@@ -92,3 +93,27 @@
             ::incremented-id 2
             :name            "Tempest"}
            (select/select-one ::venues.default-fields-arbitrary-fns 1)))))
+
+(derive ::venues.add-price ::venues.default-fields)
+
+(after-select/define-after-select ::venues.add-price
+  [venue]
+  (assoc venue :price "$$$"))
+
+(deftest ^:parallel after-select-with-default-fields-test
+  (testing "default-fields should work in combination with after-select"
+    (is (= {:id 1, :name "Tempest", :category "bar", :price "$$$"}
+           (select/select-one ::venues.add-price 1)))))
+
+(derive ::venues.with-created-at ::venues.default-fields)
+
+(default-fields/define-default-fields ::venues.with-created-at
+  [:id :name :category :created-at])
+
+(deftest ^:parallel override-less-specific-impl-test
+  (testing "Should be able to override less-specific :default-fields"
+    (is (= {:id         1
+            :name       "Tempest"
+            :category   "bar"
+            :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00"),}
+           (select/select-one ::venues.with-created-at 1)))))

@@ -89,6 +89,17 @@
                                {:id 1, :name "Tempest", :short-name "Temp", :composed? true})]
            (select/select [::venues.short-name.composed :id :name] {:order-by [[:id :asc]], :limit 1})))))
 
+(derive ::venues.short-name.more-specific ::venues.short-name)
+
+(after-select/define-after-select ::venues.short-name.more-specific
+  [venue]
+  (assoc venue :long-name (str (:short-name venue) "_long")))
+
+(deftest ^:parallel compose-more-specific-test
+  (testing "More-specific methods should be called with the results of less-specific methods"
+    (is (= {:name "Tempest", :short-name "Temp", :long-name "Temp_long", :id 1}
+           (select/select-one [::venues.short-name.more-specific :id :name] 1)))))
+
 (derive ::people.increment-id ::test/people)
 
 (def ^:private ^:dynamic *selected-people* nil)

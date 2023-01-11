@@ -1,9 +1,7 @@
 (ns hooks.toucan2.tools.with-temp
   (:require [clj-kondo.hooks-api :as hooks]))
 
-(defn with-temp [{{[_ {bindings :children} & body] :children, :as node} :node}]
-  #_(println "\n\nBEFORE\n")
-  #_(clojure.pprint/pprint (hooks/sexpr node))
+(defn with-temp [{{[_with-temp {bindings :children} & body] :children} :node}]
   (let [bindings* (into
                    []
                    (comp (partition-all 3)
@@ -21,6 +19,4 @@
                         (hooks/token-node 'let)
                         (hooks/vector-node bindings*)
                         body))]
-    #_(println "\n\nAFTER\n")
-    #_(clojure.pprint/pprint (hooks/sexpr node*))
     {:node node*}))
