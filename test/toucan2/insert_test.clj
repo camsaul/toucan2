@@ -92,6 +92,23 @@
                                                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
               (select/select-one ::test/venues 4)))))))
 
+(deftest ^:synchronized string-model-test
+  (testing "insert! should work with string table names as the model"
+    (conn/with-connection [_conn ::test/db]
+      (do-both-types-of-insert
+       (fn [returning-keys? insert!]
+         (is (= (if returning-keys?
+                  [4]
+                  1)
+                (insert! (str (model/table-name ::test/venues)) {:name "Grant & Green", :category "bar"})))
+         (testing "Venue 4 should exist now"
+           (is (= (instance/instance ::test/venues {:id         4
+                                                    :name       "Grant & Green"
+                                                    :category   "bar"
+                                                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                  (select/select-one ::test/venues 4)))))))))
+
 (deftest ^:synchronized multiple-rows-test
   (doseq [rows-fn [#'list #'vector]
           :let    [rows (rows-fn
