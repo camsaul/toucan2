@@ -9,9 +9,10 @@
   {:arglists '([instance])}
   u/dispatch-on-first-arg)
 
-(tools.simple-out-transform/define-out-transform [:toucan.query-type/select.instances ::after-select]
+;;; Do after-select for anything returning instances, not just SELECT. [[toucan2.insert/insert-returning-instances!]]
+;;; should do after-select as well.
+(tools.simple-out-transform/define-out-transform [:toucan.result-type/instances ::after-select]
   [instance]
-  ;; don't do after-select if this select is a result of doing something like insert-returning instances
   (if (isa? &query-type :toucan2.pipeline/select.instances-from-pks)
     instance
     (after-select instance)))

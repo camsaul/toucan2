@@ -6,6 +6,8 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.select :as select]
    [toucan2.test :as test]
+   [toucan2.tools.after-insert :as after-insert]
+   [toucan2.tools.after-select :as after-select]
    [toucan2.tools.with-temp :as with-temp]))
 
 (defn- do-with-temp-test [thunk]
@@ -179,3 +181,37 @@
             (is (= :not-here
                    bird)
                 "should never get here.")))))))
+
+(derive ::birds.after-select ::birds.with-default-type)
+
+(after-select/define-after-select ::birds.after-select
+  [bird]
+  (assoc bird :loves-seeb true))
+
+(deftest ^:synchronized do-after-select-test
+  (do-with-temp-test
+   (fn []
+     (testing "with-temp should invoke after-select methods"
+       (with-temp/with-temp [::birds.after-select bird]
+         (is (= {:name       "birb"
+                 :bird-type  "parakeet"
+                 :good-bird  nil
+                 :loves-seeb true}
+                (dissoc bird :id))))))))
+
+(derive ::birds.after-insert ::birds.with-default-type)
+
+(after-insert/define-after-insert ::birds.after-insert
+  [bird]
+  (assoc bird :best-friend true))
+
+(deftest ^:synchronized do-after-insert-test
+  (do-with-temp-test
+   (fn []
+     (testing "with-temp should invoke after-insert methods"
+       (with-temp/with-temp [::birds.after-insert bird]
+         (is (= {:name        "birb"
+                 :bird-type   "parakeet"
+                 :good-bird   nil
+                 :best-friend true}
+                (dissoc bird :id))))))))

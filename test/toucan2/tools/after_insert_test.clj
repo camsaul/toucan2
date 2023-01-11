@@ -78,8 +78,10 @@
   [venue]
   (assoc venue :after-select? true))
 
-(deftest ^:synchronized dont-do-after-select-test
-  (testing "After-insert should not do after-select stuff"
+(deftest ^:synchronized do-after-select-test
+  (testing "insert-returning-instances! should do after-select as well"
+    ;; TODO -- what about insert that doesn't return instances? I guess it has to be 'upgraded' to return instances in
+    ;; order to do after-insert stuff...
     (test/with-discarded-table-changes :venues
       (binding [*venues-awaiting-moderation* (atom [])]
         (is (= [{:id                   4
@@ -87,9 +89,11 @@
                  :category             "liquor-store"
                  :created-at           (LocalDateTime/parse "2017-01-01T00:00")
                  :updated-at           (LocalDateTime/parse "2017-01-01T00:00")
-                 :awaiting-moderation? true}]
+                 :awaiting-moderation? true
+                 :after-select?        true}]
                (insert/insert-returning-instances! ::venues.after-insert.after-select
                                                    {:name "Lombard Heights Market", :category "liquor-store"})))
+        ;; I guess after-insert happens before after-select? Not 100% sure whether this makes sense.
         (testing "should be added to *venues-awaiting-moderation*"
           (is (= [(instance/instance
                    ::venues.after-insert.after-select

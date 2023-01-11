@@ -15,9 +15,6 @@
 
 (set! *warn-on-reflection* true)
 
-(after-select/define-after-select ::people [person]
-  (assoc person ::after-select? true))
-
 (derive ::venues.short-name ::test/venues)
 
 (after-select/define-after-select ::venues.short-name
@@ -42,7 +39,7 @@
   {:name {:in  identity
           :out identity}})
 
-(deftest ^:synchronized after-select-should-not-affect-insert-test
+(deftest ^:synchronized after-select-insert-test
   (doseq [model [::venues.short-name
                  ::venues.short-name-with-transforms]]
     (testing model
@@ -59,12 +56,30 @@
       (test/with-discarded-table-changes :venues
         (is (= [4]
                (insert/insert-returning-pks! model :name "Tin Vietnamese", :category "restaurant"))))
-      (test/with-discarded-table-changes :venues
-        (is (= [(instance/instance model
-                                   {:id 4, :name "Tin Vietnamese", #_:short-name #_"Tin ", :category "restaurant"})]
-               (insert/insert-returning-instances! [model :id :name :category]
-                                                   :name "Tin Vietnamese"
-                                                   :category "restaurant")))))))
+      (testing "Do after-select for insert-returning-instances"
+        (testing "after-select should be done for insert-returning-instances!"
+          (test/with-discarded-table-changes :venues
+            (is (=  [{:id         4
+                      :name       "Savoy Tivoli"
+                      :short-name "Savo"
+                      :category   "bar"
+                      :created-at (LocalDateTime/parse "2023-01-11T18:44")
+                      :updated-at (LocalDateTime/parse "2023-01-11T18:44")}]
+                    (insert/insert-returning-instances! ::venues.short-name
+                                                        {:name       "Savoy Tivoli"
+                                                         :category   "bar"
+                                                         :created-at (LocalDateTime/parse "2023-01-11T18:44")
+                                                         :updated-at (LocalDateTime/parse "2023-01-11T18:44")})))))
+        (testing "[model & fields] syntax"
+          ;; & fields happens in the query so stuff added by after-select should still come back.
+          (test/with-discarded-table-changes :venues
+            (is (= [(instance/instance model
+                                       {:id 4, :name "Tin Vietnamese", :short-name "Tin ", :category "restaurant"})]
+                   (insert/insert-returning-instances! [model :id :name :category]
+                                                       :name "Tin Vietnamese"
+                                                       :category "restaurant")))))))))
+
+;;; TODO This should probably be done for `update-returning-instances!` too once we implement it.
 
 (deftest ^:synchronized after-select-should-not-affect-update-test
   (doseq [model [::venues.short-name

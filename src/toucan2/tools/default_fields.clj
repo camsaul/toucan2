@@ -79,7 +79,7 @@
 ;;; By doing this, after-select can add additional columns outside of those added by default-fields.
 (m/prefer-method! #'toucan2.pipeline/transduce-with-model
                   [:toucan.result-type/instances ::default-fields]
-                  [:toucan.query-type/select.instances :toucan2.tools.after-select/after-select])
+                  [:toucan.result-type/instances :toucan2.tools.after-select/after-select])
 
 (defmacro define-default-fields {:style/indent :defn} [model & body]
   `(let [model# ~model]

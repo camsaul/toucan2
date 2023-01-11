@@ -368,7 +368,7 @@
   create an `:around` method:
 
   ```clj
-  (defmethod toucan2.tools.transforms :around ::my-model
+  (m/defmethod toucan2.tools.transforms :around ::my-model
     [_model]
     {:field {:in name, :out keyword}})
   ```"
