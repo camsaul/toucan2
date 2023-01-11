@@ -59,11 +59,17 @@
   [rf query-type model {:keys [columns], :as parsed-args} resolved-query]
   (log/debugf :compile "Building SELECT query for %s with columns %s" model columns)
   (let [parsed-args    (dissoc parsed-args :columns)
-        resolved-query (-> (merge {:select (or (not-empty columns)
-                                               [:*])}
-                                  (when model
-                                    {:from [(table-and-alias model)]})
-                                  resolved-query)
+        resolved-query (-> (merge
+                            ;; only splice in the default `:select` and `:from` if we don't have `:union` or
+                            ;; `:union-all` in the resolved query. It doesn't make sense to do a `x UNION y` query and
+                            ;; then include `FROM` as well
+                            (when-not ((some-fn :union :union-all) resolved-query)
+                              (merge
+                               {:select (or (not-empty columns)
+                                            [:*])}
+                               (when model
+                                 {:from [(table-and-alias model)]})))
+                            resolved-query)
                            (with-meta (meta resolved-query)))]
     (log/debugf :compile "=> %s" resolved-query)
     (next-method rf query-type model parsed-args resolved-query)))

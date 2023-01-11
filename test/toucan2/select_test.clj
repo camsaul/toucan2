@@ -61,6 +61,13 @@
               :where  [:and [:= :a :b] [:= :id 1]]}
              (pipeline/build :toucan.query-type/select.* :default {:kv-args {:id 1}} {:where [:= :a :b]}))))))
 
+(deftest ^:parallel build-query-dont-override-union-test
+  (testing "Honey SQL backend of build-query should not splice in defaults when `:union` or `:union-all` are in the query"
+    (are [query] (= query
+                    (pipeline/build :toucan.query-type/select.* :default {} query))
+      {:union []}
+      {:union-all []})))
+
 (m/defmethod query/apply-kv-arg [#_model :default #_query :toucan.map-backend/honeysql2 #_k ::custom.limit]
   [_model honeysql-form _k limit]
   (assoc honeysql-form :limit limit))
