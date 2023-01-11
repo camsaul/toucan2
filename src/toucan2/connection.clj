@@ -116,6 +116,7 @@
   (fn [connection-string _f]
     (connection-string-protocol connection-string)))
 
+#_{:clj-kondo/ignore [:redundant-fn-wrapper]} ; FIXME
 (m/defmethod do-with-connection String
   [connection-string f]
   (do-with-connection-string connection-string f))

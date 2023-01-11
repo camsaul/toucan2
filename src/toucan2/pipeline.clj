@@ -414,6 +414,7 @@
                                                       :parsed-args      parsed-args}]
     (next-method rf query-type model parsed-args unresolved-query)))
 
+#_{:clj-kondo/ignore [:redundant-fn-wrapper]} ; FIXME
 (m/defmethod transduce-resolve :default
   [rf query-type model parsed-args unresolved-query]
   (transduce-build rf query-type model parsed-args unresolved-query))

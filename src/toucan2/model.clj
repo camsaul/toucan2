@@ -44,6 +44,7 @@
     (throw (ex-info (format "Invalid model %s: don't know how to get its table name." (pr-str model))
                     {:model model}))))
 
+#_{:clj-kondo/ignore [:redundant-fn-wrapper]} ; FIXME
 (m/defmethod table-name clojure.lang.Named
   [model]
   (name model))
