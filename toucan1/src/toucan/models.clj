@@ -19,7 +19,6 @@
    [toucan2.tools.after-update :as after-update]
    [toucan2.tools.before-delete :as before-delete]
    [toucan2.tools.before-insert :as before-insert]
-   [toucan2.tools.before-select :as before-select]
    [toucan2.tools.before-update :as before-update]
    [toucan2.tools.default-fields :as default-fields]
    [toucan2.tools.hydrate :as hydrate]
@@ -96,7 +95,7 @@
 
 ;;;; Properties
 
-;;; TODO Does this *need* to be a macro?
+;;; This is a macro because [[before-select/define-before-select]] and the like are macros
 (defmacro add-property!
   "Define a new 'property' named by namespaced keyword `k`, which these days is really just a helper for defining one or
   more of [[toucan2.tools.before-insert]], [[toucan2.tools.before-update]], or [[toucan2.tools.before-select]] at the
@@ -107,26 +106,29 @@
   [[toucan2.tools.before-select/define-before-select]] directly."
   {:style/indent 1}
   [k & {:keys [insert select], update-fn :update}]
-  `(do
-     (derive ~k ::property)
-     ~(when insert
-        `(let [insert-fn# ~insert]
-           (before-insert/define-before-insert ~k
-             [instance#]
-             (insert-fn# instance#))))
-     ~(when update-fn
-        `(let [update-fn# ~update-fn]
-           (before-update/define-before-update ~k
-             [instance#]
-             (update-fn# instance#))))
-     ~(when select
-        `(let [select-fn# ~select]
-           (before-select/define-before-select ~k
-             [instance#]
-             (select-fn# instance#))))))
+  (let [k (if (namespace k)
+            k
+            (keyword "toucan.models.properties" (name k)))]
+    `(do
+       (derive ~k ::property)
+       ~(when insert
+          `(let [insert-fn# ~insert]
+             (before-insert/define-before-insert ~k
+               [instance#]
+               (insert-fn# instance#))))
+       ~(when update-fn
+          `(let [update-fn# ~update-fn]
+             (before-update/define-before-update ~k
+               [instance#]
+               (update-fn# instance#))))
+       ~(when select
+          `(let [select-fn# ~select]
+             (after-select/define-after-select ~k
+               [instance#]
+               (select-fn# instance#)))))))
 
 (s/fdef add-property!
-  :args (s/cat :key (every-pred keyword? namespace)
+  :args (s/cat :key keyword?
                :fns (s/+ (s/cat :fn-type #{:select :insert :update}
                                 :fn       any?)))
   :ret  any?)
@@ -150,12 +152,15 @@
   {:style/indent [:form]}
   [modelable properties-map]
   (let [model (model/resolve-model modelable)]
-    (doseq [[k v] properties-map]
+    (doseq [[k v] properties-map
+            :let [k (if (namespace k)
+                      k
+                      (keyword "toucan.models.properties" (name k)))]]
       ;; do we *really* need to enforce this?
       (assert (and (keyword? k)
                    (namespace k)
                    (isa? k ::property))
-              (format "Keys in the properties map must be namespaced keywords defined by %s" `add-property!))
+              (format "Keys in the properties map must be keywords defined by %s" `add-property!))
       (assert (true? v) "For historical reason, all values in the properties map must be equal to `true`.")
       (derive model k))))
 
