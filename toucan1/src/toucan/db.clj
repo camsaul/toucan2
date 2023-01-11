@@ -2,6 +2,8 @@
   "Helper functions for querying the DB and inserting or updating records using Toucan models."
   (:refer-clojure :exclude [count])
   (:require
+   [camel-snake-kebab.core :as csk]
+   [clojure.set :as set]
    [honey.sql :as hsql]
    [methodical.core :as m]
    [potemkin :as p]
@@ -11,8 +13,7 @@
    [toucan2.delete :as delete]
    [toucan2.execute :as execute]
    [toucan2.insert :as insert]
-   [toucan2.instance :as instance]
-   [toucan2.jdbc.query :as jdbc.query]
+   [toucan2.jdbc :as jdbc]
    [toucan2.log :as log]
    [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
@@ -49,16 +50,20 @@
       (get @map.honeysql/global-options :dialect)))
 
 (def ^:dynamic *automatically-convert-dashes-and-underscores*
-  "Whether to automatically convert dashes in keywords to `snake_case` when compiling HoneySQL queries, even when
-  quoting. This is `false` by default.
+  "Whether to automatically convert dashes in keywords to `snake_case` when compiling HoneySQL queries, even when quoting,
+  and to convert underscores in result column names to dashes (i.e., convert to `lisp-case`). This is `false` by
+  default.
 
-  DEPRECATED: binding [[toucan2.map-backend.honeysql/*options*]] instead."
+  DEPRECATED: bind [[toucan2.map-backend.honeysql/*options*]] and [[toucan2.jdbc/*options*]] instead."
   nil)
 
 (defn set-default-automatically-convert-dashes-and-underscores!
   "DEPRECATED: set [[toucan2.map-backend.honeysql2/global-options]] directly."
   [automatically-convert-dashes-and-underscores]
-  (swap! map.honeysql/global-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores)))
+  (swap! map.honeysql/global-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores))
+  (if automatically-convert-dashes-and-underscores
+    (swap! jdbc/global-options assoc :label-fn csk/->kebab-case)
+    (swap! jdbc/global-options dissoc :label-fn)))
 
 (defn automatically-convert-dashes-and-underscores?
   []
@@ -77,10 +82,26 @@
      (when (some? convert?)
        {:quoted-snake convert?}))))
 
+(defn set-default-jdbc-options!
+  "DEPRECATED: Set [[toucan2.jdbc.query/global-options]] directly instead."
+  [jdbc-options]
+  (swap! jdbc/global-options merge (merge
+                                    ;; apparently if you don't set `:identifiers` we're supposed to be defaulting
+                                    ;; to [[u/lower-case-en]]
+                                    {:label-fn u/lower-case-en}
+                                    (set/rename-keys jdbc-options {:identifiers :label-fn}))))
+
+(defn- jdbc-options []
+  (merge
+   (when *automatically-convert-dashes-and-underscores*
+     {:label-fn csk/->kebab-case})
+   jdbc/*options*))
+
 (m/defmethod pipeline/transduce-with-model [#_query-type :default #_model :toucan1/model]
   [rf query-type model parsed-args]
   (log/debugf :compile "Compiling Honey SQL query for legacy Toucan 1 model %s" model)
-  (binding [map.honeysql/*options* (honeysql-options)]
+  (binding [map.honeysql/*options* (honeysql-options)
+            jdbc/*options*         (jdbc-options)]
     (next-method rf query-type model parsed-args)))
 
 ;; replaces `*db-connection*`
@@ -92,16 +113,6 @@
   (m/defmethod conn/do-with-connection :default
     [_connectable f]
     (conn/do-with-connection connectable f)))
-
-;; (defonce ^:private default-default-jdbc-options {:identifiers u/lower-case})
-
-;; (defonce ^:private default-jdbc-options
-;;   (atom default-default-jdbc-options))
-
-(defn set-default-jdbc-options!
-  "DEPRECATED: Set [[toucan2.jdbc.query/global-options]] directly instead."
-  [jdbc-options]
-  (swap! jdbc.query/global-options jdbc-options))
 
 
 
@@ -139,27 +150,27 @@
   (pipeline/compile :default :default honeysql-form))
 
 ;;; TODO -- are we sure we need to do things this way? Can't this stuff be bound in a pipeline method?
-(deftype ^:no-doc Toucan1ReducibleQuery [honeysql-form jdbc-options]
+(deftype ^:no-doc Toucan1ReducibleQuery [honeysql-form query-jdbc-options]
   clojure.lang.IReduceInit
   (reduce [this rf init]
     (log/debugf :results "reduce Toucan 1 reducible query %s" this)
-    (binding [jdbc.query/*options*    (merge jdbc.query/*options* jdbc-options)
+    (binding [jdbc/*options*         (merge jdbc/*options* query-jdbc-options)
               map.honeysql/*options* (honeysql-options)]
       (reduce ((map realize/realize) rf) init (execute/reducible-query nil honeysql-form))))
 
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `->Toucan1ReducibleQuery honeysql-form jdbc-options)))
+    (list `->Toucan1ReducibleQuery honeysql-form query-jdbc-options)))
 
 (defn reducible-query
   "DEPRECATED: Use [[toucan2.execute/reducible-query]] instead."
-  [honeysql-form & {:as jdbc-options}]
-  (->Toucan1ReducibleQuery honeysql-form jdbc-options))
+  [honeysql-form & {:as query-jdbc-options}]
+  (->Toucan1ReducibleQuery honeysql-form query-jdbc-options))
 
 (defn query
   "DEPRECATED: use [[toucan2.execute/query]] instead."
-  [honeysql-form & jdbc-options]
-  (realize/realize (apply reducible-query honeysql-form jdbc-options)))
+  [honeysql-form & query-jdbc-options]
+  (realize/realize (apply reducible-query honeysql-form query-jdbc-options)))
 
 (defn qualify
   ^clojure.lang.Keyword [modelable field-name]
@@ -213,7 +224,7 @@
 (defn execute!
   "DEPRECATED: use [[toucan2.execute/query-one]] instead."
   [honeysql-form & {:as options}]
-  (binding [jdbc.query/*options* (merge jdbc.query/*options* options)]
+  (binding [jdbc/*options* (merge jdbc/*options* options)]
     (execute/query-one honeysql-form)))
 
 (defn update!
@@ -275,10 +286,6 @@
 (m/defmethod model/primary-keys SimpleModel
   [{:keys [original-model]}]
   (model/primary-keys original-model))
-
-(m/defmethod instance/key-transform-fn SimpleModel
-  [{:keys [original-model]}]
-  (instance/key-transform-fn original-model))
 
 (m/defmethod pipeline/transduce-with-model [#_query-type :default #_model SimpleModel]
   [rf query-type model parsed-args]

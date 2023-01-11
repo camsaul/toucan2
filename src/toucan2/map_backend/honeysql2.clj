@@ -139,10 +139,13 @@
 
 ;;;; Query compilation
 
-(defonce global-options
+(def global-options
+  "Default global options to pass to [[honey.sql/format]]."
   (atom {:quoted true, :dialect :ansi, :quoted-snake true}))
 
-(def ^:dynamic *options* nil)
+(def ^:dynamic *options*
+  "Option override when to pass to [[honey.sql/format]]."
+  nil)
 
 (m/defmethod pipeline/transduce-compile [#_query-type :default
                                          #_model      :default

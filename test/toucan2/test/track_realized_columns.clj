@@ -1,10 +1,10 @@
 (ns toucan2.test.track-realized-columns
   "A version of the `venues` model that tracks which columns are realized."
   (:require
+   [camel-snake-kebab.core :as csk]
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.jdbc.read :as jdbc.read]
-   [toucan2.magic-map :as magic-map]
    [toucan2.test :as test]))
 
 (set! *warn-on-reflection* true)
@@ -22,8 +22,8 @@
 (m/defmethod jdbc.read/read-column-thunk :before [#_conn :default #_model ::track-realized #_col-type :default]
   [_conn _model _rset ^java.sql.ResultSetMetaData rsmeta ^Integer i]
   (when *realized-columns*
-    (let [table-name (magic-map/->kebab-case-string (.getTableName rsmeta i))
-          col-name   (magic-map/->kebab-case-string (.getColumnName rsmeta i))]
+    (let [table-name (csk/->kebab-case (.getTableName rsmeta i))
+          col-name   (csk/->kebab-case (.getColumnName rsmeta i))]
       (swap! *realized-columns* conj (keyword table-name col-name))))
   i)
 

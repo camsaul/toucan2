@@ -16,7 +16,8 @@
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.hydrate :as hydrate]
-   [toucan2.tools.transformed :as transformed])
+   [toucan2.tools.transformed :as transformed]
+   [toucan2.util :as u])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -129,7 +130,7 @@
       [row]
       (assoc row :after-select? true))
     (transformed/deftransforms ::PostSelect
-      {:name {:in str/upper-case, :out str/lower-case}})
+      {:name {:in str/upper-case, :out u/lower-case-en}})
     (testing `t1.models/post-select
       (is (= {:name "bevmo", :after-select? true}
              (t1.models/post-select (instance/instance ::PostSelect {:name "BevMo"})))))
@@ -183,7 +184,7 @@
 ;;       [row]
 ;;       (assoc row :before-insert? true))
 ;;     (transformed/deftransforms ::BeforeInsert
-;;       {:name {:in str/upper-case, :out str/lower-case}})
+;;       {:name {:in str/upper-case, :out u/lower-case-en}})
 ;;     (testing `t1.models/do-pre-insert
 ;;       (is (= {:name "BEVMO", :before-insert? true}
 ;;              (t1.models/do-pre-insert ::BeforeInsert {:name "BevMo"}))))
@@ -207,7 +208,7 @@
 ;;     [row]
 ;;     (assoc row :before-update? true))
 ;;   (transformed/deftransforms ::BeforeUpdate
-;;     {:name {:in str/upper-case, :out str/lower-case}})
+;;     {:name {:in str/upper-case, :out u/lower-case-en}})
 ;;   (testing `t1.models/do-pre-update
 ;;     (is (= {:name "BEVMO", :before-update? true}
 ;;            (t1.models/do-pre-update ::BeforeUpdate {:name "BevMo"}))))
@@ -243,7 +244,7 @@
 ;;   (assoc row :after-insert? true))
 
 ;; (transformed/deftransforms ::PostInsert
-;;   {:name {:in str/upper-case, :out str/lower-case}})
+;;   {:name {:in str/upper-case, :out u/lower-case-en}})
 
 ;; (deftest do-post-insert-test
 ;;   (testing (str `t1.models/post-insert " needs to pick up transforms AND `before-insert`")
@@ -276,7 +277,7 @@
 ;;       [row]
 ;;       (assoc row :after-update? true))
 ;;     (transformed/deftransforms ::PostUpdate
-;;       {:name {:in str/upper-case, :out str/lower-case}})
+;;       {:name {:in str/upper-case, :out u/lower-case-en}})
 ;;     (testing `t1.models/post-update
 ;;       (is (= {:name "bevmo", :after-update? true}
 ;;              (t1.models/post-update (instance/instance ::PostUpdate {:name "BevMo"})))))))
@@ -305,7 +306,7 @@
 ;;   (swap! pre-deleted conj (assoc row :before-delete? true)))
 
 ;; (transformed/deftransforms ::BeforeDelete
-;;   {:name {:in str/upper-case, :out str/lower-case}})
+;;   {:name {:in str/upper-case, :out u/lower-case-en}})
 
 ;; (deftest do-pre-delete-test
 ;;   (reset! pre-deleted [])

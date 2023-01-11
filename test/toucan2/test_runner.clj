@@ -13,7 +13,8 @@
    [environ.core :as env]
    [humane-are.core :as humane-are]
    [pjstadig.humane-test-output :as humane-test-output]
-   [toucan2.test :as test]))
+   [toucan2.test :as test]
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
@@ -39,6 +40,7 @@
 (defmethod find-tests java.io.File
   [^java.io.File file]
   (when (.isDirectory file)
+    #_{:clj-kondo/ignore [:discouraged-var]}
     (println "Looking for test namespaces in directory" (str file))
     (->> (ns.find/find-namespaces-in-dir file)
          (filter (fn [ns-symb]
@@ -65,6 +67,7 @@
 
 (defn tests [{:keys [only]}]
   (when only
+    #_{:clj-kondo/ignore [:discouraged-var]}
     (println "Running tests in" (pr-str only)))
   (find-tests only))
 
@@ -73,7 +76,7 @@
 (alter-var-root #'eftest.runner/synchronized?
                 (constantly (complement test/parallel?)))
 
-(def ^:private ci? (some-> (env/env :ci) str/lower-case parse-boolean))
+(def ^:private ci? (some-> (env/env :ci) u/lower-case-en parse-boolean))
 
 (defn- reporter
   "Create a new test reporter/event handler, a function with the signature `(handle-event event)` that gets called once
@@ -121,6 +124,7 @@
 
   To use our test runner from the REPL, use [[run]] instead."
   [options]
+  #_{:clj-kondo/ignore [:discouraged-var]}
   (let [start-time-ms (System/currentTimeMillis)
         summary       (run (tests options) options)
         fail?         (pos? (+ (:error summary) (:fail summary)))]

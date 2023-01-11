@@ -6,7 +6,6 @@
    [methodical.impl.combo.operator :as m.combo.operator]
    [toucan2.instance :as instance]
    [toucan2.log :as log]
-   [toucan2.magic-map :as magic-map]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
@@ -150,8 +149,7 @@
 ;;;; after select (or other things returning instances)
 
 (defn- apply-result-row-transform [instance k xform]
-  (assert (and (map? instance)
-               (not (magic-map/magic-map? instance)))
+  (assert (map? instance)
           (format "%s expected map rows, got %s" `apply-result-row-transform (pr-str instance)))
   ;; The "Special Optimizations" below *should* be the default case, but if some other aux methods are in place or
   ;; custom impls it might not be; things should still work normally either way.

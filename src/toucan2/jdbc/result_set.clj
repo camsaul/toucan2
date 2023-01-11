@@ -6,6 +6,7 @@
    [methodical.core :as m]
    [next.jdbc.result-set :as next.jdbc.rs]
    [toucan2.instance :as instance]
+   [toucan2.jdbc :as jdbc]
    [toucan2.jdbc.read :as jdbc.read]
    [toucan2.jdbc.row :as jdbc.row]
    [toucan2.log :as log]
@@ -75,18 +76,16 @@
          i)))))
 
 (defn instance-builder-fn
-  "Create a result set map builder function appropriate for passing as the `:builder-fn` option to [[next.jdbc]] that will
-  create [[toucan2.instance]]s of `model` using namespaces determined by [[toucan2.model/table-name->namespace]] and the
-  key transform [[toucan2.instance/key-transform-fn]]."
+  "Create a result set map builder function appropriate for passing as the `:builder-fn` option to [[next.jdbc]] that
+  will create [[toucan2.instance]]s of `model` using namespaces determined
+  by [[toucan2.model/table-name->namespace]]."
   [model ^ResultSet rset opts]
-  (let [key-xform      (instance/key-transform-fn model)
-        _              (log/debugf :results "Using key xform fn %s" key-xform)
-        table-name->ns (model/table-name->namespace model)
+  (let [table-name->ns (model/table-name->namespace model)
         _              (log/debugf :results "Using table namespaces %s" table-name->ns)
-        label-fn       (comp name key-xform)
+        label-fn       (get opts :label-fn name)
         qualifier-fn   (memoize
                         (fn [table]
-                          (let [table    (name (key-xform table))
+                          (let [table    (label-fn (name table))
                                 table-ns (some-> (get table-name->ns table) name)]
                             (log/tracef :results "Using namespace %s for columns in table %s" table-ns table)
                             table-ns)))
@@ -101,7 +100,8 @@
 
 (m/defmethod builder-fn :default
   [_conn model rset opts]
-  (instance-builder-fn model rset opts))
+  (let [merged-opts (jdbc/merge-options opts)]
+    (instance-builder-fn model rset merged-opts)))
 
 (defn reduce-result-set [rf init conn model ^ResultSet rset opts]
   (log/debugf :execute "Reduce JDBC result set for model %s with rf %s and init %s" model rf init)
@@ -110,7 +110,7 @@
                            (builder-fn conn model rset opts)
                            (jdbc.read/read-column-by-index-fn row-num->i->thunk))
         builder           (builder-fn* rset opts)
-        combined-opts     (merge (:opts builder) opts)
+        combined-opts     (jdbc/merge-options (merge (:opts builder) opts))
         label-fn          (get combined-opts :label-fn)
         _                 (assert (fn? label-fn) "Options must include :label-fn")
         col-names         (get builder :cols (next.jdbc.rs/get-modified-column-names

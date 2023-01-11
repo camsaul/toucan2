@@ -13,10 +13,12 @@
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
    [toucan2.connection :as conn]
-   [toucan2.instance :as instance]
+   [toucan2.jdbc :as jdbc]
    [toucan2.map-backend.honeysql2 :as map.honeysql]
+   [toucan2.pipeline :as pipeline]
    [toucan2.test :as test]
-   [toucan2.tools.compile :as tools.compile])
+   [toucan2.tools.compile :as tools.compile]
+   [toucan2.util :as u])
   (:import
    (java.util Locale)))
 
@@ -27,13 +29,7 @@
 (comment heroes/keep-me
          test-setup/keep-me)
 
-(deftest ^:parallel simple-model-test
-  (testing "Simple model should use the same key transform as the original model"
-    (is (identical? (instance/key-transform-fn PhoneNumber)
-                    (instance/key-transform-fn (t1.db/->SimpleModel PhoneNumber))))))
-
-;;; TODO
-#_(deftest override-quote-style-test
+(deftest ^:parallel override-quote-style-test
     (is (= "`toucan`"
            (binding [t1.db/*quoting-style* :mysql]
              ((t1.db/quote-fn) "toucan"))))
@@ -62,33 +58,35 @@
 
 (defn- mangle-a-chars
   [s]
-  (-> s name str/lower-case (str/replace "a" "â") keyword))
-
-(m/defmethod instance/key-transform-fn ::mangled-identifiers
-  [_model]
-  mangle-a-chars)
+  (-> s name u/lower-case-en (str/replace "a" "â") keyword))
 
 (derive ::UserWithMangledIdentifiers User)
 (derive ::UserWithMangledIdentifiers ::mangled-identifiers)
+
+(m/defmethod pipeline/transduce-with-model [:default ::mangled-identifiers]
+  [rf query-type model parsed-args]
+  (binding [jdbc/*options* (assoc jdbc/*options* :label-fn mangle-a-chars)]
+    (next-method rf query-type model parsed-args)))
+
+(m/prefer-method! #'pipeline/transduce-with-model [:default ::mangled-identifiers] [:default :toucan1/model])
 
 (deftest ^:parallel custom-identifiers-test
   (testing "Note the circumflexes over 'a's"
     (is (= #{:first-nâme :lâst-nâme :id}
            (-> (t1.db/select-one ::UserWithMangledIdentifiers) keys set)))))
 
-;; TODO
-#_(deftest ^:parallel default-to-lower-case-key-xform-test
-    (is (= [str/lower-case #{:first-name :last-name :id}] ; Note the absence of circumflexes over a's
-           (let [original-options @@(var t1.db/default-jdbc-options)]
-             (try
-               (t1.db/set-default-jdbc-options! {:identifiers mangle-a-chars})
-               ;; Setting default options without `:identifiers` should default to str/lower-case. If it doesn't, we can expect
-               ;; either the current value `mangle-a-chars` (:identifiers wasn't updated), or nil (overwritten).
-               (t1.db/set-default-jdbc-options! {})
-               [(:identifiers @@(var t1.db/default-jdbc-options))
-                (-> (t1.db/select-one 'User) keys set)]
-               (finally
-                 (t1.db/set-default-jdbc-options! original-options)))))))
+(deftest ^:synchronized default-to-lower-case-key-xform-test
+  (let [original-options @jdbc/global-options]
+    (try
+      (t1.db/set-default-jdbc-options! {:identifiers mangle-a-chars})
+      (testing "Setting default options without `:identifiers` should default to str/lower-case. "
+        (is (= {:label-fn u/lower-case-en}
+               (select-keys (t1.db/set-default-jdbc-options! {}) [:label-fn]))))
+      (testing "Note the absence of circumflexes over a's"
+        (is (= #{:first-name :last-name :id}
+               (-> (t1.db/select-one 'User) keys set))))
+      (finally
+        (reset! jdbc/global-options original-options)))))
 
 (deftest ^:synchronized transaction-test
   (testing "Test transaction"

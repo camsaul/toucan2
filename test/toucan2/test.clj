@@ -1,5 +1,6 @@
 (ns toucan2.test
   (:require
+   [camel-snake-kebab.core :as csk]
    [clojure.java.io :as io]
    [clojure.spec.alpha :as s]
    [clojure.string :as str]
@@ -11,9 +12,12 @@
    [pjstadig.humane-test-output :as humane-test-output]
    [puget.printer :as puget]
    [toucan2.connection :as conn]
+   [toucan2.jdbc :as jdbc]
    [toucan2.log :as log]
    [toucan2.map-backend.honeysql2 :as map.honeysql]
-   [toucan2.model :as model]))
+   [toucan2.model :as model]
+   [toucan2.pipeline :as pipeline]
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
@@ -44,7 +48,7 @@
    (db-types-from-env (env/env :test-dbs)))
   ([s]
    (when (string? s)
-     (not-empty (set (for [s (str/split (str/lower-case (str/trim s)) #"\s*,\s*")
+     (not-empty (set (for [s (str/split (u/lower-case-en (str/trim s)) #"\s*,\s*")
                            :when (seq s)]
                        (keyword s)))))))
 
@@ -76,6 +80,7 @@
         :h2)
       (first (db-types))))
 
+#_{:clj-kondo/ignore [:discouraged-var]}
 (println "Running tests against DB types:" (pr-str (db-types)))
 
 ;;;; custom version of [[t/test-var]]
@@ -119,6 +124,8 @@
                                          (fnil inc 0)))
   (wrap-test-var! varr)
   (orig-test-var varr))
+
+#_{:clj-kondo/ignore [:discouraged-var]}
 (println "Wrapped" #'t/test-var "as" #'test-var*)
 
 (doto #'t/test-var
@@ -137,6 +144,7 @@
   (doto cider-test-var
     (alter-var-root (constantly cider-test-var*))
     (alter-meta! merge (select-keys (meta #'cider-test-var*) [:ns :name :file :column :line])))
+  #_{:clj-kondo/ignore [:discouraged-var]}
   (println "Wrapped" cider-test-var "as" #'cider-test-var*))
 
 ;;;; default HoneySQL options
@@ -293,6 +301,11 @@
 (m/defmethod model/default-connectable ::models
   [_model]
   ::db)
+
+(m/defmethod pipeline/transduce-with-model [:default ::models]
+  [rf query-type model parsed-args]
+  (binding [jdbc/*options* (assoc jdbc/*options* :label-fn csk/->kebab-case)]
+    (next-method rf query-type model parsed-args)))
 
 ;;;; conveniences for REPL-based usage. These are not used in tests.
 

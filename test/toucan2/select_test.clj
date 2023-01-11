@@ -1,6 +1,5 @@
 (ns toucan2.select-test
   (:require
-   [clojure.string :as str]
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.connection :as conn]
@@ -14,7 +13,8 @@
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.compile :as tools.compile]
-   [toucan2.tools.named-query :as tools.named-query])
+   [toucan2.tools.named-query :as tools.named-query]
+   [toucan2.util :as u])
   (:import
    (java.time LocalDateTime OffsetDateTime)))
 
@@ -352,7 +352,7 @@
   (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
          (select/select-fn->fn :id :name ::test/people)))
   (is (= {2 "cam", 3 "sam", 4 "pam", 5 "tam"}
-         (select/select-fn->fn (comp inc :id) (comp str/lower-case :name) ::test/people)))
+         (select/select-fn->fn (comp inc :id) (comp u/lower-case-en :name) ::test/people)))
   (testing "Should return nil if the result is empty"
     (is (nil? (select/select-fn->fn :id :name ::test/people :id 100)))))
 
@@ -360,7 +360,7 @@
   (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
          (select/select-pk->fn :name ::test/people)))
   (is (= {1 "cam", 2 "sam", 3 "pam", 4 "tam"}
-         (select/select-pk->fn (comp str/lower-case :name) ::test/people)))
+         (select/select-pk->fn (comp u/lower-case-en :name) ::test/people)))
   (testing "Composite PKs"
     (is (= {[1 "Cam"] "Cam", [2 "Sam"] "Sam", [3 "Pam"] "Pam", [4 "Tam"] "Tam"}
            (select/select-pk->fn :name ::people.composite-pk))))
@@ -371,7 +371,7 @@
   (is (= {"Cam" 1, "Sam" 2, "Pam" 3, "Tam" 4}
          (select/select-fn->pk :name ::test/people)))
   (is (= {"cam" 1, "sam" 2, "pam" 3, "tam" 4}
-         (select/select-fn->pk (comp str/lower-case :name) ::test/people)))
+         (select/select-fn->pk (comp u/lower-case-en :name) ::test/people)))
   (testing "Composite PKs"
     (is (= {"Cam" [1 "Cam"], "Sam" [2 "Sam"], "Pam" [3 "Pam"], "Tam" [4 "Tam"]}
   (testing "Should return nil if the result is empty"
