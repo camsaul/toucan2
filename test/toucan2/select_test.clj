@@ -32,7 +32,9 @@
     [:model ::my-query]                      {:modelable :model, :queryable ::my-query}
     [:conn :db :model]                       {:connectable :db, :modelable :model, :queryable {}}
     [:conn :db :model ::my-query]            {:connectable :db, :modelable :model, :queryable ::my-query}
-    [:conn :db :model :id 1]                 {:connectable :db, :modelable :model, :kv-args {:id 1}, :queryable {}}))
+    [:conn :db :model :id 1]                 {:connectable :db, :modelable :model, :kv-args {:id 1}, :queryable {}}
+    [[:model :col] :query]                   {:modelable :model, :columns [:col], :queryable :query}
+    [[:model [:expr :col]] :query]           {:modelable :model, :columns [[:expr :col]], :queryable :query}))
 
 (deftest ^:parallel default-build-query-test
   (is (= {:select [:*]
@@ -106,7 +108,10 @@
              (select/select ::test/people :id 1))))
     (testing "columns"
       (is (= [(instance/instance ::test/people {:id 1})]
-             (select/select [::test/people :id] :id 1))))))
+             (select/select [::test/people :id] :id 1)))
+      (testing "[expr identifier]"
+        (is (= [(instance/instance ::test/people {:person-number 1})]
+               (select/select [::test/people [:id :person-number]] :id 1)))))))
 
 (deftest ^:parallel select-test-2
   (let [all-rows [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}

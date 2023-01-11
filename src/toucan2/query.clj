@@ -13,11 +13,16 @@
   (s/? (s/cat :key         (partial = :conn)
               :connectable any?)))
 
+(s/def ::default-args.modelable.column
+  (s/or :column keyword?
+        :expr-column (s/cat :expr   any?
+                            :column keyword?)))
+
 (s/def ::default-args.modelable
   (s/or
    :modelable         (complement sequential?)
    :modelable-columns (s/cat :modelable some? ; can't have a nil model. Or can you?
-                             :columns   (s/* keyword?))))
+                             :columns   (s/* (s/nonconforming ::default-args.modelable.column)))))
 
 ;;; TODO -- can we use [[s/every-kv]] for this stuff?
 (s/def ::default-args.kv-args
