@@ -383,3 +383,10 @@
   (testing "This is just a dummy test to make sure the var actually exists."
     (is (= false
            t1.db/*disable-db-logging*))))
+
+(deftest ^:parallel honeysql->sql
+  (is (= [(case (test/current-db-type)
+            :h2       "SELECT * FROM \"USER\" WHERE \"NAME\" = ?"
+            :postgres "SELECT * FROM \"user\" WHERE \"name\" = ?")
+          "Cam"]
+         (t1.db/honeysql->sql {:select [:*], :from [:user], :where [:= :name "Cam"]}))))

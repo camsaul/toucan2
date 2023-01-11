@@ -147,7 +147,7 @@
 (defn honeysql->sql
   "DEPRECATED: Use [[toucan2.pipeline/compile]] instead."
   [honeysql-form]
-  (pipeline/compile :default :default honeysql-form))
+  (pipeline/compile honeysql-form))
 
 ;;; TODO -- are we sure we need to do things this way? Can't this stuff be bound in a pipeline method?
 (deftype ^:no-doc Toucan1ReducibleQuery [honeysql-form query-jdbc-options]
