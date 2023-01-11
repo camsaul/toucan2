@@ -54,7 +54,7 @@
        (log/tracef :compile "The following values have changed: %s" changes)
        (cond-> changes->pks
          (seq changes) (update changes (fn [pks]
-                                         (conj (set pks) (model/primary-key-values model row)))))))))
+                                         (conj (set pks) (model/primary-key-values-map model row)))))))))
 
 ;;; TODO -- this is sort of problematic since it breaks [[toucan2.tools.compile]]
 (defn- apply-before-update-to-matching-rows

@@ -12,6 +12,7 @@
    [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.protocols :as protocols]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-insert :as after-insert]
@@ -203,6 +204,36 @@
     (is (= true
            (t1.db/update! Category 2 :parent-category-id 4)))))
 
+(derive ::venues.pre-update ::test/venues)
+
+(def ^:private ^:dynamic *updated-venue* nil)
+
+(t1.models/define-methods-with-IModel-method-map
+ ::venues.pre-update
+ {:pre-update (fn [venue]
+                (when *updated-venue*
+                  (reset! *updated-venue* venue))
+                venue)})
+
+(deftest ^:synchronized pre-update-only-changes-test
+  (testing "Toucan-1 style pre-update should be called with pk + changes"
+    (test/with-discarded-table-changes :venues
+      (binding [*updated-venue* (atom nil)]
+        (is (= true
+               (t1.db/update! ::venues.pre-update 1 :name "Savoy Tivoli")))
+        (is (= {:id 1, :name "Savoy Tivoli"}
+               @*updated-venue*))
+        (testing "Should still be able to get the entire original object"
+          (is (= {:id         1
+                  :name       "Tempest"
+                  :category   "bar"
+                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                 (protocols/original @*updated-venue*))))
+        (testing "Should still be able to get only the changes"
+          (is (= {:name "Savoy Tivoli"}
+                 (protocols/changes @*updated-venue*))))))))
+
 ;; (deftest do-pre-update-test
 ;;   ;; needs to pick up transforms AND `before-update`
 ;;   (before-update/define-before-update ::BeforeUpdate
@@ -324,10 +355,10 @@
     (is (= {:created-at (LocalDateTime/parse "2017-01-01T00:00:00")}
            (t1.db/select-one [Venue :created-at] :id 1)))
     (testing `select/select-one-fn
-      (is (= (java.time.LocalDateTime/parse "2017-01-01T00:00")
+      (is (= (LocalDateTime/parse "2017-01-01T00:00")
              (select/select-one-fn :created-at Venue 1))))
     (testing `t1.db/select-one-field
-      (is (= (java.time.LocalDateTime/parse "2017-01-01T00:00")
+      (is (= (LocalDateTime/parse "2017-01-01T00:00")
              (t1.db/select-one-field :created-at Venue :id 1))))))
 
 (deftest ^:parallel default-fields-fn-test
@@ -406,6 +437,6 @@
       (isa? ::people.unnamespaced-property :toucan.models.properties/unnamespaced))
     (is (= {:id                           1
             :name                         "Cam"
-            :created-at                   (java.time.OffsetDateTime/parse "2020-04-21T23:56Z")
+            :created-at                   (OffsetDateTime/parse "2020-04-21T23:56Z")
             :unnamespaced-select-property true}
            (t1.db/select-one ::people.unnamespaced-property 1)))))

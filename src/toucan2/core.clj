@@ -84,7 +84,7 @@
 
  [toucan2.model
   default-connectable
-  primary-key-values
+  primary-key-values-map
   primary-keys
   resolve-model
   select-pks-fn

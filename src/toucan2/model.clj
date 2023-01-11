@@ -85,11 +85,10 @@
                       {:model model, :result pk-or-pks})))
     pks))
 
-;;; TODO -- rename to `primary-key-values-map`
-(defn primary-key-values
+(defn primary-key-values-map
   "Return a map of primary key values for a Toucan 2 `instance`."
   ([instance]
-   (primary-key-values (protocols/model instance) instance))
+   (primary-key-values-map (protocols/model instance) instance))
   ([model m]
    (select-keys m (primary-keys model))))
 

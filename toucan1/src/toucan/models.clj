@@ -464,7 +464,22 @@
   [_k model f]
   (before-update/define-before-update model
     [row]
-    (f (realize/realize row))))
+    ;; Toucan 1 compatibility: in Toucan 1, `pre-update` was called with the changes passed to `update!` and the primary
+    ;; key of the model. e.g.
+    ;;
+    ;;    (update! User :id 1 {:name "Cam"}) => (pre-update {:id 1, :name "Cam"})
+    ;;
+    ;; Even tho this behavior is silly and wack now that Toucan 2 supports [[toucan2.protocols/original]]
+    ;; and [[toucan2.protocols/changes]], in the interest of people not having to rewrite all their code we will
+    ;; preserve the original behavior.
+    ;;
+    ;; Reset the `current` value of the instance to what it would have been in Toucan 1. Since we're not updating
+    ;; `original`, it can still be used to get the original version of the instance. `changes` works as well since it
+    ;; only returns columns that have new values in `current` and ignores ones that are no longer present. This is all
+    ;; verified in [[toucan.models-test/pre-update-only-changes-test]].
+    protocols/with-current
+    (f (protocols/with-current row (merge (model/primary-key-values-map row)
+                                          (protocols/changes row))))))
 
 (m/defmethod define-method-with-IModel-method :primary-key
   [_k model f]
