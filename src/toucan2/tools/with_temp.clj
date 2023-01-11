@@ -55,7 +55,7 @@
       (let [temp-object (first (insert/insert-returning-instances! model merged-attributes))]
         (log/debugf :with-temp "[with-temp] => %s" temp-object)
         (try
-          (t/testing (format "with temporary %s with attributes %s" (pr-str model) (pr-str merged-attributes))
+          (t/testing (format "\nwith temporary %s with attributes %s\n" (pr-str model) (pr-str merged-attributes))
             (f temp-object))
           (finally
             (delete/delete! model :toucan/pk ((model/select-pks-fn model) temp-object))))))))
@@ -112,5 +112,5 @@
                                   (s/cat :model    some?
                                          :optional (s/? (s/cat :binding    :clojure.core.specs.alpha/binding-form
                                                                :attributes (s/? any?))))))
-               :body     (s/+ any?))
+               :body     (s/* any?))
   :ret  any?)

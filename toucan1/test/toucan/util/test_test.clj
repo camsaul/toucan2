@@ -9,6 +9,7 @@
     `(t1.u.test/with-temp model [~'instance {}] :ok)
     `(t1.u.test/with-temp model [{:keys [~'a]}] :ok)
     `(t1.u.test/with-temp model [{:keys [~'a]} {}] :ok)
+    `(t1.u.test/with-temp model [{:keys [~'a]} {}])
     `(t1.u.test/with-temp* [model [~'_]] :ok)
     `(t1.u.test/with-temp* [model [~'instance {}]] :ok)
     `(t1.u.test/with-temp* [model [{:keys [~'a]}]] :ok)

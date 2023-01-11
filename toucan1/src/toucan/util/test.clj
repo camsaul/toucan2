@@ -15,7 +15,7 @@
 (s/fdef with-temp
   :args (s/cat :model              some?
                :binding+properties ::binding+properties
-               :body               (s/+ any?))
+               :body               (s/* any?))
   :ret  any?)
 
 (defmacro with-temp* [model-bindings & body]

@@ -27,7 +27,8 @@
     `(with-temp/with-temp [model {:keys [~'a]} {}] :ok)
     `(with-temp/with-temp [model ~'instance {} model] :ok)
     `(with-temp/with-temp [model ~'instance {} model ~'_] :ok)
-    `(with-temp/with-temp [model ~'instance {} model ~'instance] :ok)))
+    `(with-temp/with-temp [model ~'instance {} model ~'instance] :ok)
+    `(with-temp/with-temp [model ~'instance {} model ~'instance])))
 
 (deftest ^:parallel valid-syntax-test-2
   (testing "Disallow nil models"
