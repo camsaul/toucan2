@@ -18,6 +18,7 @@
    [methodical.util.trace :as m.trace]
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
+   [toucan2.jdbc :as jdbc]
    [toucan2.jdbc.query :as jdbc.query]
    [toucan2.log :as log]
    [toucan2.map-backend :as map]
@@ -682,7 +683,7 @@
   [rf conn query-type model sql-args]
   (let [rf* ((map (model/select-pks-fn model))
              rf)]
-    (binding [jdbc.query/*options* (assoc jdbc.query/*options* :return-keys true)]
+    (binding [jdbc/*options* (assoc jdbc/*options* :return-keys true)]
       (next-method rf* conn query-type model sql-args))))
 
 ;;; There's no such thing as "returning instances" for INSERT/DELETE/UPDATE. So we will fake it by executing the query

@@ -61,7 +61,7 @@
                                                       #_dest-key       :default
                                                       #_hydrated-model :default]
   [_original-model _dest-key _hydrated-model]
-  [:venue_id])
+  [:venue-id])
 
 (defn- remove-venues-timestamps [rows]
   (for [result rows]
@@ -75,14 +75,14 @@
          (remove-venues-timestamps
           (hydrate/hydrate [{:venue-id 1} {:venue-id 2}] ::venue)))))
 
-(deftest ^:parallel automagic-hydration-dispatch-off-model-test
+(deftest ^:parallel automagic-hydration-dispatch-on-model-test
   (testing "dispatch off of model -- hydrate different Tables for different instances"
     (is (= [(instance/instance :a-place {:venue-id 1
                                          ::venue   {:category :bar, :name "Tempest", :id 1}})
             (instance/instance :a-place {:venue-id 2
                                          ::venue   {:category :bar, :name "Ho's Tavern", :id 2}})]
            (remove-venues-timestamps
-            (hydrate/hydrate [(instance/instance :a-place {:venue_id 1})
+            (hydrate/hydrate [(instance/instance :a-place {:venue-id 1})
                               (instance/instance :a-place {:venue-id 2})]
                              ::venue))))
     (is (= [(instance/instance ::hydrate-venue-with-people
@@ -90,7 +90,7 @@
             (instance/instance ::hydrate-venue-with-people
                                {:venue-id 1000, ::venue nil})]
            (remove-venues-timestamps
-            (hydrate/hydrate [(instance/instance ::hydrate-venue-with-people {:venue_id 1})
+            (hydrate/hydrate [(instance/instance ::hydrate-venue-with-people {:venue-id 1})
                               (instance/instance ::hydrate-venue-with-people {:venue-id 1000})]
                              ::venue))))))
 
@@ -321,7 +321,7 @@
 (deftest ^:parallel batched-hydration-test
   (testing "Check that batched hydration doesn't try to hydrate fields that already exist and are not delays"
     (is (= (instance/instance :user {:user-id 1, :user "OK <3"})
-           (hydrate/hydrate (instance/instance :user {:user_id 1
+           (hydrate/hydrate (instance/instance :user {:user-id 1
                                                       :user    "OK <3"})
                             :user))))
   (is (= [{:type :toucan, ::is-bird? true}

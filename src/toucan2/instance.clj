@@ -2,13 +2,10 @@
   (:refer-clojure :exclude [instance?])
   (:require
    [clojure.data :as data]
-   [methodical.core :as m]
    [potemkin :as p]
    [pretty.core :as pretty]
-   [toucan2.magic-map :as magic-map]
    [toucan2.protocols :as protocols]
-   [toucan2.realize :as realize]
-   [toucan2.util :as u]))
+   [toucan2.realize :as realize]))
 
 (set! *warn-on-reflection* true)
 
@@ -196,33 +193,12 @@
   (pretty [_this]
     (list `->TransientInstance model m mta)))
 
-(m/defmulti key-transform-fn
-  "Function to use to magically transform map keywords when building a new instance of `model`."
-  {:arglists '([model])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod key-transform-fn :default
-  [_model]
-  magic-map/*key-transform-fn*)
-
-;;; TODO -- consider whether or not we still need this. If you don't want to use Toucan 2 instances then you can supply
-;;; a different builder function or something. Maybe [[instance]] should actually be a multimethod instead.
-(m/defmulti empty-map
-  "Return an empty map that should be used as the basis for creating new instances of a model. You can provide a custom
-  implementation if you want to use something other than the default [[toucan2.magic-map]] implementation."
-  {:arglists '([model])}
-  u/dispatch-on-first-arg)
-
-(m/defmethod empty-map :default
-  [model]
-  (magic-map/magic-map {} (key-transform-fn model)))
-
 (defn instance
   (^toucan2.instance.Instance []
    (instance nil))
 
   (^toucan2.instance.Instance [model]
-   (instance model (empty-map model)))
+   (instance model {}))
 
   (^toucan2.instance.Instance [model m]
    {:pre [((some-fn map? nil?) m)]}
@@ -239,11 +215,11 @@
      ;; (protocols/with-model m model)
 
      :else
-     (let [m* (into (empty-map model) m)]
+     (let [m* (into {} m)]
        (->Instance model m* m* (meta m)))))
 
   (^toucan2.instance.Instance [model k v & more]
-   (let [m (into (empty-map model) (partition-all 2) (list* k v more))]
+   (let [m (into {} (partition-all 2) (list* k v more))]
      (instance model m))))
 
 (extend-protocol protocols/IWithModel

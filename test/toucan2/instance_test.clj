@@ -1,14 +1,8 @@
 (ns toucan2.instance-test
   (:require
    [clojure.test :refer :all]
-   [methodical.core :as m]
    [toucan2.instance :as instance]
-   [toucan2.magic-map :as magic-map]
-   [toucan2.protocols :as protocols]
-   [toucan2.select :as select]
-   [toucan2.test :as test])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.protocols :as protocols]))
 
 (set! *warn-on-reflection* true)
 
@@ -79,13 +73,6 @@
                (assoc :name "Tempest")
                protocols/changes)))))
 
-(deftest ^:parallel contains-key-test
-  (is (= true
-         (.containsKey (instance/instance :wow {:some-key true}) :some-key)))
-  (testing "unnormalized keys"
-    (is (= true
-           (.containsKey (instance/instance :wow {:some-key true}) :SOME_KEY)))))
-
 (deftest ^:parallel equality-test
   (testing "equality"
     (testing "two instances with the same Table should be equal"
@@ -97,7 +84,9 @@
     (testing "An Instance should be considered equal to a plain map for convenience purposes"
       (testing "map == instance"
         (is (= {:a 100}
-               (instance/instance :wow {:a 100}))))
+               (instance/instance :wow {:a 100})))
+        (is (= {}
+               (instance/instance nil {}))))
       (testing "instance == map"
         (is (= (instance/instance :wow {:a 100})
                {:a 100}))))))
@@ -178,88 +167,40 @@
         (is (= 2
                (count m)))))))
 
-;;;; Magic Map stuff.
-
-(deftest ^:parallel magic-create-test
-  (let [m (instance/instance nil {:snake/snake_case 1, "SCREAMING_SNAKE_CASE" 2, :lisp-case 3, :ANGRY/LISP-CASE 4})]
-    (is (= (instance/instance nil {:snake/snake-case 1, "screaming-snake-case" 2, :lisp-case 3, :angry/lisp-case 4})
-           m)))
+(deftest ^:parallel create-test
   (testing "Should be able to create a map with varargs"
     (is (= {:db-id 1}
-           (instance/instance nil :db_id 1)))
+           (instance/instance nil :db-id 1)))
     (is (= {:db-id 1, :table-id 2}
-           (instance/instance nil :db_id 1, :TABLE_ID 2))))
+           (instance/instance nil :db-id 1, :table-id 2))))
   (testing "Should preserve metadata"
     (is (= {:x 100}
-           #_{:x 100, :type :x}         ; TODO -- not sure Toucan should set `:type` metadata
            (meta (instance/instance :x (with-meta {} {:x 100})))))))
 
-(deftest ^:parallel magic-keys-test
-  (testing "keys"
-    (let [m (instance/instance nil {:db_id 1, :table_id 2})]
-      (testing "get keys"
-        (testing "get"
-          (is (= 1
-                 (:db_id m)))
-          (is (= 1
-                 (:db-id m))))
-        (is (= [:db-id :table-id]
-               (keys m)))
-        (testing "assoc"
-          (is (= (instance/instance nil {:db-id 2, :table-id 2})
-                 (assoc m :db_id 2)))
-          (is (= (instance/instance nil {:db-id 3, :table-id 2})
-                 (assoc m :db-id 3))))
-        (testing "dissoc"
-          (is (= {}
-                 (dissoc (instance/instance nil "ScReAmInG_SnAkE_cAsE" 1) "sc-re-am-in-g-sn-ak-e-c-as-e"))))
-        (testing "update"
-          (is (= (instance/instance nil {:db-id 2, :table-id 2})
-                 (update m :db_id inc))))))))
-
-(deftest ^:parallel magic-equality-test
-  (testing "Two maps created with different key cases should be equal"
-    (is (= (instance/instance nil {:db-id 1, :table-id 2})
-           (instance/instance nil {:db_id 1, :table_id 2}))))
-  (testing "should be equal to normal map with the same keys"
-    (testing "map == instance"
-      (is (= {:db-id 1, :table-id 2}
-             (instance/instance nil {:db_id 1, :table_id 2}))))
-    (testing "instance == map"
-      (is (= (instance/instance nil {:db_id 1, :table_id 2})
-             {:db-id 1, :table-id 2})))
-    (is (= {}
-           (instance/instance nil {})))))
-
-(m/defmethod instance/key-transform-fn ::venues.no-key-transform
-  [_model]
-  identity)
-
-(derive ::venues.no-key-transform ::test/venues)
-
-(deftest ^:parallel no-key-xform-test
-  (is (= (instance/instance ::test/venues {:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")})
-         (select/select-one ::test/venues {:select [:id :created-at]})))
-  (testing "Should be able to disable key transforms by overriding `key-transform-fn*`"
-    (let [[id created-at] (case (test/current-db-type)
-                            :h2       [:ID :CREATED_AT]
-                            :postgres [:id :created_at])]
-      (is (= {id 1, created-at (LocalDateTime/parse "2017-01-01T00:00")}
-             (select/select-one ::venues.no-key-transform {:select [:id :created-at]}))))))
+(deftest ^:parallel keys-test
+  (let [m (instance/instance nil {:db-id 1, :table-id 2})]
+    (testing "get keys"
+      (testing "get"
+        (is (= 1
+               (:db-id m))))
+      (is (= [:db-id :table-id]
+             (keys m)))
+      (testing "assoc"
+        (is (= (instance/instance nil {:db-id 2, :table-id 2})
+               (assoc m :db-id 2)))
+        (is (= (instance/instance nil {:db-id 3, :table-id 2})
+               (assoc m :db-id 3))))
+      (testing "dissoc"
+        (is (= {}
+               (dissoc (instance/instance nil :db-id 1) :db-id))))
+      (testing "update"
+        (is (= (instance/instance nil {:db-id 2, :table-id 2})
+               (update m :db-id inc)))))))
 
 (deftest ^:parallel pretty-print-test
   (testing "Should pretty-print"
-    (are [print-magic-maps expected] (= expected
-                                        (binding [magic-map/*print-magic-maps* print-magic-maps]
-                                          (pr-str (instance/instance :venues {:id 1}))))
-      true  (pr-str (list
-                     'toucan2.instance/instance
-                     :venues
-                     (list
-                      'toucan2.magic-map/magic-map
-                      {:id 1}
-                      #_(symbol "#'toucan2.magic-map/kebab-case-xform"))))
-      false (pr-str '(toucan2.instance/instance :venues {:id 1})))))
+    (is (= (pr-str '(toucan2.instance/instance :venues {:id 1}))
+           (pr-str (instance/instance :venues {:id 1}))))))
 
 (deftest ^:parallel reset-original-test
   (let [m  (assoc (instance/instance :wow {:a 100}) :b 200)
