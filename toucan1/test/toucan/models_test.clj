@@ -388,3 +388,23 @@
              (t1.db/insert! ::people.default-values {:id 6})))
       (is (= expected
              (t1.db/select-one ::people.default-values :id 6))))))
+
+(t1.models/add-property! :unnamespaced
+  :select (fn [instance]
+            (assoc instance :unnamespaced-select-property true)))
+
+(derive ::people.unnamespaced-property ::test/people)
+
+(t1.models/define-methods-with-IModel-method-map
+ ::people.unnamespaced-property
+ {:properties (constantly {:unnamespaced true})})
+
+(deftest ^:parallel unnamespaced-property-test
+  (testing "Should support unnamespaced properties for Toucan 1 support"
+    (testing "Should namespace the keyword automatically; model should derive from it"
+      (isa? ::people.unnamespaced-property :toucan.models.properties/unnamespaced))
+    (is (= {:id                           1
+            :name                         "Cam"
+            :created-at                   (java.time.OffsetDateTime/parse "2020-04-21T23:56Z")
+            :unnamespaced-select-property true}
+           (t1.db/select-one ::people.unnamespaced-property 1)))))
