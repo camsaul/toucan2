@@ -10,11 +10,12 @@
 
  :hooks
  {:analyze-call
-  {toucan2.connection/with-connection  hooks.toucan2.connection/with-connection
-   toucan2.connection/with-transaction hooks.toucan2.connection/with-transaction
-   toucan2.core/with-connection        hooks.toucan2.connection/with-connection
-   toucan2.core/with-transaction       hooks.toucan2.connection/with-transaction
-   toucan2.tools.with-temp/with-temp   hooks.toucan2.tools.with-temp/with-temp}
+  {toucan2.connection/with-connection                      hooks.toucan2.connection/with-connection
+   toucan2.connection/with-transaction                     hooks.toucan2.connection/with-transaction
+   toucan2.core/with-connection                            hooks.toucan2.connection/with-connection
+   toucan2.core/with-transaction                           hooks.toucan2.connection/with-transaction
+   toucan2.tools.simple-out-transform/define-out-transform hooks.toucan2.tools.simple-out-transform/define-out-transform
+   toucan2.tools.with-temp/with-temp                       hooks.toucan2.tools.with-temp/with-temp}
 
   :macroexpand
   {toucan.db/with-call-counting                       macros.toucan2.execute/with-call-count
