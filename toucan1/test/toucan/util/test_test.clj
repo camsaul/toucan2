@@ -15,4 +15,5 @@
     `(t1.u.test/with-temp* [model [{:keys [~'a]} {}]] :ok)
     `(t1.u.test/with-temp* [model [~'instance {}] model [~'instance]] :ok)
     `(t1.u.test/with-temp* [model [~'instance {}] model [~'_]] :ok)
-    `(t1.u.test/with-temp* [model [~'instance {}] model [~'instance]] :ok)))
+    `(t1.u.test/with-temp* [model [~'instance {}] model [~'instance]] :ok)
+    `(t1.u.test/with-temp* [model [~'instance {}] model [~'instance]])))
