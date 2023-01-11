@@ -160,8 +160,11 @@
 ;;;; Postgres integration
 
 ;;; TODO -- why is cljdoc picking this up?
+;;;
+;;; TODO -- `org.postgresql.PGConnection` is the interface; `org.postgresql.jdbc.PgConnection` is actual concrete class.
+;;; Are there other concrete classes we might want to handle here? :
 (when-let [pg-connection-class (try
-                                 (Class/forName "org.postgresql.jdbc.PgConnection") ; TODO -- or is this `org.postgresql.PGConnection`
+                                 (Class/forName "org.postgresql.jdbc.PgConnection")
                                  (catch Throwable _
                                    nil))]
   (m/defmethod read-column-thunk [pg-connection-class :default Types/TIMESTAMP]
