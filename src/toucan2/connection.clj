@@ -96,6 +96,9 @@
   [m f]
   (do-with-connection (next.jdbc/get-datasource m) f))
 
+;;; for record types that implement `DataSource`, prefer the `DataSource` impl over the map impl.
+(m/prefer-method! #'do-with-connection javax.sql.DataSource clojure.lang.IPersistentMap)
+
 ;;;; connection string support
 
 (defn connection-string-protocol

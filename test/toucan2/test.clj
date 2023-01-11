@@ -177,10 +177,13 @@
   [_db-type]
   "jdbc:h2:mem:toucan2;DB_CLOSE_DELAY=-1")
 
-(defn- test-db-url [db-type]
-  (let [env-var (keyword (format "jdbc-url-%s" (name db-type)))]
-    (or (env/env env-var)
-        (default-test-db-url db-type))))
+(defn test-db-url
+  (^String []
+   (test-db-url (current-db-type)))
+  (^String [db-type]
+   (let [env-var (keyword (format "jdbc-url-%s" (name db-type)))]
+     (or (env/env env-var)
+         (default-test-db-url db-type)))))
 
 ;;;; creating test tables, and the default test models.
 

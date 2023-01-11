@@ -87,3 +87,13 @@
   (conn/with-connection [conn {:dbtype   "h2:mem"
                                :dbname   "spec_test"}]
     (is (instance? org.h2.jdbc.JdbcConnection conn))))
+
+(defrecord MyDataSource []
+  javax.sql.DataSource
+  (getConnection [_this]
+    (java.sql.DriverManager/getConnection (test/test-db-url))))
+
+(deftest ^:parallel prefer-DataSource-over-records-test
+  (testing "We should have a preference for things that are a javax.sql.DataSource over maps/record types"
+    (conn/with-connection [conn (map->MyDataSource {:dbtype "h2:mem", :dbname "data_source_test"})]
+      (is (instance? java.sql.Connection conn)))))
