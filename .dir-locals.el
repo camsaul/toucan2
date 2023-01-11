@@ -5,6 +5,7 @@
                   (cljr-favor-prefix-notation . nil)
                   (fill-column . 120)
                   (clojure-docstring-fill-column . 120)
+                  (eval . (put 'm/defmethod 'clojure-doc-string-elt 3))
                   (eval . (put 'm/defmulti 'clojure-doc-string-elt 2))
                   (eval . (put 'p/defprotocol+ 'clojure-doc-string-elt 2))
                   (eval . (put 'p/def-map-type 'clojure-doc-string-elt 2))

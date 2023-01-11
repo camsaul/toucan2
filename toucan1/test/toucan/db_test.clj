@@ -255,6 +255,18 @@
     (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
            (t1.db/select-one User 2)))))
 
+(deftest ^:synchronized simple-insert!-test
+  (doseq [model [Category
+                 'Category]]
+    (testing (format "model = ^%s %s" (.getCanonicalName (class model)) (pr-str model))
+      (test/with-discarded-table-changes Category
+        (testing "row map"
+          (is (= 5
+                 (t1.db/simple-insert! model {:name "seafood" :parent-category-id 100}))))
+        (testing "k v & more"
+          (is (= 6
+                 (t1.db/simple-insert! model :name "parrot shop" :parent-category-id 100))))))))
+
 (deftest ^:synchronized simple-insert-many!-test
   (testing "It must return the inserted ids"
     (test/with-discarded-table-changes Category

@@ -10,7 +10,6 @@
    [toucan2.instance :as instance]
    [toucan2.log :as log]
    [toucan2.model :as model]
-   [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
@@ -50,7 +49,11 @@
 (defn- model-symb->ns [symb]
   (symbol (str (root-namespace) \. (csk/->kebab-case (name symb)))))
 
-(defn- resolve-model-from-symbol [symb]
+(m/defmethod toucan2.model/resolve-model clojure.lang.Symbol
+  "Installed by Toucan 1 compatibility layer. Support resolving a model from a Symbol using
+  the [[toucan.models/root-namespace]]. This behavior should be considered deprecated -- just use model keywords
+  directly."
+  [symb]
   (let [model-ns (model-symb->ns symb)]
     @(try (ns-resolve model-ns symb)
           (catch Throwable _
@@ -58,21 +61,18 @@
             (ns-resolve model-ns symb)))))
 
 (defn resolve-model
-  "Deprecated: use [[toucan2.model/resolve-model]] to resolve models instead."
-  [model]
+  "Deprecated: use [[toucan2.model/resolve-model]] to resolve models instead. (The Toucan 2 version doesn't support
+  unpacking `[model & args]` vectors; but these are mostly used internally by `toucan2-toucan1`, so this shouldn't be a
+  problem."
+  [modelable]
   {:post [(isa? % :toucan1/model)]}
-  (cond
-    (isa? model :toucan1/model) model
-    (vector? model)             (resolve-model (first model))
-    (symbol? model)             (resolve-model-from-symbol model)
-    :else                       (throw (ex-info (str "Invalid model: " (pr-str model))
-                                                {:model model}))))
-
-(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model clojure.lang.Symbol]
-  [rf query-type symb parsed-args]
-  (let [model (resolve-model-from-symbol symb)]
-    (assert (not (symbol? model)))
-    (pipeline/transduce-with-model rf query-type model parsed-args)))
+  (if (vector? modelable)
+    (resolve-model (first modelable))
+    (let [model (model/resolve-model modelable)]
+      (when-not (isa? model :toucan1/model)
+        (throw (ex-info (str "Invalid model: " (pr-str model))
+                        {:model model})))
+      model)))
 
 (defn model?
   "Is model a legacy-compatibility model defined with [[defmodel]]?

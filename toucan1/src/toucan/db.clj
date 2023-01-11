@@ -296,7 +296,7 @@
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead. Returns the IDs of the inserted rows."
   [modelable row-maps]
   (when (seq row-maps)
-    (let [model (model/resolve-model modelable)]
+    (let [model (t1.models/resolve-model modelable)]
       (insert/insert-returning-pks! (->SimpleModel model) row-maps))))
 
 (defn insert-many!
