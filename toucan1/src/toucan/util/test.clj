@@ -28,7 +28,7 @@
 (s/fdef with-temp*
   :args (s/cat :bindings (s/spec (s/+ (s/cat :model              some?
                                              :binding+properties ::binding+properties)))
-               :body     (s/+ any?))
+               :body     (s/* any?))
   :ret  any?)
 
 (defn with-temp-defaults
