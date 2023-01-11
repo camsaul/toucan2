@@ -2,6 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
+   [methodical.core :as m]
    [toucan.db :as t1.db]
    [toucan.models :as t1.models]
    [toucan.test-models.category :as category :refer [Category]]
@@ -94,8 +95,8 @@
          ((get-in (transformed/transforms ::TypesModel) [:k :in]) "wow"))))
   (testing "Pick up changes to types"
     ;; make sure the type functions aren't registered yet.
-    (remove-method @#'t1.models/type-fn [::to-number :in])
-    (remove-method @#'t1.models/type-fn [::to-number :out])
+    (m/remove-primary-method! #'t1.models/type-fn [::to-number :in])
+    (m/remove-primary-method! #'t1.models/type-fn [::to-number :out])
     ;; should be able to dynamically resolve types defined AFTER the call to `deftypes`.
     (t1.models/deftypes ::TypesModel {:n ::to-number})
     (testing "type function is double"

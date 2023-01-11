@@ -181,14 +181,14 @@
 ;;;
 ;;; We'll try to replicate something like that below using an atom to store the registered types.
 
-(defmulti ^:private type-fn
+(m/defmulti ^:private type-fn
   {:arglists '([type-name direction])}
   (fn [type-name direction]
     {:pre [(#{:in :out} direction)]}
     [(keyword type-name) direction]))
 
 (defn- known-type-fns []
-  (set (for [[dispatch-value] (methods type-fn)
+  (set (for [[dispatch-value] (m/primary-methods type-fn)
              :when (sequential? dispatch-value)
              :let [[k _direction] dispatch-value]]
          k)))
@@ -201,18 +201,18 @@
   (when k
     (str/replace (str k) #"^:" "")))
 
-(defmethod type-fn :default
+(m/defmethod type-fn :default
   [k _direction]
   (throw (ex-info (format "Unregistered type: %s. Known types: %s"
                           k
                           (pr-str (known-type-fns)))
                   {:k k})))
 
-(defmethod type-fn [:keyword :in]
+(m/defmethod type-fn [:keyword :in]
   [_k _direction]
   keyword->qualified-name)
 
-(defmethod type-fn [:keyword :out]
+(m/defmethod type-fn [:keyword :out]
   [_k _direction]
   keyword)
 
@@ -221,8 +221,8 @@
   and use them directly in a [[toucan2.tools.transformed/deftransforms]]."
   [k & {:keys [in out]}]
   {:pre [(fn? in) (fn? out)]}
-  (defmethod type-fn [k :in]  [_k _direction] in)
-  (defmethod type-fn [k :out] [_k _direction] out)
+  (m/defmethod type-fn [k :in]  [_k _direction] in)
+  (m/defmethod type-fn [k :out] [_k _direction] out)
   nil)
 
 (defn- resolving-type-fn
@@ -417,64 +417,64 @@
 
 ;;;; these let you use method maps passed to [[extend]] for the old `IModel` protocol to implement Toucan 2 multimethods.
 
-(defmulti ^:private define-method-with-IModel-method
+(m/defmulti ^:private define-method-with-IModel-method
   {:arglists '([method-name model f])}
   u/dispatch-on-first-arg)
 
-(defmethod define-method-with-IModel-method :default-fields
+(m/defmethod define-method-with-IModel-method :default-fields
   [_k model f]
   (define-default-fields model
     (f model)))
 
-(defmethod define-method-with-IModel-method :hydration-keys
+(m/defmethod define-method-with-IModel-method :hydration-keys
   [_k model f]
   (define-hydration-keys model (f model)))
 
-(defmethod define-method-with-IModel-method :post-insert
+(m/defmethod define-method-with-IModel-method :post-insert
   [_k model f]
   (after-insert/define-after-insert model
     [row]
     (f (realize/realize row))))
 
-(defmethod define-method-with-IModel-method :post-select
+(m/defmethod define-method-with-IModel-method :post-select
   [_k model f]
   (after-select/define-after-select model
     [row]
     (f (realize/realize row))))
 
-(defmethod define-method-with-IModel-method :post-update
+(m/defmethod define-method-with-IModel-method :post-update
   [_k model f]
   (after-update/define-after-update model
     [row]
     (f (realize/realize row))))
 
-(defmethod define-method-with-IModel-method :pre-delete
+(m/defmethod define-method-with-IModel-method :pre-delete
   [_k model f]
   (before-delete/define-before-delete model
     [row]
     (f (realize/realize row))))
 
-(defmethod define-method-with-IModel-method :pre-insert
+(m/defmethod define-method-with-IModel-method :pre-insert
   [_k model f]
   (before-insert/define-before-insert model
     [row]
     (f row)))
 
-(defmethod define-method-with-IModel-method :pre-update
+(m/defmethod define-method-with-IModel-method :pre-update
   [_k model f]
   (before-update/define-before-update model
     [row]
     (f (realize/realize row))))
 
-(defmethod define-method-with-IModel-method :primary-key
+(m/defmethod define-method-with-IModel-method :primary-key
   [_k model f]
   (define-primary-key model (f model)))
 
-(defmethod define-method-with-IModel-method :properties
+(m/defmethod define-method-with-IModel-method :properties
   [_k model f]
   (defproperties model (f model)))
 
-(defmethod define-method-with-IModel-method :types
+(m/defmethod define-method-with-IModel-method :types
   [_k model f]
   (deftypes model (f model)))
 
