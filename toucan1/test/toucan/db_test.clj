@@ -275,13 +275,16 @@
 
 (deftest ^:synchronized update-where!-test
   (testing :not=
-    (test/with-discarded-table-changes User
-      (t1.db/update-where! User {:first-name [:not= "Cam"]}
-                           :first-name "Cam")
-      (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
-              {:id 2, :first-name "Cam", :last-name "Toucan"}
-              {:id 3, :first-name "Cam", :last-name "Bird"}]
-             (t1.db/select User {:order-by [:id]})))))
+    (doseq [model [User 'User]]
+      (testing (format "model = ^%s %s" (-> model class .getCanonicalName) (pr-str model))
+        (test/with-discarded-table-changes User
+          (t1.db/update-where! model
+                               {:first-name [:not= "Cam"]}
+                               :first-name "Cam")
+          (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
+                  {:id 2, :first-name "Cam", :last-name "Toucan"}
+                  {:id 3, :first-name "Cam", :last-name "Bird"}]
+                 (t1.db/select model {:order-by [:id]})))))))
   (testing "simple condition"
     (test/with-discarded-table-changes User
       (t1.db/update-where! User {:first-name "Cam"}

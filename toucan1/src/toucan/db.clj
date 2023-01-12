@@ -260,6 +260,8 @@
 ;;; TODO -- maybe this belongs in the main part of Toucan 2. You can just use the string table name directly for the
 ;;; most part (if you have a default connection defined) but in situations where the connections comes from the model
 ;;; this doesn't work.
+;;;
+;;; IMPORTANT! Make sure you resolve the model before you call `->SimpleModel`!
 (defrecord ^:no-doc SimpleModel [original-model]
   pretty/PrettyPrintable
   (pretty [_this]
@@ -298,7 +300,8 @@
 
   Returns `true` if any rows were updated, `false` otherwise."
   [modelable conditions-map & {:as changes}]
-  (pos? (update/update! (->SimpleModel modelable) conditions-map changes)))
+  (let [model (model/resolve-model modelable)]
+    (pos? (update/update! (->SimpleModel model) conditions-map changes))))
 
 (defn update-non-nil-keys!
   "DEPRECATED: there is currently no equivalent function in Toucan 2; use [[toucan2.update/update!]] and manually filter
