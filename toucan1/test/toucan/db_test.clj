@@ -217,6 +217,26 @@
       (is (= {:number id, :country_code "AU"}
              (t1.db/select-one PhoneNumber :number id))))))
 
+(deftest ^:synchronized update!-honeysql-test
+  (testing "(update! model <honeysql>)  should work and skip pre-update, etc."
+    (test/with-discarded-table-changes Category
+      (let [built (atom [])]
+        (binding [pipeline/*build* (comp (fn [result]
+                                           (swap! built conj result)
+                                           result)
+                                         pipeline/*build*)]
+          (is (= true
+                 (t1.db/update! Category {:set   {:name "LIQUOR-STORE", :parent-category-id 1000}
+                                          :where [:= :id 1]})))
+          (testing "Built query"
+            (is (= [{:update [:t1_categories]
+                     :set    {:name "LIQUOR-STORE", :parent-category-id 1000}
+                     :where  [:= :id 1]}]
+                   @built)))
+          (is (= {:id 1, :name "LIQUOR-STORE", :parent-category-id 1000}
+                 ;; use simple-model to make sure transforms aren't done (str/lower-case on :name in this case)
+                 (t1.db/select-one (t1.db/->SimpleModel Category) 1))))))))
+
 (derive ::Category.post-select Category)
 
 (t1.models/define-methods-with-IModel-method-map
@@ -279,6 +299,37 @@
               {:id 2, :first-name "Rasta", :last-name "Toucan"}
               {:id 3, :first-name "Lucky", :last-name "Bird"}]
              (t1.db/select User {:order-by [:id]}))))))
+
+(deftest ^:synchronized update-where!-no-pre-update-test
+  (testing "update-where! should not do pre-update, transforms, etc."
+    (test/with-discarded-table-changes Category
+      (let [built (atom [])]
+        (binding [pipeline/*build* (comp (fn [result]
+                                           (swap! built conj result)
+                                           result)
+                                         pipeline/*build*)]
+          ;; shouldn't do any validation of parent-category-id.
+          (testing "Update 1: should no-op because no categories match 'BAR'"
+            (is (= false
+                   (t1.db/update-where! Category
+                                        {:name "BAR"}
+                                        {:name "LIQUOR-STORE", :parent-category-id 1000}))))
+          (testing "Update 2: should change 'bar' to 'LIQUOR-STORE'"
+            (is (= true
+                   (t1.db/update-where! Category
+                                        {:name "bar"}
+                                        {:name "LIQUOR-STORE", :parent-category-id 1000}))))
+          (testing "Built queries"
+            (is (= [{:update [:t1_categories]
+                     :set    {:name "LIQUOR-STORE", :parent-category-id 1000}
+                     :where  [:= :name "BAR"]}
+                    {:update [:t1_categories]
+                     :set    {:name "LIQUOR-STORE", :parent-category-id 1000}
+                     :where  [:= :name "bar"]}]
+                   @built)))
+          (is (= {:id 1, :name "LIQUOR-STORE", :parent-category-id 1000}
+                 ;; use simple-model to make sure transforms aren't done (str/lower-case on :name in this case)
+                 (t1.db/select-one (t1.db/->SimpleModel Category) 1))))))))
 
 (derive ::User.before-update User)
 

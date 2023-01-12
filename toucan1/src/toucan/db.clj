@@ -229,14 +229,24 @@
     (execute/query-one honeysql-form)))
 
 (defn update!
-  "DEPRECATED: use [[toucan2.update/update!]] instead. The difference between this version and the Toucan 2 version is the
-  key-value args are treated as conditions in Toucan 2; in Toucan 1 you generally would have had to
-  use [[update-where!]] to update something without using the primary key."
+  "DEPRECATED: use [[toucan2.update/update!]] instead. Returns `true` if anything was updated, `false` otherwise.
+
+  Differences from Toucan 2 version:
+
+  * 2-arity version takes a honeysql form. There is no direct equivalent in Toucan 2; use [[toucan2.execute/query]]
+    instead.
+
+  * key-value args are treated as conditions in Toucan 2; in Toucan 1 you generally would have had to
+    use [[update-where!]] to update something without using the primary key."
   {:arglists '([modelable honeysql-form]
-                                    [modelable pk changes-map]
-                                    [modelable pk key-to-change new-value & more])}
+               [modelable pk changes-map]
+               [modelable pk key-to-change new-value & more])}
   ([modelable honeysql-form]
-   (pos? (update/update! modelable honeysql-form)))
+   (let [model    (model/resolve-model modelable)
+         honeysql (merge
+                   {:update [(keyword (model/table-name model))]}
+                   honeysql-form)]
+     (pos? (execute/query-one nil :toucan.result-type/update-count modelable honeysql))))
 
   ([modelable pk changes-map]
    (pos? (update/update! modelable pk changes-map)))
@@ -245,25 +255,11 @@
    (let [changes-map (merge {k v} more)]
      (update! modelable pk changes-map))))
 
-(defn update-where!
-  "DEPRECATED: use [[toucan2.update/update!]] instead."
-  [modelable conditions-map & {:as changes}]
-  (pos? (update/update! modelable conditions-map changes)))
-
-(defn update-non-nil-keys!
-  "DEPRECATED: there is currently no equivalent function in Toucan 2; use [[toucan2.update/update!]] and manually filter
-  non-nil keys instead. This function may be added in the future."
-  ([modelable id kvs]
-   (update! modelable id (into {} (for [[k v] kvs
-                                        :when (not (nil? v))]
-                                    [k v]))))
-  ([modelable id k v & more]
-   (update-non-nil-keys! modelable id (apply array-map k v more))))
-
 ;;; wraps a model to prevent `before-update` and stuff like that from happening.
 ;;;
-;;; TODO -- maybe this belongs in the main part of Toucan 2. TODO #2 -- actually I'm not sure this is needed. You can
-;;; just use the table name directly.
+;;; TODO -- maybe this belongs in the main part of Toucan 2. You can just use the string table name directly for the
+;;; most part (if you have a default connection defined) but in situations where the connections comes from the model
+;;; this doesn't work.
 (defrecord ^:no-doc SimpleModel [original-model]
   pretty/PrettyPrintable
   (pretty [_this]
@@ -293,6 +289,26 @@
   [rf query-type model parsed-args]
   (binding [map.honeysql/*options* (honeysql-options)]
     (next-method rf query-type model parsed-args)))
+
+(defn update-where!
+  "DEPRECATED: use [[toucan2.update/update!]] instead.
+
+  This preserves Toucan 1 behavior and does a 'simple' update that does not do `pre-update`, transforms, or anything
+  else like that. If you want a version without the weird gotchas, you can use [[toucan2.update/update!]] instead.
+
+  Returns `true` if any rows were updated, `false` otherwise."
+  [modelable conditions-map & {:as changes}]
+  (pos? (update/update! (->SimpleModel modelable) conditions-map changes)))
+
+(defn update-non-nil-keys!
+  "DEPRECATED: there is currently no equivalent function in Toucan 2; use [[toucan2.update/update!]] and manually filter
+  non-nil keys instead. This function may be added in the future."
+  ([modelable id kvs]
+   (update! modelable id (into {} (for [[k v] kvs
+                                        :when (not (nil? v))]
+                                    [k v]))))
+  ([modelable id k v & more]
+   (update-non-nil-keys! modelable id (apply array-map k v more))))
 
 (defn simple-insert-many!
   "DEPRECATED: use [[toucan2.insert/insert-returning-pks!]] instead. Returns the IDs of the inserted rows."

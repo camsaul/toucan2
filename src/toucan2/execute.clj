@@ -14,7 +14,6 @@
   * [[with-call-count]] -- helper macro to count the number of queries executed within a `body`."
   (:require
    [clojure.spec.alpha :as s]
-   [toucan2.connection :as conn]
    [toucan2.pipeline :as pipeline]
    [toucan2.realize :as realize]))
 
@@ -61,14 +60,13 @@
   ([connectable query-type modelable queryable]
    (reify clojure.lang.IReduceInit
      (reduce [_this rf init]
-       (binding [conn/*current-connectable* (or connectable
-                                                conn/*current-connectable*)]
-         (reduce rf
-                 init
-                 (pipeline/reducible-parsed-args
-                  query-type
-                  {:modelable   modelable
-                   :queryable   queryable})))))))
+       (reduce rf
+               init
+               (pipeline/reducible-parsed-args
+                query-type
+                {:connectable connectable
+                 :modelable   modelable
+                 :queryable   queryable}))))))
 
 ;;;; Util functions for running queries and immediately realizing the results.
 
