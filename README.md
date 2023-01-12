@@ -1,4 +1,3 @@
-[![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/camsaul/toucan2/Tests/master?style=for-the-badge)](https://github.com/camsaul/toucan2/actions/workflows/tests.yml)
 [![License](https://img.shields.io/badge/license-Eclipse%20Public%20License-blue.svg?style=for-the-badge)](https://raw.githubusercontent.com/camsaul/toucan2/master/LICENSE)
 [![GitHub last commit](https://img.shields.io/github/last-commit/camsaul/toucan2?style=for-the-badge)](https://github.com/camsaul/toucan2/commits/)
 [![Codecov](https://img.shields.io/codecov/c/github/camsaul/toucan2?style=for-the-badge)](https://codecov.io/gh/camsaul/toucan2)
