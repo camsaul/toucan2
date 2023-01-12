@@ -19,6 +19,7 @@
 
 (after-update/define-after-update ::venues.after-update
   [venue]
+  (assert (map? venue))
   (when *venues-awaiting-moderation*
     (swap! *venues-awaiting-moderation* conj (u/ensure-persistent! (select-keys venue [:id :name :category]))))
   nil)

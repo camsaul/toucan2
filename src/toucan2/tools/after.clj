@@ -21,7 +21,7 @@
   ```
 
   This function is only done for side-effects for query types that return update counts or PKs."
-  {:arglists '([query-type₁ model₂])}
+  {:arglists '([query-type₁ model₂]), :defmethod-arities #{2}}
   u/dispatch-on-first-two-args)
 
 (m/defmethod each-row-fn :after :default
@@ -33,16 +33,41 @@
                   (pr-str f)))
   f)
 
-(m/defmulti ^:no-doc result-type-rf
-  {:arglists '([original-query-type₁ model rf])}
+(m/defmethod pipeline/results-transform [#_query-type :toucan.result-type/instances #_model ::model]
+  [query-type model]
+  ;; if there's no [[each-row-fn]] for this `query-type` then we don't need to apply any transforms. Example: maybe a
+  ;; model has an [[each-row-fn]] for `INSERT` queries, but not for `UPDATE`. Since the model derives from `::model`, we
+  ;; end up here either way. But if `query-type` is `UPDATE` we shouldn't touch the query.
+  (if (m/is-default-primary-method? each-row-fn [query-type model])
+    (next-method query-type model)
+    (let [row-fn (each-row-fn query-type model)
+          row-fn (fn [row]
+                   (u/try-with-error-context ["Apply after row fn" {::query-type query-type, ::model model}]
+                     (log/debugf :results "Apply after %s for %s" query-type model)
+                     (let [result (row-fn row)]
+                       ;; if the row fn didn't return something (not generally necessary for something like
+                       ;; `after-update` which is always done for side effects) then return the original row. We still
+                       ;; need it for stuff like getting the PKs back out.
+                       (if (some? result)
+                         result
+                         row))))
+          xform  (map row-fn)]
+      (comp xform
+            (next-method query-type model)))))
+
+(m/defmulti ^:private result-type-rf
+  {:arglists '([original-query-type₁ model rf]), :defmethod-arities #{3}}
   u/dispatch-on-first-arg)
 
 (m/defmethod result-type-rf :toucan.result-type/update-count
+  "Reducing function transform that will return the count of rows."
   [_original-query-type _model rf]
   ((map (constantly 1))
    rf))
 
 (m/defmethod result-type-rf :toucan.result-type/pks
+  "Reducing function transform that will return just the PKs (as single values or vectors of values) by getting them from
+  row maps (instances)."
   [_original-query-type model rf]
   (let [pks-fn (model/select-pks-fn model)]
     ((map (fn [row]
@@ -50,36 +75,25 @@
             (pks-fn row)))
      rf)))
 
-(m/defmethod result-type-rf :toucan.result-type/instances
-  [original-query-type model rf]
-  (let [row-fn (each-row-fn original-query-type model)
-        row-fn (fn [row]
-                 (u/try-with-error-context ["Apply after row fn" {::query-type original-query-type, ::model model}]
-                   (log/debugf :results "Apply after %s for %s" original-query-type model)
-                   (let [result (row-fn row)]
-                     ;; if the row fn didn't return something (not generally necessary for something like
-                     ;; `after-update` which is always done for side effects) then return the original row. We still
-                     ;; need it for stuff like getting the PKs back out.
-                     (if (some? result)
-                       result
-                       row))))]
-    ((map row-fn) rf)))
+(m/defmethod pipeline/transduce-with-model [#_query-type ::query-type #_model ::model]
+  [rf query-type model parsed-args]
+  (cond
+    ;; only "upgrade" the query if there's an applicable [[each-row-fn]] to apply.
+    (m/is-default-primary-method? each-row-fn [query-type model])
+    (next-method rf query-type model parsed-args)
 
-(m/defmethod pipeline/transduce-execute [#_query-type ::query-type #_model ::model #_compiled-query :default]
-  [rf query-type model sql-args]
-  ;; if there's no [[each-row-fn]] for this `query-type` then we don't want to "upgrade" the query. For example: maybe a
-  ;; model has an [[each-row-fn]] for `INSERT` queries, but not for `UPDATE`. Since the model derives from `::model`,
-  ;; we end up here either way. But if `query-type` is `UPDATE` we shouldn't touch the query.
-  (if (m/is-default-primary-method? each-row-fn [query-type model])
-    (next-method rf query-type model sql-args)
+    ;; there's no need to "upgrade" the query if it's already returning instances.
+    (isa? query-type :toucan.result-type/instances)
+    (next-method rf query-type model parsed-args)
+
+    ;; otherwise we need to run an upgraded query but then transform the results back to the originals
+    ;; with [[result-type-rf]]
+    :else
     (let [upgraded-type (types/similar-query-type-returning query-type :toucan.result-type/instances)
           _             (assert upgraded-type (format "Don't know how to upgrade a %s query to one returning instances"
                                                       query-type))
-          rf*           (result-type-rf query-type model rf)
-          methodd       (if (= query-type upgraded-type)
-                          next-method
-                          pipeline/transduce-execute)]
-      (methodd rf* upgraded-type model sql-args))))
+          rf*           (result-type-rf query-type model rf)]
+      (pipeline/transduce-with-model rf* upgraded-type model parsed-args))))
 
 (defn ^:no-doc ^{:style/indent [:form]} define-after-impl
   [next-method query-type model row-fn]

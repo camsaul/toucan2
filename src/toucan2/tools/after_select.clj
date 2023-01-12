@@ -2,11 +2,12 @@
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
+   [toucan2.pipeline :as pipeline]
    [toucan2.tools.simple-out-transform :as tools.simple-out-transform]
    [toucan2.util :as u]))
 
 (m/defmulti after-select
-  {:arglists '([instance])}
+  {:arglists '([instance]), :defmethod-arities #{1}}
   u/dispatch-on-first-arg)
 
 ;;; Do after-select for anything returning instances, not just SELECT. [[toucan2.insert/insert-returning-instances!]]
@@ -33,3 +34,8 @@
                :bindings (s/spec (s/cat :instance :clojure.core.specs.alpha/binding-form))
                :body     (s/+ any?))
   :ret any?)
+
+;;; `after-select` should be done before [[toucan2.tools.after-update]] and [[toucan2.tools.after-insert]]
+(m/prefer-method! #'pipeline/results-transform
+                  [:toucan.result-type/instances ::after-select]
+                  [:toucan.result-type/instances :toucan2.tools.after/model])

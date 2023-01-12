@@ -8,6 +8,7 @@
    [toucan2.test :as test]
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-select :as after-select]
+   [toucan2.tools.default-fields :as default-fields]
    [toucan2.tools.with-temp :as with-temp]))
 
 (defn- do-with-temp-test [thunk]
@@ -215,3 +216,34 @@
                  :good-bird   nil
                  :best-friend true}
                 (dissoc bird :id))))))))
+
+(derive ::birds.after-select.after-insert ::birds.after-select)
+(derive ::birds.after-select.after-insert ::birds.after-insert)
+
+(deftest ^:synchronized do-after-select-and-after-insert-test
+  (do-with-temp-test
+   (fn []
+     (testing "with-temp should invoke after-select AND after-insert methods when both are defined"
+       (with-temp/with-temp [::birds.after-select.after-insert bird]
+         (is (= {:name        "birb"
+                 :bird-type   "parakeet"
+                 :good-bird   nil
+                 :loves-seeb  true  ; added by after-select
+                 :best-friend true} ; added by after-insert
+                (dissoc bird :id))))))))
+
+(derive ::birds.after-select.after-insert.default-fields ::birds.after-select.after-insert)
+
+(default-fields/define-default-fields ::birds.after-select.after-insert.default-fields
+  [:id :name])
+
+(deftest ^:synchronized do-after-select-and-after-insert-default-fields-test
+  (do-with-temp-test
+   (fn []
+     (testing "with-temp should apply default-fields but those added by before-select and before-insert should get preserved"
+       (with-temp/with-temp [::birds.after-select.after-insert.default-fields bird]
+         (is (= {:id          7
+                 :name        "birb"
+                 :loves-seeb  true  ; added by after-select
+                 :best-friend true} ; added by after-insert
+                bird)))))))

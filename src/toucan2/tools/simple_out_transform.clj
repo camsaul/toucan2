@@ -5,18 +5,21 @@
    [toucan2.instance :as instance]
    [toucan2.pipeline :as pipeline]))
 
+(defn -xform [f]
+  (map (fn [instance]
+         (let [instance (f instance)]
+           (cond-> instance
+             (instance/instance? instance)
+             instance/reset-original)))))
+
 (defmacro define-out-transform
   {:style/indent :defn}
   [[query-type model-type] [instance-binding] & body]
-  `(m/defmethod pipeline/transduce-with-model :around [~query-type ~model-type]
-     [rf# ~'&query-type ~'&model ~'&parsed-args]
-     (let [rf*# ((map (fn [~instance-binding]
-                        (let [instance# (do ~@body)]
-                          (cond-> instance#
-                            (instance/instance? instance#)
-                            instance/reset-original))))
-                 rf#)]
-       (~'next-method rf*# ~'&query-type ~'&model ~'&parsed-args))))
+  `(m/defmethod pipeline/results-transform [~query-type ~model-type]
+     [~'&query-type ~'&model]
+     (let [xform# (-xform (fn [~instance-binding] ~@body))]
+       (comp xform#
+             (~'next-method ~'&query-type ~'&model)))))
 
 (s/fdef define-out-transform
   :args (s/cat :dispatch-value (s/spec (s/cat :query-type keyword?

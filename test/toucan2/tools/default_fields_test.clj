@@ -1,5 +1,6 @@
 (ns toucan2.tools.default-fields-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer :all]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
@@ -8,8 +9,10 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
+   [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-select :as after-select]
-   [toucan2.tools.default-fields :as default-fields]))
+   [toucan2.tools.default-fields :as default-fields]
+   [toucan2.tools.transformed :as transformed]))
 
 (set! *warn-on-reflection* true)
 
@@ -94,16 +97,66 @@
             :name            "Tempest"}
            (select/select-one ::venues.default-fields-arbitrary-fns 1)))))
 
-(derive ::venues.add-price ::venues.default-fields)
+(derive ::venues.default-fields.after-select ::venues.default-fields)
 
-(after-select/define-after-select ::venues.add-price
+(after-select/define-after-select ::venues.default-fields.after-select
   [venue]
   (assoc venue :price "$$$"))
 
-(deftest ^:parallel after-select-with-default-fields-test
-  (testing "default-fields should work in combination with after-select"
+(deftest ^:synchronized after-select-with-default-fields-test
+  (testing "default-fields should work in combination with after-select. Preserve fields added by after-select."
     (is (= {:id 1, :name "Tempest", :category "bar", :price "$$$"}
-           (select/select-one ::venues.add-price 1)))))
+           (select/select-one ::venues.default-fields.after-select 1)))
+    (testing `insert/insert-returning-instances!
+      (test/with-discarded-table-changes :venues
+        (is (= [{:id 4, :name "Savoy Tivoli", :category "bar", :price "$$$"}]
+               (insert/insert-returning-instances! ::venues.default-fields.after-select
+                                                   {:name "Savoy Tivoli", :category "bar"})))))))
+
+(derive ::venues.default-fields.after-insert ::venues.default-fields)
+
+(after-insert/define-after-insert ::venues.default-fields.after-insert
+  [venue]
+  (assoc venue :price "$$$"))
+
+(deftest ^:synchronized after-insert-with-default-fields-test
+  (testing "default-fields should work in combination with after-insert. Preserve fields added by after-insert."
+    (testing "Sanity check: should not be present in results of select"
+      (is (= {:id 1, :name "Tempest", :category "bar"}
+             (select/select-one ::venues.default-fields.after-insert 1))))
+    (testing `insert/insert-returning-instances!
+      (test/with-discarded-table-changes :venues
+        (is (= [{:id 4, :name "Savoy Tivoli", :category "bar", :price "$$$"}]
+               (insert/insert-returning-instances! ::venues.default-fields.after-insert
+                                                   {:name "Savoy Tivoli", :category "bar"})))))))
+
+(derive ::venues.default-fields.transformed ::venues.default-fields)
+
+(transformed/deftransforms ::venues.default-fields.transformed
+  {:name {:in identity, :out str/upper-case}})
+
+(deftest ^:synchronized transformed-default-fields-test
+  (testing "default-fields should work in combination with transformed."
+    (is (= {:id 1, :name "TEMPEST", :category "bar"}
+           (select/select-one ::venues.default-fields.transformed 1)))
+    (testing `insert/insert-returning-instances!
+      (test/with-discarded-table-changes :venues
+        (is (= [{:id 4, :name "SAVOY TIVOLI", :category "bar"}]
+               (insert/insert-returning-instances! ::venues.default-fields.transformed
+                                                   {:name "Savoy Tivoli", :category "bar"})))))))
+
+(derive ::venues.default-fields.after-select.transformed ::venues.default-fields.after-select)
+(derive ::venues.default-fields.after-select.transformed ::venues.default-fields.transformed)
+
+(deftest ^:synchronized after-select-transformed-default-fields-test
+  (testing "default-fields should work in combination with after-select AND transformed."
+    (is (= {:id 1, :name "TEMPEST", :category "bar", :price "$$$"}
+           (select/select-one ::venues.default-fields.after-select.transformed 1)))
+    (testing `insert/insert-returning-instances!
+      (test/with-discarded-table-changes :venues
+        (is (= [{:id 4, :name "SAVOY TIVOLI", :category "bar", :price "$$$"}]
+               (insert/insert-returning-instances! ::venues.default-fields.after-select.transformed
+                                                   {:name "Savoy Tivoli", :category "bar"})))))))
 
 (derive ::venues.with-created-at ::venues.default-fields)
 

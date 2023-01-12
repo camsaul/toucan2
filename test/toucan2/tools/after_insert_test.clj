@@ -97,11 +97,12 @@
         (testing "should be added to *venues-awaiting-moderation*"
           (is (= [(instance/instance
                    ::venues.after-insert.after-select
-                   {:id         4
-                    :name       "Lombard Heights Market"
-                    :category   "liquor-store"
-                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                   {:id            4
+                    :name          "Lombard Heights Market"
+                    :category      "liquor-store"
+                    :created-at    (LocalDateTime/parse "2017-01-01T00:00")
+                    :updated-at    (LocalDateTime/parse "2017-01-01T00:00")
+                    :after-select? true})]
                  @*venues-awaiting-moderation*)))))))
 
 (derive ::people.record-inserts ::test/people)

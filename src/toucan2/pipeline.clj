@@ -6,10 +6,11 @@
 
   1. [[parse-args]]                  (entrypoint fn: [[transduce-unparsed]])
   2. [[toucan2.model/resolve-model]] (entrypoint fn: [[transduce-parsed]])
-  3. [[transduce-with-model]]
+  3. [[transduce-with-model]]        ; TODO -- `resolve-model` + transduce query?
   4. [[resolve]]
   5. [[build]]
   6. [[compile]]
+  x. [[results-transform]]
   7. [[transduce-execute]]           ; TODO `with-connection`
   8. [[transduce-execute-with-connection]]
 
@@ -47,13 +48,36 @@
   (fn [_rf & args]
     (apply f args)))
 
-;;;; [[transduce-execute-with-connection]]
-
 (m/defmulti transduce-execute-with-connection
   {:arglists '([rf conn₁ query-type₂ model₃ compiled-query]), :defmethod-arities #{5}}
   (dispatch-ignore-rf u/dispatch-on-first-three-args))
 
-;;;; [[transduce-execute]]
+;;;; default JDBC impls. Not convinced they belong here.
+
+(m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
+                                                #_query-type :default
+                                                #_model      :default]
+  [rf conn query-type model sql-args]
+  {:pre [(sequential? sql-args) (string? (first sql-args))]}
+  (increment-call-count!)
+  ;; `:return-keys` is passed in this way instead of binding a dynamic var because we don't want any additional queries
+  ;; happening inside of the `rf` to return keys or whatever.
+  (let [extra-options (when (isa? query-type :toucan.result-type/pks)
+                        {:return-keys true})
+        result        (jdbc.query/reduce-jdbc-query rf (rf) conn model sql-args extra-options)]
+    (rf result)))
+
+;;; To get Databases to return the generated primary keys rather than the update count for SELECT/UPDATE/DELETE we need
+;;; to set the `next.jdbc` option `:return-keys true`
+
+(m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
+                                                #_query-type :toucan.result-type/pks
+                                                #_model      :default]
+  [rf conn query-type model sql-args]
+  (let [rf* ((map (model/select-pks-fn model))
+             rf)]
+    (binding [jdbc/*options* (assoc jdbc/*options* :return-keys true)]
+      (next-method rf* conn query-type model sql-args))))
 
 (m/defmulti transduce-execute
   {:arglists '([rf query-type₁ model₂ compiled-query₃]), :defmethod-arities #{4}}
@@ -73,12 +97,17 @@
   (conn/with-transaction [_conn nil {:nested-transaction-rule :ignore}]
     (next-method rf query-type model compiled-query)))
 
+(m/defmulti results-transform
+  {:arglists '([query-type₁ model₂]), :defmethod-arities #{2}}
+  u/dispatch-on-first-two-args)
+
+(m/defmethod results-transform :default
+  [_query-type _model]
+  identity)
+
 (m/defmulti compile
   {:arglists '([query-type₁ model₂ built-query₃]), :defmethod-arities #{3}}
   u/dispatch-on-first-three-args)
-
-;;; HACK
-(def ^:private ^:dynamic *built-query* nil)
 
 (m/defmethod compile :default
   [_query-type _model query]
@@ -86,8 +115,7 @@
                (or (not (coll? query))
                    (seq query)))
           (format "Compiled query should not be nil/empty. Got: %s" (pr-str query)))
-  (vary-meta query (fn [metta]
-                     (merge (dissoc (meta *built-query*) :type) metta))))
+  query)
 
 ;;; TODO -- this is a little JDBC-specific. What if some other query engine wants to run plain string queries without us
 ;;; wrapping them in a vector? Maybe this is something that should be handled at the query execution level in
@@ -183,19 +211,26 @@
   *transduce-execute*
   #'transduce-execute)
 
+(def ^:dynamic *parsed-args*
+  "This is here just in case you might happen to need it for methods that aren't normally called with it."
+  nil)
+
 (m/defmethod transduce-with-model :default
   [rf query-type model {:keys [queryable], :as parsed-args}]
   (let [queryable      (if (contains? parsed-args :queryable)
                          queryable
                          (or queryable {}))
         resolved-query (resolve query-type model queryable)
-        parsed-args    (dissoc parsed-args :queryable)
-        built-query    (*build* query-type model parsed-args resolved-query)]
-    (if (isa? built-query ::no-op)
-      (let [init (rf)]
-        (rf init))
-      (let [compiled-query (*compile* query-type model built-query)]
-        (*transduce-execute* rf query-type model compiled-query)))))
+        parsed-args    (dissoc parsed-args :queryable)]
+    (binding [*parsed-args* parsed-args]
+      (let [built-query (*build* query-type model parsed-args resolved-query)]
+        (if (isa? built-query ::no-op)
+          (let [init (rf)]
+            (rf init))
+          (let [compiled-query (*compile* query-type model built-query)
+                xform          (results-transform query-type model)
+                rf             (xform rf)]
+            (*transduce-execute* rf query-type model compiled-query)))))))
 
 (defn- transduce-with-model* [rf query-type model parsed-args]
   (if-let [model-connectable (when-not conn/*current-connectable*
@@ -299,33 +334,6 @@
   [query-type model parsed-args]
   (reducible-fn transduce-with-model query-type model parsed-args))
 
-;;;; default JDBC impls. Not convinced they belong here.
-
-(m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
-                                                #_query-type :default
-                                                #_model      :default]
-  [rf conn query-type model sql-args]
-  {:pre [(sequential? sql-args) (string? (first sql-args))]}
-  (increment-call-count!)
-  ;; `:return-keys` is passed in this way instead of binding a dynamic var because we don't want any additional queries
-  ;; happening inside of the `rf` to return keys or whatever.
-  (let [extra-options (when (isa? query-type :toucan.result-type/pks)
-                        {:return-keys true})
-        result        (jdbc.query/reduce-jdbc-query rf (rf) conn model sql-args extra-options)]
-    (rf result)))
-
-;;; To get Databases to return the generated primary keys rather than the update count for SELECT/UPDATE/DELETE we need
-;;; to set the `next.jdbc` option `:return-keys true`
-
-(m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
-                                                #_query-type :toucan.result-type/pks
-                                                #_model      :default]
-  [rf conn query-type model sql-args]
-  (let [rf* ((map (model/select-pks-fn model))
-             rf)]
-    (binding [jdbc/*options* (assoc jdbc/*options* :return-keys true)]
-      (next-method rf* conn query-type model sql-args))))
-
 ;;; There's no such thing as "returning instances" for INSERT/DELETE/UPDATE. So we will fake it by executing the query
 ;;; with the equivalent `returning-pks` query type, and then do a `:select` query to get the matching instances and pass
 ;;; those in to the original `rf`.
@@ -349,15 +357,6 @@
 
 (defn- DML? [query-type]
   (isa? query-type :toucan.statement-type/DML))
-
-(def ^:private ^:dynamic *parsed-args* nil)
-
-(m/defmethod transduce-with-model [#_query-type :toucan.result-type/instances #_model :default]
-  [rf query-type model parsed-args]
-  (if (DML? query-type)
-    (binding [*parsed-args* parsed-args]
-      (next-method rf query-type model parsed-args))
-    (next-method rf query-type model parsed-args)))
 
 (m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
                                                 #_query-type :toucan.result-type/instances

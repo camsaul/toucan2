@@ -446,7 +446,10 @@
   [_k model f]
   (after-update/define-after-update model
     [row]
-    (f (realize/realize row))))
+    (let [row (realize/realize row)]
+      ;; the value of `f` should be ignored in Toucan 1 compatibility mode.
+      (f row)
+      row)))
 
 (m/defmethod define-method-with-IModel-method :pre-delete
   [_k model f]

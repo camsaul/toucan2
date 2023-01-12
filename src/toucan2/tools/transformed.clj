@@ -223,6 +223,12 @@
     (let [rf* ((transform-result-rows-transducer model) rf)]
       (next-method rf* query-type model parsed-args))))
 
+;; If [[toucan2.tools.after-update]] or [[toucan2.tools.after-insert]] need to "upgrade" the query, let them do that
+;; before applying any transforms. Transforms will still get applied to the upgraded query.
+(m/prefer-method! #'pipeline/transduce-with-model
+                  [:toucan2.tools.after/query-type :toucan2.tools.after/model]
+                  [:toucan.result-type/instances ::transformed.model])
+
 ;;;; before update
 
 (defn- transform-update-changes [m k->transform]

@@ -1,5 +1,6 @@
 (ns toucan2.tools.with-temp
   (:require
+   [clojure.pprint :as pprint]
    [clojure.spec.alpha :as s]
    [clojure.test :as t]
    [methodical.core :as m]
@@ -55,7 +56,9 @@
       (let [temp-object (first (insert/insert-returning-instances! model merged-attributes))]
         (log/debugf :with-temp "[with-temp] => %s" temp-object)
         (try
-          (t/testing (format "\nwith temporary %s with attributes %s\n" (pr-str model) (pr-str merged-attributes))
+          (t/testing (format "\nwith temporary %s with attributes\n%s\n"
+                             (pr-str model)
+                             (with-out-str (pprint/pprint merged-attributes)))
             (f temp-object))
           (finally
             (delete/delete! model :toucan/pk ((model/select-pks-fn model) temp-object))))))))

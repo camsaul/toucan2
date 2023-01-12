@@ -15,7 +15,6 @@
                  (-> (hooks/vector-node
                       [(ignore-unused-binding (with-meta (hooks/token-node '&query-type)  (meta bindings)))
                        (ignore-unused-binding (with-meta (hooks/token-node '&model)       (meta bindings)))
-                       (ignore-unused-binding (with-meta (hooks/token-node '&parsed-args) (meta bindings)))
                        instance-binding])
                      (with-meta (meta bindings)))
                  body))])
