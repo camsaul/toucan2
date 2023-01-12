@@ -4,7 +4,6 @@
    [methodical.core :as m]
    [toucan2.connection :as conn]
    [toucan2.log :as log]
-   [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.realize :as realize]
    [toucan2.util :as u]))
@@ -29,10 +28,7 @@
   (if *in-before-delete*
     parsed-args
     (binding [*in-before-delete* true]
-      (conn/with-transaction [_conn
-                              (or conn/*current-connectable*
-                                  (model/default-connectable model))
-                              {:nested-transaction-rule :ignore}]
+      (conn/with-transaction [_conn nil {:nested-transaction-rule :ignore}]
         ;; select and transduce the matching rows and run their [[before-delete]] methods
         (pipeline/transduce-with-model
          ((map (fn [row]

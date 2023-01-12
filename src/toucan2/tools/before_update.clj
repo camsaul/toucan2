@@ -91,10 +91,7 @@
     :else
     (let [new-args-maps (apply-before-update-to-matching-rows model (assoc parsed-args ::doing-before-update? true))]
       (log/debugf :execute "Doing recursive updates with new args maps %s" new-args-maps)
-      (conn/with-transaction [_conn
-                              (or conn/*current-connectable*
-                                  (model/default-connectable model))
-                              {:nested-transaction-rule :ignore}]
+      (conn/with-transaction [_conn nil {:nested-transaction-rule :ignore}]
         (transduce
          (map (fn [args-map]
                 (next-method rf query-type model args-map)))

@@ -7,7 +7,7 @@
    [toucan2.util :as u]))
 
 (m/defmulti resolve-model
-  {:arglists '([modelable₁])}
+  {:arglists '([modelable₁]), :defmethod-arities #{1}}
   u/dispatch-on-first-arg)
 
 (m/defmethod resolve-model :default
@@ -25,16 +25,16 @@
   no [[toucan2.connection/*current-connectable*]] is currently bound. By default, this just returns the global default
   connectable, `:default`, but you can tell Toucan to use a different default connectable for a model by implementing
   this method."
-  {:arglists '([model₁])}
+  {:arglists '([model₁]), :defmethod-arities #{1}}
   u/dispatch-on-first-arg)
 
 (m/defmethod default-connectable :default
+  "Return `nil`, so we can fall thru to something else (presumably `:default` anyway)?"
   [_model]
-  ;; TODO -- or should this return `nil`, so we can fall thru to something else (presumably `:default` anyway)?
-  :default)
+  nil)
 
 (m/defmulti table-name
-  {:arglists '([model₁])}
+  {:arglists '([model₁]), :defmethod-arities #{1}}
   u/dispatch-on-first-arg)
 
 (m/defmethod table-name :default
@@ -67,7 +67,7 @@
   If an implementation returns a single keyword, the default `:around` method will automatically wrap it in a vector. It
   also validates that the ultimate result is a sequence of keywords, so it is safe to assume that calls to this will
   always return a sequence of keywords."
-  {:arglists '([model₁])}
+  {:arglists '([model₁]), :defmethod-arities #{1}}
   u/dispatch-on-first-arg)
 
 ;;; if the PK comes back unwrapped, wrap it.

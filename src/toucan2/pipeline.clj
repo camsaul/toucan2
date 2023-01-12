@@ -5,7 +5,7 @@
   Pipeline order is
 
   1. [[transduce-unparsed]] ; TODO `parse-args`
-  2. [[transduce-parsed]]   ; TODO `resolve-model`
+  2. [[toucan2.model/resolve-model]] (entrypoint: [[transduce-parsed]])
   3. [[transduce-with-model]]
   4. [[resolve]]
   5. [[build]]
@@ -59,14 +59,9 @@
   {:arglists '([rf query-type₁ model₂ compiled-query₃]), :defmethod-arities #{4}}
   (dispatch-ignore-rf u/dispatch-on-first-three-args))
 
-;;; TODO -- see if we can eliminate this by doing it directly in one of the pipeline methods.
-(defn- current-connectable [model]
-  (or conn/*current-connectable*
-      (model/default-connectable model)))
-
 (m/defmethod transduce-execute :default
   [rf query-type model compiled-query]
-  (conn/with-connection [conn (current-connectable model)]
+  (conn/with-connection [conn]
     (transduce-execute-with-connection rf conn query-type model compiled-query)))
 
 (m/defmethod transduce-execute [#_query-type :toucan.statement-type/DML #_model :default #_compiled-query :default]
@@ -75,7 +70,7 @@
   Not 100% sure this is necessary since we would probably already be in one if we needed to be because stuff
   like [[toucan2.tools.before-delete]] have to put us in one much earlier."
   [rf query-type model compiled-query]
-  (conn/with-transaction [_conn (current-connectable model) {:nested-transaction-rule :ignore}]
+  (conn/with-transaction [_conn nil {:nested-transaction-rule :ignore}]
     (next-method rf query-type model compiled-query)))
 
 (m/defmulti compile
@@ -202,19 +197,26 @@
       (let [compiled-query (*compile* query-type model built-query)]
         (*transduce-execute* rf query-type model compiled-query)))))
 
-(m/defmulti transduce-parsed
-  {:arglists '([rf query-type₁ parsed-args])}
-  (dispatch-ignore-rf u/dispatch-on-first-arg))
+(defn- transduce-with-model* [rf query-type model parsed-args]
+  (if-let [model-connectable (when-not conn/*current-connectable*
+                               (model/default-connectable model))]
+    (binding [conn/*current-connectable* model-connectable]
+      (transduce-with-model* rf query-type model parsed-args))
+    (transduce-with-model rf query-type model parsed-args)))
 
-(m/defmethod transduce-parsed :default
+(defn transduce-parsed
   [rf query-type {:keys [modelable connectable], :as parsed-args}]
-  (let [model (model/resolve-model modelable)
-        thunk (^:once fn* []
-               (transduce-with-model rf query-type model (dissoc parsed-args :modelable :connectable)))]
-    (if connectable
-      (binding [conn/*current-connectable* connectable]
-        (thunk))
-      (thunk))))
+  ;; if `:connectable` was specified, bind it to [[conn/*current-connectable*]]; it should always override the current
+  ;; connection (if one is bound). See docstring for [[toucan2.query/reducible-query]] for more info.
+  ;;
+  ;; TODO -- I'm not 100% sure this makes sense -- if we specify `:conn ::my-connection` and then want to do something
+  ;; in a transaction for `::my-connection`? Shouldn't it still be done in a transaction?
+  (if connectable
+    (binding [conn/*current-connectable* connectable]
+      (transduce-parsed rf query-type (dissoc parsed-args :connectable)))
+    ;; if [[conn/*current-connectable*]] is not yet bound, then get the default connectable for the model and recur.
+    (let [model (model/resolve-model modelable)]
+      (transduce-with-model* rf query-type model (dissoc parsed-args :modelable)))))
 
 (m/defmulti transduce-unparsed
   {:arglists '([rf query-type₁ unparsed-args]), :defmethod-arities #{3}}

@@ -3,7 +3,7 @@
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.instance :as instance]
-   [toucan2.pipeline :as pipeline]
+   [toucan2.model :as model]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.after-insert :as after-insert]
@@ -139,9 +139,9 @@
          (is (= 7
                 (select/count ::birds.with-default-type))))))))
 
-(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model ::unresolved-model]
-  [rf query-type _model parsed-args]
-  (next-method rf query-type ::test/birds parsed-args))
+(m/defmethod model/resolve-model ::unresolved-model
+  [_model]
+  ::test/birds)
 
 (deftest ^:synchronized resolve-model-test
   (do-with-temp-test
