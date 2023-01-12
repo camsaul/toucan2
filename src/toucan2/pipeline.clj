@@ -215,22 +215,35 @@
   "This is here just in case you might happen to need it for methods that aren't normally called with it."
   nil)
 
+(defn- transduce-compiled-query [rf query-type model compiled-query]
+  (u/try-with-error-context ["with compiled query" {::compiled-query compiled-query}]
+    (let [xform (results-transform query-type model)
+          rf    (xform rf)]
+      (*transduce-execute* rf query-type model compiled-query))))
+
+(defn- transduce-built-query [rf query-type model built-query]
+  (u/try-with-error-context ["with built query" {::built-query built-query}]
+    (if (isa? built-query ::no-op)
+      (let [init (rf)]
+        (rf init))
+      (let [compiled-query (*compile* query-type model built-query)]
+        (transduce-compiled-query rf query-type model compiled-query)))))
+
+(defn- transduce-resolved-query [rf query-type model parsed-args resolved-query]
+  (u/try-with-error-context ["with resolved query" {::resolved-query resolved-query}]
+    (let [parsed-args (dissoc parsed-args :queryable)
+          built-query (*build* query-type model parsed-args resolved-query)]
+      (transduce-built-query rf query-type model built-query))))
+
 (m/defmethod transduce-with-model :default
   [rf query-type model {:keys [queryable], :as parsed-args}]
-  (let [queryable      (if (contains? parsed-args :queryable)
-                         queryable
-                         (or queryable {}))
-        resolved-query (resolve query-type model queryable)
-        parsed-args    (dissoc parsed-args :queryable)]
-    (binding [*parsed-args* parsed-args]
-      (let [built-query (*build* query-type model parsed-args resolved-query)]
-        (if (isa? built-query ::no-op)
-          (let [init (rf)]
-            (rf init))
-          (let [compiled-query (*compile* query-type model built-query)
-                xform          (results-transform query-type model)
-                rf             (xform rf)]
-            (*transduce-execute* rf query-type model compiled-query)))))))
+  (binding [*parsed-args* parsed-args]
+    (u/try-with-error-context ["with parsed args" {::query-type query-type, ::parsed-args parsed-args}]
+      (let [queryable      (if (contains? parsed-args :queryable)
+                             queryable
+                             (or queryable {}))
+            resolved-query (resolve query-type model queryable)]
+        (transduce-resolved-query rf query-type model parsed-args resolved-query)))))
 
 (defn- transduce-with-model* [rf query-type model parsed-args]
   (if-let [model-connectable (when-not conn/*current-connectable*
@@ -251,7 +264,8 @@
       (transduce-parsed rf query-type (dissoc parsed-args :connectable)))
     ;; if [[conn/*current-connectable*]] is not yet bound, then get the default connectable for the model and recur.
     (let [model (model/resolve-model modelable)]
-      (transduce-with-model* rf query-type model (dissoc parsed-args :modelable)))))
+      (u/try-with-error-context ["with model" {::model model}]
+        (transduce-with-model* rf query-type model (dissoc parsed-args :modelable))))))
 
 (m/defmulti parse-args
   {:arglists '([query-type₁ unparsed-args]), :defmethod-arities #{2}}
@@ -263,9 +277,10 @@
   (query/parse-args query-type unparsed-args))
 
 (defn transduce-unparsed
-  [rf query-type unparsed]
-  (let [parsed-args (parse-args query-type unparsed)]
-    (transduce-parsed rf query-type parsed-args)))
+  [rf query-type unparsed-args]
+  (let [parsed-args (parse-args query-type unparsed-args)]
+    (u/try-with-error-context ["with unparsed args" {::query-type query-type, ::unparsed-args unparsed-args}]
+      (transduce-parsed rf query-type parsed-args))))
 
 ;;;; rf helper functions
 
