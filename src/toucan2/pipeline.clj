@@ -4,13 +4,13 @@
 
   Pipeline order is
 
-  1. [[transduce-unparsed]] ; TODO `parse-args`
-  2. [[toucan2.model/resolve-model]] (entrypoint: [[transduce-parsed]])
+  1. [[parse-args]]                  (entrypoint fn: [[transduce-unparsed]])
+  2. [[toucan2.model/resolve-model]] (entrypoint fn: [[transduce-parsed]])
   3. [[transduce-with-model]]
   4. [[resolve]]
   5. [[build]]
   6. [[compile]]
-  7. [[transduce-execute]]  ; TODO `with-connection`
+  7. [[transduce-execute]]           ; TODO `with-connection`
   8. [[transduce-execute-with-connection]]
 
   The main pipeline entrypoint is [[transduce-unparsed]]."
@@ -218,13 +218,18 @@
     (let [model (model/resolve-model modelable)]
       (transduce-with-model* rf query-type model (dissoc parsed-args :modelable)))))
 
-(m/defmulti transduce-unparsed
-  {:arglists '([rf query-type₁ unparsed-args]), :defmethod-arities #{3}}
-  (dispatch-ignore-rf u/dispatch-on-first-arg))
+(m/defmulti parse-args
+  {:arglists '([query-type₁ unparsed-args]), :defmethod-arities #{2}}
+  u/dispatch-on-first-arg)
 
-(m/defmethod transduce-unparsed :default
+#_{:clj-kondo/ignore [:redundant-fn-wrapper]}
+(m/defmethod parse-args :default
+  [query-type unparsed-args]
+  (query/parse-args query-type unparsed-args))
+
+(defn transduce-unparsed
   [rf query-type unparsed]
-  (let [parsed-args (query/parse-args query-type unparsed)]
+  (let [parsed-args (parse-args query-type unparsed)]
     (transduce-parsed rf query-type parsed-args)))
 
 ;;;; rf helper functions

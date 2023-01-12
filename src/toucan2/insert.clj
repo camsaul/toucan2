@@ -22,7 +22,7 @@
    :rows-or-queryable (s/alt :rows      ::args.rows
                              :queryable some?)))
 
-(defn ^:no-doc parse-insert-args
+(m/defmethod pipeline/parse-args :toucan.query-type/insert.*
   [query-type unparsed-args]
   (let [parsed                               (query/parse-args query-type ::args unparsed-args)
         [rows-queryable-type rows-queryable] (:rows-or-queryable parsed)
@@ -41,11 +41,6 @@
                               :columns-rows      (let [{:keys [columns rows]} x]
                                                    (mapv (partial zipmap columns)
                                                          rows))))))))
-
-(m/defmethod pipeline/transduce-unparsed :toucan.query-type/insert.*
-  [rf query-type unparsed-args]
-  (let [parsed-args (parse-insert-args query-type unparsed-args)]
-    (pipeline/transduce-parsed rf query-type parsed-args)))
 
 (defn- can-skip-insert? [parsed-args resolved-query]
   (and (empty? (:rows parsed-args))

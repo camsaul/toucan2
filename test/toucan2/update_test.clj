@@ -18,7 +18,7 @@
 
 (deftest ^:parallel parse-update-args-test
   (are [args expected] (= expected
-                          (update/parse-update-args :toucan.query-type/update.* args))
+                          (pipeline/parse-args :toucan.query-type/update.* args))
 
     [:model 1 {:a 1}]                            {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk 1}, :queryable {}}
     [:model nil {:a 1}]                          {:modelable :model, :changes {:a 1}, :kv-args {:toucan/pk nil}, :queryable {}}
@@ -102,7 +102,7 @@
 
 (deftest ^:synchronized update-nil-test
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
-    (let [parsed-args (update/parse-update-args :toucan.query-type/update.* [::test/venues nil {:name "Taco Bell"}])]
+    (let [parsed-args (pipeline/parse-args :toucan.query-type/update.* [::test/venues nil {:name "Taco Bell"}])]
       (is (= {:modelable ::test/venues
               :kv-args   {:toucan/pk nil}
               :changes   {:name "Taco Bell"}

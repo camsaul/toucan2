@@ -23,40 +23,40 @@
 (deftest ^:parallel parse-args-test
   (testing "single map row"
     (is (= {:modelable :model, :rows [{:row 1}]}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:model {:row 1}]))))
+           (pipeline/parse-args :toucan.query-type/insert.* [:model {:row 1}]))))
   (testing "multiple map rows"
     (is (= {:modelable :model, :rows [{:row 1} {:row 2}]}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:model [{:row 1} {:row 2}]]))))
+           (pipeline/parse-args :toucan.query-type/insert.* [:model [{:row 1} {:row 2}]]))))
   (testing "kv args"
     (is (= {:modelable :model, :rows [{:a 1, :b 2, :c 3}]}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:model :a 1, :b 2, :c 3])))
+           (pipeline/parse-args :toucan.query-type/insert.* [:model :a 1, :b 2, :c 3])))
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"Don't know how to interpret :toucan.query-type/insert\.\* args:"
-         (insert/parse-insert-args :toucan.query-type/insert.* [:model :a 1, :b 2, :c]))))
+         (pipeline/parse-args :toucan.query-type/insert.* [:model :a 1, :b 2, :c]))))
   (testing "columns + vector rows"
     (is (= {:modelable :model
             :rows      [{:a 1, :b 2, :c 3} {:a 4, :b 5, :c 6}]}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:model [:a :b :c] [[1 2 3] [4 5 6]]])))
+           (pipeline/parse-args :toucan.query-type/insert.* [:model [:a :b :c] [[1 2 3] [4 5 6]]])))
     (is (= {:modelable :model
             :rows      [{:name "The Ramp", :category "bar"}
                         {:name "Louie's", :category "bar"}]}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:model [:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]]))))
+           (pipeline/parse-args :toucan.query-type/insert.* [:model [:name :category] [["The Ramp" "bar"] ["Louie's" "bar"]]]))))
   (testing "nil"
     (is (= {:modelable :model, :rows nil}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:model nil]))))
+           (pipeline/parse-args :toucan.query-type/insert.* [:model nil]))))
   (testing "empty rows"
     (is (= {:modelable :model, :rows []}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:model []]))))
+           (pipeline/parse-args :toucan.query-type/insert.* [:model []]))))
   (testing "queryable"
     (is (= {:modelable :model, :queryable ::named-rows}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:model ::named-rows]))))
+           (pipeline/parse-args :toucan.query-type/insert.* [:model ::named-rows]))))
   (testing "record type"
     (is (= {:modelable :model, :rows [(->MyRecordType 1)]}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:model (->MyRecordType 1)]))))
+           (pipeline/parse-args :toucan.query-type/insert.* [:model (->MyRecordType 1)]))))
   (testing "positional connectable"
     (is (= {:connectable :db, :modelable :model, :rows [{:row 1}]}
-           (insert/parse-insert-args :toucan.query-type/insert.* [:conn :db :model {:row 1}])))))
+           (pipeline/parse-args :toucan.query-type/insert.* [:conn :db :model {:row 1}])))))
 
 (deftest ^:parallel build-query-test
   (doseq [rows-fn [list vector]

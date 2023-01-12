@@ -22,17 +22,12 @@
    ;; here.
    :changes     map?))
 
-(defn parse-update-args
+(m/defmethod pipeline/parse-args :toucan.query-type/update.*
   [query-type unparsed-args]
   (let [parsed (query/parse-args query-type ::args unparsed-args)]
     (cond-> parsed
       (contains? parsed :pk) (-> (dissoc :pk)
                                  (update :kv-args assoc :toucan/pk (:pk parsed))))))
-
-(m/defmethod pipeline/transduce-unparsed :toucan.query-type/update.*
-  [rf query-type unparsed-args]
-  (let [parsed-args (parse-update-args query-type unparsed-args)]
-    (pipeline/transduce-parsed rf query-type parsed-args)))
 
 ;;;; Code for building Honey SQL for UPDATE lives in [[toucan2.map-backend.honeysql2]]
 
