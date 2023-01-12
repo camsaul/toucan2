@@ -1,4 +1,47 @@
 (ns toucan2.connection
+  "#### Connection Resolution
+
+  The rules for determining which connection to use are as follows. These are tried in order until one returns
+  non-nil:
+
+  1. The connectable specified in the function arguments.
+
+  2. The [[toucan2.connection/*current-connectable*]], if bound. This is bound automatically when
+     using [[with-connection]] or [[with-transaction]]
+
+  3. The [[toucan2.model/default-connectable]] for the model resolved from the `modelable` in the function arguments;
+
+  4. The `:default` implementation of [[toucan2.connection/do-with-connection]]
+
+  You can define a 'named' connectable such as `::db` by adding an implementation
+  of [[toucan2.connection/do-with-connection]], or use things like JDBC URL connection strings or [[clojure.java.jdbc]]
+  connection properties maps directly.
+
+  IMPORTANT CAVEAT! Positional connectables will be used in preference to [[*current-connectable*]], even when it was
+  bound by [[with-transaction]] -- this means your query will run OUTSIDE of the current transaction! Sometimes, this is
+  what you want, because maybe a certain query is meant to run against a different database! Usually, however, it is
+  not! So in that case you can either do something like
+
+    (t2/query (or conn/*current-connectable* ::my-db) ...)
+
+  to use the current connection if it exists, or define your named connectable method like
+
+    (m/defmethod conn/do-with-connection ::my-db
+      [_connectable f]
+      (conn/do-with-connection
+       (if (and conn/*current-connectable*
+                (not= conn/*current-connectable* ::my-db))
+           conn/*current-connectable*
+           \"jdbc:postgresql://...\")
+       f))
+
+  This, however, is super annoying! So I might reconsider this behavior in the future.
+
+  For reducible queries, the connection is not resolved until the query is executed, so you may create a reducible query
+  with no default connection available and execute it later with one bound. (This also means that [[reducible-query]]
+  does not capture dynamic bindings such as [[toucan2.connection/*current-connectable*]] -- you probably wouldn't want
+  it to, anyway, since we have no guarantees and open connection will be around when we go to use the reducible query
+  later.)"
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]

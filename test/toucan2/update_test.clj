@@ -191,3 +191,17 @@
                 {:id 2, :name "Ho's Tavern", :category "saloon"}
                 {:id 3, :name "BevMo", :category "store"}]
                (select/select [::test/venues :id :name :category] {:order-by [[:id :asc]]})))))))
+
+(deftest ^:synchronized transaction-test
+  (test/with-discarded-table-changes :venues
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"OOPS"
+         (conn/with-transaction [_ ::test/db]
+           (is (= 1
+                  (update/update! ::test/venues 1 {:category "saloon"})))
+           (is (= 1
+                  (update/update! ::test/venues 2 {:category "saloon"})))
+           (throw (ex-info "OOPS!" {})))))
+    (is (= ["bar" "bar"]
+           (select/select-fn-vec :category ::test/venues :id [:in #{1 2}] {:order-by [[:id :asc]]})))))

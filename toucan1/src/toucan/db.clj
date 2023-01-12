@@ -121,8 +121,9 @@
 
 (defmacro transaction
   "DEPRECATED: use [[toucan2.connection/with-connection]] instead."
+  {:style/indent 0}
   [& body]
-  `(conn/with-connection [~'&transaction-connection nil]
+  `(conn/with-transaction [~'&transaction-connection nil]
      ~@body))
 
 (defn quote-fn

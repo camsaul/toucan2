@@ -30,21 +30,7 @@
   You can specify `modelable` to execute the query in the context of a specific model; for queries returning rows, the
   rows will be returned as an [[toucan2.instance/instance]] of the resolved model.
 
-  #### Connection Resolution
-
-  If `connectable` is not specified, the query will be executed using a connection from the following options:
-
-  1. the current connectable, [[toucan2.connection/*current-connectable*]], if bound;
-
-  2. the [[toucan2.model/default-connectable]] for the model, if `modelable` was specified, and this is non-nil;
-
-  3. the default connectable, `:default`, if it is specified by a `:default` method
-     for [[toucan2.connection/do-with-connection]]
-
-  The connection is not resolved until the query is executed, so you may create a reducible query with no default
-  connection available and execute it later with one bound. (This also means that [[reducible-query]] does not capture
-  dynamic bindings such as [[toucan2.connection/*current-connectable*]] -- you probably wouldn't want it to, anyway,
-  since we have no guarantees and open connection will be around when we go to use the reducible query later.)"
+  See [[toucan2.connection]] for Connection resolution rules."
   ([queryable]
    ;; `nil` connectable = use the current connection or `:default` if none is specified.
    (reducible-query nil queryable))

@@ -334,6 +334,21 @@
                  ;; use simple-model to make sure transforms aren't done (str/lower-case on :name in this case)
                  (t1.db/select-one (t1.db/->SimpleModel Category) 1))))))))
 
+(deftest ^:synchronized update-where!-transaction-test
+  (test/with-discarded-table-changes :venues
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"OOPS"
+         (conn/with-connection [_ ::test/db]
+           (t1.db/transaction
+             (is (= true
+                    (t1.db/update-where! ::test/venues {:id 1} :category "saloon")))
+             (is (= true
+                    (t1.db/update-where! ::test/venues {:id 2} {:category "saloon"})))
+             (throw (ex-info "OOPS!" {}))))))
+    (is (= #{"bar"}
+           (t1.db/select-field :category ::test/venues :id [:in #{1 2}])))))
+
 (derive ::User.before-update User)
 
 (t1.models/define-methods-with-IModel-method-map
