@@ -213,21 +213,20 @@
                result))))
     identity))
 
-(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.result-type/instances #_model ::transformed.model]
+(m/defmethod pipeline/transduce-with-model [#_query-type ::pipeline/select.instances-from-pks, #_model ::transformed.model]
+  "Don't try to transform stuff when we're doing SELECT directly with PKs (e.g. to fake INSERT returning instances), We're
+  not doing transforms on the way out so we don't need to do them on the way in."
   [rf query-type model parsed-args]
-  ;; don't try to transform stuff when we're doing SELECT directly with PKs (e.g. to fake INSERT returning instances),
-  ;; we're not doing transforms on the way out so we don't need to do them on the way in
-  (if (isa? query-type ::pipeline/select.instances-from-pks)
-    (binding [*already-transformed* true]
-      (next-method rf query-type model parsed-args))
-    (let [rf* ((transform-result-rows-transducer model) rf)]
-      (next-method rf* query-type model parsed-args))))
+  (binding [*already-transformed* true]
+    (next-method rf query-type model parsed-args)))
 
-;; If [[toucan2.tools.after-update]] or [[toucan2.tools.after-insert]] need to "upgrade" the query, let them do that
-;; before applying any transforms. Transforms will still get applied to the upgraded query.
-(m/prefer-method! #'pipeline/transduce-with-model
-                  [:toucan2.tools.after/query-type :toucan2.tools.after/model]
-                  [:toucan.result-type/instances ::transformed.model])
+(m/defmethod pipeline/results-transform [#_query-type :toucan.result-type/instances #_model ::transformed.model]
+  [query-type model]
+  (if (isa? query-type ::pipeline/select.instances-from-pks)
+    (next-method query-type model)
+    (let [xform (transform-result-rows-transducer model)]
+      (comp xform
+            (next-method query-type model)))))
 
 ;;;; before update
 
@@ -291,35 +290,33 @@
           (update :rows transform-insert-rows k->transform)
           (assoc ::already-transformed? true)))))
 
-;;;; after insert
-
-(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.query-type/insert.pks #_model ::transformed.model]
-  [rf query-type model parsed-args]
+(m/defmethod pipeline/results-transform [#_query-type :toucan.query-type/insert.pks #_model ::transformed.model]
+  "Transform results of `insert!` returning PKs."
+  [query-type model]
   (let [pk-keys (model/primary-keys model)
-        rf*     ((comp
-                  ;; 1. convert result PKs to a map of PK key -> value
-                  (map (fn [pk-or-pks]
-                         (log/tracef :compile "convert result PKs %s to map of PK key -> value" pk-or-pks)
-                         (let [m (zipmap pk-keys (if (sequential? pk-or-pks)
-                                                   pk-or-pks
-                                                   [pk-or-pks]))]
-                           (log/tracef :compile "=> %s" pk-or-pks)
-                           m)))
-                  ;; 2. transform the PK results using the model's [[out-transforms]]
-                  (transform-result-rows-transducer model)
-                  ;; 3. Now flatten the maps of PK key -> value back into plain PK values or vectors of plain PK values
-                  ;; (if the model has a composite primary key)
-                  (map (let [f (if (= (count pk-keys) 1)
-                                 (first pk-keys)
-                                 (juxt pk-keys))]
-                         (fn [row]
-                           (log/tracef :results "convert PKs map back to flat PKs")
-                           (let [row (f row)]
-                             (log/tracef :results "=> %s" row)
-                             row)))))
-                 rf)]
-    (next-method rf* query-type model parsed-args)))
-
+        xform   (comp
+                 ;; 1. convert result PKs to a map of PK key -> value
+                 (map (fn [pk-or-pks]
+                        (log/tracef :compile "convert result PKs %s to map of PK key -> value" pk-or-pks)
+                        (let [m (zipmap pk-keys (if (sequential? pk-or-pks)
+                                                  pk-or-pks
+                                                  [pk-or-pks]))]
+                          (log/tracef :compile "=> %s" pk-or-pks)
+                          m)))
+                 ;; 2. transform the PK results using the model's [[out-transforms]]
+                 (transform-result-rows-transducer model)
+                 ;; 3. Now flatten the maps of PK key -> value back into plain PK values or vectors of plain PK values
+                 ;; (if the model has a composite primary key)
+                 (map (let [f (if (= (count pk-keys) 1)
+                                (first pk-keys)
+                                (juxt pk-keys))]
+                        (fn [row]
+                          (log/tracef :results "convert PKs map back to flat PKs")
+                          (let [row (f row)]
+                            (log/tracef :results "=> %s" row)
+                            row)))))]
+    (comp xform
+          (next-method query-type model))))
 
 ;;;; [[deftransforms]]
 
@@ -390,3 +387,26 @@
   :args (s/cat :model      some?
                :transforms any?)
   :ret any?)
+
+;;; If [[toucan2.tools.after-update]] or [[toucan2.tools.after-insert]] need to "upgrade" the query, let them do that
+;;; before applying any transforms. Transforms will still get applied to the upgraded query.
+;;;
+;;; TODO -- not 100% sure this is still needed
+(m/prefer-method! #'pipeline/transduce-with-model
+                  [:toucan2.tools.after/query-type :toucan2.tools.after/model]
+                  [:toucan.result-type/instances ::transformed.model])
+
+;;; apply results transforms before [[toucan2.tools.after-update]] or [[toucan2.tools.after-insert]]
+(m/prefer-method! #'pipeline/results-transform
+                  [:toucan.result-type/instances ::transformed.model]
+                  [:toucan.result-type/instances :toucan2.tools.after/model])
+
+;;; apply results transforms before [[toucan2.tools.after-select]]
+(m/prefer-method! #'pipeline/results-transform
+                  [:toucan.result-type/instances ::transformed.model]
+                  [:toucan.result-type/instances :toucan2.tools.after-select/after-select])
+
+;;; apply transforms before applying the [[toucan2.tools.default-fields]] functions
+(m/prefer-method! #'pipeline/results-transform
+                  [:toucan.result-type/instances ::transformed.model]
+                  [:toucan.result-type/instances :toucan2.tools.default-fields/default-fields])

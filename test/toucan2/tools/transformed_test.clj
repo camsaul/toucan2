@@ -39,12 +39,9 @@
 
 (derive ::venues.string-id-and-category-keyword ::venues.category-keyword)
 
-(defn- parse-int [^String s]
-  (Integer/parseInt ^String s))
-
 (m/defmethod transformed/transforms ::venues.string-id-and-category-keyword
   [_model]
-  {:id {:in  parse-int
+  {:id {:in  parse-long
         :out str}})
 
 (deftest ^:parallel select-in-test
@@ -323,7 +320,7 @@
 (derive ::transformed-venues ::test/venues)
 
 (transformed/deftransforms ::transformed-venues
-  {:id {:in  parse-int
+  {:id {:in  parse-long
         :out str}})
 
 (deftest ^:parallel deftransforms-test
@@ -347,11 +344,11 @@
 (m/prefer-method! #'transformed/transforms ::transformed-venues-2 ::transformed-venues)
 
 (deftest ^:parallel compose-deftransforms-test
-  (is (= {:id {:in parse-int, :out str}}
+  (is (= {:id {:in parse-long, :out str}}
          (transformed/transforms ::transformed-venues)))
   (is (= {:category {:in name, :out keyword}}
          (transformed/transforms ::transformed-venues-2)))
-  (is (= {:id       {:in parse-int, :out str}
+  (is (= {:id       {:in parse-long, :out str}
           :category {:in name, :out keyword}}
          (transformed/transforms ::venues.composed-deftransform)))
   (is (= (instance/instance

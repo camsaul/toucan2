@@ -10,6 +10,7 @@
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.after-update :as after-update]
+   [toucan2.tools.transformed :as transformed]
    [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
@@ -25,8 +26,7 @@
   ;; make sure this is treated as a REAL function tail.
   {:pre [(map? venue)], :post [(:awaiting-moderation? %)]}
   (testing (format "venue = %s" (pr-str venue))
-    (is (isa? (protocols/model venue) ::test/venues))
-    #_(is (instance/instance-of? ::test/venues venue)))
+    (is (isa? (protocols/model venue) ::test/venues)))
   (when *venues-awaiting-moderation*
     (swap! *venues-awaiting-moderation* conj (realize/realize venue)))
   (assoc venue :awaiting-moderation? true))
@@ -218,3 +218,37 @@
           (is (some? (f ::venues.after-insert 1 {:name "Lombard Heights Market", :category "liquor-store"})))
           (is (= {:name "Lombard Heights Market"}
                  (select/select-one [::venues.after-insert :name] 1))))))))
+
+(derive ::venues.transformed ::test/venues)
+
+(transformed/deftransforms ::venues.transformed
+  {:category {:in name, :out keyword}})
+
+(derive ::venues.after-insert.transformed ::venues.after-insert)
+(derive ::venues.after-insert.transformed ::venues.transformed)
+
+(deftest ^:synchronized transforms-test
+  (testing "transforms should be done BEFORE post-insert"
+    (doseq [f [#'insert/insert!
+               #'insert/insert-returning-pks!
+               #'insert/insert-returning-instances!]]
+      (testing f
+        (test/with-discarded-table-changes :venues
+          (binding [*venues-awaiting-moderation* (atom [])]
+            (is (= (condp = f
+                     #'insert/insert!                     1
+                     #'insert/insert-returning-pks!       [4]
+                     #'insert/insert-returning-instances! [{:id                   4,
+                                                            :name                 "Savoy Tivoli"
+                                                            :category             :bar
+                                                            :created-at           (LocalDateTime/parse "2017-01-01T00:00")
+                                                            :updated-at           (LocalDateTime/parse "2017-01-01T00:00")
+                                                            :awaiting-moderation? true}])
+                   (f ::venues.after-insert.transformed {:name "Savoy Tivoli", :category "bar"})))
+            (testing '*venues-awaiting-moderation*
+              (is (= [{:id         4,
+                       :name       "Savoy Tivoli"
+                       :category   :bar
+                       :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                       :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
+                     @*venues-awaiting-moderation*)))))))))
