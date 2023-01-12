@@ -5,6 +5,7 @@
    [honey.sql :as hsql]
    [methodical.core :as m]
    [toucan.db :as t1.db]
+   [toucan.models :as t1.models]
    [toucan.test-models.address :refer [Address]]
    [toucan.test-models.category :refer [Category]]
    [toucan.test-models.heroes :as heroes]
@@ -216,6 +217,42 @@
       (is (= {:number id, :country_code "AU"}
              (t1.db/select-one PhoneNumber :number id))))))
 
+(derive ::Category.post-select Category)
+
+(t1.models/define-methods-with-IModel-method-map
+ ::Category.post-select
+ ;; NO-OP
+ {:post-select (fn [category]
+                 category)})
+
+(derive ::Category.properties Category)
+
+(t1.models/add-property! ::parent-id
+  :update (fn [category]
+            (assoc category :parent-category-id 1)))
+
+(t1.models/define-methods-with-IModel-method-map
+ ::Category.properties
+ ;; NO-OP
+ {:properties (constantly {::parent-id true})})
+
+(deftest ^:synchronized update!-with-types-test
+  (testing "update! should work correctly for something with :types transforms and a pre-update method"
+    (doseq [[message model] {""                         Category
+                             "and a post-select method" ::Category.post-select
+                             "and properties"           ::Category.properties}]
+      (testing (format "%s\nmodel = %s" message (pr-str model))
+        (test/with-discarded-table-changes Category
+          (testing "before"
+            (is (= {:id 1, :name "bar", :parent-category-id nil}
+                   (t1.db/select-one model 1))))
+          (is (= true
+                 (t1.db/update! model 1 :name "PUB")))
+          (testing "after"
+            (is (= {:id 1, :name "pub", :parent-category-id (when (= model ::Category.properties)
+                                                              1)}
+                   (t1.db/select-one model 1)))))))))
+
 (deftest ^:synchronized update-where!-test
   (testing :not=
     (test/with-discarded-table-changes User
@@ -243,19 +280,35 @@
               {:id 3, :first-name "Lucky", :last-name "Bird"}]
              (t1.db/select User {:order-by [:id]}))))))
 
+(derive ::User.before-update User)
+
+(t1.models/define-methods-with-IModel-method-map
+ ::User.before-update
+ {:pre-update (fn [user]
+                (update user :last-name str/upper-case))})
+
 (deftest ^:synchronized update-non-nil-keys!-test
-  (test/with-discarded-table-changes User
-    (t1.db/update-non-nil-keys! User 2
-                                :first-name nil
-                                :last-name "Can")
-    (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
-           (t1.db/select-one User 2))))
-  (test/with-discarded-table-changes User
-    (t1.db/update-non-nil-keys! User 2
-                                {:first-name nil
-                                 :last-name  "Can"})
-    (is (= {:id 2, :first-name "Rasta", :last-name "Can"}
-           (t1.db/select-one User 2)))))
+  (doseq [model [User ::User.before-update]
+          [message thunk] {"kv-args"
+                           (fn []
+                             (t1.db/update-non-nil-keys! model 2
+                                                         :first-name nil
+                                                         :last-name "Can"))
+
+                           "updates map"
+                           (fn []
+                             (t1.db/update-non-nil-keys! model 2
+                                                         {:first-name nil
+                                                          :last-name  "Can"}))}]
+    (testing model
+      (testing message
+        (test/with-discarded-table-changes User
+          (is (= true
+                 (thunk)))
+          (is (= {:id 2, :first-name "Rasta", :last-name (condp = model
+                                                           User                 "Can"
+                                                           ::User.before-update "CAN")}
+                 (t1.db/select-one model 2))))))))
 
 (deftest ^:synchronized simple-insert!-test
   (doseq [model [Category

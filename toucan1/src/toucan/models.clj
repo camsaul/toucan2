@@ -133,6 +133,12 @@
                                 :fn       any?)))
   :ret  any?)
 
+;;; Property functions should be applied AFTER normal model `before-` (`pre-`) methods
+
+(m/prefer-method! #'before-update/before-update
+                  :toucan1/model
+                  :toucan.models/property)
+
 (defn properties
   "Return a map of properties added by [[add-property!]] for this model."
   [modelable]
@@ -480,7 +486,6 @@
     ;; `original`, it can still be used to get the original version of the instance. `changes` works as well since it
     ;; only returns columns that have new values in `current` and ignores ones that are no longer present. This is all
     ;; verified in [[toucan.models-test/pre-update-only-changes-test]].
-    protocols/with-current
     (f (protocols/with-current row (merge (model/primary-key-values-map row)
                                           (protocols/changes row))))))
 

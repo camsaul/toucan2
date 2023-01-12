@@ -8,7 +8,7 @@
   2. [[toucan2.model/resolve-model]] (entrypoint fn: [[transduce-parsed]])
   3. [[transduce-with-model]]        ; TODO -- `resolve-model` + transduce query?
   4. [[resolve]]
-  5. [[build]]
+  5. [[build]]                       ; TODO -- we should introduce a new hook here to use instead of [[transduce-with-model]]
   6. [[compile]]
   x. [[results-transform]]
   7. [[transduce-execute]]           ; TODO `with-connection`

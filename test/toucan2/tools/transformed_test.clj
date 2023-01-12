@@ -13,6 +13,7 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
+   [toucan2.tools.before-update :as before-update]
    [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.transformed :as transformed]
@@ -159,6 +160,53 @@
              (update/update! ::venues.string-id-and-category-keyword "1" {:name "Wow"})))
       (is (= "Wow"
              (select/select-one-fn :name ::venues.category-keyword 1))))))
+
+(derive ::venues.category-keyword.before-update ::venues.category-keyword)
+
+(def ^:private ^:dynamic *venue-before-update* nil)
+
+(before-update/define-before-update ::venues.category-keyword.before-update
+  [venue]
+  (when *venue-before-update*
+    (reset! *venue-before-update* venue))
+  venue)
+
+(deftest ^:synchronized update!-before-update-test
+  (testing "update! with transforms AND before-update"
+    (test/with-discarded-table-changes :venues
+      (binding [*venue-before-update* (atom nil)]
+        (is (= 1
+               (update/update! ::venues.category-keyword.before-update 1 {:category :BAR, :name "My Venue"})))
+        (testing `*venue-before-update*
+          (is (= {:id         1
+                  :name       "My Venue"
+                  :category   :BAR
+                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                 @*venue-before-update*))
+          (testing `protocols/original
+            (is (= {:id         1
+                    :name       "Tempest"
+                    :category   :bar
+                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                   (protocols/original @*venue-before-update*))))
+          (testing `protocols/current
+            (is (= {:id         1
+                    :name       "My Venue"
+                    :category   :BAR
+                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                   (protocols/current @*venue-before-update*))))
+          (testing `protocols/changes
+            (is (= {:category :BAR, :name "My Venue"}
+                   (protocols/changes @*venue-before-update*)))))
+        (is (= {:id         1
+                :name       "My Venue"
+                :category   :BAR
+                :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+               (select/select-one ::venues.category-keyword.before-update 1)))))))
 
 (deftest ^:synchronized save!-test
   (test/with-discarded-table-changes :venues

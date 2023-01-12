@@ -13,7 +13,13 @@
 (set! *warn-on-reflection* true)
 
 (m/defmulti before-update
-  {:arglists '([model row])}
+  {:arglists            '([model₁ row])
+   :defmethod-arities   #{2}
+   ;; work around https://github.com/camsaul/methodical/issues/142
+   :dispatch-value-spec (s/nonconforming
+                         (s/or
+                          :default (partial = :default)
+                          :model   (complement sequential?)))}
   u/dispatch-on-first-arg)
 
 (m/defmethod before-update :around :default
@@ -79,7 +85,10 @@
               pk-map            pk-maps]
           (assoc parsed-args :changes changes, :kv-args pk-map))))))
 
+;;; TODO -- why is this an around method? All it does is make things confusing when there's ambiguity
 (m/defmethod pipeline/transduce-with-model :around [#_query-type :toucan.query-type/update.* #_model ::before-update]
+  "Apply [[toucan2.tools.before-update/before-update]] to matching rows. If multiple versions of `:changes` are produced
+  as a result, recursively does an update for each version."
   [rf query-type model {::keys [doing-before-update?], :keys [changes], :as parsed-args}]
   (cond
     doing-before-update?
