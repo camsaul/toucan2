@@ -132,7 +132,7 @@
     (count* model unparsed-args)))
 
 (m/defmulti exists?*
-  {:arglists '([model₁ unparsed-args])}
+  {:arglists '([model₁ unparsed-args]), :defmethod-arities #{2}}
   u/dispatch-on-first-arg)
 
 (m/defmethod exists?* :default

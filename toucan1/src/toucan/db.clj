@@ -30,7 +30,7 @@
 
 (p/import-vars
  [t1.models resolve-model]
- [select select select-one count exists?])
+ [select select select-one count])
 
 (def ^:dynamic *quoting-style*
   "Temporarily override the default [[quoting-style]]. DEPRECATED: bind [[toucan2.map-backend.honeysql/*options*]]
@@ -359,6 +359,19 @@
   {:style/indent 2}
   [field modelable & options]
   (apply select/select-pk->fn field modelable options))
+
+;;; we could actually leverage Clojure 11 support for passing a map to `& {:keys ...}` and just have one arity, but we
+;;; want to support older Clojure versions for now at least.
+(defn exists?
+  "DEPRECATED: use [[toucan2.select/exists?]] instead."
+  ([modelable]
+   (select/exists? modelable))
+  ;; conditions maps weren't intentionally supported in Toucan 1, but they worked unintentionally, so continue to
+  ;; support them.
+  ([modelable conditions]
+   (apply select/exists? modelable (mapcat identity conditions)))
+  ([modelable k v & more]
+   (apply select/exists? modelable k v more)))
 
 ;;; Sort of weird that this accepts a different args syntax than [[delete!]] does.
 (defn simple-delete!

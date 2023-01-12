@@ -388,10 +388,21 @@
            (t1.db/select-id->field :first-name User)))))
 
 (deftest ^:parallel exists?-test
-  (is (t1.db/exists? User, :first-name "Cam"))
-  (is (t1.db/exists? User, :first-name "Rasta", :last-name "Toucan"))
+  ;; these test for `true` and `false` specifically because that's what Toucan 1 returned
+  (is (= true
+         (t1.db/exists? User, :first-name "Cam")))
+  (is (= true
+         (t1.db/exists? User, :first-name "Rasta", :last-name "Toucan")))
   (is (= false
-         (t1.db/exists? User, :first-name "Kanye", :last-name "Nest"))))
+         (t1.db/exists? User, :first-name "Kanye", :last-name "Nest")))
+  (testing "with no args: just check if any rows exist"
+    (is (= true
+           (t1.db/exists? User))))
+  (testing "apparently Toucan 1 exists? worked with a single conditions map (this was unintentional)"
+    (is (= true
+           (t1.db/exists? User {:first-name "Rasta", :last-name "Toucan"})))
+    (is (= false
+           (t1.db/exists? User {:first-name "Kanye", :last-name "Nest"})))))
 
 (deftest ^:parallel disable-db-logging-test
   (testing "This is just a dummy test to make sure the var actually exists."
