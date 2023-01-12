@@ -285,7 +285,8 @@
 (t1.models/define-methods-with-IModel-method-map
  ::User.before-update
  {:pre-update (fn [user]
-                (update user :last-name str/upper-case))})
+                (cond-> user
+                  (:last-name user) (update :last-name str/upper-case)))})
 
 (deftest ^:synchronized update-non-nil-keys!-test
   (doseq [model [User ::User.before-update]

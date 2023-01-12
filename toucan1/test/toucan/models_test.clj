@@ -7,11 +7,13 @@
    [toucan.models :as t1.models]
    [toucan.test-models.category :as category :refer [Category]]
    [toucan.test-models.phone-number :refer [PhoneNumber]]
+   [toucan.test-models.user :refer [User]]
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
    [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.model :as model]
+   [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -235,6 +237,41 @@
         (testing "Should still be able to get only the changes"
           (is (= {:name "Savoy Tivoli"}
                  (protocols/changes @*updated-venue*))))))))
+
+(derive ::User.no-op-before-update User)
+
+(t1.models/define-methods-with-IModel-method-map
+ ::User.no-op-before-update
+ {:pre-update (fn [user]
+                (dissoc user :first-name))})
+
+(deftest ^:synchronized update-do-not-set-pk-column-test
+  (testing "Don't try to set PK column(s) in UPDATE, even with the pre-update pk + changes shenanigans we're doing"
+    (test/with-discarded-table-changes User
+      (let [built (atom [])]
+        (binding [pipeline/*build* (comp (fn [result]
+                                           (swap! built conj result)
+                                           result)
+                                         pipeline/*build*)]
+          (is (= true
+                 (t1.db/update! ::User.no-op-before-update 1 {:first-name "Cam", :last-name "Eron"})))
+          (testing "built query"
+            (is (= [{:select [:*]
+                     :from   [[:t1_users]]
+                     :where  [:= :id 1]}
+                    {:update [:t1_users]
+                     :set    {:last-name "Eron"}
+                     :where  [:= :id 1]}]
+                   @built)))
+          (testing "No-op with no changes after running the after-update"
+            (reset! built [])
+            (is (= false
+                   (t1.db/update! ::User.no-op-before-update 1 {:first-name "Cam"})))
+            (testing "built query"
+              (is (= [{:select [:*]
+                       :from   [[:t1_users]]
+                       :where  [:= :id 1]}]
+                     @built)))))))))
 
 ;; (deftest do-pre-update-test
 ;;   ;; needs to pick up transforms AND `before-update`

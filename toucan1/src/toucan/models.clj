@@ -484,8 +484,9 @@
     ;;
     ;; Reset the `current` value of the instance to what it would have been in Toucan 1. Since we're not updating
     ;; `original`, it can still be used to get the original version of the instance. `changes` works as well since it
-    ;; only returns columns that have new values in `current` and ignores ones that are no longer present. This is all
-    ;; verified in [[toucan.models-test/pre-update-only-changes-test]].
+    ;; only returns columns that have new values in `current` and ignores ones that are no longer present. It will also
+    ;; ignore the primary keys, since those won't have changed. This is all verified
+    ;; in [[toucan.models-test/pre-update-only-changes-test]].
     (f (protocols/with-current row (merge (model/primary-key-values-map row)
                                           (protocols/changes row))))))
 

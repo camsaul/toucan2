@@ -262,7 +262,8 @@
 
 ;;; wraps a model to prevent `before-update` and stuff like that from happening.
 ;;;
-;;; TODO -- maybe this belongs in the main part of Toucan 2.
+;;; TODO -- maybe this belongs in the main part of Toucan 2. TODO #2 -- actually I'm not sure this is needed. You can
+;;; just use the table name directly.
 (defrecord ^:no-doc SimpleModel [original-model]
   pretty/PrettyPrintable
   (pretty [_this]

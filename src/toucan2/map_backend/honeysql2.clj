@@ -156,6 +156,7 @@
 (m/defmethod pipeline/compile [#_query-type :default
                                #_model      :default
                                #_query      :toucan.map-backend/honeysql2]
+  "Compile a Honey SQL 2 map to [sql & args]."
   [query-type model honeysql]
   (let [options  (merge @global-options
                         *options*)
