@@ -27,12 +27,7 @@
 ;;; TODO -- can we use [[s/every-kv]] for this stuff?
 (s/def ::default-args.kv-args
   (s/* (s/cat
-        :k keyword?
-        :v any?)))
-
-(s/def ::default-args.kv-args.non-empty
-  (s/+ (s/cat
-        :k keyword?
+        :k any?
         :v any?)))
 
 (s/def ::default-args.queryable

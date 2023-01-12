@@ -7,11 +7,16 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]))
 
+(s/def ::kv-args
+  (s/+ (s/cat
+        :k keyword?
+        :v any?)))
+
 (s/def ::args.rows
   (s/alt :nil               nil?
          :single-row-map    map?
          :multiple-row-maps (s/spec (s/* map?))
-         :kv-pairs          ::query/default-args.kv-args.non-empty
+         :kv-pairs          ::kv-args
          :columns-rows      (s/cat :columns (s/spec (s/+ keyword?))
                                    :rows    (s/spec (s/+ sequential?)))))
 

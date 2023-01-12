@@ -1,6 +1,7 @@
 (ns toucan2.select-test
   (:require
    [clojure.test :refer :all]
+   [honey.sql :as hsql]
    [methodical.core :as m]
    [toucan2.connection :as conn]
    [toucan2.instance :as instance]
@@ -34,7 +35,9 @@
     [:conn :db :model ::my-query]            {:connectable :db, :modelable :model, :queryable ::my-query}
     [:conn :db :model :id 1]                 {:connectable :db, :modelable :model, :kv-args {:id 1}, :queryable {}}
     [[:model :col] :query]                   {:modelable :model, :columns [:col], :queryable :query}
-    [[:model [:expr :col]] :query]           {:modelable :model, :columns [[:expr :col]], :queryable :query}))
+    [[:model [:expr :col]] :query]           {:modelable :model, :columns [[:expr :col]], :queryable :query}
+    ;; Yoda condition
+    [:model :id 1 "Cam" :name]               {:modelable :model, :kv-args {:id 1, "Cam" :name}, :queryable {}}))
 
 (deftest ^:parallel default-build-query-test
   (is (= {:select [:*]
@@ -142,6 +145,21 @@
   (testing "k v conditions + query"
     (is (= [(instance/instance ::test/venues {:id 3, :name "BevMo"})]
            (select/select ::test/venues :id [:>= 3] {:select [:id :name], :order-by [[:id :asc]]})))))
+
+;;; don't actually use this in real life since it doesn't guard against SQL injection.
+(hsql/register-fn! ::literal (fn [_literal [s]]
+                               [(str \' s \')]))
+
+(deftest ^:parallel weird-selects-test
+  (testing "Yoda conditions"
+    (is (= (select/select ::test/people :id 1 :name "Cam")
+           (select/select ::test/people :id 1 "Cam" :name))))
+  (testing "arbitrary Honey SQL"
+    (is (= (select/select ::test/people :id 1 :name "Cam")
+           (select/select ::test/people :id 1 :name [:= [::literal "Cam"]]))))
+  (testing "arbitrary Honey SQL × Yoda conditions"
+    (is (= (select/select ::test/people :id 1 :name [:= [::literal "Cam"]])
+           (select/select ::test/people :id 1 [::literal "Cam"] :name)))))
 
 (tools.named-query/define-named-query ::count-query
   {:select [[:%count.* :count]]
