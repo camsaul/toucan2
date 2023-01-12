@@ -215,13 +215,13 @@
 
 (derive ::venues.capture-updates ::venues.before-update)
 
-(m/defmethod pipeline/transduce-compile [#_query-type :toucan.query-type/update.*
-                                         #_model      ::venues.capture-updates
-                                         #_query      :default]
-  [rf query-type model built-query]
+(m/defmethod pipeline/compile [#_query-type  :toucan.query-type/update.*
+                               #_model       ::venues.capture-updates
+                               #_built-query :toucan.map-backend/*]
+  [query-type model built-query]
   (when *venues-update-queries*
     (swap! *venues-update-queries* conj built-query))
-  (next-method rf query-type model built-query))
+  (next-method query-type model built-query))
 
 ;;; this changes the category to `category-<id>` with the venue ID
 (derive ::venues.add-unique-category ::venues.capture-updates)

@@ -25,7 +25,9 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test-setup/do-with-quoted-snake-disabled)
+(use-fixtures :each
+  test-setup/do-with-quoted-snake-disabled
+  test-setup/do-with-default-quoting-style)
 
 (deftest ^:parallel resolve-model-test
   (are [x] (= :toucan.test-models.category/Category

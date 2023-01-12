@@ -222,11 +222,15 @@
 (deftest ^:synchronized transform-insert-returning-results-without-select-test
   (testing "insert-returning-instances results should be transformed if they come directly from the DB (not via select)"
     (test/with-discarded-table-changes :venues
-      (binding [pipeline/transduce-build (fn [rf _query-type _model {:keys [rows]} _resolved-query]
-                                           {:pre [(seq? rows)]}
-                                           (transduce identity rf (map (fn [row]
-                                                                         (update row :category name))
-                                                                       rows)))]
+      (binding [pipeline/*build*             (fn [_query-type _model parsed-args _resolved-query]
+                                               parsed-args)
+                pipeline/*compile*           (fn [_query-type _model built-query]
+                                               built-query)
+                pipeline/*transduce-execute* (fn [rf _query-type _model {:keys [rows], :as _compiled-query}]
+                                               {:pre [(seq? rows)]}
+                                               (transduce identity rf (map (fn [row]
+                                                                             (update row :category name))
+                                                                           rows)))]
         (is (= (instance/instance ::venues.category-keyword
                                   {:name "BevLess", :category :bar})
                (pipeline/transduce-with-model

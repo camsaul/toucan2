@@ -54,17 +54,16 @@
                 (empty? (:rows resolved-query)))
            (nil? resolved-query))))
 
-(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/insert.* #_model :default #_query :default]
-  [rf query-type model parsed-args resolved-query]
+(m/defmethod pipeline/build [#_query-type :toucan.query-type/insert.* #_model :default #_query :default]
+  [query-type model parsed-args resolved-query]
   (let [rows (some (comp not-empty :rows) [parsed-args resolved-query])]
     (if (can-skip-insert? parsed-args resolved-query)
       (do
         (log/debugf :compile "Query has no changes, skipping update")
-        ;; TODO -- not sure this is the right thing to do
-        (rf (rf)))
+        ::pipeline/no-op)
       (do
         (log/debugf :compile "Inserting %s rows into %s" (if (seq rows) (count rows) "?") model)
-        (next-method rf query-type model parsed-args resolved-query)))))
+        (next-method query-type model parsed-args resolved-query)))))
 
 ;;; The code for building an INSERT query as Honey SQL lives in [[toucan2.map-backend.honeysql2]]
 

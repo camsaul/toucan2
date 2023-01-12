@@ -53,10 +53,10 @@
     :else
     [table-id]))
 
-(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/select.*
-                                       #_model      :default
-                                       #_query      :toucan.map-backend/honeysql2]
-  [rf query-type model {:keys [columns], :as parsed-args} resolved-query]
+(m/defmethod pipeline/build [#_query-type :toucan.query-type/select.*
+                             #_model      :default
+                             #_query      :toucan.map-backend/honeysql2]
+  [query-type model {:keys [columns], :as parsed-args} resolved-query]
   (log/debugf :compile "Building SELECT query for %s with columns %s" model columns)
   (let [parsed-args    (dissoc parsed-args :columns)
         resolved-query (-> (merge
@@ -72,7 +72,7 @@
                             resolved-query)
                            (with-meta (meta resolved-query)))]
     (log/debugf :compile "=> %s" resolved-query)
-    (next-method rf query-type model parsed-args resolved-query)))
+    (next-method query-type model parsed-args resolved-query)))
 
 ;;; Support
 ;;;
@@ -85,10 +85,10 @@
    ["DEFAULT VALUES"])
  nil)
 
-(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/insert.*
-                                       #_model      :default
-                                       #_query      :toucan.map-backend/honeysql2]
-  [rf query-type model parsed-args resolved-query]
+(m/defmethod pipeline/build [#_query-type :toucan.query-type/insert.*
+                             #_model      :default
+                             #_query      :toucan.map-backend/honeysql2]
+  [query-type model parsed-args resolved-query]
   (log/debugf :compile "Building INSERT query for %s" model)
   (let [rows        (some (comp not-empty :rows) [parsed-args resolved-query])
         built-query (-> (merge
@@ -105,12 +105,12 @@
                         (with-meta (meta resolved-query)))]
     (log/debugf :compile "=> %s" built-query)
     ;; rows is only added so we can get the default methods' no-op logic if there are no rows at all.
-    (next-method rf query-type model (assoc parsed-args :rows rows) built-query)))
+    (next-method query-type model (assoc parsed-args :rows rows) built-query)))
 
-(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/update.*
-                                       #_model      :default
-                                       #_query      :toucan.map-backend/honeysql2]
-  [rf query-type model {:keys [kv-args changes], :as parsed-args} conditions-map]
+(m/defmethod pipeline/build [#_query-type :toucan.query-type/update.*
+                             #_model      :default
+                             #_query      :toucan.map-backend/honeysql2]
+  [query-type model {:keys [kv-args changes], :as parsed-args} conditions-map]
   (log/debugf :compile "Building UPDATE query for %s" model)
   (let [parsed-args (assoc parsed-args :kv-args (merge kv-args conditions-map))
         built-query (-> {:update (table-and-alias model)
@@ -118,30 +118,30 @@
                         (with-meta (meta conditions-map)))]
     (log/debugf :compile "=> %s" built-query)
     ;; `:changes` are added to `parsed-args` so we can get the no-op behavior in the default method.
-    (next-method rf query-type model (assoc parsed-args :changes changes) built-query)))
+    (next-method query-type model (assoc parsed-args :changes changes) built-query)))
 
 ;;; For building a SELECT query using the args passed to something like [[toucan2.update/update!]]. This is needed to
 ;;; implement [[toucan2.tools.before-update]]. The main syntax difference is a map 'resolved-query' is supposed to be
 ;;; treated as a conditions map for update instead of as a raw Honey SQL query.
 
-(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/select.instances.from-update
-                                       #_model      :default
-                                       #_query      :toucan.map-backend/honeysql2]
-  ;; treat the resolved query as a conditions map but otherwise behave the same as the
-  ;; `:toucan.query-type/select.instances` impl.
-  [rf query-type model parsed-args conditions-map]
-  (next-method rf query-type model (update parsed-args :kv-args #(merge % conditions-map)) {}))
+(m/defmethod pipeline/build [#_query-type :toucan.query-type/select.instances.from-update
+                             #_model      :default
+                             #_query      :toucan.map-backend/honeysql2]
+  "Treat the resolved query as a conditions map but otherwise behave the same as the `:toucan.query-type/select.instances`
+  impl."
+  [query-type model parsed-args conditions-map]
+  (next-method query-type model (update parsed-args :kv-args #(merge % conditions-map)) {}))
 
-(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/delete.*
-                                       #_model      :default
-                                       #_query      :toucan.map-backend/honeysql2]
-  [rf query-type model parsed-args resolved-query]
+(m/defmethod pipeline/build [#_query-type :toucan.query-type/delete.*
+                             #_model      :default
+                             #_query      :toucan.map-backend/honeysql2]
+  [query-type model parsed-args resolved-query]
   (log/debugf :compile "Building DELETE query for %s" model)
   (let [built-query (-> (merge {:delete-from (table-and-alias model)}
                                resolved-query)
                         (with-meta (meta resolved-query)))]
     (log/debugf :compile "=> %s" built-query)
-    (next-method rf query-type model parsed-args built-query)))
+    (next-method query-type model parsed-args built-query)))
 
 ;;;; Query compilation
 
@@ -153,14 +153,14 @@
   "Option override when to pass to [[honey.sql/format]]."
   nil)
 
-(m/defmethod pipeline/transduce-compile [#_query-type :default
-                                         #_model      :default
-                                         #_query      :toucan.map-backend/honeysql2]
-  [rf query-type model honeysql]
+(m/defmethod pipeline/compile [#_query-type :default
+                               #_model      :default
+                               #_query      :toucan.map-backend/honeysql2]
+  [query-type model honeysql]
   (let [options  (merge @global-options
                         *options*)
         _        (log/debugf :compile "Compiling Honey SQL 2 with options %s" options)
         sql-args (u/try-with-error-context ["compile Honey SQL query" {::honeysql honeysql, ::options options}]
                    (hsql/format honeysql options))]
     (log/debugf :compile "=> %s" sql-args)
-    (next-method rf query-type model sql-args)))
+    (pipeline/compile query-type model sql-args)))

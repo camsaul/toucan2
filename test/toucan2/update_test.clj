@@ -108,7 +108,7 @@
               :changes   {:name "Taco Bell"}
               :queryable {}}
              parsed-args))
-      (let [query (pipeline/resolve-query :toucan.query-type/update.* ::test/venues (:queryable parsed-args))]
+      (let [query (pipeline/resolve :toucan.query-type/update.* ::test/venues (:queryable parsed-args))]
         (is (= {}
                query))
         (is (= {:update [:venues]

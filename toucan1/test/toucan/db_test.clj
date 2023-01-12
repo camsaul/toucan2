@@ -24,7 +24,9 @@
 
 (set! *warn-on-reflection* true)
 
-(use-fixtures :each test-setup/do-with-quoted-snake-disabled)
+(use-fixtures :each
+  test-setup/do-with-quoted-snake-disabled
+  test-setup/do-with-default-quoting-style)
 
 (comment heroes/keep-me
          test-setup/keep-me)
@@ -396,7 +398,7 @@
     (is (= false
            t1.db/*disable-db-logging*))))
 
-(deftest ^:parallel honeysql->sql
+(deftest ^:parallel honeysql->sql-test
   (is (= [(case (test/current-db-type)
             :h2       "SELECT * FROM \"USER\" WHERE \"NAME\" = ?"
             :postgres "SELECT * FROM \"user\" WHERE \"name\" = ?")

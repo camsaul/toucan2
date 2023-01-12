@@ -8,6 +8,7 @@
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -71,7 +72,7 @@
   ;; we end up here either way. But if `query-type` is `UPDATE` we shouldn't touch the query.
   (if (m/is-default-primary-method? each-row-fn [query-type model])
     (next-method rf query-type model sql-args)
-    (let [upgraded-type (pipeline/similar-query-type-returning query-type :toucan.result-type/instances)
+    (let [upgraded-type (types/similar-query-type-returning query-type :toucan.result-type/instances)
           _             (assert upgraded-type (format "Don't know how to upgrade a %s query to one returning instances"
                                                       query-type))
           rf*           (result-type-rf query-type model rf)

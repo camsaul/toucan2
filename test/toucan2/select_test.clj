@@ -247,8 +247,8 @@
 ;; TODO this is probably not the way you'd want to accomplish this in real life -- I think you'd probably actually want
 ;; to implement [[toucan2.pipeline/build]] instead. But it does do a good job of letting us test that combining aux
 ;; methods work like we'd expect.
-(m/defmethod pipeline/transduce-compile :before [#_query-type :toucan.query-type/select.* #_model ::people.limit-2 #_query :toucan.map-backend/honeysql2]
-  [_rf _query-type _model built-query]
+(m/defmethod pipeline/compile :before [#_query-type :toucan.query-type/select.* #_model ::people.limit-2 #_query :toucan.map-backend/honeysql2]
+  [_query-type _model built-query]
   (assoc built-query :limit 2))
 
 (deftest ^:parallel pre-select-test
@@ -439,7 +439,7 @@
     (let [parsed-args (query/parse-args :toucan.query-type/select.* [::test/venues nil])]
       (is (= {:modelable ::test/venues, :queryable nil}
              parsed-args))
-      (let [query (pipeline/resolve-query :toucan.query-type/select.* ::test/venues (:queryable parsed-args))]
+      (let [query (pipeline/resolve :toucan.query-type/select.* ::test/venues (:queryable parsed-args))]
         (is (= nil
                query))
         (is (= {:select [:*], :from [[:venues]], :where [:= :id nil]}
@@ -473,10 +473,10 @@
 
 (derive ::venues.with-category ::test.track-realized/venues)
 
-(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/select.*
-                                       #_model      ::venues.with-category
-                                       #_query      clojure.lang.IPersistentMap]
-  [rf query-type model parsed-args resolved-query]
+(m/defmethod pipeline/build [#_query-type :toucan.query-type/select.*
+                             #_model      ::venues.with-category
+                             #_query      clojure.lang.IPersistentMap]
+  [query-type model parsed-args resolved-query]
   (let [model-ns-str    (some-> (model/namespace model) name)
         venues-category (keyword
                          (str
@@ -484,7 +484,7 @@
                             (str model-ns-str \.))
                           "category"))
         resolved-query  (assoc resolved-query :left-join [:category [:= venues-category :category.name]])]
-    (next-method rf query-type model parsed-args resolved-query)))
+    (next-method query-type model parsed-args resolved-query)))
 
 (deftest ^:parallel joined-model-test
   (test.track-realized/with-realized-columns [realized-columns]

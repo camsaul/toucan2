@@ -36,16 +36,15 @@
 
 ;;;; Code for building Honey SQL for UPDATE lives in [[toucan2.map-backend.honeysql2]]
 
-(m/defmethod pipeline/transduce-build [#_query-type :toucan.query-type/update.*
-                                       #_model      :default
-                                       #_query      :default]
-  [rf query-type model {:keys [changes], :as parsed-args} resolved-query]
+(m/defmethod pipeline/build [#_query-type :toucan.query-type/update.*
+                             #_model      :default
+                             #_query      :default]
+  [query-type model {:keys [changes], :as parsed-args} resolved-query]
   (if (empty? changes)
     (do
       (log/debugf :compile "Query has no changes, skipping update")
-      ;; TODO -- not sure this is the right thing to do
-      (rf (rf)))
-    (next-method rf query-type model parsed-args resolved-query)))
+      ::pipeline/no-op)
+    (next-method query-type model parsed-args resolved-query)))
 
 (defn reducible-update
   {:arglists '([modelable pk? conditions-map-or-query? & conditions-kv-args changes-map])}

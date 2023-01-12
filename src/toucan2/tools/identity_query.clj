@@ -41,7 +41,7 @@
   [reducible-rows]
   (->IdentityQuery reducible-rows))
 
-(m/defmethod pipeline/transduce-compile [#_query-type :default #_model :default #_query IdentityQuery]
+(m/defmethod pipeline/transduce-execute [#_query-type :default #_model :default #_query IdentityQuery]
   [rf _query-type model {:keys [rows], :as _query}]
   (log/debugf :execute "transduce IdentityQuery rows %s" rows)
   (transduce (if model
@@ -51,19 +51,18 @@
              rf
              rows))
 
-;;; this is an around method so we can intercept anything else that might normally be considered a more specific method
-;;; when it dispatches off of more-specific values of `query-type`
-(m/defmethod pipeline/transduce-build :around [#_query-type :default #_model :default #_query IdentityQuery]
-  [rf query-type model _parsed-args resolved-query]
-  (pipeline/transduce-compile rf query-type model resolved-query))
+(m/defmethod pipeline/compile [#_query-type :default #_model :default #_query IdentityQuery]
+  [_query-type _model query]
+  query)
 
-;;; TODO -- not sure we need this method since we should be bypassing it with the method below
-(m/defmethod pipeline/transduce-build [#_query-type :default #_model IdentityQuery #_query :default]
-  [rf query-type model _parsed-args resolved-query]
-  (pipeline/transduce-compile rf query-type model resolved-query))
+(m/defmethod pipeline/build [#_query-type :default #_model :default #_query IdentityQuery]
+  "This is an around method so we can intercept anything else that might normally be considered a more specific method
+  when it dispatches off of more-specific values of `query-type`."
+  [_query-type _model _parsed-args resolved-query]
+  resolved-query)
 
-;;; allow using an identity query as an 'identity model'
 (m/defmethod pipeline/transduce-with-model [#_query-type :default #_model IdentityQuery]
+  "Allow using an identity query as an 'identity model'."
   [rf _query-type model _parsed-args]
   (transduce identity rf model))
 

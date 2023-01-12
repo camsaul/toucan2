@@ -113,10 +113,10 @@
          parsed)))))
 
 
-;;;; Part of the default [[pipeline/transduce-build]] for maps: applying key-value args
+;;;; Part of the default [[pipeline/build]] for maps: applying key-value args
 
 (m/defmulti apply-kv-arg
-  {:arglists '([model₁ query₂ k₃ v])}
+  {:arglists '([model₁ query₂ k₃ v]), :defmethod-arities #{4}}
   u/dispatch-on-first-three-args)
 
 ;;; not 100% sure we need this method since the query should already have `:type` metadata, but it's nice to have it

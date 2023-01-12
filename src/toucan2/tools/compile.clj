@@ -4,6 +4,11 @@
   (:require
    [toucan2.pipeline :as pipeline]))
 
+(defn -compile [thunk]
+  (binding [pipeline/*transduce-execute* (fn [_rf _query-type _model compiled-query]
+                                           compiled-query)]
+    (thunk)))
+
 (defmacro compile
   "Return the compiled query that would be executed by a form, rather than executing that form itself.
 
@@ -15,26 +20,30 @@
   ```"
   {:style/indent 0}
   [& body]
-  `(binding [pipeline/transduce-execute (fn [rf# query-type# model# compiled-query#]
-                                                 compiled-query#)]
-     ~@body))
+  `(-compile (^:once fn* [] ~@body)))
+
+(defn -build [thunk]
+  (binding [pipeline/*compile* (fn [_query-type _model built-query]
+                                 built-query)]
+    (-compile thunk)))
 
 (defmacro build
   "Return the built query before compilation that would have been executed by `body` without compiling or executing it."
   {:style/indent 0}
   [& body]
-  `(binding [pipeline/transduce-compile (fn [rf# query-type# model# built-query#]
-                                              built-query#)]
-     ~@body))
+  `(-build (^:once fn* [] ~@body)))
+
+(defn -resolved [thunk]
+  (binding [pipeline/*build* (fn [_query-type _model _parsed-args resolved-query]
+                               resolved-query)]
+    (-build thunk)))
 
 (defmacro resolved
   "Return the resolved query and parsed args *before* building a query (e.g. before creating a Honey SQL query from the
   args passed to [[toucan2.select/select]] created by `body` without building a query, compiling it, or executing it."
   {:style/indent 0}
   [& body]
-  `(binding [pipeline/transduce-build (fn [rf# query-type# model# parsed-args# resolved-query#]
-                                        {:parsed-args parsed-args#, :resolved-query resolved-query#})]
-     ~@body))
+  `(-resolved (^:once fn* [] ~@body)))
 
 ;; (defmacro parsed-args
 ;;   [& body]

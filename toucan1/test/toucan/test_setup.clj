@@ -68,5 +68,9 @@
 (m/defmethod conn/do-with-connection ::db
   [connectable f]
   (init-db! (test/current-db-type))
-  (do-with-default-quoting-style
-   (^:once fn* [] (next-method connectable f))))
+  (next-method connectable f))
+
+;; (m/defmethod pipeline/transduce-with-model [#_query-type :default #_model :toucan1/model]
+;;   [rf query-type model parsed-args]
+;;   (do-with-default-quoting-style
+;;    (^:once fn* [] (next-method rf query-type model parsed-args))))

@@ -74,7 +74,7 @@
     (let [parsed-args (query/parse-args :toucan.query-type/delete.update-count [::test/venues nil])]
       (is (= {:modelable ::test/venues, :queryable nil}
              parsed-args))
-      (let [resolved-query (pipeline/resolve-query :toucan.query-type/delete.update-count ::test/venues (:queryable parsed-args))]
+      (let [resolved-query (pipeline/resolve :toucan.query-type/delete.update-count ::test/venues (:queryable parsed-args))]
         (is (= nil
                resolved-query))
         (is (= {:delete-from [:venues]
