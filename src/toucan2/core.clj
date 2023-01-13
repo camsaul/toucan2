@@ -21,13 +21,14 @@
    [toucan2.tools.before-select]
    [toucan2.tools.before-update]
    [toucan2.tools.compile]
+   [toucan2.tools.debug]
    [toucan2.tools.default-fields]
    [toucan2.tools.hydrate]
    [toucan2.tools.transformed]
    [toucan2.update]
    [toucan2.util]))
 
-;;; this is so no one gets confused and things these namespaces are unused.
+;;; this is so no one gets confused and thinks these namespaces are unused.
 (comment
   toucan2.connection/keep-me
   toucan2.delete/keep-me
@@ -46,6 +47,7 @@
   toucan2.tools.before-select/keep-me
   toucan2.tools.before-update/keep-me
   toucan2.tools.compile/keep-me
+  toucan2.tools.debug/keep-me
   toucan2.tools.default-fields/keep-me
   toucan2.tools.hydrate/keep-me
   toucan2.tools.transformed/keep-me
@@ -57,8 +59,6 @@
   do-with-connection
   with-connection
   with-transaction]
-
- ;; TODO -- shouldn't current connectable be in here too?
 
  [toucan2.delete
   delete!]
@@ -95,8 +95,6 @@
   current
   model
   original]
-
- #_[toucan2.query]
 
  [toucan2.save
   save!]
@@ -143,7 +141,8 @@
   build
   compile]
 
- #_[toucan2.tools.disallow]
+ [toucan2.tools.debug
+  debug]
 
  [toucan2.tools.default-fields
   define-default-fields]
@@ -154,12 +153,6 @@
   model-for-automagic-hydration
   simple-hydrate]
 
- #_[toucan2.tools.identity-query
-    identity-query]
-
- #_[toucan2.tools.with-temp
-    with-temp]
-
  [toucan2.tools.transformed
   deftransforms
   transforms]
@@ -168,7 +161,4 @@
   reducible-update
   reducible-update-returning-pks
   update!
-  update-returning-pks!]
-
- ;; TODO -- a debug macro. Binding vars imported this way doesn't work.
- #_[toucan2.util])
+  update-returning-pks!])
