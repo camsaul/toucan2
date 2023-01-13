@@ -10,7 +10,7 @@
 
 [![Clojars Project](https://clojars.org/io.github.camsaul/toucan2/latest-version.svg)](https://clojars.org/io.github.camsaul/toucan2)
 
-# Toucan 2
+# T2: Toucan 2
 
 ![Toucan 2](https://github.com/camsaul/toucan2/blob/master/assets/toucan2.png)
 
