@@ -47,7 +47,11 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: tests-postgres
+        key: v1-tests-postgres-${{ hashFiles("./deps.edn") }}
+        restore-keys: |
+          v1-tests-postgres-
+          v1-tests-
+          v1-
     - run: clojure -X:dev:test:test-postgres
       name: Run tests
       env:
@@ -74,7 +78,11 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: tests-h2
+        key: v1-tests-h2-${{ hashFiles("./deps.edn") }}
+        restore-keys: |
+          v1-tests-h2-
+          v1-tests-
+          v1-
     - run: clojure -X:dev:test:test-h2
       name: Run tests
       env:
@@ -100,7 +108,11 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: whitespace-linter
+        key: v1-tests-whitespace-linter-${{ hashFiles("./deps.edn") }}
+        restore-keys: |
+          v1-tests-whitespace-linter-
+          v1-tests-
+          v1-
     - run: clojure -T:whitespace-linter
       name: Run whitespace linter
 
@@ -124,7 +136,11 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: check
+        key: v1-tests-check-${{ hashFiles("./deps.edn") }}
+        restore-keys: |
+          v1-tests-check-
+          v1-tests-
+          v1-
     - run: clojure -M:check
       name: Check Toucan 2 core namespaces
     - run: clojure -M:check
@@ -151,7 +167,11 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: codecov
+        key: v1-tests-codecov-${{ hashFiles("./deps.edn") }}
+        restore-keys: |
+          v1-tests-codecov-
+          v1-tests-
+          v1-
     - run: clojure -X:dev:test-h2:cloverage
       name: Run tests with Cloverage
     - name: Upload results to codecov.io

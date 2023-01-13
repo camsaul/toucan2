@@ -8,7 +8,12 @@
   result)
 
 (defn -debug [thunk]
-  (binding [pipeline/*build*   (comp (partial print-result "\nBuilt:")    pipeline/*build*)
+  (binding [pipeline/*build*   (comp (partial print-result "\nBuilt:")
+                                     (let [build* pipeline/*build*]
+                                       (fn [query-type model parsed-args resolved-query]
+                                         (print-result "\nParsed args:" parsed-args)
+                                         (print-result "\nResolved query:" resolved-query)
+                                         (build* query-type model parsed-args resolved-query))))
             pipeline/*compile* (comp (partial print-result "\nCompiled:") pipeline/*compile*)]
     (thunk)))
 

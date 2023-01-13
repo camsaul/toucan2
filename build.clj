@@ -7,14 +7,14 @@
 (def scm-url "git@github.com:camsaul/toucan2.git")
 (def lib     'io.github.camsaul/toucan2)
 
+(def major-minor-version (str/trim (slurp "VERSION.txt")))
+
 (defn commit-number []
   (or (-> (sh/sh "git" "rev-list" "HEAD" "--count")
           :out
           str/trim
           parse-long)
       "9999-SNAPSHOT"))
-
-(def major-minor-version "1.0")
 
 (def version (str major-minor-version \. (commit-number)))
 
