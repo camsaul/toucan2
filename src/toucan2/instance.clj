@@ -8,6 +8,8 @@
 
 (set! *warn-on-reflection* true)
 
+(def ^:dynamic *print-original* false)
+
 (defn instance?
   "True if `x` is a Toucan2 instance, i.e. a `toucan2.instance.Instance` or some other class that satisfies the correct
   interfaces.
@@ -170,7 +172,9 @@
 
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `instance model m)))
+    (if *print-original*
+      (list `instance model (symbol "#_") orig m)
+      (list `instance model m))))
 
 (deftype ^:no-doc TransientInstance [model ^clojure.lang.ITransientMap m mta]
   clojure.lang.ITransientMap
@@ -272,8 +276,8 @@
   (protocols/with-current an-instance (apply f (protocols/current an-instance) args)))
 
 (defn update-original-and-current
-  "Like `(apply f instance args)`, but affects both the `original` map and `current` map of `an-instance` rather than just
-  the current map. Acts like regular `(apply f instance args)` if `instance` is not an `Instance`.
+  "Like `(apply f instance args)`, but affects both the `original` map and `current` map of `an-instance` rather than
+  just the current map. Acts like regular `(apply f instance args)` if `instance` is not an `Instance`.
 
   `f` is applied directly to the underlying `original` and `current` maps of `instance` itself. `f` is only applied
   once if `original` and `current` are currently the same object (i.e., the new `original` and `current` will also be
