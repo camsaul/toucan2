@@ -47,7 +47,7 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-tests-postgres-${{ hashFiles("./deps.edn") }}
+        key: v1-tests-postgres-${{ hashFiles('./deps.edn') }}
         restore-keys: |
           v1-tests-postgres-
           v1-tests-
@@ -78,7 +78,7 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-tests-h2-${{ hashFiles("./deps.edn") }}
+        key: v1-tests-h2-${{ hashFiles('./deps.edn') }}
         restore-keys: |
           v1-tests-h2-
           v1-tests-
@@ -108,7 +108,7 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-tests-whitespace-linter-${{ hashFiles("./deps.edn") }}
+        key: v1-tests-whitespace-linter-${{ hashFiles('./deps.edn') }}
         restore-keys: |
           v1-tests-whitespace-linter-
           v1-tests-
@@ -136,7 +136,7 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-tests-check-${{ hashFiles("./deps.edn") }}
+        key: v1-tests-check-${{ hashFiles('./deps.edn') }}
         restore-keys: |
           v1-tests-check-
           v1-tests-
@@ -167,7 +167,7 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-tests-codecov-${{ hashFiles("./deps.edn") }}
+        key: v1-tests-codecov-${{ hashFiles('./deps.edn') }}
         restore-keys: |
           v1-tests-codecov-
           v1-tests-

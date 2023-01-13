@@ -29,7 +29,7 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-deploy-${{ hashFiles("./deps.edn") }}
+        key: v1-deploy-${{ hashFiles('./deps.edn') }}
         restore-keys: |
           v1-deploy-
           v1-
