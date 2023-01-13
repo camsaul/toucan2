@@ -14,9 +14,11 @@
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
    [toucan2.connection :as conn]
+   [toucan2.instance :as instance]
    [toucan2.jdbc :as jdbc]
    [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.pipeline :as pipeline]
+   [toucan2.protocols :as protocols]
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
    [toucan2.util :as u])
@@ -280,6 +282,31 @@
                  ;; use simple-model to make sure transforms aren't done (str/lower-case on :name in this case)
                  (t1.db/select-one (t1.db/->SimpleModel Category) :id 1))))))))
 
+(derive ::User.before-update User)
+
+(t1.models/define-methods-with-IModel-method-map
+ ::User.before-update
+ {:pre-update (fn [user]
+                (cond-> user
+                  (:last-name user) (update :last-name str/upper-case)))})
+
+(deftest ^:synchronized update-with-instance-with-no-changes-test
+  (testing "update! should save the map you pass in, not just `changes`; that's what `save!` is for."
+    (doseq [model [User ::User.before-update]]
+      (testing model
+        (test/with-discarded-table-changes User
+          (let [user (-> (t1.db/select-one model :id 1)
+                         (assoc :last-name "Eron")
+                         instance/reset-original)]
+            (is (= nil
+                   (protocols/changes user)))
+            (is (= true
+                   (t1.db/update! model 1 user)))
+            (is (= {:id 1, :first-name "Cam", :last-name (condp = model
+                                                           User                 "Eron"
+                                                           ::User.before-update "ERON")}
+                   (t1.db/select-one [model :id :first-name :last-name] :id 1)))))))))
+
 (derive ::Category.post-select Category)
 
 (t1.models/define-methods-with-IModel-method-map
@@ -391,14 +418,6 @@
              (throw (ex-info "OOPS!" {}))))))
     (is (= #{"bar"}
            (t1.db/select-field :category ::test/venues :id [:in #{1 2}])))))
-
-(derive ::User.before-update User)
-
-(t1.models/define-methods-with-IModel-method-map
- ::User.before-update
- {:pre-update (fn [user]
-                (cond-> user
-                  (:last-name user) (update :last-name str/upper-case)))})
 
 (deftest ^:synchronized update-non-nil-keys!-test
   (doseq [model [User ::User.before-update]

@@ -273,6 +273,39 @@
                        :where  [:= :id 1]}]
                      @built)))))))))
 
+(derive ::Category.multiple-before-updates Category)
+
+(t1.models/define-methods-with-IModel-method-map
+ ::Category.multiple-before-updates
+ {:pre-update (fn [category]
+                (is (= {:name "crowbar-deluxe"}
+                       (protocols/changes category)))
+                (cond-> category
+                  (:name category) (update :name str "-ultra")))})
+
+(derive ::Category.multiple-before-updates-2 ::Category.multiple-before-updates)
+
+(t1.models/add-property! ::add-parent-category-id
+  :update (fn [category]
+            (assoc category :parent-category-id 2)))
+
+(t1.models/define-methods-with-IModel-method-map
+ ::Category.multiple-before-updates-2
+ {:pre-update (fn [category]
+                (is (= {:name "crowbar"}
+                       (protocols/changes category)))
+                (cond-> category
+                  (:name category) (update :name str "-deluxe")))
+  :properties (constantly {::add-parent-category-id true})})
+
+(deftest ^:synchronized multiple-before-updates-test
+  (testing "Make sure we aren't accidentally discarding changes with multiple before-update (e.g. pre-update + properties)"
+    (test/with-discarded-table-changes Category
+      (is (= true
+             (t1.db/update! ::Category.multiple-before-updates-2 1 {:name "crowbar"})))
+      (is (= {:id 1, :name "crowbar-deluxe-ultra", :parent-category-id 2}
+             (t1.db/select-one ::Category.multiple-before-updates-2 :id 1))))))
+
 ;; (deftest do-pre-update-test
 ;;   ;; needs to pick up transforms AND `before-update`
 ;;   (before-update/define-before-update ::BeforeUpdate
