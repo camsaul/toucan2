@@ -11,9 +11,9 @@ CREATE TABLE birds (
 
 INSERT INTO birds (name, bird_type, good_bird)
 VALUES
-('Reggae', 'toucan', true),
-('Lucky', 'pigeon', true),
-('Parroty', 'parakeet', true),
-('Green Friend', 'parakeet', false),
-('Parrot Hilton', 'parakeet', false),
-('Egg', 'parakeet', NULL);
+('Reggae', 'toucan', true),           -- 1
+('Lucky', 'pigeon', true),            -- 2
+('Parroty', 'parakeet', true),        -- 3
+('Green Friend', 'parakeet', false),  -- 4
+('Parrot Hilton', 'parakeet', false), -- 5
+('Egg', 'parakeet', NULL);            -- 6

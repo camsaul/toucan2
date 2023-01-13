@@ -343,6 +343,13 @@
                                                               1)}
                    (t1.db/select-one model :id 1)))))))))
 
+(deftest ^:synchronized update-set-nil-test
+  (test/with-discarded-table-changes :birds
+    (is (= true
+           (t1.db/update! ::test/birds 4 :bird-type "birb" :good-bird nil)))
+    (is (= {:id 4, :name "Green Friend", :bird-type "birb", :good-bird nil}
+           (t1.db/select-one ::test/birds :id 4)))))
+
 (deftest ^:synchronized update-where!-test
   (testing :not=
     (doseq [model [User 'User]]

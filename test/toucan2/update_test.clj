@@ -125,6 +125,13 @@
       (is (= 0
              (update/update! ::test/venues nil {:name "Taco Bell"}))))))
 
+(deftest ^:synchronized update-set-nil-test
+  (test/with-discarded-table-changes :birds
+    (is (= 1
+           (update/update! ::test/birds 4 {:bird-type "birb", :good-bird nil})))
+    (is (= {:id 4, :name "Green Friend", :bird-type "birb", :good-bird nil}
+           (select/select-one ::test/birds 4)))))
+
 (derive ::venues.namespaced ::test/venues)
 
 (m/defmethod model/model->namespace ::venues.namespaced

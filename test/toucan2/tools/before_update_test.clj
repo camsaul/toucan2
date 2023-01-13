@@ -12,6 +12,7 @@
    [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.before-update :as before-update]
+   [toucan2.tools.default-fields :as default-fields]
    [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
@@ -25,7 +26,6 @@
 (before-update/define-before-update ::venues.before-update
   [venue]
   (assert (map? venue) (format "Expected venue to be a map, got ^%s %s" (some-> venue class .getCanonicalName) (pr-str venue)))
-  #_(is (instance/instance? venue))
   (is (isa? (protocols/model venue) ::venues.before-update))
   (when *updated-venues*
     (swap! *updated-venues* conj venue))
@@ -412,3 +412,16 @@
              (update/update! ::people.before-update-returns-map 1 {:name "Cam v2"})))
       (is (= {:id 1, :name "Cam v2"}
              (select/select-one [::people.before-update-returns-map :id :name] 1))))))
+
+(derive ::venues.discard-category-change.default-fields ::venues.discard-category-change)
+
+(default-fields/define-default-fields ::venues.discard-category-change.default-fields
+  [:id :category])
+
+(deftest ^:synchronized before-update-with-default-fields-test
+  (testing "should be able to update fields that don't appear in default-fields"
+    (test/with-discarded-table-changes :venues
+      (is (= 1
+             (update/update! ::venues.discard-category-change.default-fields 1 {:name "Chase Center", :category "stadium"})))
+      (is (= {:id 1, :name "Chase Center", :category "bar"}
+             (select/select-one [::test/venues :id :name :category] 1))))))

@@ -35,8 +35,8 @@
 ;;; transform to the results, so we don't want to apply a default fields transform or other stuff like that.
 (derive :toucan.query-type/select.instances.fns :toucan.query-type/select.instances)
 
-;;; A special subtype of a SELECT query that should use the syntax of update. Used to power `before-update` and the
-;;; like.
+;;; A special subtype of a SELECT query that should use the syntax of update. Used to
+;;; power [[toucan2.tools.before-update]].
 ;;;
 ;;; The difference is that update is supposed to treat a resolved query map as a conditions map rather than a Honey SQL
 ;;; form.

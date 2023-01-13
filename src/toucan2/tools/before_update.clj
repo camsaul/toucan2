@@ -13,6 +13,8 @@
 
 (set! *warn-on-reflection* true)
 
+(derive ::select-for-before-update :toucan.query-type/select.instances.from-update)
+
 (m/defmulti before-update
   {:arglists            '([model₁ row])
    :defmethod-arities   #{2}
@@ -47,8 +49,6 @@
      ;; everywhere else in order to make things work nicely. Maybe we can revisit this in the future.
      (let [row         (realize/realize row)
            row         (merge row changes)
-           ;; sanity check: make sure we're working around https://github.com/seancorfield/next-jdbc/issues/222
-           _           (assert (map? row))
            row         (before-update model row)
            ;; if the `before-update` method returned a plain map then consider that to be the changes.
            ;; `protocols/changes` will return `nil` for non-instances. TODO -- does that behavior make sense? Clearly,
@@ -66,7 +66,7 @@
   (not-empty
    (pipeline/transduce-with-model
     (changes->affected-pk-maps-rf model changes)
-    :toucan.query-type/select.instances.from-update
+    ::select-for-before-update
     model
     parsed-args)))
 

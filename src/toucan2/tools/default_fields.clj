@@ -61,6 +61,15 @@
       (log/debugf :results "Not adding default fields transducer since query type derives from :toucan.query-type/select.instances.fns")
       (next-method query-type model))
 
+    ;; don't apply default fields for the recursive select done by before-update, because it busts things when we want
+    ;; to update non-default fields =(
+    ;;
+    ;; See [[toucan2.tools.before-update-test/before-update-with-default-fields-test]]
+    (isa? query-type :toucan2.tools.before-update/select-for-before-update)
+    (do
+      (log/debugf :results "Not adding default fields transducer since query type is done for the purposes of before-update")
+      (next-method query-type model))
+
     :else
     (do
       (log/debugf :results "adding transducer to return default fields for %s" model)
