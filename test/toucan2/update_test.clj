@@ -6,6 +6,7 @@
    [toucan2.instance :as instance]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
+   [toucan2.protocols :as protocols]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
@@ -193,15 +194,38 @@
                (select/select [::test/venues :id :name :category] {:order-by [[:id :asc]]})))))))
 
 (deftest ^:synchronized transaction-test
-  (test/with-discarded-table-changes :venues
-    (is (thrown-with-msg?
-         clojure.lang.ExceptionInfo
-         #"OOPS"
-         (conn/with-transaction [_ ::test/db]
-           (is (= 1
-                  (update/update! ::test/venues 1 {:category "saloon"})))
-           (is (= 1
-                  (update/update! ::test/venues 2 {:category "saloon"})))
-           (throw (ex-info "OOPS!" {})))))
-    (is (= ["bar" "bar"]
-           (select/select-fn-vec :category ::test/venues :id [:in #{1 2}] {:order-by [[:id :asc]]})))))
+  (testing "completed transaction"
+    (test/with-discarded-table-changes :venues
+      (conn/with-transaction [_ ::test/db]
+        (is (= 1
+               (update/update! ::test/venues 1 {:category "saloon"})))
+        (is (= 1
+               (update/update! ::test/venues 2 {:category "saloon"}))))
+      (is (= ["saloon" "saloon"]
+             (select/select-fn-vec :category ::test/venues :id [:in #{1 2}] {:order-by [[:id :asc]]})))))
+  (testing "aborted transaction"
+    (test/with-discarded-table-changes :venues
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"OOPS"
+           (conn/with-transaction [_ ::test/db]
+             (is (= 1
+                    (update/update! ::test/venues 1 {:category "saloon"})))
+             (is (= 1
+                    (update/update! ::test/venues 2 {:category "saloon"})))
+             (throw (ex-info "OOPS!" {})))))
+      (is (= ["bar" "bar"]
+             (select/select-fn-vec :category ::test/venues :id [:in #{1 2}] {:order-by [[:id :asc]]}))))))
+
+(deftest ^:synchronized update-with-instance-with-no-changes-test
+  (testing "update should save the map you pass in, not just `changes`; that's what `save!` is for."
+    (test/with-discarded-table-changes :venues
+      (let [venue (-> (select/select-one ::test/venues 1)
+                      (assoc :name "Savoy Tivoli")
+                      instance/reset-original)]
+        (is (= nil
+               (protocols/changes venue)))
+        (is (= 1
+               (update/update! ::test/venues 1 venue)))
+        (is (= {:id 1, :name "Savoy Tivoli", :category "bar"}
+               (select/select-one [::test/venues :id :name :category] 1)))))))
