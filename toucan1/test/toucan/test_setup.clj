@@ -32,13 +32,12 @@
  (update (hsql/get-dialect :ansi) :quote quote-for-current-db-type))
 
 (defn do-with-default-quoting-style [thunk]
-  (let [original-options @map.honeysql/global-options]
-    (try
-      (t1.db/set-default-quoting-style! ::quote-for-current-db-type)
-      (testing (format "With default quoting style = %s\n" ::quote-for-current-db-type)
-        (thunk))
-      (finally
-        (reset! map.honeysql/global-options original-options)))))
+  (try
+    (t1.db/set-default-quoting-style! ::quote-for-current-db-type)
+    (testing (format "With default quoting style = %s\n" ::quote-for-current-db-type)
+      (thunk))
+    (finally
+      (reset! map.honeysql/global-options test/global-honeysql-options))))
 
 (defn do-with-quoted-snake-disabled [thunk]
   (binding [t1.db/*automatically-convert-dashes-and-underscores* false]

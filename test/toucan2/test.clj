@@ -163,6 +163,8 @@
 
 (swap! map.honeysql/global-options assoc :dialect ::current-db.dialect)
 
+(defonce global-honeysql-options @map.honeysql/global-options) ; in case we need it later.
+
 ;;;; URLs for test DBs.
 
 (defmulti ^:private default-test-db-url

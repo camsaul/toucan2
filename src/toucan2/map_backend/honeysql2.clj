@@ -1,6 +1,7 @@
 (ns toucan2.map-backend.honeysql2
   (:require
    [better-cond.core :as b]
+   [clojure.string :as str]
    [honey.sql :as hsql]
    [honey.sql.helpers :as hsql.helpers]
    [methodical.core :as m]
@@ -53,22 +54,48 @@
     :else
     [table-id]))
 
+;;; Qualify the (plain keyword) columns in [model & columns] forms with the model table name, unless they are already
+;;; qualified. This apparently doesn't hurt anything and prevents ambiguous column errors if you're joining another
+;;; column or something like that. I wasn't going to put this in at first since I forgot it existed, but apparently
+;;; Toucan 1 did it (despite not being adequately tested) so I decided to preserve this behavior going forward since I
+;;; can't see any downsides to it.
+;;;
+;;; In Honey SQL 2 I think using keyword namespaces is the preferred way to qualify stuff, so we'll go that route
+;;; instead of using `:a.b` style qualification like we generated in Toucan 1.
+
+(defn- qualified? [column]
+  (or (namespace column)
+      (str/includes? (name column) ".")))
+
+(defn- maybe-qualify [column table]
+  (cond
+    (not (keyword? column)) column
+    (qualified? column)     column
+    :else                   (keyword (name table) (name column))))
+
+(defn- maybe-qualify-columns [columns [table-id alias-id]]
+  (let [table (or alias-id table-id)]
+    (assert (keyword? table))
+    (mapv #(maybe-qualify % table)
+          columns)))
+
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.*
                              #_model      :default
                              #_query      :toucan.map-backend/honeysql2]
   [query-type model {:keys [columns], :as parsed-args} resolved-query]
   (log/debugf :compile "Building SELECT query for %s with columns %s" model columns)
   (let [parsed-args    (dissoc parsed-args :columns)
+        table-alias    (table-and-alias model)
         resolved-query (-> (merge
                             ;; only splice in the default `:select` and `:from` if we don't have `:union` or
                             ;; `:union-all` in the resolved query. It doesn't make sense to do a `x UNION y` query and
                             ;; then include `FROM` as well
                             (when-not ((some-fn :union :union-all) resolved-query)
                               (merge
-                               {:select (or (not-empty columns)
+                               {:select (or (some-> (not-empty columns) (maybe-qualify-columns table-alias))
                                             [:*])}
                                (when model
-                                 {:from [(table-and-alias model)]})))
+                                 {:from [table-alias]})))
                             resolved-query)
                            (with-meta (meta resolved-query)))]
     (log/debugf :compile "=> %s" resolved-query)

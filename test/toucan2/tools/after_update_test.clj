@@ -6,8 +6,7 @@
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.after-update :as after-update]
-   [toucan2.update :as update]
-   [toucan2.util :as u])
+   [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
 
@@ -17,11 +16,16 @@
 
 (derive ::venues.after-update ::test.track-realized/venues)
 
+(defn- ensure-persistent! [x]
+  (if (instance? clojure.lang.ITransientCollection x)
+    (persistent! x)
+    x))
+
 (after-update/define-after-update ::venues.after-update
   [venue]
   (assert (map? venue))
   (when *venues-awaiting-moderation*
-    (swap! *venues-awaiting-moderation* conj (u/ensure-persistent! (select-keys venue [:id :name :category]))))
+    (swap! *venues-awaiting-moderation* conj (ensure-persistent! (select-keys venue [:id :name :category]))))
   nil)
 
 (deftest ^:synchronized after-update-test
@@ -53,7 +57,7 @@
 (after-update/define-after-update ::venues.after-update.composed
   [venue]
   (when *recently-updated-venues*
-    (swap! *recently-updated-venues* conj (u/ensure-persistent! (select-keys venue [:id :name]))))
+    (swap! *recently-updated-venues* conj (ensure-persistent! (select-keys venue [:id :name]))))
   venue)
 
 (deftest ^:synchronized compose-test

@@ -2,6 +2,7 @@
   (:require
    [clojure.spec.alpha :as s]
    [clojure.walk :as walk]
+   [methodical.util.dispatch :as m.dispatch]
    [pretty.core :as pretty]
    [toucan2.protocols :as protocols]))
 
@@ -11,20 +12,17 @@
 
 (set! *warn-on-reflection* true)
 
-(defn dispatch-on-first-arg
+(def ^{:arglists '([x & _])} dispatch-on-first-arg
   "Dispatch on the first argument using [[dispatch-value]], and ignore all other args."
-  [x & _]
-  (protocols/dispatch-value x))
+  (m.dispatch/dispatch-on-first-arg #'protocols/dispatch-value))
 
-(defn dispatch-on-first-two-args
+(def ^{:arglists '([x y & _])} dispatch-on-first-two-args
   "Dispatch on the two arguments using [[protocols/dispatch-value]], and ignore all other args."
-  [x y & _]
-  [(protocols/dispatch-value x) (protocols/dispatch-value y)])
+  (m.dispatch/dispatch-on-first-two-args #'protocols/dispatch-value))
 
-(defn dispatch-on-first-three-args
+(def ^{:arglists '([x y z & _])} dispatch-on-first-three-args
   "Dispatch on the three arguments using [[protocols/dispatch-value]], and ignore all other args."
-  [x y z & _]
-  [(protocols/dispatch-value x) (protocols/dispatch-value y) (protocols/dispatch-value z)])
+  (m.dispatch/dispatch-on-first-three-args #'protocols/dispatch-value))
 
 (defn lower-case-en
   "Locale-agnostic version of [[clojure.string/lower-case]]. `clojure.string/lower-case` uses the default locale in
@@ -39,6 +37,8 @@
     (derive child parent)))
 
 ;;;; [[try-with-error-context]]
+
+;;; TODO -- I don't love this stuff anymore, need to rework it at some point.
 
 (defprotocol ^:private AddContext
   (^:no-doc add-context ^Throwable [^Throwable e additional-context]))
@@ -101,8 +101,3 @@
                                           :form        seqable?)
                :body               (s/+ any?))
   :ret  any?)
-
-(defn ensure-persistent! [x]
-  (if (instance? clojure.lang.ITransientCollection x)
-    (persistent! x)
-    x))

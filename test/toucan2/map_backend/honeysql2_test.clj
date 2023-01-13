@@ -31,12 +31,13 @@
     ::venues.namespaced [:venues :venue]
     "venues"            [:venues]))
 
-;; (deftest identitfier-test
-;;   (testing "Custom Honey SQL identifier clause"
-;;     (are [identifier quoted? expected] (= expected
-;;                                           (hsql/format {:select [:*], :from [[identifier]]}
-;;                                                        {:quoted quoted?}))
-;;       [::query/identifier :wow]          false ["SELECT * FROM wow"]
-;;       [::query/identifier :wow]          true  ["SELECT * FROM \"wow\""]
-;;       [::query/identifier :table :field] false ["SELECT * FROM table.field"]
-;;       [::query/identifier :table :field] true  ["SELECT * FROM \"table\".\"field\""])))
+(deftest ^:parallel maybe-qualify-columns-test
+  (are [columns table-alias expected] (= expected
+                                         (#'map.honeysql/maybe-qualify-columns columns table-alias))
+    [:a.b :a.c :a.d]  [:x]    [:a.b :a.c :a.d]    ; everything already qualified
+    [:a/b :a/c :a/d]  [:x]    [:a/b :a/c :a/d]    ; everything already qualified (namespaced)
+    [:b :a.c :d]      [:x]    [:x/b :a.c :x/d]    ; some things unqualified
+    [:b :a.c :d]      [:x :y] [:y/b :a.c :y/d]    ; [table alias] instead of [table] -- qualify with alias
+    [:b :a.c [:d :e]] [:x :y] [:y/b :a.c [:d :e]] ; ignore non-keywords
+    [:b :a.c nil]     [:x :y] [:y/b :a.c nil]     ; ignore non-keywords
+    [:a/b :a.c :d]    [:x]    [:a/b :a.c :x/d]))  ; ignore namespaced keywords

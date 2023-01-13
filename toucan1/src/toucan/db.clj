@@ -57,6 +57,7 @@
   DEPRECATED: bind [[toucan2.map-backend.honeysql/*options*]] and [[toucan2.jdbc/*options*]] instead."
   nil)
 
+;;; TODO -- this is NOT TESTED ANYWHERE !!!!
 (defn set-default-automatically-convert-dashes-and-underscores!
   "DEPRECATED: set [[toucan2.map-backend.honeysql2/global-options]] directly."
   [automatically-convert-dashes-and-underscores]

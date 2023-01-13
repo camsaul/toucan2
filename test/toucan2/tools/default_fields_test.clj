@@ -53,7 +53,7 @@
 
 (deftest ^:parallel override-default-fields-test
   (testing "should still be able to override default fields"
-    (is (= {:select [:id :name], :from [[:venues]]}
+    (is (= {:select [:venues/id :venues/name], :from [[:venues]]}
            (pipeline/build :toucan.query-type/select.* ::venues.default-fields {:columns [:id :name]} {})))
     (is (= (instance/instance ::venues.default-fields
                               {:id 1, :name "Tempest"})

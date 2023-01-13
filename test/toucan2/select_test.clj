@@ -48,7 +48,7 @@
             :from   [[:my_table]]}
            (pipeline/build :toucan.query-type/select.* :default {} {:select [:a :b], :from [[:my_table]]}))))
   (testing "columns"
-    (is (= {:select [:a :b]
+    (is (= {:select [:default/a :default/b]
             :from   [[:default]]}
            (pipeline/build :toucan.query-type/select.* :default {:columns [:a :b]} {})))
     (testing "existing"
@@ -424,23 +424,6 @@
   (is (= false
          (select/exists? ::test/people :name "Cam Era"))))
 
-#_(derive ::people.custom-instance-type ::test/people)
-
-#_(m/defmethod instance/key-transform-fn* [:default ::people.custom-instance-type]
-    [_ _]
-    identity)
-
-#_(m/defmethod instance/instance* [:default ::people.custom-instance-type]
-  [_ _ _ m _ metta]
-  (with-meta m metta))
-
-#_(deftest ^:parallel custom-instance-type-test
-  (let [m (select/select-one ::people.custom-instance-type 1)]
-    (is (= {:id 1, :name "Cam", :created_at (OffsetDateTime/parse "2020-04-21T23:56Z")}
-           m))
-    (is (map? m))
-    (is (not (instance/toucan2-instance? m)))))
-
 (deftest ^:parallel dont-add-from-if-it-already-exists-test
   (testing "Select shouldn't add a :from clause if one is passed in explicitly already"
     (is (= (instance/instance ::test/people {:id 1})
@@ -488,6 +471,24 @@
            (select/select-one ::test/venues
                               {:left-join [[:category :c] [:= :venues.category :c.name]]
                                :order-by  [[:id :asc]]})))))
+
+(deftest ^:parallel automatically-qualifiy-model-fields-test
+  (testing "the fields in [model & fields] forms should get automatically qualified if not already qualified"
+    (let [built (atom [])]
+      (binding [pipeline/*build* (comp (fn [result]
+                                         (swap! built conj result)
+                                         result)
+                                       pipeline/*build*)]
+        ;; the ID we're getting back in the results is ambiguous, but it doesn't really matter here I guess.
+        (is (= {:id 1}
+               (select/select-one [::test/venues :id :people.id]
+                                  {:left-join [:people [:= :venues.id :people.id]]
+                                   :order-by  [[:venues.id :asc]]})))
+        (is (= [{:select    [:venues/id :people.id]
+                 :from      [[:venues]]
+                 :left-join [:people [:= :venues.id :people.id]]
+                 :order-by  [[:venues.id :asc]]}]
+               @built))))))
 
 (derive ::venues.with-category ::test.track-realized/venues)
 
@@ -551,6 +552,27 @@
   (testing `select/select-fn-set
     (is (= #{"bar" "store"}
            (select/select-fn-set :venue/category ::venues.namespaced)))))
+
+(derive ::venues.short-namespace ::test/venues)
+
+(m/defmethod model/model->namespace ::venues.short-namespace
+  [_model]
+  {::venues.short-namespace :v})
+
+(deftest ^:parallel namespaced-qualify-columns-test
+  (testing "Automatically qualify unqualified columns in [model & columns] using model namespace"
+    (let [built (atom [])]
+      (binding [pipeline/*build* (comp (fn [result]
+                                         (swap! built conj result)
+                                         result)
+                                       pipeline/*build*)]
+        ;; the ID we're getting back in the results is ambiguous, but it doesn't really matter here I guess.
+        (is (= {:v/id 1}
+               (select/select-one [::venues.short-namespace :id] :id 1)))
+        (is (= [{:select [:v/id]
+                 :from   [[:venues :v]]
+                 :where  [:= :id 1]}]
+               @built))))))
 
 (doto ::venues.namespaced.with-category
   (derive ::venues.namespaced)
