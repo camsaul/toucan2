@@ -4,6 +4,7 @@
   (:require
    [camel-snake-kebab.core :as csk]
    [clojure.set :as set]
+   [clojure.spec.alpha :as s]
    [honey.sql :as hsql]
    [methodical.core :as m]
    [potemkin :as p]
@@ -29,8 +30,7 @@
 (comment t1.models/keep-me)
 
 (p/import-vars
- [t1.models resolve-model]
- [select select select-one count])
+ [t1.models resolve-model])
 
 (def ^:dynamic *quoting-style*
   "Temporarily override the default [[quoting-style]]. DEPRECATED: bind [[toucan2.map-backend.honeysql/*options*]]
@@ -195,6 +195,28 @@
 ;;   (let [model (model/resolve-model modelable)]
 ;;     (select/select model (identity-query/identity-query rows))))
 
+(s/def ::select-options
+  (s/* (s/alt :kvs (s/+ (s/cat :k keyword?
+                               :v any?))
+              :map map?)))
+
+(defn- parse-select-options [options]
+  (let [parsed (s/conform ::select-options options)]
+    (when (s/invalid? parsed)
+      (throw (ex-info (str "Error parsing select options: " (s/explain-str ::select-options options))
+                      (s/explain-data ::select-options options))))
+    (transduce
+     identity
+     (fn
+       ([] {:kvs []})
+       ([{:keys [kvs m]}]
+        (concat kvs (when m [m])))
+       ([options [arg-type arg]]
+        (case arg-type
+          :map (update options :m merge arg)
+          :kvs (update options :kvs concat (mapcat (juxt :k :v) arg)))))
+     parsed)))
+
 (defn simple-select
   "DEPRECATED: Use [[toucan2.select/select]] instead."
   [modelable honeysql-form]
@@ -211,10 +233,10 @@
   "DEPRECATED: Use [[toucan2.select/reducible-select]] instead."
   {:arglists '([modelable & kv-args? query?]
                [[modelable & columns] & kv-args? query?])}
-  [& args]
+  [modelable & options]
   (eduction
    (map realize/realize)
-   (apply select/reducible-select args)))
+   (apply select/reducible-select modelable (parse-select-options options))))
 
 (defn simple-select-one
   "DEPRECATED: use [[toucan2.select/select-one]] instead."
@@ -344,42 +366,57 @@
   ([modelable k v & {:as more}]
    (insert! modelable (merge {k v} more))))
 
+(defn select-one
+  "DEPRECATED: use [[toucan2.select/select-one]] instead."
+  [modelable & options]
+  (apply select/select-one modelable (parse-select-options options)))
+
 (defn select-one-field
   "DEPRECATED: Use [[toucan2.select/select-one-fn]] instead."
   [field modelable & options]
-  (apply select/select-one-fn field modelable options))
+  (apply select/select-one-fn field modelable (parse-select-options options)))
 
 (defn select-one-id
   "DEPRECATED: Use [[toucan2.select/select-one-pk]] instead."
   [modelable & options]
-  (apply select/select-one-pk modelable options))
+  (apply select/select-one-pk modelable (parse-select-options options)))
+
+(defn count
+  "DEPRECATED: use [[toucan2.select/count]] instead."
+  [modelable & options]
+  (apply select/count modelable (parse-select-options options)))
+
+(defn select
+  "DEPRECATED: use [[toucan2.select/select]] instead."
+  [modelable & options]
+  (apply select/select modelable (parse-select-options options)))
 
 (defn select-field
   "DEPRECATED: Use [[toucan2.select/select-fn-set]] instead."
   [field modelable & options]
-  (apply select/select-fn-set field modelable options))
+  (apply select/select-fn-set field modelable (parse-select-options options)))
 
 (defn select-ids
   "DEPRECATED: Use [[toucan2.select/select-pk-set]] instead."
   [modelable & options]
-  (apply select/select-pks-set modelable options))
+  (apply select/select-pks-set modelable (parse-select-options options)))
 
 (defn select-field->field
   "DEPRECATED: use [[toucan2.select/select-fn->fn]] instead."
   [k v modelable & options]
-  (apply select/select-fn->fn k v modelable options))
+  (apply select/select-fn->fn k v modelable (parse-select-options options)))
 
 (defn select-field->id
   "DEPRECATED: use [[toucan2.select/select-fn->pk]] instead."
   {:style/indent 2}
   [field modelable & options]
-  (apply select/select-fn->pk field modelable options))
+  (apply select/select-fn->pk field modelable (parse-select-options options)))
 
 (defn select-id->field
   "DEPRECATED: use [[toucan2.select/select-pk->fn]] instead."
   {:style/indent 2}
   [field modelable & options]
-  (apply select/select-pk->fn field modelable options))
+  (apply select/select-pk->fn field modelable (parse-select-options options)))
 
 ;;; we could actually leverage Clojure 11 support for passing a map to `& {:keys ...}` and just have one arity, but we
 ;;; want to support older Clojure versions for now at least.

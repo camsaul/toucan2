@@ -127,7 +127,7 @@
       (is (= true
              (t1.db/update! Category 1, :name "Bar-Or-Club")))
       (is (= {:id 1, :name "bar-or-club", :parent-category-id nil}
-             (t1.db/select-one Category 1))))))
+             (t1.db/select-one Category :id 1))))))
 
 (deftest ^:parallel do-post-select-test
   (testing `t1.models/post-select
@@ -478,4 +478,4 @@
             :name                         "Cam"
             :created-at                   (OffsetDateTime/parse "2020-04-21T23:56Z")
             :unnamespaced-select-property true}
-           (t1.db/select-one ::people.unnamespaced-property 1)))))
+           (t1.db/select-one ::people.unnamespaced-property :id 1)))))

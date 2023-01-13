@@ -32,16 +32,59 @@
 (comment heroes/keep-me
          test-setup/keep-me)
 
+(deftest ^:parallel parse-select-options-test
+  (doseq [b [:b {} 1]]
+    (are [actual expected] (= expected
+                              (#'t1.db/parse-select-options actual))
+      [{:order-by [[:id :dec]]} :a b {:where [:= :x 1]}]
+      [:a b {:where [:= :x 1], :order-by [[:id :dec]]}]
+
+      [:a b {:order-by [[:id :dec]]} {:where [:= :x 1]}]
+      [:a b {:where [:= :x 1], :order-by [[:id :dec]]}]
+
+      [{:order-by [[:id :dec]]} {:where [:= :x 1]} :a b]
+      [:a b {:where [:= :x 1], :order-by [[:id :dec]]}]
+
+      [:a b {:order-by [[:id :dec]]} :c :d {:where [:= :x 1]}]
+      [:a b :c :d {:where [:= :x 1], :order-by [[:id :dec]]}]
+
+      [:a b {:order-by [[:id :dec]]} {:where [:= :x 1]} :c :d]
+      [:a b :c :d {:where [:= :x 1], :order-by [[:id :dec]]}]
+
+      [{:order-by [[:id :dec]]} :a b {:where [:= :x 1]} :c :d]
+      [:a b :c :d {:where [:= :x 1], :order-by [[:id :dec]]}]
+
+      [{:order-by [[:id :dec]]} {:where [:= :x 1]} :a b :c :d]
+      [:a b :c :d {:where [:= :x 1], :order-by [[:id :dec]]}])))
+
+(deftest ^:parallel totally-broken-select-test
+  (testing (str "I never intentionally meant to support things like these, but as a accident of the implementation "
+                "details you're actually able to stick maps wherever you want in the args\n")
+    (are [f expected] (= expected
+                         (f {:order-by [[:id :desc]]}
+                            :category [:not= "saloon"]
+                            {:where [:not= :name "BevMo"], :limit 1}))
+      (partial t1.db/select Venue)                                      [{:id 2, :name "Ho's Tavern", :category :bar}]
+      (partial t1.db/select-one Venue)                                  {:id 2, :name "Ho's Tavern", :category :bar}
+      (partial t1.db/select-one-field :category Venue)                  :bar
+      (partial t1.db/select-one-id Venue)                               2
+      (partial t1.db/select-field :category Venue)                      #{:bar}
+      (partial t1.db/select-ids Venue)                                  #{2}
+      (partial t1.db/select-field->field :id :category Venue)           {2 :bar}
+      (partial t1.db/select-id->field :category Venue)                  {2 :bar}
+      (fn [& args] (into [] (apply t1.db/select-reducible Venue args))) [{:id 2, :name "Ho's Tavern", :category :bar}]
+      (partial t1.db/count Venue)                                       1)))
+
 (deftest ^:parallel override-quote-style-test
-    (is (= "`toucan`"
-           (binding [t1.db/*quoting-style* :mysql]
-             ((t1.db/quote-fn) "toucan"))))
-    (is (= "\"toucan\""
-           (binding [t1.db/*quoting-style* :ansi]
-             ((t1.db/quote-fn) "toucan"))))
-    (is (= "[toucan]"
-           (binding [t1.db/*quoting-style* :sqlserver]
-             ((t1.db/quote-fn) "toucan")))))
+  (is (= "`toucan`"
+         (binding [t1.db/*quoting-style* :mysql]
+           ((t1.db/quote-fn) "toucan"))))
+  (is (= "\"toucan\""
+         (binding [t1.db/*quoting-style* :ansi]
+           ((t1.db/quote-fn) "toucan"))))
+  (is (= "[toucan]"
+         (binding [t1.db/*quoting-style* :sqlserver]
+           ((t1.db/quote-fn) "toucan")))))
 
 (deftest ^:parallel  dashed-field-names-test
   (testing "Test allowing dashed field names"
@@ -235,7 +278,7 @@
                    @built)))
           (is (= {:id 1, :name "LIQUOR-STORE", :parent-category-id 1000}
                  ;; use simple-model to make sure transforms aren't done (str/lower-case on :name in this case)
-                 (t1.db/select-one (t1.db/->SimpleModel Category) 1))))))))
+                 (t1.db/select-one (t1.db/->SimpleModel Category) :id 1))))))))
 
 (derive ::Category.post-select Category)
 
@@ -265,13 +308,13 @@
         (test/with-discarded-table-changes Category
           (testing "before"
             (is (= {:id 1, :name "bar", :parent-category-id nil}
-                   (t1.db/select-one model 1))))
+                   (t1.db/select-one model :id 1))))
           (is (= true
                  (t1.db/update! model 1 :name "PUB")))
           (testing "after"
             (is (= {:id 1, :name "pub", :parent-category-id (when (= model ::Category.properties)
                                                               1)}
-                   (t1.db/select-one model 1)))))))))
+                   (t1.db/select-one model :id 1)))))))))
 
 (deftest ^:synchronized update-where!-test
   (testing :not=
@@ -332,7 +375,7 @@
                    @built)))
           (is (= {:id 1, :name "LIQUOR-STORE", :parent-category-id 1000}
                  ;; use simple-model to make sure transforms aren't done (str/lower-case on :name in this case)
-                 (t1.db/select-one (t1.db/->SimpleModel Category) 1))))))))
+                 (t1.db/select-one (t1.db/->SimpleModel Category) :id 1))))))))
 
 (deftest ^:synchronized update-where!-transaction-test
   (test/with-discarded-table-changes :venues
@@ -378,7 +421,7 @@
           (is (= {:id 2, :first-name "Rasta", :last-name (condp = model
                                                            User                 "Can"
                                                            ::User.before-update "CAN")}
-                 (t1.db/select-one model 2))))))))
+                 (t1.db/select-one model :id 2))))))))
 
 (deftest ^:synchronized simple-insert!-test
   (doseq [model [Category
