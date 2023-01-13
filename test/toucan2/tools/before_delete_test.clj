@@ -150,3 +150,26 @@
                (delete/delete! ::venues.record-before-delete :id 1)))
         (is (= [1]
                @*deleted-venues*))))))
+
+(derive ::venues.recursive-before-delete ::test/venues)
+
+(before-delete/define-before-delete ::venues.recursive-before-delete
+  [{venue-id :id, :as venue}]
+  (when *deleted-venues*
+    (swap! *deleted-venues* conj venue-id))
+  ;; recursively delete the venue with the ID immediately before this one.
+  (when (pos? venue-id)
+    (delete/delete! ::venues.recursive-before-delete :id (dec venue-id)))
+  venue)
+
+(deftest ^:synchronized recursive-before-delete-test
+  (testing "If before-delete recursively deletes something, it should trigger those object(s) before-delete methods"
+    (test/with-discarded-table-changes :venues
+      (binding [*deleted-venues* (atom [])]
+        (testing "Only count the top-level delete for update-count purposes"
+          (is (= 1
+                 (delete/delete! ::venues.recursive-before-delete :id 3))))
+        (is (= [3 2 1]
+               @*deleted-venues*))
+        (is (= nil
+               (select/select-fn-set :id ::test/venues)))))))
