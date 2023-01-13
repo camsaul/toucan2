@@ -3,6 +3,7 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.connection :as conn]
+   [toucan2.instance :as instance]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -44,23 +45,30 @@
      ;; After going back and forth on this I've concluded that it's probably best to just realize the entire row here.
      ;; There are a lot of situations where we don't need to do this, but it means we have to step on eggshells
      ;; everywhere else in order to make things work nicely. Maybe we can revisit this in the future.
-     (let [row     (realize/realize row)
-           row     (merge row changes)
+     (let [row         (realize/realize row)
+           row         (merge row changes)
            ;; sanity check: make sure we're working around https://github.com/seancorfield/next-jdbc/issues/222
-           _       (assert (map? row))
-           row     (before-update model row)
-           changes (protocols/changes row)]
-       ;; this is the version that doesn't realize everything
-       #_[original-values      (select-keys row (keys changes))
-          _                    (log/tracef :compile "Fetched original values for row: %s" original-values)
-          row                  (merge row changes)
-
-          row                  (before-update model row)
-          [_ values-to-update] (data/diff original-values row #_(select-keys row (protocols/realized-keys row)))]
+           _           (assert (map? row))
+           row         (before-update model row)
+           ;; if the `before-update` method returned a plain map then consider that to be the changes.
+           ;; `protocols/changes` will return `nil` for non-instances. TODO -- does that behavior make sense? Clearly,
+           ;; it's easy to use wrong -- it took me hours to figure out why something was working and that I needed to
+           ;; make this change :sad:
+           row-changes (if (instance/instance? row)
+                         (protocols/changes row)
+                         row)]
        (log/tracef :compile "The following values have changed: %s" changes)
        (cond-> changes->pks
-         (seq changes) (update changes (fn [pks]
-                                         (conj (set pks) (model/primary-key-values-map model row)))))))))
+         (seq row-changes) (update row-changes (fn [pks]
+                                                 (conj (set pks) (model/primary-key-values-map model row)))))))))
+
+(defn- fetch-changes->pk-maps [model {:keys [changes], :as parsed-args}]
+  (not-empty
+   (pipeline/transduce-with-model
+    (changes->affected-pk-maps-rf model changes)
+    :toucan.query-type/select.instances.from-update
+    model
+    parsed-args)))
 
 ;;; TODO -- this is sort of problematic since it breaks [[toucan2.tools.compile]]
 (defn- apply-before-update-to-matching-rows
@@ -69,12 +77,7 @@
   [model {:keys [changes], :as parsed-args}]
   (u/try-with-error-context ["apply before-update to matching rows" {::model model, ::changes changes}]
     (log/debugf :compile "apply before-update to matching rows for %s" model)
-    (when-let [changes->pk-maps (not-empty (let [rf (changes->affected-pk-maps-rf model changes)]
-                                             (pipeline/transduce-with-model
-                                              rf
-                                              :toucan.query-type/select.instances.from-update
-                                              model
-                                              parsed-args)))]
+    (when-let [changes->pk-maps (fetch-changes->pk-maps model parsed-args)]
       (log/tracef :compile "changes->pk-maps = %s" changes->pk-maps)
       (if (= (count changes->pk-maps) 1)
         ;; every row has the same exact changes: we only need to perform a single update, using the original

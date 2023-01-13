@@ -398,3 +398,17 @@
                @*updated-people*))
         (is (= {:id 1, :name "CAM 2.0"}
                (select/select-one [::people.suffix-name :id :name] 1)))))))
+
+(derive ::people.before-update-returns-map ::test/people)
+
+(before-update/define-before-update ::people.before-update-returns-map
+  [person]
+  (merge {:name "Cam 2.0"} person))
+
+(deftest ^:synchronized before-update-that-returns-plain-map-test
+  (testing "if a before-update method returns a plain map, use those as the changes"
+    (test/with-discarded-table-changes :people
+      (is (= 1
+             (update/update! ::people.before-update-returns-map 1 {:name "Cam v2"})))
+      (is (= {:id 1, :name "Cam v2"}
+             (select/select-one [::people.before-update-returns-map :id :name] 1))))))
