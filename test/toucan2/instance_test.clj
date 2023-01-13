@@ -71,7 +71,54 @@
     (is (= nil
            (-> (instance/instance :venues {:id 1, :name "Tempest", :category "bar"})
                (assoc :name "Tempest")
-               protocols/changes)))))
+               protocols/changes))))
+  (testing "Ignore columns that got removed"
+    (let [m (-> (instance/instance :places {:id 1, :bird-info {:type :toucan, :num-cans 2, :good-bird? true}})
+                (dissoc :good-bird?))]
+      (is (= nil
+             (protocols/changes m)))))
+  (testing "Do not do a deep diff! Only diff the top-level"
+    (testing 'assoc
+      (let [m (-> (instance/instance :places {:id 1, :bird-info {:type :toucan, :num-cans 2, :good-bird? true}})
+                  (assoc-in [:bird-info :favorite-snacc] :blueberries))]
+        (is (= {:bird-info {:type :toucan, :num-cans 2, :good-bird? true, :favorite-snacc :blueberries}}
+               (protocols/changes m)))))
+    (testing 'update
+      (let [m (-> (instance/instance :places {:id 1, :bird-info {:type :toucan, :num-cans 2, :good-bird? true}})
+                  (assoc-in [:bird-info :num-cans] 4))]
+        (is (= {:bird-info {:type :toucan, :num-cans 4, :good-bird? true}}
+               (protocols/changes m)))))
+    (testing 'dissoc
+      (let [m (-> (instance/instance :places {:id 1, :bird-info {:type :toucan, :num-cans 2, :good-bird? true}})
+                  (update :bird-info dissoc :good-bird?))]
+        (is (= {:bird-info {:type :toucan, :num-cans 2}}
+               (protocols/changes m)))))
+    (testing "sequences"
+      (testing "add an element"
+        (let [m (-> (instance/instance :places {:id 1, :parakeets ["Parroty" "Green Friend" "Parrot Hilton"]})
+                    (update :parakeets conj "Egg"))]
+          (is (= {:parakeets ["Parroty" "Green Friend" "Parrot Hilton" "Egg"]}
+                 (protocols/changes m)))))
+      (testing "remove an element"
+        (let [m (-> (instance/instance :places {:id 1, :parakeets ["Parroty" "Green Friend" "Parrot Hilton"]})
+                    (update :parakeets rest))]
+          (is (= {:parakeets ["Green Friend" "Parrot Hilton"]}
+                 (protocols/changes m))))))
+    (testing "type changed completely"
+      (let [parrot-vector ["Parroty" "Green Friend" "Parrot Hilton"]
+            parrot-count  4
+            parrot-map    {:num-birbs 4}]
+        (doseq [[before after] [[parrot-vector parrot-count]
+                                [parrot-vector parrot-map]
+                                [parrot-count parrot-vector]
+                                [parrot-count parrot-map]
+                                [parrot-map parrot-vector]
+                                [parrot-map parrot-count]]]
+          (testing (format "%s => %s" (pr-str before) (pr-str after))
+            (let [m (-> (instance/instance :places {:id 1, :parakeets before})
+                        (assoc :parakeets after))]
+              (is (= {:parakeets after}
+                     (protocols/changes m))))))))))
 
 (deftest ^:parallel equality-test
   (testing "equality"

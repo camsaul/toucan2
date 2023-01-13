@@ -1,7 +1,6 @@
 (ns toucan2.instance
   (:refer-clojure :exclude [instance?])
   (:require
-   [clojure.data :as data]
    [potemkin :as p]
    [pretty.core :as pretty]
    [toucan2.protocols :as protocols]
@@ -30,6 +29,23 @@
   [model x]
   (and (instance? x)
        (isa? (protocols/model x) model)))
+
+(defn- changes*
+  "Changes between `orig` and `m`. Unlike [[clojure.data/diff]], this is a shallow diff. Only columns that are added or
+  modified should be returned."
+  [original current]
+  (if (or (not (map? original))
+          (not (map? current)))
+    current
+    (not-empty
+     (into
+      (empty original)
+      (map (fn [k]
+             (let [original-value (get original k)
+                   current-value  (get current k)]
+               (when-not (= original-value current-value)
+                 [k current-value]))))
+      (keys current)))))
 
 (declare ->TransientInstance)
 
@@ -139,7 +155,7 @@
         (Instance. model orig new-current mta))))
 
   (changes [_this]
-    (not-empty (second (data/diff orig m))))
+    (not-empty (changes* orig m)))
 
   protocols/IDispatchValue
   (dispatch-value [_this]
