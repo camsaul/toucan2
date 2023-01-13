@@ -88,11 +88,10 @@
   {:arglists '([f1 f2 modelable-columns & kv-args? query?]
                [f1 f2 :conn connectable modelable-columns & kv-args? query?])}
   [f1 f2 & args]
-  (not-empty
-   (into
-    {}
-    (map (juxt f1 f2))
-    (apply reducible-select args))))
+  (into
+   {}
+   (map (juxt f1 f2))
+   (apply reducible-select args)))
 
 (defn select-fn->pk
   {:arglists '([f modelable-columns & kv-args? query?]

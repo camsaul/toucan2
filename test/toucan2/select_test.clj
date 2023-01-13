@@ -383,8 +383,9 @@
          (select/select-fn->fn :id :name ::test/people)))
   (is (= {2 "cam", 3 "sam", 4 "pam", 5 "tam"}
          (select/select-fn->fn (comp inc :id) (comp u/lower-case-en :name) ::test/people)))
-  (testing "Should return nil if the result is empty"
-    (is (nil? (select/select-fn->fn :id :name ::test/people :id 100)))))
+  (testing "Should return empty map if the result is empty"
+    (is (= {}
+           (select/select-fn->fn :id :name ::test/people :id 100)))))
 
 (deftest ^:parallel select-pk->fn-test
   (is (= {1 "Cam", 2 "Sam", 3 "Pam", 4 "Tam"}
@@ -394,8 +395,9 @@
   (testing "Composite PKs"
     (is (= {[1 "Cam"] "Cam", [2 "Sam"] "Sam", [3 "Pam"] "Pam", [4 "Tam"] "Tam"}
            (select/select-pk->fn :name ::people.composite-pk))))
-  (testing "Should return nil if the result is empty"
-    (is (nil? (select/select-pk->fn :name ::test/people :id 100)))))
+  (testing "Should return empty map if the result is empty"
+    (is (= {}
+           (select/select-pk->fn :name ::test/people :id 100)))))
 
 (deftest ^:parallel select-fn->pk-test
   (is (= {"Cam" 1, "Sam" 2, "Pam" 3, "Tam" 4}
@@ -404,9 +406,10 @@
          (select/select-fn->pk (comp u/lower-case-en :name) ::test/people)))
   (testing "Composite PKs"
     (is (= {"Cam" [1 "Cam"], "Sam" [2 "Sam"], "Pam" [3 "Pam"], "Tam" [4 "Tam"]}
-  (testing "Should return nil if the result is empty"
+  (testing "Should return empty map if the result is empty"
            (select/select-fn->pk :name ::people.composite-pk))))
-    (is (nil? (select/select-fn->pk :name ::people.composite-pk :id 100)))))
+    (is (= {}
+           (select/select-fn->pk :name ::people.composite-pk :id 100)))))
 
 (deftest ^:parallel count-test
   (is (= 4
