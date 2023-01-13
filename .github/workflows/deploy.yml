@@ -29,9 +29,9 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-deploy-${{ hashFiles('./deps.edn') }}
+        key: v1-${{ hashFiles('./deps.edn') }}-deploy
         restore-keys: |
-          v1-deploy-
+          v1-${{ hashFiles('./deps.edn') }}-
           v1-
     - name: Build Toucan 2
       run: clojure -T:build build

@@ -47,10 +47,9 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-tests-postgres-${{ hashFiles('./deps.edn') }}
+        key: v1-${{ hashFiles('./deps.edn') }}-postgres
         restore-keys: |
-          v1-tests-postgres-
-          v1-tests-
+          v1-${{ hashFiles('./deps.edn') }}-
           v1-
     - run: clojure -X:dev:test:test-postgres
       name: Run tests
@@ -78,10 +77,9 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-tests-h2-${{ hashFiles('./deps.edn') }}
+        key: v1-${{ hashFiles('./deps.edn') }}-h2
         restore-keys: |
-          v1-tests-h2-
-          v1-tests-
+          v1-${{ hashFiles('./deps.edn') }}-
           v1-
     - run: clojure -X:dev:test:test-h2
       name: Run tests
@@ -108,10 +106,9 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-tests-whitespace-linter-${{ hashFiles('./deps.edn') }}
+        key: v1-${{ hashFiles('./deps.edn') }}-whitespace-linter
         restore-keys: |
-          v1-tests-whitespace-linter-
-          v1-tests-
+          v1-${{ hashFiles('./deps.edn') }}-
           v1-
     - run: clojure -T:whitespace-linter
       name: Run whitespace linter
@@ -136,10 +133,9 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-tests-check-${{ hashFiles('./deps.edn') }}
+        key: v1-${{ hashFiles('./deps.edn') }}-check
         restore-keys: |
-          v1-tests-check-
-          v1-tests-
+          v1-${{ hashFiles('./deps.edn') }}-
           v1-
     - run: clojure -M:check
       name: Check Toucan 2 core namespaces
@@ -167,10 +163,9 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-tests-codecov-${{ hashFiles('./deps.edn') }}
+        key: v1-${{ hashFiles('./deps.edn') }}-codecov
         restore-keys: |
-          v1-tests-codecov-
-          v1-tests-
+          v1-${{ hashFiles('./deps.edn') }}-
           v1-
     - run: clojure -X:dev:test-h2:cloverage
       name: Run tests with Cloverage

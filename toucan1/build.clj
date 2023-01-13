@@ -1,5 +1,6 @@
 (ns build
-  (:require [clojure.string :as str]
+  (:require [clojure.java.shell :as sh]
+            [clojure.string :as str]
             [org.corfield.build :as bb]))
 
 (def lib 'io.github.camsaul/toucan2-toucan1)
