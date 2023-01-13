@@ -286,16 +286,22 @@
         (is (not (instance/instance? result)))))))
 
 (deftest ^:parallel update-original-and-current-test
-  (let [m (-> (instance/instance :x :a 1)
-              (assoc :b 2)
-              (instance/update-original-and-current assoc :c 3))]
-    (is (= {:a 1, :c 3}
-           (protocols/original m)))
-    (is (= (instance/instance :x {:a 1, :b 2, :c 3})
-           m))
-    ;; A key being present in original but not in 'current' does not constitute a change
-    (is (= {:b 2}
-           (protocols/changes m)))
+  (let [m1 (-> (instance/instance :x :a 1)
+               (assoc :b 2))]
+    (are [f expected] (= (instance/instance :x expected)
+                         (f m1))
+      identity             {:a 1, :b 2}
+      #'protocols/current  {:a 1, :b 2}
+      #'protocols/original {:a 1}
+      #'protocols/changes  {:b 2})
+    (let [m2 (instance/update-original-and-current m1 assoc :c 3)]
+      (are [f expected] (= (instance/instance :x expected)
+                           (f m2))
+        identity             {:a 1, :b 2, :c 3}
+        #'protocols/current  {:a 1, :b 2, :c 3}
+        #'protocols/original {:a 1, :c 3}
+        ;; A key being present in original but not in 'current' does not constitute a change
+        #'protocols/changes  {:b 2}))
     (testing "Just act like regular 'apply' for non-instances"
       (let [result (instance/update-original-and-current {:a 1} assoc :c 3)]
         (is (= {:a 1, :c 3}
