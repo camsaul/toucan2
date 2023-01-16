@@ -178,8 +178,10 @@
   {:select [:id :name :updated-at], :where [:= :id 1]})
 
 (deftest ^:parallel do-not-apply-default-fields-in-query-with-select
-  (testing "Don't apply default-fields if we specify a Honey SQL query with explicit `:select`"
-    (are [query] (= {:id 1, :name "Tempest", :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
-                    (select/select-one ::venues.default-fields query))
-      {:select [:id :name :updated-at], :where [:= :id 1]}
-      ::named-query.select-venues-override-default-fields)))
+  (testing "Don't apply default-fields if we specify a Honey SQL query with explicit"
+    (doseq [select [:select :select-distinct]]
+      (testing select
+        (are [query] (= {:id 1, :name "Tempest", :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                        (select/select-one ::venues.default-fields query))
+          {select [:id :name :updated-at], :where [:= :id 1]}
+          ::named-query.select-venues-override-default-fields)))))

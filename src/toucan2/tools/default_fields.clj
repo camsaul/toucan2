@@ -3,6 +3,7 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.log :as log]
+   [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.pipeline :as pipeline]
    [toucan2.util :as u]))
 
@@ -57,11 +58,11 @@
                                        #_resolved-query-type :toucan.map-backend/honeysql2]
   "Skip default fields behavior for Honey SQL queries that contain `:select`. Bind [[*skip-default-fields*]] to `true`."
   [rf query-type model parsed-args honeysql]
-  (if (seq (:select honeysql))
+  (if (map.honeysql/include-default-select? honeysql)
+    (next-method rf query-type model parsed-args honeysql)
     (binding [*skip-default-fields* true]
-      (log/debugf :results "Not adding default fields because query contains `:select`")
-      (next-method rf query-type model parsed-args honeysql))
-    (next-method rf query-type model parsed-args honeysql)))
+      (log/debugf :results "Not adding default fields because query already contains `:select` or `:select-distinct`")
+      (next-method rf query-type model parsed-args honeysql))))
 
 (m/defmethod pipeline/results-transform [#_query-type :toucan.result-type/instances #_model ::default-fields]
   [query-type model]

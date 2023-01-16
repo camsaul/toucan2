@@ -105,7 +105,12 @@
              (select/select ::test/people ["SELECT * FROM people WHERE id = ?;" 1]))))
     (testing "HoneySQL"
       (is (= expected
-             (select/select ::test/people {:select [:*], :from [[:people]], :where [:= :id 1]}))))
+             (select/select ::test/people {:select [:*], :from [[:people]], :where [:= :id 1]})))
+      (testing "Existing :select"
+        (is (= [{:id 1, :name "Cam"}]
+               (select/select ::test/people {:select [:id :name], :from [[:people]], :where [:= :id 1]})))
+        (is (= [{:id 1, :name "Cam"}]
+               (select/select ::test/people {:select-distinct [:id :name], :from [[:people]], :where [:= :id 1]})))))
     (testing "PK"
       (is (= expected
              (select/select ::test/people 1))))

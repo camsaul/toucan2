@@ -80,6 +80,23 @@
     (mapv #(maybe-qualify % table)
           columns)))
 
+(defn include-default-select?
+  "Should we splice in the default `:select` clause for this `honeysql-query`? Only splice in the default `:select` if we
+  don't have `:union`, `:union-all`, or `:select-distinct` in the resolved query."
+  [honeysql-query]
+  (every? (fn [k]
+            (not (contains? honeysql-query k)))
+          [:union :union-all :select :select-distinct]))
+
+(defn- include-default-from?
+  "Should we splice in the default `:from` clause for this `honeysql-query`? Only splice in the default `:from` if we
+  don't have `:union` or `:union-all` in the resolved query. It doesn't make sense to do a `x UNION y` query and then
+  include `FROM` as well."
+  [honeysql-query]
+  (every? (fn [k]
+            (not (contains? honeysql-query k)))
+          [:union :union-all]))
+
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.*
                              #_model      :default
                              #_query      :toucan.map-backend/honeysql2]
@@ -87,17 +104,14 @@
   [query-type model {:keys [columns], :as parsed-args} resolved-query]
   (log/debugf :compile "Building SELECT query for %s with columns %s" model columns)
   (let [parsed-args    (dissoc parsed-args :columns)
-        table-alias    (table-and-alias model)
+        table+alias    (table-and-alias model)
         resolved-query (-> (merge
-                            ;; only splice in the default `:select` and `:from` if we don't have `:union` or
-                            ;; `:union-all` in the resolved query. It doesn't make sense to do a `x UNION y` query and
-                            ;; then include `FROM` as well
-                            (when-not ((some-fn :union :union-all) resolved-query)
-                              (merge
-                               {:select (or (some-> (not-empty columns) (maybe-qualify-columns table-alias))
-                                            [:*])}
-                               (when model
-                                 {:from [table-alias]})))
+                            (when (include-default-select? resolved-query)
+                              {:select (or (some-> (not-empty columns) (maybe-qualify-columns table+alias))
+                                           [:*])})
+                            (when (and model
+                                       (include-default-from? resolved-query))
+                              {:from [table+alias]})
                             resolved-query)
                            (with-meta (meta resolved-query)))]
     (log/debugf :compile "=> %s" resolved-query)
@@ -177,8 +191,7 @@
 
 ;;;; Query compilation
 
-(def global-options
-  "Default global options to pass to [[honey.sql/format]]."
+(defonce ^{:doc "Default global options to pass to [[honey.sql/format]]."} global-options
   (atom {:quoted true, :dialect :ansi, :quoted-snake true}))
 
 (def ^:dynamic *options*

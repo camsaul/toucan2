@@ -2,8 +2,8 @@
   (:require
    [toucan2.util :as u]))
 
-(def global-options
-  "Default options automatically passed to all [[next.jdbc]] queries and builder functions."
+(defonce ^{:doc "Default options automatically passed to all [[next.jdbc]] queries and builder functions."}
+  global-options
   (atom {:label-fn u/lower-case-en}))
 
 (def ^:dynamic *options*
