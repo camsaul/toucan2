@@ -131,19 +131,19 @@
             v)]
     [k v]))
 
-(def ^:private ^:dynamic *already-transformed* false)
+(def ^:private ^:dynamic *skip-in-transforms* false)
 
 (m/defmethod query/apply-kv-arg [#_model ::transformed.model
                                  #_query :default
                                  #_k     :default]
   [model query k v]
   (if (or (instance? RecordTypeForInterceptingApplyKVArgCalls query)
-          *already-transformed*
+          *skip-in-transforms*
           (nil? v))
     (next-method model query k v)
     (let [[k v*] (query/apply-kv-arg model (->RecordTypeForInterceptingApplyKVArgCalls) k v)]
       #_(printf "Intercepted apply-kv-arg %s %s => %s\n" k (pr-str v) (pr-str v*))
-      (binding [*already-transformed* true]
+      (binding [*skip-in-transforms* true]
         (next-method model query k v*)))))
 
 ;;;; after select (or other things returning instances)
@@ -213,12 +213,14 @@
                result))))
     identity))
 
-(m/defmethod pipeline/transduce-with-model [#_query-type ::pipeline/select.instances-from-pks, #_model ::transformed.model]
+(m/defmethod pipeline/build [#_query-type     ::pipeline/select.instances-from-pks
+                             #_model          ::transformed.model
+                             #_resolved-query :default]
   "Don't try to transform stuff when we're doing SELECT directly with PKs (e.g. to fake INSERT returning instances), We're
   not doing transforms on the way out so we don't need to do them on the way in."
-  [rf query-type model parsed-args]
-  (binding [*already-transformed* true]
-    (next-method rf query-type model parsed-args)))
+  [query-type model parsed-args resolved-query]
+  (binding [*skip-in-transforms* true]
+    (next-method query-type model parsed-args resolved-query)))
 
 (m/defmethod pipeline/results-transform [#_query-type :toucan.result-type/instances #_model ::transformed.model]
   [query-type model]
@@ -237,6 +239,11 @@
                   (if-let [xform (get k->transform k)]
                     (xform v)
                     v))])))
+
+#_(m/defmethod pipeline/transduce-query [#_query-type         :toucan.query-type/update.*
+                                       #_model              ::transformed.model
+                                       #_resolved-type-type :default]
+  "Apply transformations to the `changes` map in an UPDATE query.")
 
 (m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/update.* #_model ::transformed.model]
   [_rf _query-type model {:keys [changes], :as parsed-args}]
@@ -268,17 +275,19 @@
         row-xform  (apply comp row-xforms)]
     (map row-xform rows)))
 
-(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/insert.* #_model ::transformed.model]
-  [_rf query-type model parsed-args]
+(m/defmethod pipeline/build [#_query-type     :toucan.query-type/insert.*
+                             #_model          ::transformed.model
+                             #_resolved-query :default]
+  [query-type model parsed-args resolved-query]
   (assert (isa? model ::transformed.model))
   (b/cond
     (::already-transformed? parsed-args)
-    parsed-args
+    (next-method query-type model parsed-args resolved-query)
 
     :let [k->transform (in-transforms model)]
 
     (empty? k->transform)
-    parsed-args
+    (next-method query-type model parsed-args resolved-query)
 
     :else
     (u/try-with-error-context ["apply in transforms before inserting rows" {::query-type  query-type
@@ -286,9 +295,10 @@
                                                                             ::parsed-args parsed-args
                                                                             ::transforms  k->transform}]
       (log/debugf :compile "Apply %s transforms to %s" k->transform parsed-args)
-      (-> parsed-args
-          (update :rows transform-insert-rows k->transform)
-          (assoc ::already-transformed? true)))))
+      (let [parsed-args (-> parsed-args
+                            (update :rows transform-insert-rows k->transform)
+                            (assoc ::already-transformed? true))]
+        (next-method query-type model parsed-args resolved-query)))))
 
 (m/defmethod pipeline/results-transform [#_query-type :toucan.query-type/insert.pks #_model ::transformed.model]
   "Transform results of `insert!` returning PKs."

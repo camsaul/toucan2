@@ -4,19 +4,21 @@
 
   Pipeline order is
 
-  1. [[parse-args]]                  (entrypoint fn: [[transduce-unparsed]])
-  2. [[toucan2.model/resolve-model]] (entrypoint fn: [[transduce-parsed]])
-  3. [[transduce-with-model]]        ; TODO -- `resolve-model` + transduce query?
-  4. [[resolve]]
-  5. [[build]]                       ; TODO -- we should introduce a new hook here to use instead of [[transduce-with-model]]
-  6. [[compile]]
-  x. [[results-transform]]
-  7. [[transduce-execute]]           ; TODO `with-connection`
-  8. [[transduce-execute-with-connection]]
+  1.  [[parse-args]]                  (entrypoint fn: [[transduce-unparsed]])
+  2.  [[toucan2.model/resolve-model]] (entrypoint fn: [[transduce-parsed]])
+  3.  [[transduce-with-model]]        ; consider deprecating in favor of [[transduce-query]]
+  4.  [[resolve]]
+  5.  [[transduce-query]]
+  6.  [[build]]
+  7.  [[compile]]
+  8.  [[results-transform]]
+  9.  [[transduce-execute]]           ; TODO `with-connection`
+  10. [[transduce-execute-with-connection]]
 
   The main pipeline entrypoint is [[transduce-unparsed]]."
   (:refer-clojure :exclude [compile resolve])
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
@@ -202,12 +204,6 @@
   [_query-type _model queryable]
   queryable)
 
-;;;; [[transduce-with-model]]
-
-(m/defmulti transduce-with-model
-  {:arglists '([rf query-type₁ model₂ parsed-args]), :defmethod-arities #{4}}
-  (dispatch-ignore-rf u/dispatch-on-first-two-args))
-
 (def ^:dynamic ^{:arglists '([query-type model parsed-args resolved-query])}
   *build*
   #'build)
@@ -238,11 +234,29 @@
       (let [compiled-query (*compile* query-type model built-query)]
         (transduce-compiled-query rf query-type model compiled-query)))))
 
-(defn- transduce-resolved-query [rf query-type model parsed-args resolved-query]
-  (u/try-with-error-context ["with resolved query" {::resolved-query resolved-query}]
-    (let [parsed-args (dissoc parsed-args :queryable)
-          built-query (*build* query-type model parsed-args resolved-query)]
-      (transduce-built-query rf query-type model built-query))))
+(m/defmulti transduce-query
+  {:arglists '([rf query-type₁ model₂ parsed-args resolved-query₃]), :defmethod-arities #{5}}
+  (fn [_rf query-type₁ model₂ _parsed-args resolved-query₃]
+    (u/dispatch-on-first-three-args query-type₁ model₂ resolved-query₃)))
+
+(m/defmethod transduce-query :default
+  [rf query-type model parsed-args resolved-query]
+  (let [built-query (*build* query-type model parsed-args resolved-query)]
+    (transduce-built-query rf query-type model built-query)))
+
+(defn- transduce-query* [rf query-type model parsed-args resolved-query]
+  (let [parsed-args    (dissoc parsed-args :queryable)
+        resolved-query (cond-> resolved-query
+                         (and (map? resolved-query)
+                              (not (record? resolved-query))
+                              (isa? (type resolved-query) clojure.lang.IPersistentMap))
+                         (vary-meta assoc :type (map/backend)))]
+    (u/try-with-error-context ["with resolved query" {::resolved-query resolved-query}]
+      (transduce-query rf query-type model parsed-args resolved-query))))
+
+(m/defmulti transduce-with-model
+  {:arglists '([rf query-type₁ model₂ parsed-args]), :defmethod-arities #{4}}
+  (dispatch-ignore-rf u/dispatch-on-first-two-args))
 
 (m/defmethod transduce-with-model :default
   [rf query-type model {:keys [queryable], :as parsed-args}]
@@ -252,7 +266,7 @@
                              queryable
                              (or queryable {}))
             resolved-query (resolve query-type model queryable)]
-        (transduce-resolved-query rf query-type model parsed-args resolved-query)))))
+        (transduce-query* rf query-type model parsed-args resolved-query)))))
 
 (defn- transduce-with-model* [rf query-type model parsed-args]
   (if-let [model-connectable (when-not conn/*current-connectable*

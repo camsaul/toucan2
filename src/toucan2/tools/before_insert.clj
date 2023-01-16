@@ -23,20 +23,26 @@
 
 ;;; make sure we transform rows whether it's in the parsed args or in the resolved query.
 
-(m/defmethod pipeline/transduce-with-model :around [#_query-type :toucan.query-type/insert.*
-                                                    #_model      ::before-insert]
-  [rf query-type model parsed-args]
+(m/defmethod pipeline/transduce-query :around [#_query-type     :toucan.query-type/insert.*
+                                               #_model          ::before-insert
+                                               #_resolved-query :default]
+  "Execute [[before-insert]] methods and the INSERT query inside a transaction."
+  [rf query-type model parsed-args resolved-query]
   (conn/with-transaction [_conn nil {:nested-transaction-rule :ignore}]
-    (let [parsed-args (cond-> parsed-args
-                        (:rows parsed-args) (update :rows do-before-insert-to-rows model))]
-      (next-method rf query-type model parsed-args))))
+    (next-method rf query-type model parsed-args resolved-query)))
 
-(m/defmethod pipeline/build :before [#_query-type :toucan.query-type/insert.*
-                                     #_model      ::before-insert
-                                     #_query      clojure.lang.IPersistentMap]
-  [_query-type model _parsed-args resolved-query]
-  (cond-> resolved-query
-    (:rows resolved-query) (update :rows do-before-insert-to-rows model)))
+(m/defmethod pipeline/build [#_query-type     :toucan.query-type/insert.*
+                             #_model          ::before-insert
+                             #_resolved-query :toucan.map-backend/honeysql2]
+  "Apply [[before-insert]] to `:rows` in the `resolved-query` or `parsed-args` for Honey SQL queries."
+  [query-type model parsed-args resolved-query]
+  ;; not 100% sure why either `parsed-args` OR `resolved-query` can have `:rows` but I guess we have to update either
+  ;; one
+  (let [parsed-args    (cond-> parsed-args
+                         (:rows parsed-args) (update :rows do-before-insert-to-rows model))
+        resolved-query (cond-> resolved-query
+                         (:rows resolved-query) (update :rows do-before-insert-to-rows model))]
+    (next-method query-type model parsed-args resolved-query)))
 
 ;;; Important! before-insert should be done BEFORE any [[toucan2.tools.transformed/transforms]]. Transforms are often
 ;;; for serializing and deserializing values; we don't want before insert methods to have to work with

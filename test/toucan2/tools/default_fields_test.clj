@@ -12,7 +12,10 @@
    [toucan2.tools.after-insert :as after-insert]
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.default-fields :as default-fields]
-   [toucan2.tools.transformed :as transformed]))
+   [toucan2.tools.named-query :as named-query]
+   [toucan2.tools.transformed :as transformed])
+  (:import
+   (java.time LocalDateTime)))
 
 (set! *warn-on-reflection* true)
 
@@ -170,3 +173,13 @@
             :category   "bar"
             :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00"),}
            (select/select-one ::venues.with-created-at 1)))))
+
+(named-query/define-named-query ::named-query.select-venues-override-default-fields
+  {:select [:id :name :updated-at], :where [:= :id 1]})
+
+(deftest ^:parallel do-not-apply-default-fields-in-query-with-select
+  (testing "Don't apply default-fields if we specify a Honey SQL query with explicit `:select`"
+    (are [query] (= {:id 1, :name "Tempest", :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                    (select/select-one ::venues.default-fields query))
+      {:select [:id :name :updated-at], :where [:= :id 1]}
+      ::named-query.select-venues-override-default-fields)))

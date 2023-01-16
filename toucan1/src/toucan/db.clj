@@ -22,6 +22,7 @@
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
+   [toucan2.tools.default-fields :as default-fields]
    [toucan2.update :as update]
    [toucan2.util :as u]))
 
@@ -221,14 +222,21 @@
 (defn simple-select
   "DEPRECATED: Use [[toucan2.select/select]] instead."
   [modelable honeysql-form]
-  (select/select modelable honeysql-form))
+  (binding [default-fields/*skip-default-fields* true]
+    (select/select modelable honeysql-form)))
 
 (defn simple-select-reducible
   "DEPRECATED: Use [[toucan2.select/reducible-select]] instead."
   [modelable honeysql-form]
-  (eduction
-   (map realize/realize)
-   (select/reducible-select modelable honeysql-form)))
+  (reify clojure.lang.IReduceInit
+    (reduce [_this rf init]
+      (binding [default-fields/*skip-default-fields* true]
+        (reduce
+         rf
+         init
+         (eduction
+          (map realize/realize)
+          (select/reducible-select modelable honeysql-form)))))))
 
 (defn select-reducible
   "DEPRECATED: Use [[toucan2.select/reducible-select]] instead."

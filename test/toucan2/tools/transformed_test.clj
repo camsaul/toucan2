@@ -272,7 +272,7 @@
                 pipeline/*compile*           (fn [_query-type _model built-query]
                                                built-query)
                 pipeline/*transduce-execute* (fn [rf _query-type _model {:keys [rows], :as _compiled-query}]
-                                               {:pre [(seq? rows)]}
+                                               {:pre [(seq rows)]}
                                                (transduce identity rf (map (fn [row]
                                                                              (update row :category name))
                                                                            rows)))]

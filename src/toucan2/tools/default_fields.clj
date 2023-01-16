@@ -17,7 +17,9 @@
   (s/coll-of ::default-field))
 
 (m/defmulti default-fields
-  {:arglists '([model])}
+  "The default fields to return for a model `model` that derives from `:toucan2.tools.default-fields/default-fields`. You
+  probably don't need to use this directly; use [[toucan2.tools.default-fields/define-default-fields]] instead."
+  {:arglists '([model]), :defmethod-arities #{1}, :dispatch-value-spec (complement vector?)}
   u/dispatch-on-first-arg)
 
 (m/defmethod default-fields :around :default
@@ -44,10 +46,30 @@
                                          (field-fn instance))
                                        field-fns))))))
 
+(def ^:dynamic *skip-default-fields*
+  "Whether to skip applying default Fields because the query already includes explicit fields, e.g. `:select` for a Honey
+  SQL query."
+  false)
+
+;;; TODO -- should we skip default fields for a Query that has top-level `:union` or `:union-all`?
+(m/defmethod pipeline/transduce-query [#_query-type          :toucan.result-type/instances
+                                       #_model               ::default-fields
+                                       #_resolved-query-type :toucan.map-backend/honeysql2]
+  "Skip default fields behavior for Honey SQL queries that contain `:select`. Bind [[*skip-default-fields*]] to `true`."
+  [rf query-type model parsed-args honeysql]
+  (if (seq (:select honeysql))
+    (binding [*skip-default-fields* true]
+      (log/debugf :results "Not adding default fields because query contains `:select`")
+      (next-method rf query-type model parsed-args honeysql))
+    (next-method rf query-type model parsed-args honeysql)))
+
 (m/defmethod pipeline/results-transform [#_query-type :toucan.result-type/instances #_model ::default-fields]
   [query-type model]
   (log/debugf :results "Model %s has default fields" model)
   (cond
+    *skip-default-fields*
+    (next-method query-type model)
+
     ;; don't apply default fields for queries that specify other columns e.g. `(select [SomeModel :col])`
     (seq (:columns pipeline/*parsed-args*))
     (do

@@ -23,6 +23,7 @@
    [toucan2.tools.compile :as tools.compile]
    [toucan2.util :as u])
   (:import
+   (java.time LocalDateTime)
    (java.util Locale)))
 
 (set! *warn-on-reflection* true)
@@ -223,16 +224,44 @@
       (is (= #{{:id 1, :first-name "Cam", :last-name "Saul"}}
              (transduce-to-set (t1.db/simple-select-reducible model {:where [:= :id 1]})))))))
 
+(deftest ^:parallel simple-select-default-fields-test
+  (testing "Should not apply default fields"
+    (are [thunk] (= [{:id         1
+                      :name       "Tempest"
+                      :category   :bar
+                      :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
+                    thunk)
+      (t1.db/simple-select Venue {:where [:= :id 1]})
+      (into [] (t1.db/simple-select-reducible Venue {:where [:= :id 1]})))))
+
+(deftest ^:parallel simple-select-union-test
+  (doseq [union [:union :union-all]]
+    (testing union
+      (let [query {union [{:select [:id :category]
+                           :from   [:t1_venues]
+                           :where  [:= :id 1]}
+                          {:select [:id :category]
+                           :from   [:t1_venues]
+                           :where  [:= :id 2]}]}]
+        (are [thunk] (= [{:id       1
+                          :category :bar}
+                         {:id       2
+                          :category :bar}]
+                        thunk)
+          (t1.db/simple-select Venue query)
+          (into [] (t1.db/simple-select-reducible Venue query)))))))
+
 ;; TODO
 #_(deftest test-37
-      (testing "reducible-query should pass default JDBC options along to clojure.java.jdbc"
-        (is (= [:connection [""] {:a 1, :b 3, :c 4}]
-               (let [fn-args (atom nil)]
-                 (with-redefs [t1.db/connection             (constantly :connection)
-                               #_t1.db/default-jdbc-options #_ (atom {:a 1, :b 2})
-                               #_jdbc/reducible-query    #_ (fn [& args]
-                                                              (reset! fn-args args))]
-                   (t1.db/reducible-query {} :b 3, :c 4)))))))
+    (testing "reducible-query should pass default JDBC options along to clojure.java.jdbc"
+      (is (= [:connection [""] {:a 1, :b 3, :c 4}]
+             (let [fn-args (atom nil)]
+               (with-redefs [t1.db/connection             (constantly :connection)
+                             #_t1.db/default-jdbc-options #_ (atom {:a 1, :b 2})
+                             #_jdbc/reducible-query    #_ (fn [& args]
+                                                            (reset! fn-args args))]
+                 (t1.db/reducible-query {} :b 3, :c 4)))))))
 
 (deftest ^:parallel simple-select-one-test
   (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
