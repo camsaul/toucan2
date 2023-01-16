@@ -131,8 +131,17 @@
   [query-type model m]
   (compile query-type model (vary-meta m assoc :type (map/backend))))
 
+(s/def ::build.dispatch-value
+  (s/or
+   :default                         ::types/dispatch-value.default
+   :query-type-model-resolved-query (s/cat :query-type     ::types/dispatch-value.query-type
+                                           :model          ::types/dispatch-value.model
+                                           :resolved-query ::types/dispatch-value.resolved-query)))
+
 (m/defmulti build
-  {:arglists '([query-type₁ model₂ parsed-args resolved-query₃]), :defmethod-arities #{4}}
+  {:arglists            '([query-type₁ model₂ parsed-args resolved-query₃])
+   :defmethod-arities   #{4}
+   :dispatch-value-spec (s/nonconforming ::build.dispatch-value)}
   (fn [query-type₁ model₂ _parsed-args resolved-query₃]
     (u/dispatch-on-first-three-args query-type₁ model₂ resolved-query₃)))
 

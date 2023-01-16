@@ -1,5 +1,6 @@
 (ns toucan2.types
-  "Toucan 2 query type hierarchy.")
+  "Toucan 2 query type hierarchy."
+  (:require [clojure.spec.alpha :as s]))
 
 ;;; the query type hierarchy below is used for pipeline methods and tooling to decide what sort of things they need to
 ;;; do -- for example you should not do row-map transformations to a query that returns an update count.
@@ -126,3 +127,18 @@
                        (isa? descendant result-type))
               descendant))
           (descendants base-type))))
+
+(s/def ::dispatch-value.default
+  (partial = :default))
+
+(s/def ::dispatch-value.query-type
+  (s/or :default    ::dispatch-value.default
+        :query-type query-type?))
+
+(s/def ::dispatch-value.model
+  (s/or :default ::dispatch-value.default
+        :model   (some-fn symbol? keyword?)))
+
+(s/def ::dispatch-value.resolved-query
+  (s/or :default ::dispatch-value.default
+        :model   (some-fn nil? symbol? keyword?)))

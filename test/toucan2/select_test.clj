@@ -516,7 +516,7 @@
 
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.*
                              #_model      ::venues.with-category
-                             #_query      clojure.lang.IPersistentMap]
+                             #_query      :toucan.map-backend/honeysql2]
   [query-type model parsed-args resolved-query]
   (let [model-ns-str    (some-> (model/namespace model) name)
         venues-category (keyword
