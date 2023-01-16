@@ -24,6 +24,7 @@
    [toucan2.tools.debug]
    [toucan2.tools.default-fields]
    [toucan2.tools.hydrate]
+   [toucan2.tools.named-query]
    [toucan2.tools.transformed]
    [toucan2.update]
    [toucan2.util]))
@@ -50,6 +51,7 @@
   toucan2.tools.debug/keep-me
   toucan2.tools.default-fields/keep-me
   toucan2.tools.hydrate/keep-me
+  toucan2.tools.named-query/keep-me
   toucan2.tools.transformed/keep-me
   toucan2.update/keep-me
   toucan2.util/keep-me)
@@ -152,6 +154,9 @@
   hydrate
   model-for-automagic-hydration
   simple-hydrate]
+
+ [toucan2.tools.named-query
+  define-named-query]
 
  [toucan2.tools.transformed
   deftransforms
