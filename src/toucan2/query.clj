@@ -14,9 +14,9 @@
               :connectable any?)))
 
 (s/def ::default-args.modelable.column
-  (s/or :column keyword?
+  (s/or :column      keyword?
         :expr-column (s/cat :expr   any?
-                            :column keyword?)))
+                            :column (s/? keyword?))))
 
 (s/def ::default-args.modelable
   (s/or

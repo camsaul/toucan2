@@ -35,7 +35,10 @@
     [:conn :db :model ::my-query]            {:connectable :db, :modelable :model, :queryable ::my-query}
     [:conn :db :model :id 1]                 {:connectable :db, :modelable :model, :kv-args {:id 1}, :queryable {}}
     [[:model :col] :query]                   {:modelable :model, :columns [:col], :queryable :query}
-    [[:model [:expr :col]] :query]           {:modelable :model, :columns [[:expr :col]], :queryable :query}
+    [[:model [:%max.id]] :query]             {:modelable :model, :columns [[:%max.id]], :queryable :query}
+    [[:model [:%max.id :max-id]] :query]     {:modelable :model, :columns [[:%max.id :max-id]], :queryable :query}
+    [[:model [[:max :id]]] :query]           {:modelable :model, :columns [[[:max :id]]], :queryable :query}
+    [[:model [[:max :id] :max-id]] :query]   {:modelable :model, :columns [[[:max :id] :max-id]], :queryable :query}
     ;; Yoda condition
     [:model :id 1 "Cam" :name]               {:modelable :model, :kv-args {:id 1, "Cam" :name}, :queryable {}}))
 
@@ -112,6 +115,22 @@
     (testing "columns"
       (is (= [(instance/instance ::test/people {:id 1})]
              (select/select [::test/people :id] :id 1)))
+      (testing "With alias"
+        (is (= [(instance/instance ::test/people {:person-id 1})]
+               (select/select [::test/people [:id :person-id]] :id 1))))
+      (testing "Honey SQL expression"
+        (doseq [expr [:%max.id
+                      [:max :id]]]
+          (testing expr
+            (testing "with alias"
+              (is (= [(instance/instance ::test/people {:person-id 4})]
+                     (select/select [::test/people [expr :person-id]]))))
+            (testing "no alias"
+              (let [expected-key (case (test/current-db-type)
+                                   :h2       (keyword "max(-id)")
+                                   :postgres :max)]
+                (is (= [(instance/instance ::test/people {expected-key 4})]
+                       (select/select [::test/people [expr]]))))))))
       (testing "[expr identifier]"
         (is (= [(instance/instance ::test/people {:person-number 1})]
                (select/select [::test/people [:id :person-number]] :id 1)))))))
