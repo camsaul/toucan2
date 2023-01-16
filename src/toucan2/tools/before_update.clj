@@ -9,20 +9,22 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
+(comment types/keep-me)
+
 (derive ::select-for-before-update :toucan.query-type/select.instances.from-update)
 
 (m/defmulti before-update
+  "Do before-update operations for side effects and transformations to a `row` (presumably a Toucan instance?) before
+  applying an UPDATE operation."
   {:arglists            '([model₁ row])
    :defmethod-arities   #{2}
    ;; work around https://github.com/camsaul/methodical/issues/142
-   :dispatch-value-spec (s/nonconforming
-                         (s/or
-                          :default (partial = :default)
-                          :model   (complement sequential?)))}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 (m/defmethod before-update :around :default
@@ -105,8 +107,11 @@
       (log/debugf :execute "Doing recursive updates with new args maps %s" new-args-maps)
       (conn/with-transaction [_conn nil {:nested-transaction-rule :ignore}]
         (transduce
-         (map (fn [args-map]
-                (next-method rf query-type model args-map)))
+         (comp (map (fn [args-map]
+                      (next-method rf query-type model args-map)))
+               (if (isa? query-type :toucan.result-type/pks)
+                 cat
+                 identity))
          rf
          new-args-maps)))))
 

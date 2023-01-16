@@ -193,8 +193,8 @@
 
             ;; for whatever reason the order returned here is different between H2 and Postgres
             #'update/update-returning-pks!
-            (is (= #{1 2}
-                   (set result)))))
+            (is (= [1 2]
+                   (sort result)))))
         (is (= [{:id 1, :name "Tempest", :category "saloon"}
                 {:id 2, :name "Ho's Tavern", :category "saloon"}
                 {:id 3, :name "BevMo", :category "store"}]

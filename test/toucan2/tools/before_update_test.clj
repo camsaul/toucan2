@@ -13,9 +13,10 @@
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.before-update :as before-update]
    [toucan2.tools.default-fields :as default-fields]
+   [toucan2.tools.named-query :as named-query]
    [toucan2.update :as update])
   (:import
-   (java.time LocalDateTime)))
+   (java.time LocalDateTime OffsetDateTime)))
 
 (set! *warn-on-reflection* true)
 
@@ -379,7 +380,7 @@
 
 (derive ::people.suffix-name ::test/people)
 
-(def ^:private ^:dynamic *updated-people*)
+(def ^:private ^:dynamic *updated-people* nil)
 
 (before-update/define-before-update ::people.suffix-name
   [person]
@@ -425,3 +426,20 @@
              (update/update! ::venues.discard-category-change.default-fields 1 {:name "Chase Center", :category "stadium"})))
       (is (= {:id 1, :name "Chase Center", :category "bar"}
              (select/select-one [::test/venues :id :name :category] 1))))))
+
+(named-query/define-named-query ::people.named-conditions
+  {:id [:> 1]})
+
+(deftest ^:synchronized named-query-test
+  (doseq [update! [#'update/update!
+                   #'update/update-returning-pks!]]
+    (test/with-discarded-table-changes :people
+      (testing update!
+        (is (= (condp = update!
+                 #'update/update!               3
+                 #'update/update-returning-pks! [2 3 4])
+               (update! ::people.suffix-name ::people.named-conditions {:name "CAM"})))
+        (is (= {:id         2
+                :name       "CAM 2.0"
+                :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")}
+               (select/select-one ::test/people 2)))))))
