@@ -248,22 +248,25 @@
 
 (derive ::people.no-timestamps ::people)
 
-(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/select.* #_model ::people.no-timestamps]
-  [_rf _query-type _model parsed-args]
-  (update parsed-args :columns (fn [columns]
-                                 (or columns [:id :name]))))
+(m/defmethod pipeline/build [#_query-type     :toucan.query-type/select.*
+                             #_model          ::people.no-timestamps
+                             #_resolved-query :default]
+  [query-type model parsed-args resolved-query]
+  (let [parsed-args (update parsed-args :columns (fn [columns]
+                                                   (or columns [:id :name])))]
+    (next-method query-type model parsed-args resolved-query)))
 
-(m/defmethod pipeline/transduce-with-model [#_query-type :toucan.query-type/select.instances #_model ::people.no-timestamps]
-  [rf query-type model parsed-args]
-  (let [rf* ((map (fn [person]
-                    (testing (format "\nperson = ^%s %s" (some-> person class .getCanonicalName) (pr-str person))
-                      ;; (testing "\nreducing function should see Toucan 2 instances"
-                      ;;   (is (instance/instance? person)))
-                      (testing "\ninstance table should be a ::people.no-timestamps"
-                        (is (isa? (protocols/model person) ::people.no-timestamps))))
-                    (assoc person :after-select? true)))
-             rf)]
-    (next-method rf* query-type model parsed-args)))
+(m/defmethod pipeline/results-transform [#_query-type :toucan.query-type/select.instances
+                                         #_model      ::people.no-timestamps]
+  [query-type model]
+  (comp (map (fn [person]
+               (testing (format "\nperson = ^%s %s" (some-> person class .getCanonicalName) (pr-str person))
+                 ;; (testing "\nreducing function should see Toucan 2 instances"
+                 ;;   (is (instance/instance? person)))
+                 (testing "\ninstance table should be a ::people.no-timestamps"
+                   (is (isa? (protocols/model person) ::people.no-timestamps))))
+               (assoc person :after-select? true)))
+        (next-method query-type model)))
 
 (deftest ^:parallel default-query-test
   (testing "Should be able to set some defaults by implementing transduce-with-model"

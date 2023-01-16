@@ -240,23 +240,22 @@
                     (xform v)
                     v))])))
 
-#_(m/defmethod pipeline/transduce-query [#_query-type         :toucan.query-type/update.*
-                                       #_model              ::transformed.model
-                                       #_resolved-type-type :default]
-  "Apply transformations to the `changes` map in an UPDATE query.")
-
-(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/update.* #_model ::transformed.model]
-  [_rf _query-type model {:keys [changes], :as parsed-args}]
+(m/defmethod pipeline/build [#_query-type     :toucan.query-type/update.*
+                             #_model          ::transformed.model
+                             #_resolved-query :default]
+  "Apply transformations to the `changes` map in an UPDATE query."
+  [query-type model {:keys [changes], :as parsed-args} resolved-query]
   (b/cond
     (not (map? changes))
-    parsed-args
+    (next-method query-type model parsed-args resolved-query)
 
     :let [k->transform (not-empty (in-transforms model))]
 
     (not k->transform)
-    parsed-args
+    (next-method query-type model parsed-args resolved-query)
 
-    (update parsed-args :changes transform-update-changes k->transform)))
+    (let [parsed-args (update parsed-args :changes transform-update-changes k->transform)]
+      (next-method query-type model parsed-args resolved-query))))
 
 ;;;; before insert
 
@@ -295,9 +294,15 @@
                                                                             ::parsed-args parsed-args
                                                                             ::transforms  k->transform}]
       (log/debugf :compile "Apply %s transforms to %s" k->transform parsed-args)
-      (let [parsed-args (-> parsed-args
-                            (update :rows transform-insert-rows k->transform)
-                            (assoc ::already-transformed? true))]
+      (let [parsed-args    (cond-> parsed-args
+                             (seq (:rows parsed-args))
+                             (update :rows transform-insert-rows k->transform)
+
+                             true
+                             (assoc ::already-transformed? true))
+            resolved-query (cond-> resolved-query
+                             (seq (:rows resolved-query))
+                             (update :rows transform-insert-rows k->transform))]
         (next-method query-type model parsed-args resolved-query)))))
 
 (m/defmethod pipeline/results-transform [#_query-type :toucan.query-type/insert.pks #_model ::transformed.model]
@@ -402,7 +407,7 @@
 ;;; before applying any transforms. Transforms will still get applied to the upgraded query.
 ;;;
 ;;; TODO -- not 100% sure this is still needed
-(m/prefer-method! #'pipeline/transduce-with-model
+#_(m/prefer-method! #'pipeline/transduce-with-model
                   [:toucan2.tools.after/query-type :toucan2.tools.after/model]
                   [:toucan.result-type/instances ::transformed.model])
 

@@ -50,7 +50,7 @@
 ;;;
 ;;; By marking `::before-insert` as preferred over `:toucan2.tools.transformed/transformed` it will be done first (see
 ;;; https://github.com/camsaul/methodical#before-methods)
-(m/prefer-method! #'pipeline/transduce-with-model
+#_(m/prefer-method! #'pipeline/transduce-with-model
                   [:toucan.query-type/insert.* ::before-insert]
                   [:toucan.query-type/insert.* :toucan2.tools.transformed/transformed.model])
 

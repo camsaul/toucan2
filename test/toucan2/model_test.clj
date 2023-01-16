@@ -49,10 +49,10 @@
 
 (derive ::people.unquoted ::test/people)
 
-(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model ::people.unquoted]
-  [rf query-type model parsed-args]
+(m/defmethod pipeline/transduce-query [#_query-type :default #_model ::people.unquoted #_resolved-query :default]
+  [rf query-type model parsed-args resolved-query]
   (binding [map.honeysql/*options* {:quoted false}]
-    (next-method rf query-type model parsed-args)))
+    (next-method rf query-type model parsed-args resolved-query)))
 
 (deftest ^:parallel default-honeysql-options-for-a-model-test
   (testing "There should be a way to specify 'default options' for a specific model"

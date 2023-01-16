@@ -307,10 +307,10 @@
   [_model]
   ::db)
 
-(m/defmethod pipeline/transduce-with-model [:default ::models]
-  [rf query-type model parsed-args]
+(m/defmethod pipeline/transduce-query [:default ::models :default]
+  [rf query-type model parsed-args resolved-query]
   (binding [jdbc/*options* (assoc jdbc/*options* :label-fn csk/->kebab-case)]
-    (next-method rf query-type model parsed-args)))
+    (next-method rf query-type model parsed-args resolved-query)))
 
 ;;;; conveniences for REPL-based usage. These are not used in tests.
 

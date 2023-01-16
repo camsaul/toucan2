@@ -4,16 +4,15 @@
 
   Pipeline order is
 
-  1.  [[parse-args]]                  (entrypoint fn: [[transduce-unparsed]])
-  2.  [[toucan2.model/resolve-model]] (entrypoint fn: [[transduce-parsed]])
-  3.  [[transduce-with-model]]        ; consider deprecating in favor of [[transduce-query]]
-  4.  [[resolve]]
-  5.  [[transduce-query]]
-  6.  [[build]]
-  7.  [[compile]]
-  8.  [[results-transform]]
-  9.  [[transduce-execute]]           ; TODO `with-connection`
-  10. [[transduce-execute-with-connection]]
+  1. [[parse-args]]                  (entrypoint fn: [[transduce-unparsed]])
+  2. [[toucan2.model/resolve-model]] (entrypoint fn: [[transduce-parsed]])
+  3. [[resolve]]
+  4. [[transduce-query]]
+  5. [[build]]
+  6. [[compile]]
+  7. [[results-transform]]
+  8. [[transduce-execute]]           ; TODO `with-connection`
+  9. [[transduce-execute-with-connection]]
 
   The main pipeline entrypoint is [[transduce-unparsed]]."
   (:refer-clojure :exclude [compile resolve])
@@ -32,6 +31,8 @@
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
+
+(comment s/keep-me)
 
 ;;;; pipeline
 
@@ -100,7 +101,9 @@
     (next-method rf query-type model compiled-query)))
 
 (m/defmulti results-transform
-  {:arglists '([query-type₁ model₂]), :defmethod-arities #{2}}
+  {:arglists            '([query-type₁ model₂])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model)}
   u/dispatch-on-first-two-args)
 
 (m/defmethod results-transform :default
@@ -133,17 +136,10 @@
   [query-type model m]
   (compile query-type model (vary-meta m assoc :type (map/backend))))
 
-(s/def ::build.dispatch-value
-  (s/or
-   :default                         ::types/dispatch-value.default
-   :query-type-model-resolved-query (s/cat :query-type     ::types/dispatch-value.query-type
-                                           :model          ::types/dispatch-value.model
-                                           :resolved-query ::types/dispatch-value.resolved-query)))
-
 (m/defmulti build
   {:arglists            '([query-type₁ model₂ parsed-args resolved-query₃])
    :defmethod-arities   #{4}
-   :dispatch-value-spec (s/nonconforming ::build.dispatch-value)}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-resolved-query)}
   (fn [query-type₁ model₂ _parsed-args resolved-query₃]
     (u/dispatch-on-first-three-args query-type₁ model₂ resolved-query₃)))
 
@@ -235,7 +231,9 @@
         (transduce-compiled-query rf query-type model compiled-query)))))
 
 (m/defmulti transduce-query
-  {:arglists '([rf query-type₁ model₂ parsed-args resolved-query₃]), :defmethod-arities #{5}}
+  {:arglists            '([rf query-type₁ model₂ parsed-args resolved-query₃])
+   :defmethod-arities   #{5}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-resolved-query)}
   (fn [_rf query-type₁ model₂ _parsed-args resolved-query₃]
     (u/dispatch-on-first-three-args query-type₁ model₂ resolved-query₃)))
 
@@ -254,26 +252,20 @@
     (u/try-with-error-context ["with resolved query" {::resolved-query resolved-query}]
       (transduce-query rf query-type model parsed-args resolved-query))))
 
-(m/defmulti transduce-with-model
-  {:arglists '([rf query-type₁ model₂ parsed-args]), :defmethod-arities #{4}}
-  (dispatch-ignore-rf u/dispatch-on-first-two-args))
-
-(m/defmethod transduce-with-model :default
+(defn- transduce-with-model
   [rf query-type model {:keys [queryable], :as parsed-args}]
-  (binding [*parsed-args* parsed-args]
-    (u/try-with-error-context ["with parsed args" {::query-type query-type, ::parsed-args parsed-args}]
-      (let [queryable      (if (contains? parsed-args :queryable)
-                             queryable
-                             (or queryable {}))
-            resolved-query (resolve query-type model queryable)]
-        (transduce-query* rf query-type model parsed-args resolved-query)))))
-
-(defn- transduce-with-model* [rf query-type model parsed-args]
+  ;; if `*current-connectable*` is unbound but `model` has a default connectable, bind `*current-connectable*` and recur
   (if-let [model-connectable (when-not conn/*current-connectable*
                                (model/default-connectable model))]
     (binding [conn/*current-connectable* model-connectable]
-      (transduce-with-model* rf query-type model parsed-args))
-    (transduce-with-model rf query-type model parsed-args)))
+      (transduce-with-model rf query-type model parsed-args))
+    (binding [*parsed-args* parsed-args]
+      (u/try-with-error-context ["with parsed args" {::query-type query-type, ::parsed-args parsed-args}]
+        (let [queryable      (if (contains? parsed-args :queryable)
+                               queryable
+                               (or queryable {}))
+              resolved-query (resolve query-type model queryable)]
+          (transduce-query* rf query-type model parsed-args resolved-query))))))
 
 (defn transduce-parsed
   [rf query-type {:keys [modelable connectable], :as parsed-args}]
@@ -288,7 +280,7 @@
     ;; if [[conn/*current-connectable*]] is not yet bound, then get the default connectable for the model and recur.
     (let [model (model/resolve-model modelable)]
       (u/try-with-error-context ["with model" {::model model}]
-        (transduce-with-model* rf query-type model (dissoc parsed-args :modelable))))))
+        (transduce-with-model rf query-type model (dissoc parsed-args :modelable))))))
 
 (m/defmulti parse-args
   {:arglists '([query-type₁ unparsed-args]), :defmethod-arities #{2}}

@@ -131,9 +131,13 @@
 (s/def ::dispatch-value.default
   (partial = :default))
 
+;;; `:toucan.query-type/abstract` exists for things that aren't actually supposed to go in the query type hierarchy, but
+;;; we want to be able to derive other query types FROM them. See [[toucan2.tools.after]] and
+;;; `:toucan2.tools.after/query-type` for example.
 (s/def ::dispatch-value.query-type
-  (s/or :default    ::dispatch-value.default
-        :query-type query-type?))
+  (s/or :default             ::dispatch-value.default
+        :abstract-query-type #(isa? % :toucan.query-type/abstract)
+        :query-type          query-type?))
 
 (s/def ::dispatch-value.model
   (s/or :default ::dispatch-value.default
@@ -142,3 +146,15 @@
 (s/def ::dispatch-value.resolved-query
   (s/or :default ::dispatch-value.default
         :model   (some-fn nil? symbol? keyword?)))
+
+(s/def ::dispatch-value.query-type-model
+  (s/or :default          ::dispatch-value.default
+        :query-type-model (s/cat :query-type ::dispatch-value.query-type
+                                 :model      ::dispatch-value.model)))
+
+(s/def ::dispatch-value.query-type-model-resolved-query
+  (s/or
+   :default                         ::dispatch-value.default
+   :query-type-model-resolved-query (s/cat :query-type     ::dispatch-value.query-type
+                                           :model          ::dispatch-value.model
+                                           :resolved-query ::dispatch-value.resolved-query)))

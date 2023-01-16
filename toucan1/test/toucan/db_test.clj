@@ -112,12 +112,14 @@
 (derive ::UserWithMangledIdentifiers User)
 (derive ::UserWithMangledIdentifiers ::mangled-identifiers)
 
-(m/defmethod pipeline/transduce-with-model [:default ::mangled-identifiers]
-  [rf query-type model parsed-args]
+(m/defmethod pipeline/transduce-query [:default ::mangled-identifiers :default]
+  [rf query-type model parsed-args resolved-query]
   (binding [jdbc/*options* (assoc jdbc/*options* :label-fn mangle-a-chars)]
-    (next-method rf query-type model parsed-args)))
+    (next-method rf query-type model parsed-args resolved-query)))
 
-(m/prefer-method! #'pipeline/transduce-with-model [:default ::mangled-identifiers] [:default :toucan1/model])
+(m/prefer-method! #'pipeline/transduce-query
+                  [:default ::mangled-identifiers :default]
+                  [:default :toucan1/model :default])
 
 (deftest ^:parallel custom-identifiers-test
   (testing "Note the circumflexes over 'a's"

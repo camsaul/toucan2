@@ -54,7 +54,10 @@
                 (empty? (:rows resolved-query)))
            (nil? resolved-query))))
 
-(m/defmethod pipeline/build [#_query-type :toucan.query-type/insert.* #_model :default #_query :default]
+(m/defmethod pipeline/build [#_query-type     :toucan.query-type/insert.*
+                             #_model          :default
+                             #_resolved-query :default]
+  "Default INSERT query method. No-ops if there are no `:rows` to insert in either `parsed-args` or `resolved-query`."
   [query-type model parsed-args resolved-query]
   (let [rows (some (comp not-empty :rows) [parsed-args resolved-query])]
     (if (can-skip-insert? parsed-args resolved-query)

@@ -1,6 +1,7 @@
 (ns toucan2.tools.before-select-test
   (:require
    [clojure.test :refer :all]
+   [methodical.core :as m]
    [toucan2.instance :as instance]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -37,6 +38,8 @@
 (doto ::people.named-cam.id-and-name
   (derive ::people.named-cam)
   (derive ::people.id-and-name))
+
+(m/prefer-method! #'before-select/before-select ::people.named-cam ::people.id-and-name)
 
 (deftest ^:parallel compose-test
   (is (= [(instance/instance ::people.named-cam.id-and-name {:id 1, :name "Cam", ::after-select? true})]

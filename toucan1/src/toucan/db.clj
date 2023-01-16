@@ -99,12 +99,12 @@
      {:label-fn csk/->kebab-case})
    jdbc/*options*))
 
-(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model :toucan1/model]
-  [rf query-type model parsed-args]
+(m/defmethod pipeline/transduce-query [#_query-type :default #_model :toucan1/model #_resolved-query :default]
+  [rf query-type model parsed-args resolved-query]
   (log/debugf :compile "Compiling Honey SQL query for legacy Toucan 1 model %s" model)
   (binding [map.honeysql/*options* (honeysql-options)
             jdbc/*options*         (jdbc-options)]
-    (next-method rf query-type model parsed-args)))
+    (next-method rf query-type model parsed-args resolved-query)))
 
 ;; replaces `*db-connection*`
 (p/import-vars [conn *current-connectable*])
@@ -319,10 +319,10 @@
   [{:keys [original-model]}]
   (model/primary-keys original-model))
 
-(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model SimpleModel]
-  [rf query-type model parsed-args]
+(m/defmethod pipeline/transduce-query [#_query-type :default #_model SimpleModel #_resolved-query :default]
+  [rf query-type model parsed-args resolved-query]
   (binding [map.honeysql/*options* (honeysql-options)]
-    (next-method rf query-type model parsed-args)))
+    (next-method rf query-type model parsed-args resolved-query)))
 
 (defn update-where!
   "DEPRECATED: use [[toucan2.update/update!]] instead.

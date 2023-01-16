@@ -64,22 +64,23 @@
          (seq row-changes) (update row-changes (fn [pks]
                                                  (conj (set pks) (model/primary-key-values-map model row)))))))))
 
-(defn- fetch-changes->pk-maps [model {:keys [changes], :as parsed-args}]
+(defn- fetch-changes->pk-maps [model {:keys [changes], :as parsed-args} resolved-query]
   (not-empty
-   (pipeline/transduce-with-model
+   (pipeline/transduce-query
     (changes->affected-pk-maps-rf model changes)
     ::select-for-before-update
     model
-    parsed-args)))
+    parsed-args
+    resolved-query)))
 
 ;;; TODO -- this is sort of problematic since it breaks [[toucan2.tools.compile]]
 (defn- apply-before-update-to-matching-rows
   "Fetch the matching rows based on original `parsed-args`; apply [[before-update]] to each. Return a new *sequence* of
   parsed args maps that should be used to perform 'replacement' update operations."
-  [model {:keys [changes], :as parsed-args}]
+  [model {:keys [changes], :as parsed-args} resolved-query]
   (u/try-with-error-context ["apply before-update to matching rows" {::model model, ::changes changes}]
     (log/debugf :compile "apply before-update to matching rows for %s" model)
-    (when-let [changes->pk-maps (fetch-changes->pk-maps model parsed-args)]
+    (when-let [changes->pk-maps (fetch-changes->pk-maps model parsed-args resolved-query)]
       (log/tracef :compile "changes->pk-maps = %s" changes->pk-maps)
       (if (= (count changes->pk-maps) 1)
         ;; every row has the same exact changes: we only need to perform a single update, using the original
@@ -90,25 +91,28 @@
               pk-map            pk-maps]
           (assoc parsed-args :changes changes, :kv-args pk-map))))))
 
-;;; TODO -- why is this an around method? All it does is make things confusing when there's ambiguity
-(m/defmethod pipeline/transduce-with-model :around [#_query-type :toucan.query-type/update.* #_model ::before-update]
+(m/defmethod pipeline/transduce-query [#_query-type     :toucan.query-type/update.*
+                                       #_model          ::before-update
+                                       #_resolved-query :default]
   "Apply [[toucan2.tools.before-update/before-update]] to matching rows. If multiple versions of `:changes` are produced
   as a result, recursively does an update for each version."
-  [rf query-type model {::keys [doing-before-update?], :keys [changes], :as parsed-args}]
+  [rf query-type model {::keys [doing-before-update?], :keys [changes], :as parsed-args} resolved-query]
   (cond
     doing-before-update?
-    (next-method rf query-type model parsed-args)
+    (next-method rf query-type model parsed-args resolved-query)
 
     (empty? changes)
-    (next-method rf query-type model parsed-args)
+    (next-method rf query-type model parsed-args resolved-query)
 
     :else
-    (let [new-args-maps (apply-before-update-to-matching-rows model (assoc parsed-args ::doing-before-update? true))]
+    (let [new-args-maps (apply-before-update-to-matching-rows model
+                                                              (assoc parsed-args ::doing-before-update? true)
+                                                              resolved-query)]
       (log/debugf :execute "Doing recursive updates with new args maps %s" new-args-maps)
       (conn/with-transaction [_conn nil {:nested-transaction-rule :ignore}]
         (transduce
          (comp (map (fn [args-map]
-                      (next-method rf query-type model args-map)))
+                      (next-method rf query-type model args-map resolved-query)))
                (if (isa? query-type :toucan.result-type/pks)
                  cat
                  identity))
@@ -129,3 +133,9 @@
                :bindings (s/spec (s/cat :instance :clojure.core.specs.alpha/binding-form))
                :body     (s/+ any?))
   :ret any?)
+
+;;; `::before-update` should intercept the query before `after-update` tries to upgrade the query for results
+;;; transforms.
+(m/prefer-method! #'pipeline/transduce-query
+                  [:toucan.query-type/update.* ::before-update :default]
+                  [:toucan2.tools.after/query-type :toucan2.tools.after/model :default])

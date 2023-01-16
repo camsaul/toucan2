@@ -16,6 +16,7 @@
    [toucan2.tools.before-update :as before-update]
    [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.identity-query :as identity-query]
+   [toucan2.tools.named-query :as named-query]
    [toucan2.tools.transformed :as transformed]
    [toucan2.update :as update])
   (:import
@@ -226,6 +227,9 @@
               :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
              (select/select-one ::venues.category-keyword 1))))))
 
+(named-query/define-named-query ::insert.named-rows
+  {:rows [{:name "Hi-Dive", :category :bar}]})
+
 (deftest ^:synchronized insert!-test
   (doseq [insert! [#'insert/insert!
                    #'insert/insert-returning-pks!
@@ -234,7 +238,8 @@
       (doseq [[args-description args] {"single map row"        [{:name "Hi-Dive", :category :bar}]
                                        "multiple map rows"     [[{:name "Hi-Dive", :category :bar}]]
                                        "kv args"               [:name "Hi-Dive", :category :bar]
-                                       "columns + vector rows" [[:name :category] [["Hi-Dive" :bar]]]}]
+                                       "columns + vector rows" [[:name :category] [["Hi-Dive" :bar]]]
+                                       "named rows"            [::insert.named-rows]}]
         (testing (str args-description \newline (pr-str (list* insert! ::venues.category-keyword args)))
           (test/with-discarded-table-changes :venues
             (is (= (condp = insert!
@@ -267,9 +272,10 @@
 (deftest ^:synchronized transform-insert-returning-results-without-select-test
   (testing "insert-returning-instances results should be transformed if they come directly from the DB (not via select)"
     (test/with-discarded-table-changes :venues
-      (binding [pipeline/*build*             (fn [_query-type _model parsed-args _resolved-query]
-                                               parsed-args)
-                pipeline/*compile*           (fn [_query-type _model built-query]
+      (binding [pipeline/*build*             (fn [_query-type _model parsed-args resolved-query]
+                                               (merge-with concat parsed-args resolved-query))
+                pipeline/*compile*           (fn [_query-type _model {:keys [rows], :as built-query}]
+                                               {:pre [(seq rows)]}
                                                built-query)
                 pipeline/*transduce-execute* (fn [rf _query-type _model {:keys [rows], :as _compiled-query}]
                                                {:pre [(seq rows)]}
@@ -278,10 +284,11 @@
                                                                            rows)))]
         (is (= (instance/instance ::venues.category-keyword
                                   {:name "BevLess", :category :bar})
-               (pipeline/transduce-with-model
+               (pipeline/transduce-query
                 (completing conj first)
                 :toucan.query-type/insert.instances
                 ::venues.category-keyword
+                {}
                 {:rows [{:name "BevLess", :category :bar}]}))))
       (testing "sanity check: should not have inserted a row."
         (is (= 3

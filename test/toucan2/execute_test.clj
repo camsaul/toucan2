@@ -165,9 +165,9 @@
   (is (= [{:a 1} {:a 2} {:a 3}]
          (execute/query ::connectable.not-even-jdbc [{:key :a}]))))
 
-(m/defmethod pipeline/transduce-with-model [:default ::model.not-even-jdbc]
-  [rf query-type model {:keys [queryable], :as _parsed-args}]
-  (pipeline/transduce-execute rf query-type model queryable))
+(m/defmethod pipeline/transduce-query [:default ::model.not-even-jdbc :default]
+  [rf query-type model _parsed-args resolved-query]
+  (pipeline/transduce-execute rf query-type model resolved-query))
 
 ;;; here's how you can have custom compilation behavior. At this point in time it requires specifying a model as well
 ;;; since connection isn't realized until after the query compilation stage.

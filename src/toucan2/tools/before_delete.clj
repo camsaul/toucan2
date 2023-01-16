@@ -6,12 +6,17 @@
    [toucan2.log :as log]
    [toucan2.pipeline :as pipeline]
    [toucan2.realize :as realize]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
+(comment types/keep-me)
+
 (m/defmulti before-delete
-  {:arglists '([model instance])}
+  {:arglists            '([model₁ instance])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 (m/defmethod before-delete :around :default
@@ -19,22 +24,29 @@
   (log/tracef :compile "Do before-delete for %s %s" model instance)
   (next-method model instance))
 
-(m/defmethod pipeline/transduce-with-model :before [#_query-type :toucan.query-type/delete.*
-                                                    #_model      ::before-delete]
-  [_rf _query-type model parsed-args]
+(defn- do-before-delete-for-matching-rows!
+  "Select and transduce the matching rows and run their [[before-delete]] methods."
+  [model parsed-args resolved-query]
+  (pipeline/transduce-query
+   ((map (fn [row]
+           ;; this is another case where we don't NEED to fully realize the rows but it's a big hassle for people
+           ;; to use this if we don't. Let's be nice and realize things for people.
+           (before-delete model (realize/realize row))))
+    (constantly nil))
+   :toucan.query-type/select.instances
+   model
+   parsed-args
+   resolved-query))
+
+(m/defmethod pipeline/transduce-query [#_query-type     :toucan.query-type/delete.*
+                                       #_model          ::before-delete
+                                       #_resolved-query :default]
+  "Do a recursive SELECT query with the args passed to `delete!`; apply [[before-delete]] to all matching rows. Then call
+  the `next-method`. This is all done inside of a transaction."
+  [rf query-type model parsed-args resolved-query]
   (conn/with-transaction [_conn nil {:nested-transaction-rule :ignore}]
-    ;; select and transduce the matching rows and run their [[before-delete]] methods
-    (pipeline/transduce-with-model
-     ((map (fn [row]
-             ;; this is another case where we don't NEED to fully realize the rows but it's a big hassle for people
-             ;; to use this if we don't. Let's be nice and realize things for people.
-             (before-delete model (realize/realize row))))
-      (constantly nil))
-     :toucan.query-type/select.instances
-     model
-     parsed-args)
-    ;; cool, now we can proceed
-    parsed-args))
+    (do-before-delete-for-matching-rows! model parsed-args resolved-query)
+    (next-method rf query-type model parsed-args resolved-query)))
 
 (defn ^:no-doc before-delete-impl [next-method model instance f]
   (let [result (or (f model instance)

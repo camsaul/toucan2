@@ -31,6 +31,7 @@
     [:= k v]))
 
 (m/defmethod query/apply-kv-arg [#_model :default #_query :toucan.map-backend/honeysql2 #_k :default]
+  "Apply key-value args to a Honey SQL 2 query map."
   [_model honeysql k v]
   (log/debugf  :compile "apply kv-arg %s %s" k v)
   (let [result (update honeysql :where (fn [existing-where]
@@ -82,6 +83,7 @@
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.*
                              #_model      :default
                              #_query      :toucan.map-backend/honeysql2]
+  "Build a Honey SQL 2 SELECT query."
   [query-type model {:keys [columns], :as parsed-args} resolved-query]
   (log/debugf :compile "Building SELECT query for %s with columns %s" model columns)
   (let [parsed-args    (dissoc parsed-args :columns)
@@ -115,6 +117,7 @@
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/insert.*
                              #_model      :default
                              #_query      :toucan.map-backend/honeysql2]
+  "Build a Honey SQL 2 INSERT query."
   [query-type model parsed-args resolved-query]
   (log/debugf :compile "Building INSERT query for %s" model)
   (let [rows        (some (comp not-empty :rows) [parsed-args resolved-query])
@@ -137,6 +140,7 @@
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/update.*
                              #_model      :default
                              #_query      :toucan.map-backend/honeysql2]
+  "Build a Honey SQL 2 UPDATE query."
   [query-type model {:keys [kv-args changes], :as parsed-args} conditions-map]
   (log/debugf :compile "Building UPDATE query for %s" model)
   (let [parsed-args (assoc parsed-args :kv-args (merge kv-args conditions-map))
@@ -162,6 +166,7 @@
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/delete.*
                              #_model      :default
                              #_query      :toucan.map-backend/honeysql2]
+  "Build a Honey SQL 2 DELETE query."
   [query-type model parsed-args resolved-query]
   (log/debugf :compile "Building DELETE query for %s" model)
   (let [built-query (-> (merge {:delete-from (table-and-alias model)}

@@ -7,9 +7,9 @@
 
 (set! *warn-on-reflection* true)
 
-(m/defmethod pipeline/transduce-with-model [:default ::system-properties]
-  [rf _query-type _model {:keys [queryable kv-args]}]
-  (let [ks (into (if (keyword? queryable) [queryable] [])
+(m/defmethod pipeline/transduce-query [:default ::system-properties :default]
+  [rf _query-type _model {:keys [kv-args]} resolved-query]
+  (let [ks (into (if (keyword? resolved-query) [resolved-query] [])
                  (mapcat identity)
                  kv-args)]
     (assert (sequential? ks))

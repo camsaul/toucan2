@@ -61,9 +61,11 @@
   [_query-type _model _parsed-args resolved-query]
   resolved-query)
 
-(m/defmethod pipeline/transduce-with-model [#_query-type :default #_model IdentityQuery]
+(m/defmethod pipeline/transduce-query [#_query-type     :default
+                                       #_model          IdentityQuery
+                                       #_resolved-query :default]
   "Allow using an identity query as an 'identity model'."
-  [rf _query-type model _parsed-args]
+  [rf _query-type model _parsed-args _resolved-query]
   (transduce identity rf model))
 
 

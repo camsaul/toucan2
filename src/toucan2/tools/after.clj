@@ -75,16 +75,22 @@
             (pks-fn row)))
      rf)))
 
-(m/defmethod pipeline/transduce-with-model [#_query-type ::query-type #_model ::model]
-  [rf query-type model parsed-args]
+(derive ::query-type :toucan.query-type/abstract)
+
+(m/defmethod pipeline/transduce-query [#_query-type     ::query-type
+                                       #_model          ::model
+                                       #_resolved-query :default]
+  "'Upgrade' a query so that it returns instances, and run the upgraded query so that we can apply [[each-row-fn]] to the
+  results. Then apply [[result-type-rf]] to the results of the original expected type are ultimately returned."
+  [rf query-type model parsed-args resolved-query]
   (cond
     ;; only "upgrade" the query if there's an applicable [[each-row-fn]] to apply.
     (m/is-default-primary-method? each-row-fn [query-type model])
-    (next-method rf query-type model parsed-args)
+    (next-method rf query-type model parsed-args resolved-query)
 
     ;; there's no need to "upgrade" the query if it's already returning instances.
     (isa? query-type :toucan.result-type/instances)
-    (next-method rf query-type model parsed-args)
+    (next-method rf query-type model parsed-args resolved-query)
 
     ;; otherwise we need to run an upgraded query but then transform the results back to the originals
     ;; with [[result-type-rf]]
@@ -93,7 +99,7 @@
           _             (assert upgraded-type (format "Don't know how to upgrade a %s query to one returning instances"
                                                       query-type))
           rf*           (result-type-rf query-type model rf)]
-      (pipeline/transduce-with-model rf* upgraded-type model parsed-args))))
+      (pipeline/transduce-query rf* upgraded-type model parsed-args resolved-query))))
 
 (defn ^:no-doc ^{:style/indent [:form]} define-after-impl
   [next-method query-type model row-fn]
