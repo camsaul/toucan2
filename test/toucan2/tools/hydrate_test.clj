@@ -71,7 +71,8 @@
 
 (defn- remove-venues-timestamps [rows]
   (for [result rows]
-    (update result ::venue #(dissoc % :updated-at :created-at))))
+    (cond-> result
+      (::venue result) (update ::venue #(dissoc % :updated-at :created-at)))))
 
 (deftest ^:parallel automagic-hydration-test
   (is (= [{:venue-id 1
@@ -80,13 +81,15 @@
            ::venue   {:category :bar, :name "Ho's Tavern", :id 2}}]
          (remove-venues-timestamps
           (hydrate/hydrate [{:venue-id 1} {:venue-id 2}] ::venue))))
-  (testing "nil FKs"
+  (testing "nil or non-existent FKs"
     (is (= [{:venue-id nil
              ::venue   nil}
             {:venue-id nil
+             ::venue   nil}
+            {:venue-id 1000
              ::venue   nil}]
            (remove-venues-timestamps
-            (hydrate/hydrate [{:venue-id nil} {:venue-id nil}] ::venue)))))
+            (hydrate/hydrate [{:venue-id nil} {:venue-id nil} {:venue-id 1000}] ::venue)))))
   (testing "Alternative fk-keys-for-automagic-hydration impl"
     (is (= [{:venue_id nil
              ::venue   nil}
@@ -384,8 +387,12 @@
                          {:id         2
                           :name       "Sam"
                           :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")})}
-          {:person-id 3, :person-name "Bird"}
-          {:persion-id nil, :person-name "Pam"}]
+          {:person-id   3
+           :person-name "Bird"
+           ::people     nil}
+          {:persion-id  nil
+           :person-name "Pam"
+           ::people     nil}]
          (hydrate/hydrate [(instance/instance nil {:person-id 1, :person-name "Cam"})
                            {:person-id 2, :person-name "Sam"}
                            {:person-id 3, :person-name "Bird"}
@@ -411,7 +418,7 @@
                  {:person-id nil, :person-name nil}]]
         (testing (format "source map = %s" (pr-str m))
           (execute/with-call-count [call-count]
-            (is (= m
+            (is (= (assoc m ::people nil)
                    (hydrate/hydrate (instance/instance nil m)
                                     ::people)))
             (is (= 0
@@ -457,8 +464,8 @@
         (is (= false
                (:good-bird? bad-bird)))
         (is (contains? bad-birds (::birb bad-bird))))
-      (testing "don't hydrate nil keys"
-        (is (= {:good-bird? nil}
+      (testing "DO hydrate nil keys"
+        (is (= {:good-bird? nil, ::birb nil}
                no-bird))))))
 
 (deftest ^:parallel unnest-first-result-test

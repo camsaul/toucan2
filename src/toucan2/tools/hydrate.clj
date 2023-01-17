@@ -332,7 +332,7 @@
   (log/debugf :hydrate "Attempting to hydrate %s rows out of %s" (count (filter ::fk rows)) (count rows))
   (for [row rows]
     (if-not (::fk row)
-      row
+      (assoc row dest-key nil)
       (let [fk-vals          (::fk row)
             ;; convert fk to from [id] to id if it only has one key. This is what `select-pk->fn` returns.
             fk-vals          (if (= (count fk-vals) 1)
@@ -341,8 +341,8 @@
             fetched-instance (get pk->fetched-instance fk-vals)]
         (log/tracef :hydrate "Hydrate %s %s with %s" dest-key [row] (or fetched-instance
                                                                         "nil (no matching fetched row)"))
-        (cond-> (dissoc row ::fk)
-          fetched-instance (assoc dest-key fetched-instance))))))
+        (-> (dissoc row ::fk)
+            (assoc dest-key fetched-instance))))))
 
 (m/defmethod hydrate-with-strategy ::automagic-batched
   [model _strategy dest-key rows]
