@@ -11,6 +11,7 @@
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.after-select :as after-select]
+   [toucan2.tools.default-fields :as default-fields]
    [toucan2.tools.hydrate :as hydrate]
    [toucan2.tools.transformed :as transformed])
   (:import
@@ -60,14 +61,14 @@
 
 (m/defmethod hydrate/fk-keys-for-automagic-hydration [#_original-model ::hydrate-venue-with-people
                                                       #_dest-key       :default
-                                                      #_hydrated-model :default]
-  [_original-model _dest-key _hydrated-model]
+                                                      #_hydrating-model :default]
+  [_original-model _dest-key _hydrating-model]
   [:venue-id])
 
 (m/defmethod hydrate/fk-keys-for-automagic-hydration [#_original-model ::venue_id
                                                       #_dest-key       :default
-                                                      #_hydrated-model :default]
-  [_original-model _dest-key _hydrated-model]
+                                                      #_hydrating-model :default]
+  [_original-model _dest-key _hydrating-model]
   [:venue_id])
 
 (defn- remove-venues-timestamps [rows]
@@ -403,7 +404,7 @@
   ::people.composite-pk)
 
 (m/defmethod hydrate/fk-keys-for-automagic-hydration [:default ::people :default]
-  [_original-model _dest-key _hydrated-model]
+  [_original-model _dest-key _hydrating-model]
   [:person-id :person-name])
 
 (deftest ^:parallel automagic-batched-hydration-composite-pks-test
@@ -469,38 +470,38 @@
   ::birds.boolean-pk)
 
 (m/defmethod hydrate/fk-keys-for-automagic-hydration [:default ::birb ::birds.boolean-pk]
-  [_original-model _dest-key _hydrated-model]
+  [_original-model _dest-key _hydrating-model]
   [:good-bird?])
 
 (deftest ^:parallel automagic-batched-hydration-truthiness-test
-  (testing "Make sure automagic batched hydration compares things with some? (should work with false values)")
-  (conn/with-connection [_conn ::test/db]
-    (let [results                      [{:good-bird? true}
-                                        {:good-bird? false}
-                                        {:good-bird? nil}]
-          ;; which bird we get back is indeterminate since there are multiple matching birds; we will consider any of
-          ;; them to be the right answer.
-          good-birds                   #{{:id 1, :name "Reggae", :bird-type "toucan", :good-bird true}
-                                         {:id 2, :name "Lucky", :bird-type "pigeon", :good-bird true}
-                                         {:id 3, :name "Parroty", :bird-type "parakeet", :good-bird true}}
-          bad-birds                    #{{:id 4, :name "Green Friend", :bird-type "parakeet", :good-bird false}
-                                         {:id 5, :name "Parrot Hilton", :bird-type "parakeet", :good-bird false}}
-          [good-bird bad-bird no-bird] (hydrate/hydrate results ::birb)]
-      (testing "good bird"
-        (is (= #{:good-bird? ::birb}
-               (set (keys good-bird))))
-        (is (= true
-               (:good-bird? good-bird)))
-        (is (contains? good-birds (::birb good-bird))))
-      (testing "bad bird"
-        (is (= #{:good-bird? ::birb}
-               (set (keys bad-bird))))
-        (is (= false
-               (:good-bird? bad-bird)))
-        (is (contains? bad-birds (::birb bad-bird))))
-      (testing "DO hydrate nil keys"
-        (is (= {:good-bird? nil, ::birb nil}
-               no-bird))))))
+  (testing "Make sure automagic batched hydration compares things with some? (should work with false values)"
+    (conn/with-connection [_conn ::test/db]
+      (let [results                      [{:good-bird? true}
+                                          {:good-bird? false}
+                                          {:good-bird? nil}]
+            ;; which bird we get back is indeterminate since there are multiple matching birds; we will consider any of
+            ;; them to be the right answer.
+            good-birds                   #{{:id 1, :name "Reggae", :bird-type "toucan", :good-bird true}
+                                           {:id 2, :name "Lucky", :bird-type "pigeon", :good-bird true}
+                                           {:id 3, :name "Parroty", :bird-type "parakeet", :good-bird true}}
+            bad-birds                    #{{:id 4, :name "Green Friend", :bird-type "parakeet", :good-bird false}
+                                           {:id 5, :name "Parrot Hilton", :bird-type "parakeet", :good-bird false}}
+            [good-bird bad-bird no-bird] (hydrate/hydrate results ::birb)]
+        (testing "good bird"
+          (is (= #{:good-bird? ::birb}
+                 (set (keys good-bird))))
+          (is (= true
+                 (:good-bird? good-bird)))
+          (is (contains? good-birds (::birb good-bird))))
+        (testing "bad bird"
+          (is (= #{:good-bird? ::birb}
+                 (set (keys bad-bird))))
+          (is (= false
+                 (:good-bird? bad-bird)))
+          (is (contains? bad-birds (::birb bad-bird))))
+        (testing "DO hydrate nil keys"
+          (is (= {:good-bird? nil, ::birb nil}
+                 no-bird)))))))
 
 (deftest ^:parallel unnest-first-result-test
   (are [coll expected] (= expected
@@ -668,3 +669,53 @@
             (let [instance (instance/instance ::venues k v)]
               (is (= instance
                      (hydrate/hydrate instance k))))))))))
+
+(m/defmethod hydrate/simple-hydrate [#_model ::venues #_k ::needs-hydration-test.simple]
+  [_model k instance]
+  (assoc instance k 200))
+
+(m/defmethod hydrate/needs-hydration? [#_model ::venues #_k ::needs-hydration-test.simple]
+  [_model _k _instance]
+  true)
+
+(m/defmethod hydrate/batched-hydrate [#_model ::venues #_k ::needs-hydration-test.batched]
+  [_model k instances]
+  (for [instance instances]
+    (assoc instance k 200)))
+
+(m/defmethod hydrate/needs-hydration? [#_model ::venues #_k ::needs-hydration-test.batched]
+  [_model _k _instance]
+  true)
+
+(derive ::people.default-fields ::people)
+
+(default-fields/define-default-fields ::people.default-fields
+  [:id :name])
+
+(m/defmethod hydrate/model-for-automagic-hydration [#_model ::venues #_k ::needs-hydration-test.automagic-batched]
+  [_original-model _k]
+  ::people.default-fields)
+
+(m/defmethod hydrate/fk-keys-for-automagic-hydration [#_original-model  ::venues
+                                                      #_dest-key        ::needs-hydration-test.automagic-batched
+                                                      #_hydrating-model ::people.default-fields]
+  [_original-model _dest-key _hydrating-model]
+  [:person-id])
+
+(m/defmethod hydrate/needs-hydration? [#_model ::venues #_k ::needs-hydration-test.automagic-batched]
+  [_model _k _instance]
+  true)
+
+(deftest ^:parallel needs-hydration-test
+  (testing "Should be possible to force re-hydration by implementing `needs-hydration?`"
+    (doseq [k [::needs-hydration-test.simple
+               ::needs-hydration-test.batched]]
+      (testing (name k)
+        (is (= (instance/instance ::venues k 200)
+               (-> (instance/instance ::venues k 100)
+                   (hydrate/hydrate k))))))
+    (testing "automagic batched"
+      (let [k ::needs-hydration-test.automagic-batched]
+        (is (= (instance/instance ::venues :person-id 1, k {:id 1, :name "Cam"})
+               (-> (instance/instance ::venues :person-id 1, k 100)
+                   (hydrate/hydrate k))))))))
