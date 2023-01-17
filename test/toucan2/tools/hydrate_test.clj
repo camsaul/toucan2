@@ -63,6 +63,12 @@
   [_original-model _dest-key _hydrated-model]
   [:venue-id])
 
+(m/defmethod hydrate/fk-keys-for-automagic-hydration [#_original-model ::venue_id
+                                                      #_dest-key       :default
+                                                      #_hydrated-model :default]
+  [_original-model _dest-key _hydrated-model]
+  [:venue_id])
+
 (defn- remove-venues-timestamps [rows]
   (for [result rows]
     (update result ::venue #(dissoc % :updated-at :created-at))))
@@ -73,7 +79,26 @@
           {:venue-id 2
            ::venue   {:category :bar, :name "Ho's Tavern", :id 2}}]
          (remove-venues-timestamps
-          (hydrate/hydrate [{:venue-id 1} {:venue-id 2}] ::venue)))))
+          (hydrate/hydrate [{:venue-id 1} {:venue-id 2}] ::venue))))
+  (testing "nil FKs"
+    (is (= [{:venue-id nil
+             ::venue   nil}
+            {:venue-id nil
+             ::venue   nil}]
+           (remove-venues-timestamps
+            (hydrate/hydrate [{:venue-id nil} {:venue-id nil}] ::venue)))))
+  (testing "Alternative fk-keys-for-automagic-hydration impl"
+    (is (= [{:venue_id nil
+             ::venue   nil}
+            {:venue_id 2
+             ::venue   {:category :bar, :name "Ho's Tavern", :id 2}}
+            {:venue_id 1000
+             ::venue   nil}]
+           (remove-venues-timestamps
+            (hydrate/hydrate [(instance/instance ::venue_id {:venue_id nil})
+                              (instance/instance ::venue_id {:venue_id 2})
+                              (instance/instance ::venue_id {:venue_id 1000})]
+                             ::venue))))))
 
 (deftest ^:parallel automagic-hydration-dispatch-on-model-test
   (testing "dispatch off of model -- hydrate different Tables for different instances"

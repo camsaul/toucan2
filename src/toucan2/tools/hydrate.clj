@@ -109,22 +109,57 @@
   ```"
   (:require
    [camel-snake-kebab.core :as csk]
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
 (swap! log/all-topics conj :hydrate)
+
+(derive ::automagic-batched   ::strategy)
+(derive ::multimethod-batched ::strategy)
+(derive ::multimethod-simple  ::strategy)
+
+(s/def ::dispatch-value.strategy
+  (s/or
+   :default  ::types/dispatch-value.default
+   :strategy #(isa? % ::strategy)))
+
+(s/def ::dispatch-value.hydration-key
+  (some-fn keyword? symbol?))
+
+(s/def ::dispatch-value.model-k
+  (s/or :default ::types/dispatch-value.default
+        :model-k (s/cat
+                  :model ::types/dispatch-value.model
+                  :k     ::dispatch-value.hydration-key)))
+
+(s/def ::dispatch-value.model-k-model
+  (s/or :default ::types/dispatch-value.default
+        :model-k (s/cat
+                  :model ::types/dispatch-value.model
+                  :k     ::dispatch-value.hydration-key
+                  :model ::types/dispatch-value.model)))
+
+(s/def ::dispatch-value.model-strategy-k
+  (s/or :default          ::types/dispatch-value.default
+        :model-strategy-k (s/cat :model    ::types/dispatch-value.model
+                                 :strategy ::dispatch-value.strategy
+                                 :k        ::dispatch-value.hydration-key)))
 
 (m/defmulti can-hydrate-with-strategy?
   "Can we hydrate the key `k` in instances of `model` using a specific hydration `strategy`?
 
   Normally you should never need to call this yourself. The only reason you would implement it is if you are
   implementing a custom hydration strategy."
-  {:arglists '([model₁ strategy₂ k₃])}
+  {:arglists            '([model₁ strategy₂ k₃])
+   :defmethod-arities   #{3}
+   :dispatch-value-spec (s/nonconforming ::dispatch-value.model-strategy-k)}
   u/dispatch-on-first-three-args)
 
 (m/defmulti hydrate-with-strategy
@@ -132,7 +167,9 @@
 
   Normally you should not call this yourself. The only reason you would implement this method is if you are implementing
   a custom hydration strategy."
-  {:arglists '([model strategy₁ k instances])}
+  {:arglists '([model strategy₁ k instances])
+   :defmethod-arities #{4}
+   :dispatch-value-spec (s/nonconforming ::dispatch-value.strategy)}
   (fn [_model strategy _k _instances]
     strategy))
 
@@ -182,7 +219,9 @@
 
   You probably don't want to write an implementation for `[<some-model> :default]` or `[:default :default]`, unless you
   want every key that we attempt to hydrate to be hydrated by that method."
-  {:arglists '([original-model₁ k₂])}
+  {:arglists            '([original-model₁ k₂])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec (s/nonconforming ::dispatch-value.model-k)}
   u/dispatch-on-first-two-args)
 
 (m/defmethod model-for-automagic-hydration :default
@@ -233,7 +272,9 @@
     [_original-model _dest-key _hydrated-model]
     [:creator-id])
   ```"
-  {:arglists '([original-model₁ dest-key₂ hydrated-model₃])}
+  {:arglists            '([original-model₁ dest-key₂ hydrated-model₃])
+   :defmethod-arities   #{3}
+   :dispatch-value-spec (s/nonconforming ::dispatch-value.model-k-model)}
   u/dispatch-on-first-three-args)
 
 (m/defmethod fk-keys-for-automagic-hydration :default
@@ -341,7 +382,9 @@
   than doing one call per row. If you just want to hydrate each row independently, implement [[simple-hydrate]] instead.
   If you are hydrating entire instances of some other model, consider setting up automagic batched hydration
   using [[model-for-automagic-hydration]] and possibly [[fk-keys-for-automagic-hydration]]."
-  {:arglists '([model₁ k₂ instances])}
+  {:arglists            '([model₁ k₂ instances])
+   :defmethod-arities   #{3}
+   :dispatch-value-spec (s/nonconforming ::dispatch-value.model-k)}
   u/dispatch-on-first-two-args)
 
 (m/defmethod can-hydrate-with-strategy? [:default ::multimethod-batched :default]
@@ -359,7 +402,9 @@
 ;;; TODO -- better dox
 (m/defmulti simple-hydrate
   "Implementations should return a version of map `row` with the key `k` added."
-  {:arglists '([model₁ k₂ row])}
+  {:arglists            '([model₁ k₂ row])
+   :defmethod-arities   #{3}
+   :dispatch-value-spec (s/nonconforming ::dispatch-value.model-k)}
   u/dispatch-on-first-two-args)
 
 (m/defmethod simple-hydrate :around :default
