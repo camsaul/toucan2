@@ -1,5 +1,6 @@
 (ns toucan2.tools.hydrate-test
   (:require
+   [clojure.math.combinatorics :as math.combo]
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.connection :as conn]
@@ -350,6 +351,30 @@
     (is (= {:f [:a 100]}
            (hydrate/hydrate {:f [:a 100]} :p)))))
 
+(deftest ^:parallel merge-hydrated-instances-test
+  (doseq [[a b c d e f :as order] (take 1 (math.combo/permutations (range 1 7)))
+          :let                    [annotated-instances (map (fn [i]
+                                                              (case (long i)
+                                                                1 {:needs-hydration? false, :instance {:x 1, :y 1}}
+                                                                2 {:needs-hydration? false, :instance {:x 2, :y 2}}
+                                                                3 {:needs-hydration? true, :instance {:x 3}}
+                                                                4 {:needs-hydration? true, :instance {:x 4}}
+                                                                5 {:needs-hydration? false, :instance {:x 5, :y 5}}
+                                                                6 {:needs-hydration? true, :instance {:x 6}}))
+                                                            order)
+                                   hydrated-instances (->> order
+                                                           (filter #{3 4 6})
+                                                           (map (fn [i]
+                                                                  {:x i, :y i})))]]
+    (testing (pr-str order)
+      (is (= [{:x a, :y a}
+              {:x b, :y b}
+              {:x c, :y c}
+              {:x d, :y d}
+              {:x e, :y e}
+              {:x f, :y f}]
+             (#'hydrate/merge-hydrated-instances annotated-instances hydrated-instances))))))
+
 (m/defmethod hydrate/batched-hydrate [:default ::is-bird?]
   [_model _k rows]
   (for [row rows]
@@ -618,3 +643,28 @@
       (is (= #_#{:venues/category}
              #{:people/id :people/created-at :venues/category :people/name}
              (realized-columns))))))
+
+(m/defmethod hydrate/simple-hydrate [#_model ::venues #_k ::already-hydrated-test.simple]
+  [_model _k _instance]
+  (throw (ex-info "Oops!" {})))
+
+(m/defmethod hydrate/batched-hydrate [#_model ::venues #_k ::already-hydrated-test.batched]
+  [_model _k _instances]
+  (throw (ex-info "Oops!" {})))
+
+(deftest ^:parallel already-hydrated-test
+  (doseq [k [::already-hydrated-test.simple
+             ::already-hydrated-test.batched]]
+    (testing (str k \newline)
+      (testing "sanity check: should error if it attempts to hydrate key"
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Oops"
+             (hydrate/hydrate (instance/instance ::venues) k))))
+      (testing "Do not attempt to call hydration function if key is already hydrated"
+        ;; make sure we handle `false` -- it is not-nil but should be treated as hydrated
+        (doseq [v [:ok false]]
+          (testing (format "\nv = %s" (pr-str v))
+            (let [instance (instance/instance ::venues k v)]
+              (is (= instance
+                     (hydrate/hydrate instance k))))))))))

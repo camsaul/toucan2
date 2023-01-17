@@ -167,8 +167,8 @@
 
   Normally you should not call this yourself. The only reason you would implement this method is if you are implementing
   a custom hydration strategy."
-  {:arglists '([model strategy₁ k instances])
-   :defmethod-arities #{4}
+  {:arglists            '([model strategy₁ k instances])
+   :defmethod-arities   #{4}
    :dispatch-value-spec (s/nonconforming ::dispatch-value.strategy)}
   (fn [_model strategy _k _instances]
     strategy))
@@ -228,7 +228,7 @@
   [_model _k]
   nil)
 
-(m/defmethod can-hydrate-with-strategy? [:default ::automagic-batched :default]
+(m/defmethod can-hydrate-with-strategy? [#_model :default #_strategy ::automagic-batched #_k :default]
   [model _strategy dest-key]
   (boolean (model-for-automagic-hydration model dest-key)))
 
@@ -394,13 +394,62 @@
    :dispatch-value-spec (s/nonconforming ::dispatch-value.model-k)}
   u/dispatch-on-first-two-args)
 
-(m/defmethod can-hydrate-with-strategy? [:default ::multimethod-batched :default]
+(m/defmethod can-hydrate-with-strategy? [#_model :default #_strategy ::multimethod-batched #_k :default]
   [model _strategy k]
   (boolean (m/effective-primary-method batched-hydrate (m/dispatch-value batched-hydrate model k))))
 
+;;; The basic strategy behind batched hydration is thus:
+;;;
+;;; 1. Take the sequence of instances and "annotate" them, recording whether they `:needs-hydration?`
+;;;
+;;; 2. Take all the instances that `:needs-hydration?` and do [[batched-hydrate]] for them
+;;;
+;;; 3. Go back thru the sequence of annotated instances, and each time we encounter an instance marked
+;;;    `:needs-hydration?`, replace it with the first hydrated instance; repeat this process until we have spliced all
+;;;    the hydrated instances back in.
+
+(defn- merge-hydrated-instances
+  "Merge the annotated instances as returned by [[annotate-instances]] and the hydrated instances as returned
+  by [[hydrate-annotated-instances]] back into a single un-annotated sequence.
+
+    (merge-hydrated-instances
+     [{:needs-hydration? false, :instance {:x 1, :y 1}}
+      {:needs-hydration? false, :instance {:x 2, :y 2}}
+      {:needs-hydration? true,  :instance {:x 3}}
+      {:needs-hydration? true,  :instance {:x 4}}
+      {:needs-hydration? false, :instance {:x 5, :y 5}}
+      {:needs-hydration? true,  :instance {:x 6}}]
+     [{:x 3, :y 3} {:x 4, :y 4} {:x 6, :y 6}])
+    =>
+    [{:x 1, :y 1}
+     {:x 2, :y 2}
+     {:x 3, :y 3}
+     {:x 4, :y 4}
+     {:x 5, :y 5}
+     {:x 6, :y 6}]"
+  [annotated-instances hydrated-instances]
+  (loop [acc [], annotated-instances annotated-instances, hydrated-instances hydrated-instances]
+    (if (empty? hydrated-instances)
+      (concat acc (map :instance annotated-instances))
+      (let [[not-hydrated [_needed-hydration & more]] (split-with (complement :needs-hydration?) annotated-instances)]
+        (recur (concat acc (map :instance not-hydrated) [(first hydrated-instances)])
+               more
+               (rest hydrated-instances))))))
+
+(defn- annotate-instances [k instances]
+  (for [instance instances]
+    {:needs-hydration? (nil? (get instance k))
+     :instance         instance}))
+
+(defn- hydrate-annotated-instances [model k annotated-instances]
+  (when-let [instances-that-need-hydration (not-empty (map :instance (filter :needs-hydration? annotated-instances)))]
+    (batched-hydrate model k instances-that-need-hydration)))
+
 (m/defmethod hydrate-with-strategy ::multimethod-batched
   [model _strategy k instances]
-  (batched-hydrate model k instances))
+  (let [annotated-instances (annotate-instances k instances)
+        hydrated-instances  (hydrate-annotated-instances model k annotated-instances)]
+    (merge-hydrated-instances annotated-instances hydrated-instances)))
 
 
 ;;;                          Method-Based Simple Hydration (using impls of [[simple-hydrate]])
@@ -409,27 +458,29 @@
 ;;; TODO -- better dox
 (m/defmulti simple-hydrate
   "Implementations should return a version of map `row` with the key `k` added."
-  {:arglists            '([model₁ k₂ row])
+  {:arglists            '([model₁ k₂ instance])
    :defmethod-arities   #{3}
    :dispatch-value-spec (s/nonconforming ::dispatch-value.model-k)}
   u/dispatch-on-first-two-args)
 
-(m/defmethod simple-hydrate :around :default
-  [model k row]
-  (u/try-with-error-context ["simple hydrate" {:model model, :k k, :row row}]
-    (next-method model k row)))
+(defn- simple-hydrate* [model k instance]
+  (u/try-with-error-context ["simple hydrate" {:model model, :k k, :instance instance}]
+    (simple-hydrate model k instance)))
 
-(m/defmethod can-hydrate-with-strategy? [:default ::multimethod-simple :default]
+(m/defmethod can-hydrate-with-strategy? [#_model :default #_strategy ::multimethod-simple #_k :default]
   [model _strategy k]
   (boolean (m/effective-primary-method simple-hydrate (m/dispatch-value simple-hydrate model k))))
 
 (m/defmethod hydrate-with-strategy ::multimethod-simple
-  [model _strategy k rows]
+  [model _strategy k instances]
   ;; TODO -- consider whether we should optimize this a bit and cache the methods we use so we don't have to go thru
-  ;; multimethod dispatch on every row.
-  (for [row rows]
-    (when row
-      (simple-hydrate model k row))))
+  ;; multimethod dispatch on every instance.
+  (for [instance instances]
+    (when instance
+      ;; only hydrate the key if it's not non-nil.
+      (cond->> instance
+        (nil? (get instance k))
+        (simple-hydrate* model k)))))
 
 
 ;;;                                           Hydration Using All Strategies
