@@ -42,7 +42,7 @@ See [`toucan2-toucan1` docs](toucan1/README.md) for more information.
 
 ## License
 
-Code, documentation, and artwork copyright © 2017-2022 [Cam Saul](https://camsaul.com).
+Code, documentation, and artwork copyright © 2017-2023 [Cam Saul](https://camsaul.com).
 
 Distributed under the [Eclipse Public License](https://raw.githubusercontent.com/camsaul/toucan2/master/LICENSE),
 same as Clojure.

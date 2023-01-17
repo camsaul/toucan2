@@ -101,6 +101,15 @@
             (hydrate/hydrate [(instance/instance ::venue_id {:venue_id nil})
                               (instance/instance ::venue_id {:venue_id 2})
                               (instance/instance ::venue_id {:venue_id 1000})]
+                             ::venue)))))
+  (testing "Do not stomp on already-hydrated keys"
+    (is (= [{:venue-id 1
+             ::venue   {:name "My Venue"}}
+            {:venue-id 1000
+             ::venue   {:name "Another Venue"}}]
+           (remove-venues-timestamps
+            (hydrate/hydrate [{:venue-id 1, ::venue {:name "My Venue"}}
+                              {:venue-id 1000, ::venue {:name "Another Venue"}}]
                              ::venue))))))
 
 (deftest ^:parallel automagic-hydration-dispatch-on-model-test

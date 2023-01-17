@@ -331,8 +331,15 @@
 (defn- do-automagic-batched-hydration [dest-key rows pk->fetched-instance]
   (log/debugf :hydrate "Attempting to hydrate %s rows out of %s" (count (filter ::fk rows)) (count rows))
   (for [row rows]
-    (if-not (::fk row)
+    (cond
+      ;; don't stomp on already-hydrated values in row
+      (some? (get row dest-key))
+      row
+
+      (not (::fk row))
       (assoc row dest-key nil)
+
+      :else
       (let [fk-vals          (::fk row)
             ;; convert fk to from [id] to id if it only has one key. This is what `select-pk->fn` returns.
             fk-vals          (if (= (count fk-vals) 1)
