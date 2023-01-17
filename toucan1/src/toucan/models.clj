@@ -226,7 +226,7 @@
   "DEPRECATED: Toucan 2 does not currently have a transforms registry like Toucan 2 did. Define your transforms with `def`
   and use them directly in a [[toucan2.tools.transformed/deftransforms]]."
   [k & {:keys [in out]}]
-  {:pre [(fn? in) (fn? out)]}
+  {:pre [(ifn? in) (ifn? out)]}
   (m/defmethod type-fn [k :in]  [_k _direction] in)
   (m/defmethod type-fn [k :out] [_k _direction] out)
   nil)
