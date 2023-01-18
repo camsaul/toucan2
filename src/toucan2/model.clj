@@ -1,22 +1,39 @@
 (ns toucan2.model
+  "Methods related to resolving Toucan 2 models, appropriate table names to use when building queries for them, and
+  namespaces to use for columns in query results."
   (:refer-clojure :exclude [namespace])
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.log :as log]
    [toucan2.protocols :as protocols]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
+(comment s/keep-me
+         types/keep-me)
+
 (m/defmulti resolve-model
+  "Resolve a *modelable* to an actual Toucan *model* (usually a keyword). A modelable is anything that can be resolved to
+  a model via this method. You can implement this method to define special model resolution behavior, for example
+  `toucan2-toucan1` defines a method for `clojure.lang.Symbol` that does namespace resolution to return an appropriate
+  model keyword.
+
+  You can also implement this method to do define behaviors when a model is used, for example making sure some namespace
+  with method implementation for the model is loaded, logging some information, etc."
   {:arglists '([modelable₁]), :defmethod-arities #{1}}
   u/dispatch-on-first-arg)
 
 (m/defmethod resolve-model :default
+  "Default implementation. Return `modelable` as is, i.e., there is nothing to resolve, and we can use it directly as a
+  model."
   [modelable]
   modelable)
 
 (m/defmethod resolve-model :around :default
+  "Log model resolution as it happens for debugging purposes."
   [modelable]
   (let [model (next-method modelable)]
     (log/debugf :compile "Resolved modelable %s => model %s" modelable model)
@@ -36,18 +53,34 @@
   nil)
 
 (m/defmulti table-name
-  {:arglists '([model₁]), :defmethod-arities #{1}}
+  "Return the actual underlying table name that should be used to query a `model`.
+
+  By default for things that implement `name`, the table name is just `(keyword (name x))`.
+
+  ```clj
+  (t2/table-name :models/user)
+  ;; =>
+  :user
+  ```
+
+  You can write your own implementations for this for models whose table names do not match their `name`.
+
+  This is guaranteed to return a keyword, so it can easily be used directly in Honey SQL queries and the like; if you
+  return something else, the default `:after` method will convert it to a keyword for you."
+  {:arglists            '([model₁])
+   :defmethod-arities   #{1}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 (m/defmethod table-name :default
+  "Fallback implementation. Redirects keywords to the implementation for `clojure.lang.Named` (use the `name` of the
+  keyword). For everything else, throws an error, since we don't know how to get a table name from it."
   [model]
   (if (instance? clojure.lang.Named model)
     ((m/effective-method table-name clojure.lang.Named) model)
     (throw (ex-info (format "Invalid model %s: don't know how to get its table name." (pr-str model))
                     {:model model}))))
 
-;;; FIXME -- Kondo shouldn't warn about this.
-#_{:clj-kondo/ignore [:redundant-fn-wrapper]}
 (m/defmethod table-name :after :default
   "Always return table names as keywords. This will facilitate using them directly inside Honey SQL, e.g.
 
@@ -55,12 +88,18 @@
   [a-table-name]
   (keyword a-table-name))
 
-#_{:clj-kondo/ignore [:redundant-fn-wrapper]} ; FIXME
 (m/defmethod table-name clojure.lang.Named
+  "Default implementation for anything that is a `clojure.lang.Named`, such as a keywords or symbols. Use the `name` as
+  the table name.
+
+  ```clj
+  (t2/table-name :models/user) => :user
+  ```"
   [model]
   (name model))
 
 (m/defmethod table-name String
+  "Implementation for strings. Use the string name as-is."
   [table]
   table)
 
@@ -81,8 +120,9 @@
   {:arglists '([model₁]), :defmethod-arities #{1}}
   u/dispatch-on-first-arg)
 
-;;; if the PK comes back unwrapped, wrap it.
 (m/defmethod primary-keys :around :default
+  "If the PK comes back unwrapped, wrap it -- make sure results are always returned as a vector of keywords. Throw an
+  error if results are in the incorrect format."
   [model]
   (let [pk-or-pks (next-method model)
         pks       (if (sequential? pk-or-pks)
@@ -120,10 +160,12 @@
 (m/defmulti model->namespace
   "Return a map of namespaces to use when fetching results with this model.
 
-    (m/defmethod model->namespace ::my-model
-      [_model]
-      {::my-model      \"x\"
-       ::another-model \"y\"})"
+  ```clj
+  (m/defmethod model->namespace ::my-model
+    [_model]
+    {::my-model      \"x\"
+     ::another-model \"y\"})
+  ```"
   {:arglists '([model₁])}
   u/dispatch-on-first-arg)
 
@@ -133,6 +175,7 @@
   nil)
 
 (m/defmethod model->namespace :after :default
+  "Validate the results."
   [namespace-map]
   (when (some? namespace-map)
     (assert (map? namespace-map)
@@ -141,7 +184,11 @@
                     (pr-str namespace-map))))
   namespace-map)
 
-(defn table-name->namespace [model]
+(defn table-name->namespace
+  "Take the [[model->namespace]] map for a model and return a map of string table name -> namespace. This is used to
+  determine how to prefix columns in results based on their table name;
+  see [[toucan2.jdbc.result-set/instance-builder-fn]] for an example of this usage."
+  [model]
   (not-empty
    (into {}
          (comp (filter (fn [[model _a-namespace]]
@@ -151,7 +198,10 @@
                       [(name (table-name model)) a-namespace])))
          (model->namespace model))))
 
-(defn namespace [model]
+(defn namespace
+  "Get the namespace that should be used to prefix keys associated with a `model` in query results. This is taken from the
+  model's implementation of [[model->namespace]]."
+  [model]
   (some
    (fn [[a-model a-namespace]]
      (when (isa? model a-model)
@@ -159,6 +209,8 @@
    (model->namespace model)))
 
 (m/defmethod primary-keys :default
+  "By default the primary key for a model is the column `:id`; or `:some-namespace/id` if the model defines a namespace
+  for itself with [[model->namespace]]."
   [model]
   (if-let [model-namespace (namespace model)]
     [(keyword (name model-namespace) "id")]

@@ -1,4 +1,16 @@
 (ns toucan2.instance
+  "Toucan 2 instances are a custom map type that does two things regular maps do not do:
+
+  1. They are associated with a particular model; [[toucan2.protocols/model]] can be used to get it. This is usually set
+     when the instance comes out of that database.
+
+  2. They track their [[toucan2.protocols/original]] version when they come out of the application database. This can in
+     turn be used to calculate the [[toucan2.protocols/changes]] that have been made, which powers features
+     like [[toucan2.save/save!]].
+
+  Normally a Toucan instance is considered equal to a plain map with the same
+  current (via [[toucan2.protocols/current]]) value. It is considered equal to other instances if they have the same
+  current value and their model is the same."
   (:refer-clojure :exclude [instance?])
   (:require
    [potemkin :as p]
@@ -8,7 +20,10 @@
 
 (set! *warn-on-reflection* true)
 
-(def ^:dynamic *print-original* false)
+(def ^:dynamic *print-original*
+  "For debugging purposes: whether to print the original version of an instance, in addition to the current version, when
+  printing an [[instance]]."
+  false)
 
 (defn instance?
   "True if `x` is a Toucan2 instance, i.e. a `toucan2.instance.Instance` or some other class that satisfies the correct
@@ -214,6 +229,19 @@
     (list `->TransientInstance model m mta)))
 
 (defn instance
+  "Create a new Toucan 2 instance. See the namespace docstring for [[toucan2.instance]] for more information about *what*
+  a Toucan 2 instance is.
+
+  This function has several arities:
+
+  * With no args, creates an empty instance with its *model* set to `nil`
+
+  * With one arg, creates an empty instance of a *model*.
+
+  * With two args, creates an instance of a *model* from an existing map. This is optimized: if the map is already an
+    instance of the model, returns the map as-is.
+
+  * With three or more args, creates an instance of a *model* with key-value args."
   (^toucan2.instance.Instance []
    (instance nil))
 
@@ -221,7 +249,8 @@
    (instance model {}))
 
   (^toucan2.instance.Instance [model m]
-   {:pre [((some-fn map? nil?) m)]}
+   (assert ((some-fn map? nil?) m)
+           (format "Expected a map or nil, got ^%s %s" (.getCanonicalName (class m)) (pr-str m)))
    (cond
      ;; optimization: if `m` is already an instance with `model` return it as-is.
      (and (instance? m)

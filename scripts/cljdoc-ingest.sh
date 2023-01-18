@@ -29,10 +29,12 @@ docker run --rm \
        --volume /tmp/cljdoc:/app/data \
        --entrypoint clojure \
        cljdoc/cljdoc \
+       -Sforce \
        -M:cli ingest \
          --project io.github.camsaul/toucan2 \
          --version "$version" \
-         --git /toucan2
+         --git /toucan2 \
+         --rev $(git rev-parse HEAD)
 
 cat <<EOF
 
@@ -43,5 +45,9 @@ If you haven't already, start the web server with ./scripts/cljdoc-server.sh and
 You can view the docs locally by going to
 
 http://localhost:8000/d/io.github.camsaul/toucan2/$version
+
+If something didn't work, try going to
+
+http://localhost:8000/builds
 
 EOF

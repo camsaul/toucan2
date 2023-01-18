@@ -146,7 +146,7 @@
 (s/def ::dispatch-value.model
   ::dispatch-value.keyword-or-class)
 
-(s/def ::dispatch-value.resolved-query
+(s/def ::dispatch-value.query
   ::dispatch-value.keyword-or-class)
 
 (s/def ::dispatch-value.query-type-model
@@ -154,9 +154,9 @@
         :query-type-model (s/cat :query-type ::dispatch-value.query-type
                                  :model      ::dispatch-value.model)))
 
-(s/def ::dispatch-value.query-type-model-resolved-query
+(s/def ::dispatch-value.query-type-model-query
   (s/or
    :default                         ::dispatch-value.default
-   :query-type-model-resolved-query (s/cat :query-type     ::dispatch-value.query-type
-                                           :model          ::dispatch-value.model
-                                           :resolved-query ::dispatch-value.resolved-query)))
+   :query-type-model-resolved-query (s/cat :query-type ::dispatch-value.query-type
+                                           :model      ::dispatch-value.model
+                                           :query      ::dispatch-value.query)))

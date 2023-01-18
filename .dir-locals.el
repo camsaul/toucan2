@@ -4,6 +4,7 @@
                   (cider-clojure-cli-aliases . "dev")
                   (cljr-favor-prefix-notation . nil)
                   (fill-column . 120)
+                  (column-enforce-column . 120)
                   (clojure-docstring-fill-column . 120)
                   (eval . (put 'm/defmethod 'clojure-doc-string-elt 3))
                   (eval . (put 'm/defmulti 'clojure-doc-string-elt 2))
@@ -15,4 +16,6 @@
                   (eval . (define-clojure-indent
                            (p/defprotocol+ '(1 (:defn)))
                            (p/def-map-type '(2 nil nil (:defn)))
-                           (p/deftype+ '(2 nil nil (:defn))))))))
+                           (p/deftype+ '(2 nil nil (:defn)))))))
+ (markdown-mode . ((fill-column . 80)
+                   (column-enforce-column . 80))))

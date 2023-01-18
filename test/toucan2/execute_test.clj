@@ -129,6 +129,33 @@
       (is (= {:count 4}
              (execute/query-one "SELECT count(*) AS \"count\" FROM people;"))))))
 
+(deftest ^:synchronized query-update-count-test
+  (testing "For query types returning an update count, both `query` and `query-one` should return the count"
+    (doseq [f [#'execute/query
+               #'execute/query-one]]
+      (testing f
+        (test/with-discarded-table-changes :people
+          (is (= 1
+                 (f
+                  ::test/db
+                  :toucan.result-type/update-count
+                  nil
+                  ["UPDATE people SET name = ? WHERE name = ?;"
+                   "TouCam"
+                   "Cam"])))))))
+  (testing "default query type"
+    (doseq [[f expected] {#'execute/query     [1]
+                          #'execute/query-one 1}]
+      (testing f
+        (test/with-discarded-table-changes :people
+          (is (= expected
+                 (f
+                  ::test/db
+                  nil
+                  ["UPDATE people SET name = ? WHERE name = ?;"
+                   "TouCam"
+                   "Cam"]))))))))
+
 (deftest ^:parallel reducible-query-as-test
   (is (= [(instance/instance :people {:id 1, :name "Cam", :created_at (OffsetDateTime/parse "2020-04-21T23:56Z")})]
          (realize/realize (execute/reducible-query ::test/db :people "SELECT * FROM people WHERE id = 1;")))))
@@ -167,7 +194,7 @@
 
 (m/defmethod pipeline/transduce-query [:default ::model.not-even-jdbc :default]
   [rf query-type model _parsed-args resolved-query]
-  (pipeline/transduce-execute rf query-type model resolved-query))
+  (#'pipeline/transduce-execute rf query-type model resolved-query))
 
 ;;; here's how you can have custom compilation behavior. At this point in time it requires specifying a model as well
 ;;; since connection isn't realized until after the query compilation stage.

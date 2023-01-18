@@ -1,5 +1,7 @@
 (ns toucan2.insert
-  "Implementation of [[insert!]]."
+  "Implementation of [[insert!]].
+
+  The code for building an INSERT query as Honey SQL lives in [[toucan2.map-backend.honeysql2]]"
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
@@ -27,9 +29,10 @@
    :rows-or-queryable (s/alt :rows      ::args.rows
                              :queryable some?)))
 
-(m/defmethod pipeline/parse-args :toucan.query-type/insert.*
+(m/defmethod query/parse-args :toucan.query-type/insert.*
+  "Default args parsing method for [[toucan2.insert/insert!]]. Uses the spec `:toucan2.insert/args`."
   [query-type unparsed-args]
-  (let [parsed                               (query/parse-args query-type ::args unparsed-args)
+  (let [parsed                               (query/parse-args-with-spec query-type ::args unparsed-args)
         [rows-queryable-type rows-queryable] (:rows-or-queryable parsed)
         parsed                               (select-keys parsed [:modelable :columns :connectable])]
     (case rows-queryable-type
@@ -68,31 +71,57 @@
         (log/debugf :compile "Inserting %s rows into %s" (if (seq rows) (count rows) "?") model)
         (next-method query-type model parsed-args resolved-query)))))
 
-;;; The code for building an INSERT query as Honey SQL lives in [[toucan2.map-backend.honeysql2]]
-
-;;;; [[reducible-insert]] and [[insert!]]
-
-(defn reducible-insert
-  {:arglists '([modelable row-or-rows]
-               [modelable k v & more]
-               [modelable columns row-vectors])}
-  [& unparsed-args]
-  (pipeline/reducible-unparsed :toucan.query-type/insert.update-count unparsed-args))
-
 (defn insert!
-  "Returns number of rows inserted."
-  {:arglists '([modelable row-or-rows]
+  "Insert a row or rows into the database. Returns the number of rows inserted.
+
+  This function is pretty flexible in what it accepts:
+
+  Insert a single row with key-value args:
+
+  ```clj
+  (t2/insert! :models/venues :name \"Grant & Green\", :category \"bar\")
+  ```
+
+  Insert a single row as a map:
+
+  ```clj
+  (t2/insert! :models/venues {:name \"Grant & Green\", :category \"bar\"})
+  ```
+
+  Insert multiple row maps:
+
+  ```clj
+  (t2/insert! :models/venues [{:name \"Grant & Green\", :category \"bar\"}
+                              {:name \"Savoy Tivoli\", :category \"bar\"}])
+  ```
+
+  Insert rows with a vector of column names and a vector of value maps:
+
+  ```clj
+  (t2/insert! :models/venues [:name :category] [[\"Grant & Green\" \"bar\"]
+                                                [\"Savoy Tivoli\" \"bar\"]])
+  ```
+
+  As with other Toucan 2 functions, you can optionally pass a connectable if you pass `:conn` as the first arg. Refer to
+  the `:toucan2.insert/args` spec for the complete syntax.
+
+  Named connectables can also be used to define the rows:
+
+  ```clj
+  (t2/define-named-query ::named-rows
+    {:rows [{:name \"Grant & Green\", :category \"bar\"}
+            {:name \"North Beach Cantina\", :category \"restaurant\"}]})
+
+  (t2/insert! :models/venues ::named-rows)
+  ```"
+  {:arglists '([modelable row-or-rows-or-queryable]
                [modelable k v & more]
-               [modelable columns row-vectors])}
+               [modelable columns row-vectors]
+               [:conn connectable modelable row-or-rows]
+               [:conn connectable modelable k v & more]
+               [:conn connectable modelable columns row-vectors])}
   [& unparsed-args]
   (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/insert.update-count unparsed-args))
-
-(defn reducible-insert-returning-pks
-  {:arglists '([modelable row-or-rows]
-               [modelable k v & more]
-               [modelable columns row-vectors])}
-  [& unparsed-args]
-  (pipeline/reducible-unparsed :toucan.query-type/insert.pks unparsed-args))
 
 (defn insert-returning-pks!
   "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
@@ -100,21 +129,14 @@
   returns a vector of single values, e.g. `[1 2]` if the primary key is `:id` and you've inserted rows 1 and 2; for
   composite primary keys this returns a vector of tuples where each tuple has the value of corresponding primary key as
   returned by [[model/primary-keys]], e.g. for composite PK `[:id :name]` you might get `[[1 \"Cam\"] [2 \"Sam\"]]`."
-  {:arglists '([modelable row-or-rows]
-               [modelable k v & more]
-               [modelable columns row-vectors])}
-  [& unparsed-args]
-  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/insert.pks unparsed-args))
-
-(defn reducible-insert-returning-instances
-  {:arglists '([modelable row-or-rows]
+  {:arglists '([modelable row-or-rows-or-queryable]
                [modelable k v & more]
                [modelable columns row-vectors]
-               [[modelable & columns-to-return] row-or-rows]
-               [[modelable & columns-to-return] k v & more]
-               [[modelable & columns-to-return] columns row-vectors])}
+               [:conn connectable modelable row-or-rows]
+               [:conn connectable modelable k v & more]
+               [:conn connectable modelable columns row-vectors])}
   [& unparsed-args]
-  (pipeline/reducible-unparsed :toucan.query-type/insert.instances unparsed-args))
+  (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/insert.pks unparsed-args))
 
 (defn insert-returning-instances!
   "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
@@ -122,11 +144,11 @@
   returns a vector of single values, e.g. `[1 2]` if the primary key is `:id` and you've inserted rows 1 and 2; for
   composite primary keys this returns a vector of tuples where each tuple has the value of corresponding primary key as
   returned by [[model/primary-keys]], e.g. for composite PK `[:id :name]` you might get `[[1 \"Cam\"] [2 \"Sam\"]]`."
-  {:arglists '([modelable row-or-rows]
-               [modelable k v & more]
-               [modelable columns row-vectors]
-               [[modelable & columns-to-return] row-or-rows]
-               [[modelable & columns-to-return] k v & more]
-               [[modelable & columns-to-return] columns row-vectors])}
+  {:arglists '([modelable-columns row-or-rows-or-queryable]
+               [modelable-columns k v & more]
+               [modelable-columns columns row-vectors]
+               [:conn connectable modelable-columns row-or-rows]
+               [:conn connectable modelable-columns k v & more]
+               [:conn connectable modelable-columns columns row-vectors])}
   [& unparsed-args]
   (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/insert.instances unparsed-args))

@@ -41,15 +41,17 @@
   [reducible-rows]
   (->IdentityQuery reducible-rows))
 
-(m/defmethod pipeline/transduce-execute [#_query-type :default #_model :default #_query IdentityQuery]
-  [rf _query-type model {:keys [rows], :as _query}]
-  (log/debugf :execute "transduce IdentityQuery rows %s" rows)
-  (transduce (if model
-               (map (fn [result-row]
-                      (instance/instance model result-row)))
-               identity)
-             rf
-             rows))
+;; (m/defmethod pipeline/transduce-execute [#_query-type :default #_model :default #_query IdentityQuery]
+;;   [rf _query-type model {:keys [rows], :as _query}]
+;;   (log/debugf :execute "transduce IdentityQuery rows %s" rows)
+;;   (transduce (if model
+;;                (map (fn [result-row]
+;;                       (instance/instance model result-row)))
+;;                identity)
+;;              rf
+;;              rows))
+
+;; Not sure I understand how you're supposed to get to these points anyway
 
 (m/defmethod pipeline/compile [#_query-type :default #_model :default #_query IdentityQuery]
   [_query-type _model query]
@@ -71,34 +73,36 @@
 
 ;;;; Identity connection
 
-(defrecord ^:no-doc IdentityConnection [rows]
+(deftype ^:no-doc IdentityConnection []
   pretty/PrettyPrintable
   (pretty [_this]
-    (list `identity-connection rows)))
+    (list `->IdentityConnection)))
 
 (m/defmethod conn/do-with-connection IdentityConnection
   [connectable f]
+  {:pre [(ifn? f)]}
   (f connectable))
 
 (m/defmethod conn/do-with-transaction IdentityConnection
   [connectable _options f]
+  {:pre [(ifn? f)]}
   (f connectable))
 
 (m/defmethod pipeline/transduce-execute-with-connection [#_conn IdentityConnection #_query-type :default #_model :default]
-  [rf conn _query-type model _compiled-query]
-  (transduce
-   (map (fn [row]
-          (instance/instance model row)))
-   rf
-   (:rows conn)))
+  [rf _conn _query-type model id-query]
+  (assert (instance? IdentityQuery id-query))
+  (binding [conn/*current-connectable* nil]
+    (transduce
+     (map (fn [row]
+            (if (map? row)
+              (instance/instance model row)
+              row)))
+     rf
+     (:rows id-query))))
 
-(defn identity-connection [rows]
-  (->IdentityConnection rows))
-
-;; (defrecord ^:no-doc IdentityQuery2 [rows]
-;;   pretty/PrettyPrintable
-;;   (pretty [_this]
-;;     (list `identity-query-2 rows)))
-
-;; (defn identity-query-2 [rows]
-;;   (->IdentityQuery2 rows))
+(m/defmethod pipeline/transduce-query [#_query-type     :default
+                                       #_model          :default
+                                       #_resolved-query IdentityQuery]
+  [rf query-type model parsed-args resolved-query]
+  (binding [conn/*current-connectable* (->IdentityConnection)]
+    (next-method rf query-type model parsed-args resolved-query)))

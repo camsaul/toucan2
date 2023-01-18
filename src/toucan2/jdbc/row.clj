@@ -1,4 +1,4 @@
-(ns toucan2.jdbc.row
+(ns ^:no-doc toucan2.jdbc.row
   "Custom [[TransientRow]] type. This is mostly in a separate namespace so I don't have to look at it when working on
   unrelated [[toucan2.jdbc.result-set]] stuff.
 
@@ -352,7 +352,9 @@
                 *fetch-all-columns* (fetch-all-columns! builder i->thunk))]
       (next.jdbc.rs/row! builder row))))
 
-(defn row
+(defn ^:no-doc row
+  "Create a new `TransientRow`. Part of the low-level implementation of the JDBC query execution backend. You probably
+  shouldn't be using this directly!"
   [model ^ResultSet rset builder i->thunk col-name->index]
   (assert (not (.isClosed rset)) "ResultSet is already closed")
   (assert (seq (:cols builder)) "builder must have :cols")

@@ -273,8 +273,8 @@
                               :categories]]
             (create-table! db-type conn table-name)))
         (swap! initialized-test-dbs conj db-type)))))
-
 (m/defmethod conn/do-with-connection ::db
+
   [_connectable f]
   (let [db-type (current-db-type)]
     (set-up-test-db! db-type)

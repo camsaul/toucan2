@@ -54,10 +54,14 @@
 (defn- do-after-select [model rows]
   (select/select model (identity-query/identity-query rows)))
 
+(defn- reducible-with-model
+  [query-type model parsed-args]
+  (#'pipeline/reducible-fn #'pipeline/transduce-with-model query-type model parsed-args))
+
 (defn- do-after-reducible-select [model rows]
-  (pipeline/reducible-with-model :toucan.query-type/select.instances
-                                 model
-                                 {:queryable (identity-query/identity-query rows)}))
+  (reducible-with-model :toucan.query-type/select.instances
+                        model
+                        {:queryable (identity-query/identity-query rows)}))
 
 (deftest ^:parallel do-after-select-test
   (testing "Can we use `identity-query` to build some sort of abomination like Toucan 1 do-post-select?"

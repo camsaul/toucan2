@@ -5,6 +5,8 @@
    [toucan2.instance :as instance]
    [toucan2.pipeline :as pipeline]))
 
+;; TODO -- I'm not really convinced this is worth it at all. It's used in exactly one place =(
+
 (defn -xform [f]
   (map (fn [instance]
          (let [instance (f instance)]

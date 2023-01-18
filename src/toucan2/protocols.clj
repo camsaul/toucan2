@@ -29,19 +29,19 @@
 (p/defprotocol+ IRecordChanges
   "Protocol for something that records the changes made to it, e.g. a Toucan instance."
   (original [instance]
-            "Get the original version of `instance` as it appeared when it first came out of the DB.")
+    "Get the original version of `instance` as it appeared when it first came out of the DB.")
 
   (^{:style/indent nil} with-original [instance new-original]
-    "Return a copy of `instance` with its `original` map set to `new-original`.")
+   "Return a copy of `instance` with its `original` map set to `new-original`.")
 
   (current [instance]
-           "Return the underlying map representing the current state of an `instance`.")
+    "Return the underlying map representing the current state of an `instance`.")
 
   (^{:style/indent nil} with-current [instance new-current]
-    "Return a copy of `instance` with its underlying `current` map set to `new-current`.")
+   "Return a copy of `instance` with its underlying `current` map set to `new-current`.")
 
   (changes [instance]
-           "Get a map with any changes made to `instance` since it came out of the DB. Only includes keys that have been
+    "Get a map with any changes made to `instance` since it came out of the DB. Only includes keys that have been
     added or given different values; keys that were removed are not counted. Returns `nil` if there are no changes."))
 
 ;;; `nil` and `IPersistentMap` can implement so of the methods that make sense for them -- `nil` or a plain map doesn't
@@ -75,8 +75,13 @@
     this)
   (with-current [_this new-current]
     new-current)
-  (changes [_this]
-    nil))
+  ;; treat the entire map as `changes` -- that way if you accidentally do something like
+  ;;
+  ;; (merge plain-map instance)
+  ;;
+  ;; in a `before-update` method, you don't accidentally shoot yourself in the foot and break `update!` or the like.
+  (changes [this]
+    this))
 
 (p/defprotocol+ IDispatchValue
   :extend-via-metadata true

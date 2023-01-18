@@ -14,12 +14,35 @@
   * [[with-call-count]] -- helper macro to count the number of queries executed within a `body`."
   (:require
    [clojure.spec.alpha :as s]
-   [toucan2.pipeline :as pipeline]
-   [toucan2.realize :as realize]))
+   [toucan2.pipeline :as pipeline]))
 
 (set! *warn-on-reflection* true)
 
-(defn reducible-query
+(defn- query* [f]
+  (fn query**
+    ([queryable]
+     ;; `nil` connectable = use the current connection or `:default` if none is specified.
+     (query** nil queryable))
+
+    ([connectable queryable]
+     (query** connectable nil queryable))
+
+    ([connectable modelable queryable]
+     ;; by passing `result-type/*` we'll basically get whatever the default is -- instances for `SELECT` or update counts
+     ;; for `DML` stuff.
+     (query** connectable :toucan.result-type/* modelable queryable))
+
+    ([connectable query-type modelable queryable]
+     (let [parsed-args {:connectable connectable
+                        :modelable   modelable
+                        :queryable   queryable}]
+       (f query-type parsed-args)))))
+
+(def ^{:arglists '([queryable]
+                   [connectable queryable]
+                   [connectable modelable queryable]
+                   [connectable query-type modelable queryable])}
+  reducible-query
   "Create a reducible query that when reduced with resolve and compile `queryable`, open a connection using `connectable`
   and [[toucan2.connection/with-connection]], execute the query, and reduce the results.
 
@@ -31,28 +54,7 @@
   rows will be returned as an [[toucan2.instance/instance]] of the resolved model.
 
   See [[toucan2.connection]] for Connection resolution rules."
-  ([queryable]
-   ;; `nil` connectable = use the current connection or `:default` if none is specified.
-   (reducible-query nil queryable))
-
-  ([connectable queryable]
-   (reducible-query connectable nil queryable))
-
-  ([connectable modelable queryable]
-   ;; by passing `result-type/*` we'll basically get whatever the default is -- instances for `SELECT` or update counts
-   ;; for `DML` stuff.
-   (reducible-query connectable :toucan.result-type/* modelable queryable))
-
-  ([connectable query-type modelable queryable]
-   (reify clojure.lang.IReduceInit
-     (reduce [_this rf init]
-       (reduce rf
-               init
-               (pipeline/reducible-parsed-args
-                query-type
-                {:connectable connectable
-                 :modelable   modelable
-                 :queryable   queryable}))))))
+  (query* pipeline/reducible-parsed-args))
 
 ;;;; Util functions for running queries and immediately realizing the results.
 
@@ -71,7 +73,10 @@
 
   Like [[reducible-query]], this may be used with either `SELECT` queries that return rows or things like `UPDATE` that
   normally return the count of rows updated."
-  (comp realize/realize reducible-query))
+  (query*
+   (fn [query-type parsed-args]
+     (let [rf (pipeline/default-rf query-type)]
+       (pipeline/transduce-parsed rf query-type parsed-args)))))
 
 (def ^{:arglists '([queryable]
                    [connectable queryable]
@@ -87,8 +92,11 @@
 
   Like [[reducible-query]], this may be used with either `SELECT` queries that return rows or things like `UPDATE` that
   normally return the count of rows updated."
-  (comp realize/reduce-first reducible-query))
-
+  (query*
+   (fn [query-type parsed-args]
+     (let [rf    (pipeline/default-rf query-type)
+           xform (pipeline/first-result-xform-fn query-type)]
+       (pipeline/transduce-parsed (xform rf) query-type parsed-args)))))
 
 ;;;; [[with-call-count]]
 

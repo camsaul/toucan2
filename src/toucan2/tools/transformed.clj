@@ -217,7 +217,7 @@
   (reduce
    (fn [f [k xform]]
      (comp (apply-result-row-transform-fn k xform)
-      f))
+           f))
    identity
    k->transform))
 

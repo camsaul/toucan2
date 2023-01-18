@@ -98,8 +98,8 @@
   :use                                   {:level :warning}
   :used-underscored-binding              {:level :warning}
   :warn-on-reflection                    {:level :warning}
-  ;; :docstring-no-summary                 {:level :warning}
-  ;; :missing-docstring                     {:level :warning}
+  ;; :docstring-no-summary                  {:level :warning}
+  #_:missing-docstring                     #_{:level :warning}
 
   :toucan2/validate-deftest {:level :warning}}
 
@@ -120,5 +120,13 @@
  {:linters {:unresolved-symbol {:level :off}}}
 
  :ns-groups
- [{:pattern "^toucan\\..*"
-   :name    toucan-1}]}
+ ;; tests are anything that ends in `test`, or anything that starts with `toucan.test` or `toucan2.test`
+ [{:pattern "^(?:(?:.*test)|(?:toucan2?\\.test.*))$"
+   :name    tests}
+  #_{:pattern "^toucan\\..*"
+     :name    toucan-1}]
+
+ :config-in-ns
+ {tests
+  {:linters
+   {:missing-docstring {:level :off}}}}}

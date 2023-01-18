@@ -74,10 +74,7 @@
  [toucan2.insert
   insert!
   insert-returning-instances!
-  insert-returning-pks!
-  reducible-insert
-  reducible-insert-returning-instances
-  reducible-insert-returning-pks]
+  insert-returning-pks!]
 
  [toucan2.instance
   instance

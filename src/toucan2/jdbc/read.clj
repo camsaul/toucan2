@@ -56,12 +56,26 @@
     (u/try-with-error-context ["read column" {:thunk thunk, :model model}]
       (thunk))))
 
-(defn get-object-of-class-thunk [^ResultSet rset ^Long i ^Class klass]
+(defn get-object-of-class-thunk
+  "Return a thunk that will be used to fetch values at column index `i` from ResultSet `rset` as a given class. Calling
+  this thunk is equivalent to
+
+  ```clj
+  (.getObject rset i klass)
+  ```
+
+  but includes extra logging."
+  [^ResultSet rset ^Long i ^Class klass]
   (log/debugf :results
               "Fetching values in column %s with %s"
               i
               (list '.getObject 'rs i klass))
   (fn get-object-of-class-thunk []
+    ;; what's the overhead of this? A million rows with 10 columns each = 10 million calls =(
+    ;;
+    ;; from Criterium: a no-op call takes about 20ns locally. So 10m rows => 200ms from this no-op call. That's a little
+    ;; expensive, but probably not as bad as the overhead we get from other nonsense here in Toucan 2. We'll have to do
+    ;; some general performance tuning in the future.
     (log/tracef :results "col %s => %s" i (list '.getObject 'rset i klass))
     (.getObject rset i klass)))
 
@@ -109,7 +123,28 @@
                    (make-column-thunk conn model rset i)))
         int))
 
-(defn make-cached-row-num->i->thunk [conn model ^ResultSet rset]
+(defn ^:no-doc make-cached-row-num->i->thunk
+  "Returns a function that, given the current row number, returns a function that, given a column number, returns a cached
+  thunk to fetch values of that column. Confusing, huh? Here's a chart to make it a bit easier to visualize:
+
+  ```clj
+  (make-cached-row-num->i->thunk conn model rset)
+  =>
+  (f current-row-number)
+  =>
+  (f column-index)
+  =>
+  (column-value-thunk)
+  ```
+
+  What's the point of this? The main point is to cache values that come out of the database, so we only fetch them once.
+  This is used to implement our transient rows in [[toucan2.jdbc.result-set]] -- accessing the value of a transient row
+  twice should not result in two calls to `.getObject`.
+
+  The row number is used for cache-busting purposes, so we can reset the cache after each row is returned (so we don't
+  accidentally cache values from the first row and return them for all the rows). The row number passed in here doesn't
+  need to correspond to the actual row number from a JDBC standpoint; it's used only for cache-busting purposes."
+  [conn model ^ResultSet rset]
   (let [i->thunk       (make-i->thunk conn model rset)
         cached-row-num (atom -1)
         cached-values  (atom {})]
@@ -128,7 +163,7 @@
               (swap! cached-values assoc i v)
               v)))))))
 
-(defn read-column-by-index-fn
+(defn ^:no-doc read-column-by-index-fn
   "Given a `java.sql.Connection` `conn`, a `model`, and a `java.sql.ResultSet` `rset`, return a function that can be used
   with [[next.jdbc.result-set/builder-adapter]]. The function has the signature
 

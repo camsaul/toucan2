@@ -5,7 +5,10 @@
    [toucan2.log :as log]
    [toucan2.map-backend :as map]
    [toucan2.model :as model]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
+
+(comment types/keep-me)
 
 ;;;; [[parse-args]]
 
@@ -54,14 +57,39 @@
           :opt-un [:toucan2.query.parsed-args/kv-args
                    :toucan2.query.parsed-args/columns]))
 
-(defn validate-parsed-args [parsed-args]
+(defn- validate-parsed-args [parsed-args]
   (u/try-with-error-context ["validate parsed args" {::parsed-args parsed-args}]
     (let [result (s/conform ::parsed-args parsed-args)]
       (when (s/invalid? result)
         (throw (ex-info (format "Invalid parsed args: %s" (s/explain-str ::parsed-args parsed-args))
                         (s/explain-data ::parsed-args parsed-args)))))))
 
-(defn parse-args
+(defn parse-args-with-spec
+  "Parse `unparsed-args` for `query-type` with the given `spec`. See documentation for [[parse-args]] for more details."
+  [query-type spec unparsed-args]
+  (u/try-with-error-context ["parse args" {::query-type query-type, ::unparsed-args unparsed-args}]
+    (log/debugf :compile "Parse args for query type %s %s" query-type unparsed-args)
+    (let [parsed (s/conform spec unparsed-args)]
+      (when (s/invalid? parsed)
+        (throw (ex-info (format "Don't know how to interpret %s args: %s"
+                                (pr-str query-type)
+                                (s/explain-str spec unparsed-args))
+                        (s/explain-data spec unparsed-args))))
+      (log/tracef :compile "Conformed args: %s" parsed)
+      (let [parsed (cond-> parsed
+                     (:modelable parsed)                 (merge (let [[modelable-type x] (:modelable parsed)]
+                                                                  (case modelable-type
+                                                                    :modelable         {:modelable x}
+                                                                    :modelable-columns x)))
+                     (:connectable parsed)               (update :connectable :connectable)
+                     (not (contains? parsed :queryable)) (assoc :queryable {})
+                     (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
+                                                                            (into {} (map (juxt :k :v)) kv-args))))]
+        (log/debugf :compile "Parsed => %s" parsed)
+        (validate-parsed-args parsed)
+        parsed))))
+
+(m/defmulti parse-args
   "`parse-args` takes a sequence of unparsed args passed to something like [[toucan2.select/select]] and parses them into
   a parsed args map. The default implementation uses [[clojure.spec.alpha]] to parse the args according to `args-spec`.
 
@@ -81,46 +109,52 @@
 
   * `:columns` -- for things that return instances, `:columns` is a sequence of columns to return. These are commonly
     specified by wrapping the modelable in a `[modelable & columns]` vector."
-  ([query-type unparsed-args]
-   (parse-args query-type ::default-args unparsed-args))
+  {:arglists            '([query-type₁ unparsed-args])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type)}
+  u/dispatch-on-first-arg)
 
-  ([query-type spec unparsed-args]
-   (u/try-with-error-context ["parse args" {::query-type query-type, ::unparsed-args unparsed-args}]
-     (log/debugf :compile "Parse args for query type %s %s" query-type unparsed-args)
-     (let [parsed (s/conform spec unparsed-args)]
-       (when (s/invalid? parsed)
-         (throw (ex-info (format "Don't know how to interpret %s args: %s"
-                                 (pr-str query-type)
-                                 (s/explain-str spec unparsed-args))
-                         (s/explain-data spec unparsed-args))))
-       (log/tracef :compile "Conformed args: %s" parsed)
-       (let [parsed (cond-> parsed
-                      (:modelable parsed)                 (merge (let [[modelable-type x] (:modelable parsed)]
-                                                                   (case modelable-type
-                                                                     :modelable         {:modelable x}
-                                                                     :modelable-columns x)))
-                      (:connectable parsed)               (update :connectable :connectable)
-                      (not (contains? parsed :queryable)) (assoc :queryable {})
-                      (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
-                                                                             (into {} (map (juxt :k :v)) kv-args))))]
-         (log/debugf :compile "Parsed => %s" parsed)
-         (validate-parsed-args parsed)
-         parsed)))))
+(m/defmethod parse-args :default
+  "The default implementation calls [[parse-args-with-spec]] with the `:toucan2.query/default-args` spec."
+  [query-type unparsed-args]
+  (parse-args-with-spec query-type ::default-args unparsed-args))
 
 
 ;;;; Part of the default [[pipeline/build]] for maps: applying key-value args
 
 (m/defmulti apply-kv-arg
-  {:arglists '([model₁ query₂ k₃ v]), :defmethod-arities #{4}}
+  "Merge a key-value pair into a `query`, presumably a map. What this means depends on
+  the [[toucan2.protocols/dispatch-value]] of `query` -- for a plain map, this is given `:type` metadata at some point
+  for the [[toucan2.map-backend/default-backend]].
+
+  Example: the default Honey SQL backend, applies `k` and `v` as a `:where` condition:
+
+  ```clj
+  (apply-kv-arg :default {} :k :v)
+  ;; =>
+  {:where [:= :k :v]}
+  ```
+
+  You can add new implementations of this method to special behaviors for support arbitrary keys, or to support new
+  query backends. `:toucan/pk` support is implemented this way."
+  {:arglists            '([model₁ resolved-query₂ k₃ v])
+   :defmethod-arities   #{4}
+   :dispatch-value-spec (s/nonconforming (s/or
+                                          :default       ::types/dispatch-value.default
+                                          :model-query-k (s/cat :model          ::types/dispatch-value.model
+                                                                :resolved-query ::types/dispatch-value.query
+                                                                :k              keyword?)))}
   u/dispatch-on-first-three-args)
 
 ;;; not 100% sure we need this method since the query should already have `:type` metadata, but it's nice to have it
 ;;; anyway so we can play around with this stuff from the REPL
 (m/defmethod apply-kv-arg [#_model :default #_query clojure.lang.IPersistentMap #_k :default]
+  "Default implementation for maps. This adds `:type` metadata to the map (from [[map/backend]]) and recurses,
+  ultimately handing off to the map backend's implementation.
+
+  See [[toucan2.map-backend.honeysql2]] for the Honey SQL-specific impl for this."
   [model query k v]
   (apply-kv-arg model (vary-meta query assoc :type (map/backend)) k v))
-
-;;;; See [[toucan2.map-backend.honeysql2]] for the Honey SQL-specific impl for this.
 
 (comment
   ;; with a composite PK like
@@ -179,9 +213,11 @@
    m
    (toucan-pk-composite-values pk-columns v)))
 
-;;; `:around` so we can intercept the normal handler. This "unpacks" the PK and ultimately uses the normal calls to
-;;; [[apply-kv-arg]]
 (m/defmethod apply-kv-arg :around [#_model :default #_query :default #_k :toucan/pk]
+  "Implementation for handling key-value args for `:toucan/pk`.
+
+  This is an `:around` so we can intercept the normal handler. This 'unpacks' the PK and ultimately uses the normal
+  calls to [[apply-kv-arg]]."
   [model honeysql _k v]
   ;; `fn-name` here would be if you passed something like `:toucan/pk [:in 1 2]` -- the fn name would be `:in` -- and we
   ;; pass that to [[condition->honeysql-where-clause]]
@@ -191,7 +227,9 @@
       (apply-non-composite-toucan-pk model honeysql (first pk-columns) v)
       (apply-composite-toucan-pk model honeysql pk-columns v))))
 
-(defn apply-kv-args [model query kv-args]
+(defn apply-kv-args
+  "Convenience. Merge a map of `kv-args` into a resolved `query` with repeated calls to [[apply-kv-arg]]."
+  [model query kv-args]
   (log/debugf :compile "Apply kv-args %s" kv-args)
   (reduce
    (fn [query [k v]]

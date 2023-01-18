@@ -22,9 +22,9 @@
    ;; here.
    :changes     map?))
 
-(m/defmethod pipeline/parse-args :toucan.query-type/update.*
+(m/defmethod query/parse-args :toucan.query-type/update.*
   [query-type unparsed-args]
-  (let [parsed (query/parse-args query-type ::args unparsed-args)]
+  (let [parsed (query/parse-args-with-spec query-type ::args unparsed-args)]
     (cond-> parsed
       (contains? parsed :pk) (-> (dissoc :pk)
                                  (update :kv-args assoc :toucan/pk (:pk parsed))))))

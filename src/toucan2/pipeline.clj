@@ -4,15 +4,14 @@
 
   Pipeline order is
 
-  1. [[parse-args]]                  (entrypoint fn: [[transduce-unparsed]])
+  1. [[toucan2.query/parse-args]]    (entrypoint fn: [[transduce-unparsed]])
   2. [[toucan2.model/resolve-model]] (entrypoint fn: [[transduce-parsed]])
   3. [[resolve]]
   4. [[transduce-query]]
   5. [[build]]
   6. [[compile]]
   7. [[results-transform]]
-  8. [[transduce-execute]]           ; TODO `with-connection`
-  9. [[transduce-execute-with-connection]]
+  8. [[transduce-execute-with-connection]]
 
   The main pipeline entrypoint is [[transduce-unparsed]]."
   (:refer-clojure :exclude [compile resolve])
@@ -25,6 +24,7 @@
    [toucan2.jdbc.query :as jdbc.query]
    [toucan2.map-backend :as map]
    [toucan2.model :as model]
+   [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.realize :as realize]
    [toucan2.types :as types]
@@ -36,33 +36,45 @@
 
 ;;;; pipeline
 
-(def ^:dynamic *call-count-thunk*
+(def ^:dynamic ^:no-doc *call-count-thunk*
   "Thunk function to call every time a query is executed if [[toucan2.execute/with-call-count]] is in use. Implementees
   of [[transduce-execute-with-connection]] should invoke this every time a query gets executed. You can
   use [[increment-call-count!]] to simplify the chore of making sure it's non-`nil` before invoking it."
   nil)
-
-(defn increment-call-count! []
-  (when *call-count-thunk* (*call-count-thunk*)))
-
-;;; The little subscripts below are so you can tell at a glance which args are used for dispatch.
 
 (defn- dispatch-ignore-rf [f]
   (fn [_rf & args]
     (apply f args)))
 
 (m/defmulti transduce-execute-with-connection
-  {:arglists '([rf conn₁ query-type₂ model₃ compiled-query]), :defmethod-arities #{5}}
+  "The final stage of the Toucan 2 query execution pipeline. Execute a compiled query (as returned by [[compile]]) with a
+  database connection, e.g. a `java.sql.Connection`, and transduce results with reducing function `rf`.
+
+  The only reason you should need to implement this method is if you are writing a new query execution backend."
+  {:arglists            '([rf conn₁ query-type₂ model₃ compiled-query])
+   :defmethod-arities   #{5}
+   :dispatch-value-spec (s/nonconforming
+                         (s/or :default               ::types/dispatch-value.default
+                               :conn-query-type-model (s/cat :conn       ::types/dispatch-value.keyword-or-class
+                                                             :query-type ::types/dispatch-value.query-type
+                                                             :model      ::types/dispatch-value.model)))}
   (dispatch-ignore-rf u/dispatch-on-first-three-args))
+
+(m/defmethod transduce-execute-with-connection :before :default
+  "Count all queries that are executed by calling [[*call-count-thunk*]] if bound."
+  [_rf _conn _query-type _model query]
+  (when *call-count-thunk*
+    (*call-count-thunk*))
+  query)
 
 ;;;; default JDBC impls. Not convinced they belong here.
 
 (m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
                                                 #_query-type :default
                                                 #_model      :default]
+  "Default impl for the JDBC query execution backend."
   [rf conn query-type model sql-args]
   {:pre [(sequential? sql-args) (string? (first sql-args))]}
-  (increment-call-count!)
   ;; `:return-keys` is passed in this way instead of binding a dynamic var because we don't want any additional queries
   ;; happening inside of the `rf` to return keys or whatever.
   (let [extra-options (when (isa? query-type :toucan.result-type/pks)
@@ -70,37 +82,55 @@
         result        (jdbc.query/reduce-jdbc-query rf (rf) conn model sql-args extra-options)]
     (rf result)))
 
-;;; To get Databases to return the generated primary keys rather than the update count for SELECT/UPDATE/DELETE we need
-;;; to set the `next.jdbc` option `:return-keys true`
-
 (m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
                                                 #_query-type :toucan.result-type/pks
                                                 #_model      :default]
+  "JDBC query execution backend for executing queries that return PKs (`:toucan.result-type/pks`).
+
+  To get Databases to return the generated primary keys rather than the update count for SELECT/UPDATE/DELETE we need to
+  set the `next.jdbc` option `:return-keys true`. So this binds [[jdbc/*options*]] and then calls the default JDBC impl."
   [rf conn query-type model sql-args]
   (let [rf* ((map (model/select-pks-fn model))
              rf)]
     (binding [jdbc/*options* (assoc jdbc/*options* :return-keys true)]
       (next-method rf* conn query-type model sql-args))))
 
-(m/defmulti transduce-execute
-  {:arglists '([rf query-type₁ model₂ compiled-query₃]), :defmethod-arities #{4}}
-  (dispatch-ignore-rf u/dispatch-on-first-three-args))
-
-(m/defmethod transduce-execute :default
+(defn- transduce-execute
+  "Get a connection from the current connection and call [[transduce-execute-with-connection]]. For DML queries, this
+  uses [[conn/with-transaction]] to get a connection and ensure we are in a transaction, if we're not already in one.
+  For non-DML queries this uses the usual [[conn/with-connection]]."
   [rf query-type model compiled-query]
-  (conn/with-connection [conn]
-    (transduce-execute-with-connection rf conn query-type model compiled-query)))
-
-(m/defmethod transduce-execute [#_query-type :toucan.statement-type/DML #_model :default #_compiled-query :default]
-  "For DML stuff we will run the whole thing in a transaction if we're not already in one.
-
-  Not 100% sure this is necessary since we would probably already be in one if we needed to be because stuff
-  like [[toucan2.tools.before-delete]] have to put us in one much earlier."
-  [rf query-type model compiled-query]
-  (conn/with-transaction [_conn nil {:nested-transaction-rule :ignore}]
-    (next-method rf query-type model compiled-query)))
+  (u/try-with-error-context {::rf rf}
+    (if (isa? query-type :toucan.statement-type/DML)
+      ;; For DML stuff we will run the whole thing in a transaction if we're not already in one. Not 100% sure this is
+      ;; necessary since we would probably already be in one if we needed to be because stuff
+      ;; like [[toucan2.tools.before-delete]] have to put us in one much earlier.
+      (conn/with-transaction [conn nil {:nested-transaction-rule :ignore}]
+        (transduce-execute-with-connection rf conn query-type model compiled-query))
+      ;; otherwise we can just execute with a normal non-transaction query.
+      (conn/with-connection [conn]
+        (transduce-execute-with-connection rf conn query-type model compiled-query)))))
 
 (m/defmulti results-transform
+  "The transducer that should be applied to the reducing function executed when running a query of
+  `query-type` (see [[toucan2.types]]) for `model` (`nil` if the query is ran without a model, e.g.
+  with [[toucan2.execute/query]]). The default implementation returns `identity`; add your own implementations as
+  desired to apply additional results transforms.
+
+  Be sure to `comp` the transform from `next-method`:
+
+  ```clj
+  (m/defmethod t2/results-transform [:toucan.query-type/select.* :my-model]
+    [query-type model]
+    (comp (next-method query-type model)
+          (map (fn [instance]
+                 (assoc instance :num-cans 2)))))
+  ```
+
+  It's probably better to put the transducer returned by `next-method` first in the call to `comp`, because `cond` works
+  like `->` when composing transducers, and since `next-method` is by definition the less-specific method, it makes
+  sense to call that transform before we apply our own. This means our own transforms will get to see the results of the
+  previous stage, rather than vice-versa."
   {:arglists            '([query-type₁ model₂])
    :defmethod-arities   #{2}
    :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model)}
@@ -110,11 +140,45 @@
   [_query-type _model]
   identity)
 
+(defn query-dispatch-value
+  "Dispatch value for a resolved or built query, e.g. a Honey SQL map. Dispatch value is determined in this order:
+
+  1. If the query is a map, but not a record type:
+
+     1. Dispatch on `:type` metadata if present;
+
+     2. otherwise dispatch on the current [[map/backend]].
+
+  2. If query is not a plain map, dispatch on [[protocols/dispatch-value]]. For a keyword, this is itself; otherwise it
+     is normally the result of `type`.
+
+  This lets us dispatch on the default [[map/backend]] when we encounter bare Clojure maps with no `:type` metadata."
+  [query]
+  (or (when (and (map? query)
+                 (not (record? query)))
+        (or (:type (meta query))
+            (map/backend)))
+      (protocols/dispatch-value query)))
+
 (m/defmulti compile
-  {:arglists '([query-type₁ model₂ built-query₃]), :defmethod-arities #{3}}
-  u/dispatch-on-first-three-args)
+  "Compile a `built-query` to something that can be executed natively by the query execution backend, e.g. compile a Honey
+  SQL map to a `[sql & args]` vector.
+
+  You should implement this method when writing a custom map backend; see [[toucan2.map-backend]] for more information.
+
+  In addition to dispatching on `query-type` and `model`, this dispatches on the type of `built-query`, in a special
+  way: for plain maps this will dispatch on the current [[map/backend]]."
+  {:arglists            '([query-type₁ model₂ built-query₃])
+   :defmethod-arities   #{3}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-query)}
+  (fn [query-type model built-query]
+    [(protocols/dispatch-value query-type)
+     (protocols/dispatch-value model)
+     (query-dispatch-value built-query)]))
 
 (m/defmethod compile :default
+  "Default implementation: return query as-is (i.e., consider it to already be compiled). Check that the query is non-nil
+  and, if it is a collection, non-empty. Everything else is fair game."
   [_query-type _model query]
   (assert (and (some? query)
                (or (not (coll? query))
@@ -131,17 +195,21 @@
   [query-type model sql]
   (compile query-type model [sql]))
 
-(m/defmethod compile [#_query-type :default #_model :default #_built-query clojure.lang.IPersistentMap]
-  "Default method for a map. Hands off to the appropriate method for [[toucan2.map-backend/backend]]."
-  [query-type model m]
-  (compile query-type model (vary-meta m assoc :type (map/backend))))
-
 (m/defmulti build
+  "Build a query by applying `parsed-args` to `resolved-query` into something that can be compiled by [[compile]], e.g.
+  build a Honey SQL query by applying `parsed-args` to an initial `resolved-query` map.
+
+  You should implement this method when writing a custom map backend; see [[toucan2.map-backend]] for more information.
+
+  In addition to dispatching on `query-type` and `model`, this dispatches on the type of `resolved-query`, in a special
+  way: for plain maps this will dispatch on the current [[map/backend]]."
   {:arglists            '([query-type₁ model₂ parsed-args resolved-query₃])
    :defmethod-arities   #{4}
-   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-resolved-query)}
-  (fn [query-type₁ model₂ _parsed-args resolved-query₃]
-    (u/dispatch-on-first-three-args query-type₁ model₂ resolved-query₃)))
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-query)}
+  (fn [query-type model _parsed-args resolved-query]
+    [(protocols/dispatch-value query-type)
+     (protocols/dispatch-value model)
+     (query-dispatch-value resolved-query)]))
 
 (m/defmethod build :default
   [_query-type _model _parsed-args resolved-query]
@@ -165,15 +233,11 @@
   (build query-type model (update parsed-args :kv-args assoc :toucan/pk pk) {}))
 
 (m/defmethod build [#_query-type :default #_model :default #_resolved-query :toucan.map-backend/*]
-  "Base map backend implementation."
+  "Base map backend implementation. Applies the `:kv-args` in `parsed-args` using [[query/apply-kv-args]], and ignores
+  other parsed args."
   [query-type model {:keys [kv-args], :as parsed-args} m]
   (let [m (query/apply-kv-args model m kv-args)]
     (next-method query-type model (dissoc parsed-args :kv-args) m)))
-
-(m/defmethod build [#_query-type :default #_model :default #_resolved-query clojure.lang.IPersistentMap]
-  "Default implementation for maps. Calls the [[toucan2.map-backend/backend]] method."
-  [query-type model parsed-args m]
-  (build query-type model parsed-args (vary-meta m assoc :type (map/backend))))
 
 (m/defmethod build [#_query-type :default #_model :default #_query String]
   "Default implementation for plain strings. Wrap the string in a vector and recurse."
@@ -193,27 +257,38 @@
   (next-method query-type model parsed-args sql-args))
 
 (m/defmulti resolve
-  {:arglists '([query-type₁ model₂ queryable₃]), :defmethod-arities #{3}}
+  "Resolve a `queryable` to an actual query, e.g. resolve a named query defined by [[toucan2.tools.named-query]] to an
+  actual Honey SQL map."
+  {:arglists            '([query-type₁ model₂ queryable₃])
+   :defmethod-arities   #{3}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-query)}
   u/dispatch-on-first-three-args)
 
 (m/defmethod resolve :default
+  "The default implementation considers a query to already be resolved, and returns it as-is."
   [_query-type _model queryable]
   queryable)
 
-(def ^:dynamic ^{:arglists '([query-type model parsed-args resolved-query])}
-  *build*
+(def ^:dynamic ^{:arglists '([query-type model parsed-args resolved-query])} *build*
+  "The function to use when building a query. Normally [[build]], but you can bind this to intercept build behavior to
+  do something different."
   #'build)
 
-(def ^:dynamic ^{:arglists '([query-type model built-query])}
-  *compile*
+(def ^:dynamic ^{:arglists '([query-type model built-query])} *compile*
+  "The function to use when compiling a query. Normally [[compile]], but you can bind this to intercept normal
+  compilation behavior to do something different."
   #'compile)
 
-(def ^:dynamic ^{:arglists '([rf query-type model compiled-query])}
+(def ^:no-doc ^:dynamic ^{:arglists '([rf query-type model compiled-query])}
   *transduce-execute*
+  "The function to use to open a connection, execute, and transduce a query. Normally [[transduce-execute]]. The primary
+  use case for binding this is to intercept query execution and return some results without opening any connections."
   #'transduce-execute)
 
 (def ^:dynamic *parsed-args*
-  "This is here just in case you might happen to need it for methods that aren't normally called with it."
+  "The parsed args seen at the beginning of the pipeline. This is bound in case methods in later stages of the pipeline,
+  such as [[results-transform]], need it for one reason or another. (See for example [[toucan2.tools.default-fields]],
+  which applies different behavior if a query was initiated with `[model & columns]` syntax vs. if it was not.)"
   nil)
 
 (defn- transduce-compiled-query [rf query-type model compiled-query]
@@ -231,11 +306,25 @@
         (transduce-compiled-query rf query-type model compiled-query)))))
 
 (m/defmulti transduce-query
+  "One of the primary customization points for the Toucan 2 query execution pipeline. [[build]] and [[compile]] a
+  `resolved-query`, then open a connection, execute the query, and transduce the results
+  with [[transduce-execute-with-connection]] (using the [[results-transform]]).
+
+  You can implement this method to introduce custom behavior that should happen before a query is built or compiled,
+  e.g. transformations to the `parsed-args` or other shenanigans like changing underlying query type being
+  executed (e.g. [[toucan2.tools.after]], which 'upgrades' queries returning update counts or PKs to ones returning
+  instances so [[toucan2.tools.after-update]] and [[toucan2.tools.after-insert]] can be applied to affected rows).
+
+  As with [[build]] and [[compile]], the dispatch value of `resolved-query` uses special rules, and is calculated
+  with [[query-dispatch-value]] rather than [[protocols/dispatch-value]]; map queries with no `:type` metadata will
+  dispatch on the [[map/backend]] rather than on `clojure.lang.IPersistentMap` (or similar)."
   {:arglists            '([rf query-type₁ model₂ parsed-args resolved-query₃])
    :defmethod-arities   #{5}
-   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-resolved-query)}
-  (fn [_rf query-type₁ model₂ _parsed-args resolved-query₃]
-    (u/dispatch-on-first-three-args query-type₁ model₂ resolved-query₃)))
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-query)}
+  (fn [_rf query-type model _parsed-args resolved-query]
+    [(protocols/dispatch-value query-type)
+     (protocols/dispatch-value model)
+     (query-dispatch-value resolved-query)]))
 
 (m/defmethod transduce-query :default
   [rf query-type model parsed-args resolved-query]
@@ -267,7 +356,8 @@
               resolved-query (resolve query-type model queryable)]
           (transduce-query* rf query-type model parsed-args resolved-query))))))
 
-(defn transduce-parsed
+(defn ^:no-doc transduce-parsed
+  "Like [[transduce-unparsed]], but called with already-parsed args rather than unparsed args."
   [rf query-type {:keys [modelable connectable], :as parsed-args}]
   ;; if `:connectable` was specified, bind it to [[conn/*current-connectable*]]; it should always override the current
   ;; connection (if one is bound). See docstring for [[toucan2.query/reducible-query]] for more info.
@@ -282,24 +372,17 @@
       (u/try-with-error-context ["with model" {::model model}]
         (transduce-with-model rf query-type model (dissoc parsed-args :modelable))))))
 
-(m/defmulti parse-args
-  {:arglists '([query-type₁ unparsed-args]), :defmethod-arities #{2}}
-  u/dispatch-on-first-arg)
-
-#_{:clj-kondo/ignore [:redundant-fn-wrapper]}
-(m/defmethod parse-args :default
-  [query-type unparsed-args]
-  (query/parse-args query-type unparsed-args))
-
-(defn transduce-unparsed
+(defn ^:no-doc transduce-unparsed
+  "Entrypoint to the Toucan 2 query execution pipeline. Parse `unparsed-args` for a `query-type`, then resolve model and
+  query, build and compile query, then open a connection, execute the query, and transduce the results."
   [rf query-type unparsed-args]
-  (let [parsed-args (parse-args query-type unparsed-args)]
+  (let [parsed-args (query/parse-args query-type unparsed-args)]
     (u/try-with-error-context ["with unparsed args" {::query-type query-type, ::unparsed-args unparsed-args}]
       (transduce-parsed rf query-type parsed-args))))
 
 ;;;; rf helper functions
 
-(defn with-init
+(defn ^:no-doc with-init
   "Returns a version of reducing function `rf` with a zero-arity (initial value arity) that returns `init`."
   [rf init]
   (fn
@@ -308,33 +391,44 @@
     ([x y] (rf x y))))
 
 (m/defmulti default-rf
-  {:arglists '([query-type]),:defmethod-arities #{1}}
+  "The default reducing function for queries of `query-type`. Used for non-reducible operations
+  like [[toucan2.select/select]] or [[toucan2.execute/query]]."
+  {:arglists            '([query-type])
+   :defmethod-arities   #{1}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type)}
   keyword)
 
 (m/defmethod default-rf :toucan.result-type/update-count
+  "The reducing function for queries returning an update count. Sums all numbers passed in."
   [_query-type]
   (-> (fnil + 0 0)
       (with-init 0)
       completing))
 
 (m/defmethod default-rf :toucan.result-type/*
+  "The default reducing function for all query types unless otherwise specified. Returns realized maps (by default, Toucan
+  2 instances)."
   [_query-type]
   ((map realize/realize) conj))
 
-;;; This doesn't work for things that return update counts!
-(defn first-result-rf [rf]
-  (completing ((take 1) rf) first))
+(defn ^:no-doc first-result-xform-fn
+  "Return a transducer that transforms a reducing function `rf` so it always takes at most one value and returns the first
+  value from the results. This doesn't work for things that return update counts!"
+  [query-type]
+  (if (isa? query-type :toucan.result-type/update-count)
+    identity
+    (fn [rf]
+      (completing ((take 1) rf) first))))
 
 ;;;; Helper functions for implementing stuff like [[toucan2.select/select]]
 
-(defn transduce-unparsed-with-default-rf [query-type unparsed]
+(defn ^:no-doc transduce-unparsed-with-default-rf
+  "Helper for implementing things like [[toucan2.select/select]]. Transduce `unparsed-args` using the [[default-rf]] for
+  this `query-type`."
+  [query-type unparsed-args]
   (assert (types/query-type? query-type))
   (let [rf (default-rf query-type)]
-    (transduce-unparsed rf query-type unparsed)))
-
-(defn transduce-unparsed-first-result [query-type unparsed]
-  (let [rf (default-rf query-type)]
-    (transduce-unparsed (first-result-rf rf) query-type unparsed)))
+    (transduce-unparsed rf query-type unparsed-args)))
 
 
 ;;;; reducible versions for implementing stuff like [[toucan2.select/reducible-select]]
@@ -352,17 +446,17 @@
     (pretty [_this]
       (list* `reducible-fn f args))))
 
-(defn reducible-unparsed
+(defn ^:no-doc reducible-unparsed
+  "Helper for implementing things like [[toucan2.select/reducible-select]]. A reducible version
+  of [[transduce-unparsed]]."
   [query-type unparsed]
   (reducible-fn transduce-unparsed query-type unparsed))
 
-(defn reducible-parsed-args
+(defn ^:no-doc reducible-parsed-args
+  "Helper for implementing things like [[toucan2.execute/reducible-query]] that don't need arg parsing. A reducible
+  version of [[transduce-parsed]]."
   [query-type parsed-args]
   (reducible-fn transduce-parsed query-type parsed-args))
-
-(defn reducible-with-model
-  [query-type model parsed-args]
-  (reducible-fn transduce-with-model query-type model parsed-args))
 
 ;;; There's no such thing as "returning instances" for INSERT/DELETE/UPDATE. So we will fake it by executing the query
 ;;; with the equivalent `returning-pks` query type, and then do a `:select` query to get the matching instances and pass

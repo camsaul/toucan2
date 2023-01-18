@@ -3,6 +3,7 @@
   implementation; [[reduce-result-set]] which is used to reduce results from JDBC databases."
   (:require
    [better-cond.core :as b]
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [next.jdbc.result-set :as next.jdbc.rs]
    [toucan2.instance :as instance]
@@ -11,14 +12,27 @@
    [toucan2.jdbc.row :as jdbc.row]
    [toucan2.log :as log]
    [toucan2.model :as model]
+   [toucan2.types :as types]
    [toucan2.util :as u])
   (:import
    (java.sql ResultSet ResultSetMetaData)))
 
 (set! *warn-on-reflection* true)
 
+(comment s/keep-me
+         types/keep-me)
+
 (m/defmulti builder-fn
-  {:arglists '([^java.sql.Connection conn₁ model₂ ^java.sql.ResultSet rset opts])}
+  "Return the [[next.jdbc]] builder function to use to create the results when querying a model. By default, this
+  uses [[instance-builder-fn]], and returns Toucan 2 instances; but if you want to use plain maps you can use one of the
+  other builder functions that ships with `next.jdbc`, or write your own custom builder function."
+  {:arglists            '([^java.sql.Connection conn₁ model₂ ^java.sql.ResultSet rset opts])
+   :defmethod-arities   #{4}
+   :dispatch-value-spec (s/nonconforming
+                         (s/or :default ::types/dispatch-value.default
+                               :conn-model (s/cat :conn (s/or :default   ::types/dispatch-value.default
+                                                              :classname symbol?)
+                                                  :model ::types/dispatch-value.model)))}
   u/dispatch-on-first-two-args)
 
 (defrecord ^:no-doc InstanceBuilder [model ^ResultSet rset ^ResultSetMetaData rsmeta cols]
@@ -99,11 +113,19 @@
      (assoc (->InstanceBuilder model rset rsmeta col-names) :opts opts))))
 
 (m/defmethod builder-fn :default
+  "Default [[next.jdbc]] builder function. Uses [[instance-builder-fn]] to return Toucan 2 instances."
   [_conn model rset opts]
   (let [merged-opts (jdbc/merge-options opts)]
     (instance-builder-fn model rset merged-opts)))
 
-(defn reduce-result-set [rf init conn model ^ResultSet rset opts]
+(defn ^:no-doc reduce-result-set
+  "Reduce a `java.sql.ResultSet` using reducing function `rf` and initial value `init`. `conn` is an instance of
+  `java.sql.Connection`. `conn` and `model` are used mostly for dispatch value purposes for things like [[builder-fn]],
+  and for creating instances with the correct model.
+
+  Part of the low-level implementation of the JDBC query execution backend -- you probably shouldn't be using this
+  directly."
+  [rf init conn model ^ResultSet rset opts]
   (log/debugf :execute "Reduce JDBC result set for model %s with rf %s and init %s" model rf init)
   (let [row-num->i->thunk (jdbc.read/make-cached-row-num->i->thunk conn model rset)
         builder-fn*       (next.jdbc.rs/builder-adapter
