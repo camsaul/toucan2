@@ -10,24 +10,43 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.query :as query]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
-;;; HACK Once https://github.com/camsaul/methodical/issues/96 is fixed we can remove this.
-(alter-meta! #'m.combo.operator/combine-methods-with-operator assoc :private false)
+(s/def ::transforms-map.direction->fn
+  (s/map-of #{:in :out}
+            ifn?))
+
+(s/def ::transforms-map.column->direction
+  (s/map-of keyword?
+            ::transforms-map.direction->fn))
+
+(defn- validate-transforms-map [transforms-map]
+  (when (and transforms-map
+             (s/invalid? (s/conform ::transforms-map.column->direction transforms-map)))
+    (throw (ex-info (format "Invalid deftransforms map: %s"
+                            (s/explain-str ::transforms-map.column->direction transforms-map))
+                    (s/explain-data ::transforms-map.column->direction transforms-map)))))
 
 ;; combine the results of all matching methods into one map.
 (m.combo.operator/defoperator ::merge-transforms
   [method-fns invoke]
   (transduce
    (map invoke)
-   ;; for the time being keep the values from map returned by the more-specific method in preference to the ones
-   ;; returned by the less-specific methods.
-   (completing (fn [m1 m2]
-                 ;; TODO -- we should probably throw an error if one of the transforms is stomping on the other.
-                 (merge-with merge m2 m1)))
-   {}
+   (fn
+     ([]
+      {})
+     ([m]
+      (validate-transforms-map m)
+      m)
+     ([m1 m2]
+      ;; for the time being keep the values from map returned by the more-specific method in preference to the ones
+      ;; returned by the less-specific methods.
+      ;;
+      ;; TODO -- we should probably throw an error if one of the transforms is stomping on the other.
+      (merge-with merge m2 m1)))
    method-fns))
 
 (defonce ^{:doc "Return a map of
@@ -48,7 +67,10 @@
     ;; TODO -- once https://github.com/camsaul/methodical/issues/97 is implemented, use that.
     (m/standard-dispatcher u/dispatch-on-first-arg)
     (m/standard-method-table))
-   {:ns *ns*, :name `transforms}))
+   {:ns                  *ns*
+    :name                `transforms
+    :defmethod-arities   #{1}
+    :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}))
 
 ;;; I originally considered walking and transforming the HoneySQL, but decided against it because it's too ambiguous.
 ;;; It's too hard to tell if

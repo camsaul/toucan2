@@ -50,9 +50,12 @@
    [pretty.core :as pretty]
    [toucan2.log :as log]
    [toucan2.protocols :as protocols]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
+
+(comment types/keep-me)
 
 (def ^:dynamic *current-connectable*
   "The current connectable or connection. If you get a connection with [[with-connection]] or [[with-transaction]], it
@@ -61,7 +64,9 @@
   nil)
 
 (m/defmulti do-with-connection
-  {:arglists '([connectable₁ f])}
+  {:arglists            '([connectable₁ f])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec ::types/dispatch-value.keyword-or-class}
   u/dispatch-on-first-arg
   :default-value ::default)
 

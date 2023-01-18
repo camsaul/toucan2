@@ -511,3 +511,12 @@
       (with-redefs [log/pprint-doc (constantly nil)]
         (is (= :bar
                (select/select-one-fn :category ::venues.category-keyword 1)))))))
+
+(transformed/deftransforms ::invalid
+  {:column keyword})
+
+(deftest ^:parallel validate-deftransforms-test
+  (is (thrown-with-msg?
+       Throwable
+       #"Invalid deftransforms map"
+       (transformed/transforms ::invalid))))

@@ -139,13 +139,15 @@
         :abstract-query-type #(isa? % :toucan.query-type/abstract)
         :query-type          query-type?))
 
+;; technically `nil` is valid and it's not read in as a Symbol
+(s/def ::dispatch-value.keyword-or-class
+  (some-fn keyword? symbol? nil?))
+
 (s/def ::dispatch-value.model
-  (s/or :default ::dispatch-value.default
-        :model   (some-fn symbol? keyword?)))
+  ::dispatch-value.keyword-or-class)
 
 (s/def ::dispatch-value.resolved-query
-  (s/or :default ::dispatch-value.default
-        :model   (some-fn nil? symbol? keyword?)))
+  ::dispatch-value.keyword-or-class)
 
 (s/def ::dispatch-value.query-type-model
   (s/or :default          ::dispatch-value.default
