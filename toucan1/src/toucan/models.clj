@@ -32,6 +32,17 @@
 (p/import-vars
  [default-fields default-fields define-default-fields])
 
+(defonce ^:private ^{:doc "A map of unqualified symbol model name => model keyword for model resolution.
+
+    {'User :my.project.models/User}
+
+  When a model is defined with [[defmodel]], an entry is created here; the [[toucan2.model/resolve-model]] method for
+  `clojure.lang.Symbol` below will check this registry first before attempting to resolve the model from
+  the [[-root-namespace]]. This allows models that were not defined following the 'usual' pattern to be resolved without
+  drama."}
+  -model-symbol-registry
+  (atom {}))
+
 (defn set-root-namespace!
   "DEPRECATED: In Toucan 2, models do not get resolved from namespaces the way they did in Toucan 1. You generally do not
   need to resolve models, since they are generally just keywords. If you want to introduce special model resolution
@@ -54,16 +65,18 @@
   the [[toucan.models/root-namespace]]. This behavior should be considered deprecated -- just use model keywords
   directly."
   [symb]
-  (let [qualified-symb (if (namespace symb)
-                         symb
-                         (let [model-ns (model-symb->ns symb)]
-                           (symbol (name model-ns) (name symb))))]
-    (try
-      (some-> (requiring-resolve qualified-symb) var-get)
-      (catch Throwable e
-        (throw (ex-info (format "Error resolving model %s from symbol: %s" symb (ex-message e))
-                        {:symbol    symb
-                         :attempted qualified-symb}))))))
+  (or
+   (get @-model-symbol-registry symb)
+   (let [qualified-symb (if (namespace symb)
+                          symb
+                          (let [model-ns (model-symb->ns symb)]
+                            (symbol (name model-ns) (name symb))))]
+     (try
+       (some-> (requiring-resolve qualified-symb) var-get)
+       (catch Throwable e
+         (throw (ex-info (format "Error resolving model %s from symbol: %s" symb (ex-message e))
+                         {:symbol    symb
+                          :attempted qualified-symb})))))))
 
 (defn resolve-model
   "Deprecated: use [[toucan2.model/resolve-model]] to resolve models instead. (The Toucan 2 version doesn't support
@@ -91,6 +104,7 @@
   as a keyword, and define [[model/table-name]] if needed."
   [model table-name]
   (let [model-keyword (keyword (name (ns-name *ns*)) (name model))]
+    (swap! -model-symbol-registry assoc (symbol model) model-keyword)
     `(do
        (derive ~model-keyword :toucan1/model)
        (m/defmethod model/table-name ~model-keyword

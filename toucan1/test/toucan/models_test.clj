@@ -34,6 +34,8 @@
 #_{:clj-kondo/ignore [:unused-private-var]}
 (def ^:private MyCategory :toucan.test-models.category/Category)
 
+(t1.models/defmodel MyCategoryDefModel :t1_category)
+
 (deftest ^:parallel resolve-model-test
   (are [x] (= :toucan.test-models.category/Category
               (t1.models/resolve-model x))
@@ -41,26 +43,33 @@
     'Category
     [Category]
     ['Category]
+    ;; namespaced symbol should use that symbol's namespace rather than the `-root-namespace`
     'toucan.models-test/MyCategory)
-  (is (thrown-with-msg?
-       clojure.lang.ExceptionInfo
-       #"Invalid model: 2"
-       (t1.models/resolve-model 2)))
-  (is (thrown-with-msg?
-       clojure.lang.ExceptionInfo
-       #"Invalid model: :some-other-keyword"
-       (t1.models/resolve-model :some-other-keyword)))
-  (testing "Error when model cannot be resolved from the root namespace"
+  (testing "errors"
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
-         #"Error resolving model MyCategory from symbol: Could not locate toucan/test_models/my_category__init\.class"
-         (t1.models/resolve-model 'MyCategory)))
-    (try
-      (t1.models/resolve-model 'MyCategory)
-      (catch Throwable e
-        (is (= '{:symbol    MyCategory
-                 :attempted toucan.test-models.my-category/MyCategory}
-               (ex-data e)))))))
+         #"Invalid model: 2"
+         (t1.models/resolve-model 2)))
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Invalid model: :some-other-keyword"
+         (t1.models/resolve-model :some-other-keyword)))
+    (testing "Error when model cannot be resolved from the root namespace"
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Error resolving model MyCategory from symbol: Could not locate toucan/test_models/my_category__init\.class"
+           (t1.models/resolve-model 'MyCategory)))
+      (try
+        (t1.models/resolve-model 'MyCategory)
+        (catch Throwable e
+          (is (= '{:symbol    MyCategory
+                   :attempted toucan.test-models.my-category/MyCategory}
+                 (ex-data e)))))))
+  (testing "registry"
+    (is (= :toucan.models-test/MyCategoryDefModel
+           (get @@#'t1.models/-model-symbol-registry 'MyCategoryDefModel))
+        (is (= :toucan.models-test/MyCategoryDefModel
+               (t1.models/resolve-model 'MyCategoryDefModel))))))
 
 (deftest ^:parallel properties-test
   (is (= {:toucan.test-models.venue/timestamped? true}
