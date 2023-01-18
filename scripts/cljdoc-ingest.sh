@@ -9,7 +9,9 @@ script_directory=`dirname "${BASH_SOURCE[0]}"`
 cd "$script_directory/.."
 project_root=$(pwd)
 
-version=$(cat VERSION.txt)
+major_minor_version=$(cat VERSION.txt)
+patch_version=$(git rev-list HEAD --count)
+version="$major_minor_version.$patch_version"
 
 # Build and install locally.
 
