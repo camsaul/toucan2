@@ -100,7 +100,7 @@
          (is (= (if returning-keys?
                   [4]
                   1)
-                (insert! (str (model/table-name ::test/venues)) {:name "Grant & Green", :category "bar"})))
+                (insert! (name (model/table-name ::test/venues)) {:name "Grant & Green", :category "bar"})))
          (testing "Venue 4 should exist now"
            (is (= (instance/instance ::test/venues {:id         4
                                                     :name       "Grant & Green"

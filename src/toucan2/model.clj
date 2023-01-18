@@ -44,6 +44,13 @@
     (throw (ex-info (format "Invalid model %s: don't know how to get its table name." (pr-str model))
                     {:model model}))))
 
+(m/defmethod table-name :around :default
+  "Always return table names as keywords. This will facilitate using them directly inside Honey SQL, e.g.
+
+    {:select [:*], :from [(t2/table-name MyModel)]}"
+  [model]
+  (keyword (next-method model)))
+
 #_{:clj-kondo/ignore [:redundant-fn-wrapper]} ; FIXME
 (m/defmethod table-name clojure.lang.Named
   [model]
@@ -121,7 +128,7 @@
                          (not= (m/effective-primary-method table-name model)
                                (m/default-effective-method table-name))))
                (map (fn [[model a-namespace]]
-                      [(table-name model) a-namespace])))
+                      [(name (table-name model)) a-namespace])))
          (model->namespace model))))
 
 (defn namespace [model]

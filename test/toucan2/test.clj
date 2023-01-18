@@ -233,7 +233,7 @@
       (str/trim stmt))))
 
 (defn create-table!
-  "Create the table named `table-name` for the [[current-db-type]] using the SQL from [[create-table-sql-file]]."
+  "(Re-)Create the table named `table-name` for the [[current-db-type]] using the SQL from [[create-table-sql-file]]."
   ([table-name]
    (create-table! (current-db-type) table-name))
 

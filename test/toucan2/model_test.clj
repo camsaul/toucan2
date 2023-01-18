@@ -37,15 +37,19 @@
          #"Bad toucan2.model/primary-keys for model .* should return keyword or sequence of keywords, got .*"
          (model/primary-keys ::primary-keys.returns-invalid)))))
 
+(m/defmethod model/table-name ::string-table-name
+  [_model]
+  "my-table")
+
 (deftest ^:parallel ^:parallel table-name-test
-  (doseq [[model expected] {"ABC"    "ABC"
-                            :abc     "abc"
-                            :ns/abc  "abc"
-                            :default "default"
-                            'symbol  "symbol"}]
-    (testing (pr-str `(model/table-name ~model))
-      (is (= expected
-             (model/table-name model))))))
+  (are [model expected] (= expected
+                           (model/table-name model))
+    "ABC"               :ABC
+    :abc                :abc
+    :ns/abc             :abc
+    :default            :default
+    'symbol             :symbol
+    ::string-table-name :my-table))
 
 (derive ::people.unquoted ::test/people)
 
