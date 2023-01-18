@@ -31,13 +31,17 @@
   test-setup/do-with-quoted-snake-disabled
   test-setup/do-with-default-quoting-style)
 
+#_{:clj-kondo/ignore [:unused-private-var]}
+(def ^:private MyCategory :toucan.test-models.category/Category)
+
 (deftest ^:parallel resolve-model-test
   (are [x] (= :toucan.test-models.category/Category
               (t1.models/resolve-model x))
     Category
     'Category
     [Category]
-    ['Category])
+    ['Category]
+    'toucan.models-test/MyCategory)
   (is (thrown-with-msg?
        clojure.lang.ExceptionInfo
        #"Invalid model: 2"
@@ -45,7 +49,18 @@
   (is (thrown-with-msg?
        clojure.lang.ExceptionInfo
        #"Invalid model: :some-other-keyword"
-       (t1.models/resolve-model :some-other-keyword))))
+       (t1.models/resolve-model :some-other-keyword)))
+  (testing "Error when model cannot be resolved from the root namespace"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"Error resolving model MyCategory from symbol: Could not locate toucan/test_models/my_category__init\.class"
+         (t1.models/resolve-model 'MyCategory)))
+    (try
+      (t1.models/resolve-model 'MyCategory)
+      (catch Throwable e
+        (is (= '{:symbol    MyCategory
+                 :attempted toucan.test-models.my-category/MyCategory}
+               (ex-data e)))))))
 
 (deftest ^:parallel properties-test
   (is (= {:toucan.test-models.venue/timestamped? true}

@@ -54,11 +54,16 @@
   the [[toucan.models/root-namespace]]. This behavior should be considered deprecated -- just use model keywords
   directly."
   [symb]
-  (let [model-ns (model-symb->ns symb)]
-    @(try (ns-resolve model-ns symb)
-          (catch Throwable _
-            (require model-ns)
-            (ns-resolve model-ns symb)))))
+  (let [qualified-symb (if (namespace symb)
+                         symb
+                         (let [model-ns (model-symb->ns symb)]
+                           (symbol (name model-ns) (name symb))))]
+    (try
+      (some-> (requiring-resolve qualified-symb) var-get)
+      (catch Throwable e
+        (throw (ex-info (format "Error resolving model %s from symbol: %s" symb (ex-message e))
+                        {:symbol    symb
+                         :attempted qualified-symb}))))))
 
 (defn resolve-model
   "Deprecated: use [[toucan2.model/resolve-model]] to resolve models instead. (The Toucan 2 version doesn't support

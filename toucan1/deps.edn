@@ -3,7 +3,7 @@
 
  :aliases
  {:dev
-  {:extra-paths ["test"]}
+  {:extra-paths ["test" "../test"]}
 
   ;; clojure -M:check
   :check
