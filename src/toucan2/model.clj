@@ -6,6 +6,8 @@
    [toucan2.protocols :as protocols]
    [toucan2.util :as u]))
 
+(set! *warn-on-reflection* true)
+
 (m/defmulti resolve-model
   {:arglists '([modelable₁]), :defmethod-arities #{1}}
   u/dispatch-on-first-arg)
@@ -44,12 +46,14 @@
     (throw (ex-info (format "Invalid model %s: don't know how to get its table name." (pr-str model))
                     {:model model}))))
 
-(m/defmethod table-name :around :default
+;;; FIXME -- Kondo shouldn't warn about this.
+#_{:clj-kondo/ignore [:redundant-fn-wrapper]}
+(m/defmethod table-name :after :default
   "Always return table names as keywords. This will facilitate using them directly inside Honey SQL, e.g.
 
     {:select [:*], :from [(t2/table-name MyModel)]}"
-  [model]
-  (keyword (next-method model)))
+  [a-table-name]
+  (keyword a-table-name))
 
 #_{:clj-kondo/ignore [:redundant-fn-wrapper]} ; FIXME
 (m/defmethod table-name clojure.lang.Named
@@ -114,12 +118,28 @@
       (apply juxt pk-keys))))
 
 (m/defmulti model->namespace
+  "Return a map of namespaces to use when fetching results with this model.
+
+    (m/defmethod model->namespace ::my-model
+      [_model]
+      {::my-model      \"x\"
+       ::another-model \"y\"})"
   {:arglists '([model₁])}
   u/dispatch-on-first-arg)
 
 (m/defmethod model->namespace :default
+  "By default, don't namespace column names when fetching rows."
   [_model]
   nil)
+
+(m/defmethod model->namespace :after :default
+  [namespace-map]
+  (when (some? namespace-map)
+    (assert (map? namespace-map)
+            (format "model->namespace should return a map. Got: ^%s %s"
+                    (some-> namespace-map class .getCanonicalName)
+                    (pr-str namespace-map))))
+  namespace-map)
 
 (defn table-name->namespace [model]
   (not-empty

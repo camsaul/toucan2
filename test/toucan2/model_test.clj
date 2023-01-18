@@ -9,6 +9,8 @@
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]))
 
+(set! *warn-on-reflection* true)
+
 (deftest ^:parallel primary-keys-test
   (testing "default implementation"
     (is (= [:id]
@@ -103,3 +105,16 @@
 (deftest ^:parallel namespaced-default-primary-keys-test
   (is (= [:venue/id]
          (model/primary-keys ::venues.namespaced))))
+
+(m/defmethod model/model->namespace ::bad-model->namespace
+  [_model]
+  "my-namespace")
+
+(deftest ^:parallel model->namespace-error-test
+  (testing "model->namespace :after method should validate results"
+    (is (thrown-with-msg?
+         Throwable
+         (re-pattern
+          (java.util.regex.Pattern/quote
+           "Assert failed: model->namespace should return a map. Got: ^java.lang.String \"my-namespace\""))
+         (model/model->namespace ::bad-model->namespace)))))
