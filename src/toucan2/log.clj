@@ -1,5 +1,5 @@
 (ns toucan2.log
-  "Toucan 2 logging utilities. This is basically just a fancy wrapper around [[clojure.tools.logging]] that supports some
+  "Toucan 2 logging utilities. This is basically just a fancy wrapper around `clojure.tools.logging` that supports some
   additional debugging facilities, such as dynamically enabling logging for different topics or levels from the REPL."
   (:require
    [clojure.spec.alpha :as s]
@@ -20,7 +20,7 @@
 
 (def ^:dynamic *level*
   "The current log level (as a keyword) to log messages directly to stdout with. By default this is `nil`, which means
-  don't log any messages to stdout regardless of their level. (They are still logged via [[clojure.tools.logging]].)
+  don't log any messages to stdout regardless of their level. (They are still logged via `clojure.tools.logging`.)
 
   You can dynamically bind this to enable logging at a higher level in the REPL for debugging purposes. You can also set
   a default value for this by setting the atom [[level]]."

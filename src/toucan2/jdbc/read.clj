@@ -171,7 +171,7 @@
   (f builder rset i) => result
   ```
 
-  When this function is called with a [[next.jdbc]] result set `builder`, a `java.sql.ResultSet` `rset`, and column
+  When this function is called with a `next.jdbc` result set `builder`, a `java.sql.ResultSet` `rset`, and column
   index `i`, it will return the value of that column for the current row.
 
   The function used to fetch the column is built by combining [[read-column-thunk]]

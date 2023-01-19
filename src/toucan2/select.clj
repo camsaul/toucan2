@@ -7,7 +7,7 @@
 
   ### Functions that return primary keys
 
-  Functions that return primary keys such as [[select-pk-set]] determine which primary keys to return by
+  Functions that return primary keys such as [[select-pks-set]] determine which primary keys to return by
   calling [[toucan2.model/select-pks-fn]], which is based on the model's implementation
   of [[toucan2.model/primary-keys]]. Models with just a single primary key column will return primary keys 'unwrapped',
   i.e., the values of that column will be returned directly. Models with compound primary keys (i.e., primary keys

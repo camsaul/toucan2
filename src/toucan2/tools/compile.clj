@@ -4,7 +4,9 @@
   (:require
    [toucan2.pipeline :as pipeline]))
 
-(defn -compile [thunk]
+(defn ^:no-doc -compile
+  "Impl for the [[compile]] macro. Do not use this directly."
+  [thunk]
   (binding [pipeline/*transduce-execute* (fn [_rf _query-type _model compiled-query]
                                            compiled-query)]
     (thunk)))
@@ -22,7 +24,9 @@
   [& body]
   `(-compile (^:once fn* [] ~@body)))
 
-(defn -build [thunk]
+(defn ^:no-doc -build
+  "Impl for the [[build]] macro. Do not use this directly."
+  [thunk]
   (binding [pipeline/*compile* (fn [_query-type _model built-query]
                                  built-query)]
     (-compile thunk)))

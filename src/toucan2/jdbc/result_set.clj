@@ -1,5 +1,5 @@
 (ns toucan2.jdbc.result-set
-  "Implementation of a custom [[next.jdbc]] result set builder function, [[builder-fn]], and the default
+  "Implementation of a custom `next.jdbc` result set builder function, [[builder-fn]], and the default
   implementation; [[reduce-result-set]] which is used to reduce results from JDBC databases."
   (:require
    [better-cond.core :as b]
@@ -23,7 +23,7 @@
          types/keep-me)
 
 (m/defmulti builder-fn
-  "Return the [[next.jdbc]] builder function to use to create the results when querying a model. By default, this
+  "Return the `next.jdbc` builder function to use to create the results when querying a model. By default, this
   uses [[instance-builder-fn]], and returns Toucan 2 instances; but if you want to use plain maps you can use one of the
   other builder functions that ships with `next.jdbc`, or write your own custom builder function."
   {:arglists            '([^java.sql.Connection conn₁ model₂ ^java.sql.ResultSet rset opts])
@@ -90,7 +90,7 @@
          i)))))
 
 (defn instance-builder-fn
-  "Create a result set map builder function appropriate for passing as the `:builder-fn` option to [[next.jdbc]] that
+  "Create a result set map builder function appropriate for passing as the `:builder-fn` option to `next.jdbc` that
   will create [[toucan2.instance]]s of `model` using namespaces determined
   by [[toucan2.model/table-name->namespace]]."
   [model ^ResultSet rset opts]
@@ -113,7 +113,7 @@
      (assoc (->InstanceBuilder model rset rsmeta col-names) :opts opts))))
 
 (m/defmethod builder-fn :default
-  "Default [[next.jdbc]] builder function. Uses [[instance-builder-fn]] to return Toucan 2 instances."
+  "Default `next.jdbc` builder function. Uses [[instance-builder-fn]] to return Toucan 2 instances."
   [_conn model rset opts]
   (let [merged-opts (jdbc/merge-options opts)]
     (instance-builder-fn model rset merged-opts)))

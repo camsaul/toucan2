@@ -104,6 +104,8 @@
      (f conn))))
 
 (m/defmethod do-with-connection :around ::default
+  "Do some debug logging/context capture. Bind [[*current-connectable*]] to the connection `f` is called with inside of
+  `f`."
   [connectable f]
   (assert (fn? f))
   ;; add the connection class or pretty representation rather than the connection type itself to avoid leaking sensitive
@@ -257,6 +259,7 @@
   :default-value ::default)
 
 (m/defmethod do-with-transaction :around ::default
+  "Bind [[*current-connectable*]] to the connection `f` is called with inside of `f`."
   [connection options f]
   (log/debugf :execute "do with transaction %s %s" options (some-> connection class .getCanonicalName symbol))
   (next-method connection options (bind-current-connectable-fn f)))
@@ -278,7 +281,7 @@
   directly to the underlying implementation, such as [[next.jdbc.transaction]].
 
   `:nested-transaction-rule` must be one of `#{:allow :ignore :prohibit}`, a set of possibilities borrowed from
-  [[next.jdbc]]. For non-JDBC implementations, you should treat `:allow` as the default behavior if unspecified."
+  `next.jdbc`. For non-JDBC implementations, you should treat `:allow` as the default behavior if unspecified."
   {:style/indent 1, :arglists '([[conn-binding connectable options?] & body])}
   [[conn-binding connectable options] & body]
   `(with-connection [conn# ~connectable]

@@ -3,7 +3,7 @@
   unrelated [[toucan2.jdbc.result-set]] stuff.
 
   This is roughly adapted from [[next.jdbc.result-set/mapify-result-set]] in a somewhat-successful attempt to make
-  Toucan 2 be [[next.jdbc]]-compatible."
+  Toucan 2 be `next.jdbc`-compatible."
   (:require
    [better-cond.core :as b]
    [clojure.core.protocols :as core-p]
@@ -44,7 +44,7 @@
 ;;; TODO -- maybe we can combine the
 (deftype ^:no-doc TransientRow [model
                                 ^ResultSet rset
-                                ;; [[next.jdbc]] result set builder, usually an instance
+                                ;; `next.jdbc` result set builder, usually an instance
                                 ;; of [[toucan2.jdbc.result_set.InstanceBuilder]] or
                                 ;; whatever [[toucan2.jdbc.result-set/builder-fn]] returns. Should have the key `:cols`
                                 builder
