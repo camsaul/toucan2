@@ -559,7 +559,8 @@
   (testing "identifiers should be quoted"
     (is (= [(case (test/current-db-type)
               :h2       "SELECT * FROM \"T1_USERS\" ORDER BY \"ID\" ASC"
-              :postgres "SELECT * FROM \"t1_users\" ORDER BY \"id\" ASC")]
+              :postgres "SELECT * FROM \"t1_users\" ORDER BY \"id\" ASC"
+              :mariadb  "SELECT * FROM `t1_users` ORDER BY `id` ASC")]
            (tools.compile/compile (t1.db/select User {:order-by [:id]})))))
   (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
           {:id 2, :first-name "Rasta", :last-name "Toucan"}
@@ -635,6 +636,7 @@
 (deftest ^:parallel honeysql->sql-test
   (is (= [(case (test/current-db-type)
             :h2       "SELECT * FROM \"USER\" WHERE \"NAME\" = ?"
-            :postgres "SELECT * FROM \"user\" WHERE \"name\" = ?")
+            :postgres "SELECT * FROM \"user\" WHERE \"name\" = ?"
+            :mariadb  "SELECT * FROM `user` WHERE `name` = ?")
           "Cam"]
          (t1.db/honeysql->sql {:select [:*], :from [:user], :where [:= :name "Cam"]}))))

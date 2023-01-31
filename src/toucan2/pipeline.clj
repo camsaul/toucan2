@@ -195,6 +195,7 @@
   [query-type model sql]
   (compile query-type model [sql]))
 
+;;; TODO -- does this belong here, or in [[toucan2.query]]?
 (m/defmulti build
   "Build a query by applying `parsed-args` to `resolved-query` into something that can be compiled by [[compile]], e.g.
   build a Honey SQL query by applying `parsed-args` to an initial `resolved-query` map.
@@ -332,12 +333,7 @@
     (transduce-built-query rf query-type model built-query)))
 
 (defn- transduce-query* [rf query-type model parsed-args resolved-query]
-  (let [parsed-args    (dissoc parsed-args :queryable)
-        resolved-query (cond-> resolved-query
-                         (and (map? resolved-query)
-                              (not (record? resolved-query))
-                              (isa? (type resolved-query) clojure.lang.IPersistentMap))
-                         (vary-meta assoc :type (map/backend)))]
+  (let [parsed-args (dissoc parsed-args :queryable)]
     (u/try-with-error-context ["with resolved query" {::resolved-query resolved-query}]
       (transduce-query rf query-type model parsed-args resolved-query))))
 
@@ -479,36 +475,36 @@
                        :queryable {}}]
       (transduce-with-model rf ::select.instances-from-pks model parsed-args))))
 
-(defn- DML? [query-type]
-  (isa? query-type :toucan.statement-type/DML))
+(derive ::DML-queries-returning-instances :toucan.result-type/instances)
+
+(doseq [query-type [:toucan.query-type/delete.instances
+                    :toucan.query-type/update.instances
+                    :toucan.query-type/insert.instances]]
+  (derive query-type ::DML-queries-returning-instances))
 
 (m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
-                                                #_query-type :toucan.result-type/instances
+                                                #_query-type ::DML-queries-returning-instances
                                                 #_model      :default]
   [rf conn query-type model sql-args]
   ;; for non-DML stuff (ie `SELECT`) JDBC can actually return instances with zero special magic, so we can just let the
   ;; next method do it's thing. Presumably if we end up here with something that is neither DML or DQL, but maybe
   ;; something like a DDL `CREATE TABLE` statement, we probably don't want to assume it has the possibility to have it
   ;; return generated PKs.
-  (let [pk-query-type (when DML?
-                        (types/similar-query-type-returning query-type :toucan.result-type/pks))]
-    (if-not pk-query-type
-      ;; non-DML query or if we don't know how to do magic, let the `next-method` do it's thing.
-      (next-method rf conn query-type model sql-args)
-      ;; for DML stuff get generated PKs and then do a SELECT to get the rows. See if we know how the right
-      ;; returning-PKs query type.
-      ;;
-      ;; We're using `conj` here instead of `rf` so no row-transform nonsense or whatever is done. We will pass the
-      ;; actual instances to the original `rf` once we get them.
-      ;;
-      ;;
-      (let [pks     (transduce-execute-with-connection conj conn pk-query-type model sql-args)
-            ;; this is sort of a hack but I don't know of any other way to pass along `:columns` information with the
-            ;; original parsed args
-            columns (:columns *parsed-args*)]
-        ;; once we have a sequence of PKs then get instances as with `select` and do our magic on them using the
-        ;; ORIGINAL `rf`.
-        (transduce-instances-from-pks rf model columns pks)))))
+  (let [pk-query-type (types/similar-query-type-returning query-type :toucan.result-type/pks)]
+    ;; for DML stuff get generated PKs and then do a SELECT to get the rows. See if we know how the right
+    ;; returning-PKs query type.
+    ;;
+    ;; We're using `conj` here instead of `rf` so no row-transform nonsense or whatever is done. We will pass the
+    ;; actual instances to the original `rf` once we get them.
+    ;;
+    ;;
+    (let [pks     (transduce-execute-with-connection conj conn pk-query-type model sql-args)
+          ;; this is sort of a hack but I don't know of any other way to pass along `:columns` information with the
+          ;; original parsed args
+          columns (:columns *parsed-args*)]
+      ;; once we have a sequence of PKs then get instances as with `select` and do our magic on them using the
+      ;; ORIGINAL `rf`.
+      (transduce-instances-from-pks rf model columns pks))))
 
 ;;;; Misc util functions. TODO -- I don't think this belongs here; hopefully this can live somewhere where we can call
 ;;;; it `compile` instead.

@@ -133,7 +133,8 @@
             (testing "no alias"
               (let [expected-key (case (test/current-db-type)
                                    :h2       (keyword "max(-id)")
-                                   :postgres :max)]
+                                   :postgres :max
+                                   :mariadb  (keyword "max(`id`)"))]
                 (is (= [(instance/instance ::test/people {expected-key 4})]
                        (select/select [::test/people [expr]]))))))))
       (testing "[expr identifier]"
@@ -460,7 +461,8 @@
            (select/select-one ::test/people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]})))
     (is (= [(case (test/current-db-type)
               :h2       "SELECT \"P\".\"ID\" FROM \"PEOPLE\" AS \"P\" WHERE \"P\".\"ID\" = ?"
-              :postgres "SELECT \"p\".\"id\" FROM \"people\" AS \"p\" WHERE \"p\".\"id\" = ?")
+              :postgres "SELECT \"p\".\"id\" FROM \"people\" AS \"p\" WHERE \"p\".\"id\" = ?"
+              :mariadb  "SELECT `p`.`id` FROM `people` AS `p` WHERE `p`.`id` = ?")
             1]
            (tools.compile/compile
              (select/select-one :people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]}))))))
@@ -477,7 +479,8 @@
                (pipeline/build :toucan.query-type/select.* ::test/venues parsed-args query)))))
     (is (= [(case (test/current-db-type)
               :h2       "SELECT * FROM \"VENUES\" WHERE \"ID\" IS NULL"
-              :postgres "SELECT * FROM \"venues\" WHERE \"id\" IS NULL")]
+              :postgres "SELECT * FROM \"venues\" WHERE \"id\" IS NULL"
+              :mariadb  "SELECT * FROM `venues` WHERE `id` IS NULL")]
            (tools.compile/compile
              (select/select ::test/venues nil))))
     (is (= []

@@ -158,7 +158,8 @@
                  ::venues.exception.clojure-land #"Don't insert a store"
                  ::venues.exception.db-land      (case (test/current-db-type)
                                                    :postgres #"ERROR: duplicate key value violates unique constraint"
-                                                   :h2       #"Unique index or primary key violation"))
+                                                   :h2       #"Unique index or primary key violation"
+                                                   :mariadb  #"Duplicate entry"))
                (insert/insert! model {:category "store", :name "My Store"})))
           (testing "\nShould be done inside a transaction"
             (is (= [(instance/instance model

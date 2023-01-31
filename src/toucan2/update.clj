@@ -18,8 +18,7 @@
    :kv-args     ::query/default-args.kv-args
    ;; by default, assuming this resolves to a map query, is treated as a map of conditions.
    :queryable   ::query/default-args.queryable
-   ;; TODO -- we should introduce some sort of `do-with-update-changes` method so it's possible to use named update maps
-   ;; here.
+   ;; TODO -- This should support named changes maps too. Also,
    :changes     map?))
 
 (m/defmethod query/parse-args :toucan.query-type/update.*
@@ -29,11 +28,13 @@
       (contains? parsed :pk) (-> (dissoc :pk)
                                  (update :kv-args assoc :toucan/pk (:pk parsed))))))
 
-;;;; Code for building Honey SQL for UPDATE lives in [[toucan2.map-backend.honeysql2]]
-
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/update.*
                              #_model      :default
                              #_query      :default]
+  "Default method for building UPDATE queries. Code for building Honey SQL for UPDATE lives
+  in [[toucan2.map-backend.honeysql2]].
+
+  This doesn't really do much, but if the query has no `:changes`, returns the special flag `:toucan2.pipeline/no-op`."
   [query-type model {:keys [changes], :as parsed-args} resolved-query]
   (if (empty? changes)
     (do

@@ -94,13 +94,54 @@
            (select/select-one-fn :name ::test/venues 1)))))
 
 (deftest ^:synchronized update-returning-pks-test
-  (test/with-discarded-table-changes :venues
-    (is (= [1 2]
-           ;; the order these come back in is indeterminate but as long as we get back a sequence of [1 2] we're fine
-           (sort (update/update-returning-pks! ::test/venues :category "bar" {:category "BARRR"}))))
-    (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
-            (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
-           (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]})))))
+  (doseq [[message thunk] {`update/update-returning-pks!
+                           (fn []
+                             (update/update-returning-pks! ::test/venues :category "bar" {:category "BARRR"}))
+
+                           "low-level pipeline methods"
+                           (fn []
+                             (conn/with-connection [_conn ::test/db]
+                               (pipeline/transduce-query (pipeline/default-rf :toucan.query-type/update.pks)
+                                                         :toucan.query-type/update.pks
+                                                         ::test/venues
+                                                         {:changes {:category "BARRR"}}
+                                                         {:category "bar"})))}]
+    (testing message
+      (test/with-discarded-table-changes :venues
+        (is (= [1 2]
+               ;; the order these come back in is indeterminate but as long as we get back a sequence of [1 2] we're
+               ;; fine
+               (sort (thunk))))
+        (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
+                (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
+               (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]})))))))
+
+(deftest ^:synchronized update-returning-instances-test
+  (testing "Not officially supported -- yet. Test that we can return instances from update using low-level pipeline methods"
+    (test/with-discarded-table-changes :venues
+      (is (= [(instance/instance ::test/venues
+                                 {:id         1
+                                  :name       "Tempest"
+                                  :category   "BARRR"
+                                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")
+                                  :created-at (LocalDateTime/parse "2017-01-01T00:00")})
+              (instance/instance ::test/venues
+                                 {:id         2
+                                  :name       "Ho's Tavern"
+                                  :category   "BARRR"
+                                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")
+                                  :created-at (LocalDateTime/parse "2017-01-01T00:00")})]
+             (sort-by
+              :id
+              (conn/with-connection [_conn ::test/db]
+                (pipeline/transduce-query (pipeline/default-rf :toucan.query-type/update.instances)
+                                          :toucan.query-type/update.instances
+                                          ::test/venues
+                                          {:changes {:category "BARRR"}}
+                                          {:category "bar"})))))
+      (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
+              (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
+             (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]}))))))
 
 (deftest ^:synchronized update-nil-test
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
@@ -119,7 +160,9 @@
                (pipeline/build :toucan.query-type/update.* ::test/venues parsed-args query)))))
     (is (= [(case (test/current-db-type)
               :h2       "UPDATE \"VENUES\" SET \"NAME\" = ? WHERE \"ID\" IS NULL"
-              :postgres "UPDATE \"venues\" SET \"name\" = ? WHERE \"id\" IS NULL") "Taco Bell"]
+              :postgres "UPDATE \"venues\" SET \"name\" = ? WHERE \"id\" IS NULL"
+              :mariadb  "UPDATE `venues` SET `name` = ? WHERE `id` IS NULL")
+            "Taco Bell"]
            (tools.compile/compile
              (update/update! ::test/venues nil {:name "Taco Bell"}))))
     (test/with-discarded-table-changes :venues

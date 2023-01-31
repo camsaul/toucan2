@@ -96,7 +96,7 @@
 (defn- jdbc-options []
   (merge
    (when *automatically-convert-dashes-and-underscores*
-     {:label-fn csk/->kebab-case})
+     {:label-fn u/->kebab-case})
    jdbc/*options*))
 
 (m/defmethod pipeline/transduce-query [#_query-type :default #_model :toucan1/model #_resolved-query :default]

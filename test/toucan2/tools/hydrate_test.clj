@@ -143,7 +143,7 @@
     (catch Throwable _e
       false)))
 
-(deftest ^:FIXME-not-parallel ^:synchronized valid-form-test
+(deftest ^:parallel valid-form-test
   (testing "invalid forms"
     (doseq [form ["k"
                   'k
@@ -531,7 +531,7 @@
   [_model k m]
   (assoc m k 1000))
 
-(deftest ^:FIXME-not-parallel ^:synchronized hydrate-sequence-dispatch-on-model-test
+(deftest ^:parallel hydrate-sequence-dispatch-on-model-test
   (testing "We should dispatch on the model of the first instance when hydrating a sequence"
     (is (= [(instance/instance ::m.hydrate-sequence {:a 1, ::model.x 1000})
             (instance/instance ::m.hydrate-sequence {:a 2, ::model.x 1000})]

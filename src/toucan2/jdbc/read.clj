@@ -24,14 +24,22 @@
   (into {} (for [^java.lang.reflect.Field field (.getDeclaredFields Types)]
              [(.getLong field Types) (.getName field)])))
 
-;;; TODO -- dispatch for this method is busted.
-;;;
-;;; 1.`col-type` should be an explicit parameter. A little weird to dispatch off of something that's not even one of the
-;;;    parameters
-;;;
-;;; 2. This should also dispatch off of the actual underlying column name
 (m/defmulti read-column-thunk
-  "Return a zero-arg function that, when called, will fetch the value of the column from the current row."
+  "Return a zero-arg function that, when called, will fetch the value of the column from the current row.
+
+  Dispatches on `java.sql.Connection` class, `model`, and the `java.sql.Types` mapping for the column, e.g.
+  `java.sql.Types/TIMESTAMP`.
+
+  ### TODO -- dispatch for this method is busted.
+
+  1. The `java.sql.Types` column type should be an explicit parameter. A little weird to dispatch off of something
+     that's not even one of the parameters
+
+  2. Should this also dispatch off of the actual underlying column name? So you can read a column in different ways for
+     different models.
+
+  3. Should this dispatch off of the underlying database column type name string, e.g. `timestamp` or `timestamptz`? It
+     seems like a lot of the time we need to do different things based on that type name."
   {:arglists '([^Connection conn₁ model₂ ^ResultSet rset ^ResultSetMetaData rsmeta₍₃₎ ^Long i])}
   (fn [^Connection conn model _rset ^ResultSetMetaData rsmeta ^Long i]
     (let [col-type (.getColumnType rsmeta i)]
@@ -85,10 +93,6 @@
   [_conn _model ^ResultSet rset _ ^Long i]
   (fn get-string-thunk []
     (.getString rset i)))
-
-(m/defmethod read-column-thunk [:default :default Types/TIMESTAMP]
-  [_conn _model rset _rsmeta i]
-  (get-object-of-class-thunk rset i java.time.LocalDateTime))
 
 (m/defmethod read-column-thunk [:default :default Types/TIMESTAMP]
   [_conn _model rset _rsmeta i]
@@ -203,8 +207,26 @@
                                  (catch Throwable _
                                    nil))]
   (m/defmethod read-column-thunk [pg-connection-class :default Types/TIMESTAMP]
+    "Both Postgres `timestamp` and `timestamp with time zone` come back as `java.sql.Types/TIMESTAMP`; check the actual
+  database column type name so we can fetch objects as the correct class."
     [_conn _model ^ResultSet rset ^ResultSetMetaData rsmeta ^Long i]
-    (let [^Class klass (if (= (.getColumnTypeName rsmeta i) "timestamptz")
+    (let [^Class klass (if (= (u/lower-case-en (.getColumnTypeName rsmeta i)) "timestamptz")
+                         java.time.OffsetDateTime
+                         java.time.LocalDateTime)]
+      (get-object-of-class-thunk rset i klass))))
+
+;;;; MySQL / MariaDB integration
+
+;;; TODO -- need the MySQL class here too.
+
+(when-let [mariadb-connection-class (Class/forName "org.mariadb.jdbc.MariaDbConnection")]
+  (m/defmethod read-column-thunk [mariadb-connection-class :default Types/TIMESTAMP]
+    "MySQL/MariaDB `timestamp` is normalized to UTC, so return it as an `OffsetDateTime` rather than a `LocalDateTime`.
+  `datetime` columns should be returned as `LocalDateTime`. Both `timestamp` and `datetime` seem to come back as
+  `java.sql.Types/TIMESTAMP`, so check the actual database column type name so we can fetch objects as the correct
+  class."
+    [_conn _model ^ResultSet rset ^ResultSetMetaData rsmeta ^Long i]
+    (let [^Class klass (if (= (u/lower-case-en (.getColumnTypeName rsmeta i)) "timestamp")
                          java.time.OffsetDateTime
                          java.time.LocalDateTime)]
       (get-object-of-class-thunk rset i klass))))

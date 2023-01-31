@@ -343,7 +343,8 @@
            Throwable
            (case (test/current-db-type)
              :postgres #"null value in column \"category\" of relation \"venues\" violates not-null constraint"
-             :h2       #"NULL not allowed for column \"CATEGORY\";")
+             :h2       #"NULL not allowed for column \"CATEGORY\";"
+             :mariadb  #"Column 'category' cannot be null")
            (update/update! ::venues.upper-case-name.no-stores {:updated-at (LocalDateTime/parse "2022-08-22T18:17:00")})))
       (is (= [{:id 1, :name "Tempest", :category "bar"}
               {:id 2, :name "Ho's Tavern", :category "bar"}

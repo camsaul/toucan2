@@ -17,14 +17,15 @@
  :aliases
  {:dev
   {:extra-deps
-   {com.h2database/h2              {:mvn/version "2.1.214"}
-    eftest/eftest                  {:mvn/version "0.6.0"}
-    io.github.camsaul/humane-are   {:mvn/version "1.0.2"}
-    org.clojure/java.classpath     {:mvn/version "1.0.0"}
-    org.clojure/math.combinatorics {:mvn/version "0.1.6"}
-    org.clojure/tools.namespace    {:mvn/version "1.3.0"}
-    org.postgresql/postgresql      {:mvn/version "42.5.1"}
-    pjstadig/humane-test-output    {:mvn/version "0.11.0"}}
+   {com.h2database/h2                    {:mvn/version "2.1.214"}
+    eftest/eftest                        {:mvn/version "0.6.0"}
+    io.github.camsaul/humane-are         {:mvn/version "1.0.2"}
+    org.clojure/java.classpath           {:mvn/version "1.0.0"}
+    org.clojure/math.combinatorics       {:mvn/version "0.1.6"}
+    org.clojure/tools.namespace          {:mvn/version "1.3.0"}
+    org.mariadb.jdbc/mariadb-java-client {:mvn/version "2.7.6"}
+    org.postgresql/postgresql            {:mvn/version "42.5.1"}
+    pjstadig/humane-test-output          {:mvn/version "0.11.0"}}
 
    :extra-paths
    ["test" "toucan1/src" "toucan1/test"]
@@ -54,12 +55,13 @@
    :exec-args  {:paths            ["deps.edn" "src" "test" "toucan1/src" "toucan1/test" ".github" "docs"]
                 :include-patterns ["\\.clj[cs]?$" "\\.edn$" "\\.yaml$" "\\.sql$" "\\.md$"]}}
 
-  ;; Run tests against the value of `TEST_DBS`, by default `postgres,h2`.
+  ;; Run tests against the value of `TEST_DBS`, by default `postgres,h2,mariadb`.
   ;;
   ;; clojure -X:dev:test
   :test
   {:exec-fn   toucan2.test-runner/run-tests
-   :jvm-opts  ["-Dtest.dbs=h2,postgres"
+   :jvm-opts  ["-Dtest.dbs=h2,postgres,mariadb"
+               "-Dtoucan.test=true"
                "-Dtoucan.debug.level=disabled" #_trace]
    :exec-args {:only ["test"
                       "toucan1/test"]}}
@@ -87,6 +89,12 @@
   ;; clj -X:dev:test:test-postgres
   :test-postgres
   {:jvm-opts ["-Dtest.dbs=postgres"]}
+
+  ;; run tests only against MariaDB.
+  ;;
+  ;; clj -X:dev:test:test-mariadb
+  :test-mariadb
+  {:jvm-opts ["-Dtest.dbs=mariadb"]}
 
   ;; clj -X:dev:cloverage
   :cloverage

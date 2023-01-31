@@ -1,6 +1,5 @@
 (ns toucan2.test
   (:require
-   [camel-snake-kebab.core :as csk]
    [clojure.java.io :as io]
    [clojure.spec.alpha :as s]
    [clojure.string :as str]
@@ -17,12 +16,17 @@
    [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
+   [toucan2.tools.update-returning-pks-workaround
+    :as update-returning-pks-workaround]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
 (humane-are/install!)
-(humane-test-output/activate!)
+
+;; don't activate humane test output when running from the CLI, since it breaks Eftest's pretty diffs.
+(when-not (some-> (System/getProperty "toucan.test") parse-boolean)
+  (humane-test-output/activate!))
 
 ;;; make sure ALL of our tests are either marked `^:parallel` or `^:synchronized`, that way we can run things quick in
 ;;; the test runner.
@@ -80,6 +84,15 @@
         :h2)
       (first (db-types))))
 
+(defn- honey-sql-dialect
+  ([]
+   (honey-sql-dialect (current-db-type)))
+  ([db-type]
+   (case db-type
+     :h2               ::h2
+     :postgres         :ansi
+     (:mysql :mariadb) :mysql)))
+
 #_{:clj-kondo/ignore [:discouraged-var]}
 (println "Running tests against DB types:" (pr-str (db-types)))
 
@@ -109,7 +122,14 @@
         wrapped (fn wrapped-test-fn []
                   (binding [*parallel-test* (when (parallel? varr) varr)]
                     (doseq [db-type (db-types)]
-                      (binding [*current-db-type* db-type]
+                      (binding [*current-db-type*
+                                db-type
+
+                                update-returning-pks-workaround/*use-update-returning-pks-workaround*
+                                (#{:mysql :mariadb} db-type)
+
+                                map.honeysql/*options*
+                                (assoc map.honeysql/*options* :dialect (honey-sql-dialect db-type))]
                         (t/testing (str db-type \newline)
                           (orig))))))]
     (alter-meta! varr assoc :test wrapped)))
@@ -149,21 +169,15 @@
 
 ;;;; default HoneySQL options
 
-(defn quote-for-current-db [& args]
-  (let [f (:quote (hsql/get-dialect :ansi))
-        f (case (current-db-type)
-            :postgres f
-            :h2       (comp str/upper-case f))]
-    (apply f args)))
-
 (hsql/register-dialect!
- ::current-db.dialect
- (assoc (hsql/get-dialect :ansi)
-        :quote quote-for-current-db))
+ ::h2
+ (update (hsql/get-dialect :ansi)
+         :quote
+         (fn [f]
+           (comp str/upper-case f))))
 
-(swap! map.honeysql/global-options assoc :dialect ::current-db.dialect)
-
-(defonce global-honeysql-options @map.honeysql/global-options) ; in case we need it later.
+;;; in case we need it later, so we can reset it. See [[toucan.test-setup/do-with-default-quoting-style]]
+(defonce global-honeysql-options @map.honeysql/global-options)
 
 ;;;; URLs for test DBs.
 
@@ -174,6 +188,10 @@
 (defmethod default-test-db-url :postgres
   [_db-type]
   "jdbc:postgresql://localhost:5432/toucan2?user=cam&password=cam")
+
+(defmethod default-test-db-url :mariadb
+  [_db-type]
+  "jdbc:mysql://localhost:3306/metabase_test?user=root")
 
 (defmethod default-test-db-url :h2
   [_db-type]
@@ -194,12 +212,13 @@
   (fn [db-type model-or-table-name]
     [(keyword db-type) (keyword model-or-table-name)]))
 
-(m/defmethod create-table-sql-file [:postgres :people]    [_db-type _table] "toucan2/test/people.postgres.sql")
-(m/defmethod create-table-sql-file [:h2 :people]          [_db-type _table] "toucan2/test/people.h2.sql")
-(m/defmethod create-table-sql-file [:postgres :venues]    [_db-type _table] "toucan2/test/venues.postgres.sql")
-(m/defmethod create-table-sql-file [:h2 :venues]          [_db-type _table] "toucan2/test/venues.h2.sql")
-(m/defmethod create-table-sql-file [:default :birds]      [_db-type _table] "toucan2/test/birds.sql")
-(m/defmethod create-table-sql-file [:default :categories] [_db-type _table] "toucan2/test/categories.sql")
+(m/defmethod create-table-sql-file :default
+  [db-type model-or-table-name]
+  (let [table-name   (name (model/table-name model-or-table-name))
+        db-file-name (format "toucan2/test/%s.%s.sql" table-name (name db-type))]
+    (if (io/resource db-file-name)
+      db-file-name
+      (format "toucan2/test/%s.sql" table-name))))
 
 (derive ::people ::models)
 
@@ -273,8 +292,8 @@
                               :categories]]
             (create-table! db-type conn table-name)))
         (swap! initialized-test-dbs conj db-type)))))
-(m/defmethod conn/do-with-connection ::db
 
+(m/defmethod conn/do-with-connection ::db
   [_connectable f]
   (let [db-type (current-db-type)]
     (set-up-test-db! db-type)
@@ -307,9 +326,18 @@
   [_model]
   ::db)
 
-(m/defmethod pipeline/transduce-query [:default ::models :default]
+(m/defmethod pipeline/transduce-query :around [:default ::models :default]
   [rf query-type model parsed-args resolved-query]
-  (binding [jdbc/*options* (assoc jdbc/*options* :label-fn csk/->kebab-case)]
+  (binding [jdbc/*options*
+            (assoc jdbc/*options* :label-fn u/->kebab-case)
+
+            ;; these are also set in the wrapped test var; so these aren't strictly needed but they're set here anyway
+            ;; as a REPL convenience
+            update-returning-pks-workaround/*use-update-returning-pks-workaround*
+            (#{:mysql :mariadb} (current-db-type))
+
+            map.honeysql/*options*
+            (assoc map.honeysql/*options* :dialect (honey-sql-dialect))]
     (next-method rf query-type model parsed-args resolved-query)))
 
 ;;;; conveniences for REPL-based usage. These are not used in tests.
@@ -317,7 +345,7 @@
 (defn set-db-types!
   "Change the DB types to run tests against for the current REPL session."
   [& ks]
-  {:pre [(every? keyword? ks) (seq ks)]}
+  {:pre [(every? #{:postgres :mariadb :h2} ks) (seq ks)]}
   (reset! db-types* (set ks)))
 
 (derive ::convenience-connectable ::db)

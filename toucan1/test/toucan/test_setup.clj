@@ -23,8 +23,8 @@
 (defn- quote-for-current-db-type [quote-fn]
   (comp (fn [s]
           ((case (test/current-db-type)
-             :h2       str/upper-case
-             :postgres identity #_u/lower-case-en) s))
+             :h2                  str/upper-case
+             (:postgres :mariadb) identity) s))
         quote-fn))
 
 (hsql/register-dialect!

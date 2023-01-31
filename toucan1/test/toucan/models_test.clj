@@ -510,8 +510,8 @@
     (let [expected {:id         6
                     :name       "Default Person"
                     :created-at (case (test/current-db-type)
-                                  :h2       (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")
-                                  :postgres (OffsetDateTime/parse "2023-01-01T01:26Z"))}]
+                                  :h2                  (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")
+                                  (:postgres :mariadb) (OffsetDateTime/parse "2023-01-01T01:26Z"))}]
       (is (= expected
              (t1.db/insert! ::people.default-values {:id 6})))
       (is (= expected

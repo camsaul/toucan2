@@ -80,7 +80,8 @@
                    ::venues.before-delete-exception.clojure-land #"Don't delete a store"
                    ::venues.before-delete-exception.db-land      (case (test/current-db-type)
                                                                    :postgres #"ERROR: duplicate key value violates unique constraint"
-                                                                   :h2       #"Unique index or primary key violation"))
+                                                                   :h2       #"Unique index or primary key violation"
+                                                                   :mariadb  #"Duplicate entry"))
                  (delete/delete! model)))
             (is (= [[model 1]
                     [model 2]

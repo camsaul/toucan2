@@ -1,5 +1,6 @@
 (ns toucan2.util
   (:require
+   [camel-snake-kebab.core :as csk]
    [clojure.spec.alpha :as s]
    [clojure.walk :as walk]
    [methodical.util.dispatch :as m.dispatch]
@@ -101,3 +102,11 @@
                                           :form        seqable?)
                :body               (s/+ any?))
   :ret  any?)
+
+(defn ->kebab-case
+  "Like `camel-snake-kebab.core/->kebab-case`, but supports namespaced keywords."
+  [x]
+  (if (and (keyword? x) (namespace x))
+    (keyword (csk/->kebab-case (namespace x))
+             (csk/->kebab-case (name x)))
+    (csk/->kebab-case x)))
