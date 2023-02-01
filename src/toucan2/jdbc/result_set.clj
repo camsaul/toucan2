@@ -29,9 +29,8 @@
   {:arglists            '([^java.sql.Connection conn₁ model₂ ^java.sql.ResultSet rset opts])
    :defmethod-arities   #{4}
    :dispatch-value-spec (s/nonconforming
-                         (s/or :default ::types/dispatch-value.default
-                               :conn-model (s/cat :conn (s/or :default   ::types/dispatch-value.default
-                                                              :classname symbol?)
+                         (s/or :default    ::types/dispatch-value.default
+                               :conn-model (s/cat :conn  ::types/dispatch-value.keyword-or-class
                                                   :model ::types/dispatch-value.model)))}
   u/dispatch-on-first-two-args)
 
@@ -75,6 +74,8 @@
    (fn [column-name]
      (when (or (string? column-name)
                (instance? clojure.lang.Named column-name))
+       ;; TODO FIXME -- it seems like the column name we get here has already went thru the label fn/qualifying
+       ;; functions. The `(originally ...)` in the log message is wrong. Are we applying label function twice?!
        (let [column-name' (keyword
                            (when (instance? clojure.lang.Named column-name)
                              (when-let [col-ns (namespace column-name)]
@@ -87,6 +88,8 @@
                                         (inc i)))
                                     cols)))]
          (log/tracef :results "Index of column named %s (originally %s) is %s" column-name' column-name i)
+         (when-not i
+           (log/errorf :results "Could not determine index of column name %s. Found: %s" column-name cols))
          i)))))
 
 (defn instance-builder-fn
@@ -95,11 +98,10 @@
   by [[toucan2.model/table-name->namespace]]."
   [model ^ResultSet rset opts]
   (let [table-name->ns (model/table-name->namespace model)
-        _              (log/debugf :results "Using table namespaces %s" table-name->ns)
         label-fn       (get opts :label-fn name)
         qualifier-fn   (memoize
                         (fn [table]
-                          (let [table    (label-fn (name table))
+                          (let [table    (some-> table not-empty name label-fn)
                                 table-ns (some-> (get table-name->ns table) name)]
                             (log/tracef :results "Using namespace %s for columns in table %s" table-ns table)
                             table-ns)))
@@ -107,8 +109,9 @@
                                :qualifier-fn qualifier-fn}
                               opts)
         rsmeta         (.getMetaData rset)
+        _              (log/debugf :results "Getting modified column names with next.jdbc options %s" opts)
         col-names      (next.jdbc.rs/get-modified-column-names rsmeta opts)]
-    (log/tracef :results "Column names: %s" col-names)
+    (log/debugf :results "Column names: %s" col-names)
     (constantly
      (assoc (->InstanceBuilder model rset rsmeta col-names) :opts opts))))
 
@@ -139,12 +142,16 @@
                                               (.getMetaData rset)
                                               combined-opts))
         col-name->index   (make-column-name->index col-names label-fn)]
+    (log/tracef :results "column name -> index = %s" col-name->index)
     (loop [acc init]
       (b/cond
         (not (.next rset))
-        acc
+        (do
+          (log/tracef :results "Result set has no more rows.")
+          acc)
 
         :let [row-num  (.getRow rset)
+              _        (log/tracef :results "Fetch row %s" row-num)
               i->thunk (row-num->i->thunk row-num)
               row      (jdbc.row/row model rset builder i->thunk col-name->index)
               acc'     (rf acc row)]

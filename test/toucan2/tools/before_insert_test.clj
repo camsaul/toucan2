@@ -158,7 +158,8 @@
                  ::venues.exception.clojure-land #"Don't insert a store"
                  ::venues.exception.db-land      (case (test/current-db-type)
                                                    :postgres #"ERROR: duplicate key value violates unique constraint"
-                                                   :h2       #"Unique index or primary key violation"))
+                                                   :h2       #"Unique index or primary key violation"
+                                                   :mariadb  #"Duplicate entry"))
                (insert/insert! model {:category "store", :name "My Store"})))
           (testing "\nShould be done inside a transaction"
             (is (= [(instance/instance model
@@ -192,6 +193,6 @@
     (is (= {:id         5
             :name       "Default Person"
             :created-at (case (test/current-db-type)
-                          :h2       (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")
-                          :postgres (OffsetDateTime/parse "2023-01-01T01:26Z"))}
+                          :h2                  (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")
+                          (:postgres :mariadb) (OffsetDateTime/parse "2023-01-01T01:26Z"))}
            (select/select-one ::people.default-values 5)))))

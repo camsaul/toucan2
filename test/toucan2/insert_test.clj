@@ -67,8 +67,7 @@
               :values      [{:name "Grant & Green", :category "bar"}]}
              (pipeline/build :toucan.query-type/insert.* ::test/venues {:rows rows} {}))))))
 
-;;; TODO -- a bit of a misnomer now.
-(defn- do-both-types-of-insert [f]
+(defn- do-insert-and-insert-returning-pks [f]
   (testing "Should be no Venue 4 yet"
     (is (= nil
            (select/select-one ::test/venues 4))))
@@ -79,7 +78,7 @@
         (f returning-keys? insert!)))))
 
 (deftest ^:synchronized insert-single-row-test
-  (do-both-types-of-insert
+  (do-insert-and-insert-returning-pks
    (fn [returning-keys? insert!]
      (is (= (if returning-keys?
               [4]
@@ -93,10 +92,48 @@
                                                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
               (select/select-one ::test/venues 4)))))))
 
+(deftest ^:synchronized include-pk-test
+  (testing "If a value for the PK is explicitly specified, insert! and friends should still work correctly"
+    (doseq [[insert! expected] {#'insert/insert!                     1
+                                #'insert/insert-returning-pks!       [4]
+                                #'insert/insert-returning-instances! [(instance/instance
+                                                                       ::test/venues
+                                                                       {:id         4
+                                                                        :name       "Grant & Green"
+                                                                        :category   "bar"
+                                                                        :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]}]
+      (test/with-discarded-table-changes :venues
+        (testing insert!
+          (is (= expected
+                 (insert! ::test/venues {:id 4, :name "Grant & Green", :category "bar"})))
+          (testing "Venue 4 should exist now"
+            (is (= (instance/instance ::test/venues {:id         4
+                                                     :name       "Grant & Green"
+                                                     :category   "bar"
+                                                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                   (select/select-one ::test/venues 4)))))))))
+
+(deftest ^:synchronized include-pk-non-integer-test
+  (testing "If a value for a *non-integer* PK is explicitly specified, insert! and friends should still work correctly"
+    (doseq [[insert! expected] {#'insert/insert!                     1
+                                #'insert/insert-returning-pks!       ["012345678"]
+                                #'insert/insert-returning-instances! [(instance/instance
+                                                                       ::test/phone-number
+                                                                       {:number "012345678", :country-code "US"})]}]
+      (test/with-discarded-table-changes :phone_number
+        (testing insert!
+          (is (= expected
+                 (insert! ::test/phone-number {:number "012345678", :country-code "US"})))
+          (testing "Phone Number 1 should exist now"
+            (is (= (instance/instance ::test/phone-number {:number "012345678", :country-code "US"})
+                   (select/select-one ::test/phone-number :toucan/pk "012345678")))))))))
+
 (deftest ^:synchronized string-model-test
   (testing "insert! should work with string table names as the model"
     (conn/with-connection [_conn ::test/db]
-      (do-both-types-of-insert
+      (do-insert-and-insert-returning-pks
        (fn [returning-keys? insert!]
          (is (= (if returning-keys?
                   [4]
@@ -116,7 +153,7 @@
                          {:name "Black Horse London Pub", :category "bar"}
                          {:name "Nick's Crispy Tacos", :category "bar"})]]
     (testing (format "rows = %s %s\n" rows-fn (pr-str rows))
-      (do-both-types-of-insert
+      (do-insert-and-insert-returning-pks
        (fn [returning-keys? insert!]
          (is (= (if returning-keys?
                   [4 5]
@@ -136,7 +173,7 @@
                   (select/select ::test/venues :id [:>= 4] {:order-by [[:id :asc]]})))))))))
 
 (deftest ^:synchronized key-values-test
-  (do-both-types-of-insert
+  (do-insert-and-insert-returning-pks
    (fn [returning-keys? insert!]
      (is (= (if returning-keys?
               [4]
@@ -151,7 +188,7 @@
               (select/select-one ::test/venues :id 4)))))))
 
 (deftest ^:synchronized multiple-rows-with-column-names-test
-  (do-both-types-of-insert
+  (do-insert-and-insert-returning-pks
    (fn [returning-keys? insert!]
      (testing "Insert multiple rows with column names"
        (is (= (if returning-keys?
@@ -224,12 +261,13 @@
   (testing "Should be able to insert an empty row."
     (doseq [row-or-rows [{}
                          [{}]]]
-      ;;; TODO -- what about multiple empty rows?? :shrug:
+      ;; TODO -- what about multiple empty rows?? :shrug:
       (testing (format "row-or-rows = %s" (pr-str row-or-rows))
         (test/with-discarded-table-changes :birds
           (is (= [(case (test/current-db-type)
                     :h2       "INSERT INTO \"BIRDS\" DEFAULT VALUES"
-                    :postgres "INSERT INTO \"birds\" DEFAULT VALUES")]
+                    :postgres "INSERT INTO \"birds\" DEFAULT VALUES"
+                    :mariadb  "INSERT INTO `birds` () VALUES ()")]
                  (tools.compile/compile
                    (insert/insert! ::test/birds row-or-rows))))
           (is (= 1
@@ -341,5 +379,7 @@
       (test.track-realized/with-realized-columns [realized-columns]
         (is (= [4]
                (insert/insert-returning-pks! ::test.track-realized/venues {:name "Walgreens", :category "store"})))
-        (is (= #{:venues/id}
+        (is (= (case (test/current-db-type)
+                 (:postgres :h2) #{:venues/id}
+                 :mariadb        #{:insert-id})
                (realized-columns)))))))

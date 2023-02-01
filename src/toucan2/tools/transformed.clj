@@ -235,7 +235,7 @@
                result))))
     identity))
 
-(m/defmethod pipeline/build [#_query-type     ::pipeline/select.instances-from-pks
+(m/defmethod pipeline/build [#_query-type     :toucan.query-type/select.instances-from-pks
                              #_model          ::transformed.model
                              #_resolved-query :default]
   "Don't try to transform stuff when we're doing SELECT directly with PKs (e.g. to fake INSERT returning instances), We're
@@ -246,7 +246,7 @@
 
 (m/defmethod pipeline/results-transform [#_query-type :toucan.result-type/instances #_model ::transformed.model]
   [query-type model]
-  (if (isa? query-type ::pipeline/select.instances-from-pks)
+  (if (isa? query-type :toucan.query-type/select.instances-from-pks)
     (next-method query-type model)
     (let [xform (transform-result-rows-transducer model)]
       (comp xform
@@ -424,14 +424,6 @@
   :args (s/cat :model      some?
                :transforms any?)
   :ret any?)
-
-;;; If [[toucan2.tools.after-update]] or [[toucan2.tools.after-insert]] need to "upgrade" the query, let them do that
-;;; before applying any transforms. Transforms will still get applied to the upgraded query.
-;;;
-;;; TODO -- not 100% sure this is still needed
-#_(m/prefer-method! #'pipeline/transduce-with-model
-                  [:toucan2.tools.after/query-type :toucan2.tools.after/model]
-                  [:toucan.result-type/instances ::transformed.model])
 
 ;;; apply results transforms before [[toucan2.tools.after-update]] or [[toucan2.tools.after-insert]]
 (m/prefer-method! #'pipeline/results-transform

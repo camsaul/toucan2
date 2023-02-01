@@ -79,6 +79,11 @@
   (derive :toucan.query-type/delete.*)
   (derive :toucan.result-type/instances))
 
+;;; The following are 'special' types only used in SPECIAL situations.
+
+;; A select query that is done with PKs fetched directly from that database. These don't need to be transformed.
+(derive :toucan.query-type/select.instances-from-pks :toucan.query-type/select.instances)
+
 (defn query-type?
   "True if `query-type` derives from one of the various abstract query keywords such as `:toucan.result-type/*` or
   `:toucan.query-type/*`. This does not guarantee that the query type is a 'concrete', just that it is something with

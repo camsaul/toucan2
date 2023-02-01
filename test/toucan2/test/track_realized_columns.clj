@@ -22,7 +22,7 @@
 (m/defmethod jdbc.read/read-column-thunk :before [#_conn :default #_model ::track-realized #_col-type :default]
   [_conn _model _rset ^java.sql.ResultSetMetaData rsmeta ^Integer i]
   (when *realized-columns*
-    (let [table-name (csk/->kebab-case (.getTableName rsmeta i))
+    (let [table-name (some-> (.getTableName rsmeta i) not-empty csk/->kebab-case)
           col-name   (csk/->kebab-case (.getColumnName rsmeta i))]
       (swap! *realized-columns* conj (keyword table-name col-name))))
   i)

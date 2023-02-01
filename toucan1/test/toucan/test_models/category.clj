@@ -7,10 +7,8 @@
    *  `post-insert`                 -- which adds IDs of newly created Categories to a \"moderation queue\";
    *  `pre-delete`                  -- which deletes child Categories when deleting a Category;"
   (:require
-   [methodical.core :as m]
    [toucan.db :as t1.db]
    [toucan.models :as t1.models]
-   [toucan2.test :as test]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -59,11 +57,3 @@
   :pre-update  assert-parent-category-exists
   :post-update add-category-to-updated-queue!
   :pre-delete  delete-child-categories!})
-
-(m/defmethod test/create-table-sql-file [:postgres Category]
-  [_db-type _table-name]
-  "toucan/test_models/category.postgres.sql")
-
-(m/defmethod test/create-table-sql-file [:h2 Category]
-  [_db-type _table-name]
-  "toucan/test_models/category.h2.sql")

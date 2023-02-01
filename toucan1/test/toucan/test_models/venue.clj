@@ -1,9 +1,7 @@
 (ns toucan.test-models.venue
   "A model with `:types`, custom `:properties`, and `:default-fields`."
   (:require
-   [methodical.core :as m]
-   [toucan.models :as t1.models]
-   [toucan2.test :as test]))
+   [toucan.models :as t1.models]))
 
 (set! *warn-on-reflection* true)
 
@@ -22,11 +20,3 @@
  {:default-fields (constantly [:id :name :category])
   :types          (constantly {:category :keyword})
   :properties     (constantly {::timestamped? true})})
-
-(m/defmethod test/create-table-sql-file [:postgres Venue]
-  [_db-type _table-name]
-  "toucan/test_models/venue.postgres.sql")
-
-(m/defmethod test/create-table-sql-file [:h2 Venue]
-  [_db-type _table-name]
-  "toucan/test_models/venue.h2.sql")

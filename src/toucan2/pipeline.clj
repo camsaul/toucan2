@@ -20,12 +20,11 @@
    [methodical.core :as m]
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
-   [toucan2.jdbc :as jdbc]
-   [toucan2.jdbc.query :as jdbc.query]
    [toucan2.map-backend :as map]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
    [toucan2.query :as query]
+   [toucan2.query-execution-backend :as query-execution]
    [toucan2.realize :as realize]
    [toucan2.types :as types]
    [toucan2.util :as u]))
@@ -42,15 +41,15 @@
   use [[increment-call-count!]] to simplify the chore of making sure it's non-`nil` before invoking it."
   nil)
 
-(defn- dispatch-ignore-rf [f]
-  (fn [_rf & args]
-    (apply f args)))
-
+;;; TODO -- This name is a little long, maybe this should be called `transduce-execute` and the function should get
+;;; called something else
 (m/defmulti transduce-execute-with-connection
   "The final stage of the Toucan 2 query execution pipeline. Execute a compiled query (as returned by [[compile]]) with a
   database connection, e.g. a `java.sql.Connection`, and transduce results with reducing function `rf`.
 
-  The only reason you should need to implement this method is if you are writing a new query execution backend."
+  The only reason you should need to implement this method is if you are writing a new query execution backend. If
+  needed, you can specify initialization logic for your query execution backend by
+  implementing [[toucan2.query-execution-backend/load-backend-if-needed]] for your connection class."
   {:arglists            '([rf conn₁ query-type₂ model₃ compiled-query])
    :defmethod-arities   #{5}
    :dispatch-value-spec (s/nonconforming
@@ -58,7 +57,8 @@
                                :conn-query-type-model (s/cat :conn       ::types/dispatch-value.keyword-or-class
                                                              :query-type ::types/dispatch-value.query-type
                                                              :model      ::types/dispatch-value.model)))}
-  (dispatch-ignore-rf u/dispatch-on-first-three-args))
+  (fn [_rf conn query-type model _compiled-query]
+    (u/dispatch-on-first-three-args conn query-type model)))
 
 (m/defmethod transduce-execute-with-connection :before :default
   "Count all queries that are executed by calling [[*call-count-thunk*]] if bound."
@@ -66,34 +66,6 @@
   (when *call-count-thunk*
     (*call-count-thunk*))
   query)
-
-;;;; default JDBC impls. Not convinced they belong here.
-
-(m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
-                                                #_query-type :default
-                                                #_model      :default]
-  "Default impl for the JDBC query execution backend."
-  [rf conn query-type model sql-args]
-  {:pre [(sequential? sql-args) (string? (first sql-args))]}
-  ;; `:return-keys` is passed in this way instead of binding a dynamic var because we don't want any additional queries
-  ;; happening inside of the `rf` to return keys or whatever.
-  (let [extra-options (when (isa? query-type :toucan.result-type/pks)
-                        {:return-keys true})
-        result        (jdbc.query/reduce-jdbc-query rf (rf) conn model sql-args extra-options)]
-    (rf result)))
-
-(m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
-                                                #_query-type :toucan.result-type/pks
-                                                #_model      :default]
-  "JDBC query execution backend for executing queries that return PKs (`:toucan.result-type/pks`).
-
-  To get Databases to return the generated primary keys rather than the update count for SELECT/UPDATE/DELETE we need to
-  set the `next.jdbc` option `:return-keys true`. So this binds [[jdbc/*options*]] and then calls the default JDBC impl."
-  [rf conn query-type model sql-args]
-  (let [rf* ((map (model/select-pks-fn model))
-             rf)]
-    (binding [jdbc/*options* (assoc jdbc/*options* :return-keys true)]
-      (next-method rf* conn query-type model sql-args))))
 
 (defn- transduce-execute
   "Get a connection from the current connection and call [[transduce-execute-with-connection]]. For DML queries, this
@@ -106,9 +78,11 @@
       ;; necessary since we would probably already be in one if we needed to be because stuff
       ;; like [[toucan2.tools.before-delete]] have to put us in one much earlier.
       (conn/with-transaction [conn nil {:nested-transaction-rule :ignore}]
+        (query-execution/load-backend-if-needed conn)
         (transduce-execute-with-connection rf conn query-type model compiled-query))
       ;; otherwise we can just execute with a normal non-transaction query.
       (conn/with-connection [conn]
+        (query-execution/load-backend-if-needed conn)
         (transduce-execute-with-connection rf conn query-type model compiled-query)))))
 
 (m/defmulti results-transform
@@ -195,6 +169,7 @@
   [query-type model sql]
   (compile query-type model [sql]))
 
+;;; TODO -- does this belong here, or in [[toucan2.query]]?
 (m/defmulti build
   "Build a query by applying `parsed-args` to `resolved-query` into something that can be compiled by [[compile]], e.g.
   build a Honey SQL query by applying `parsed-args` to an initial `resolved-query` map.
@@ -291,6 +266,11 @@
   which applies different behavior if a query was initiated with `[model & columns]` syntax vs. if it was not.)"
   nil)
 
+(def ^:dynamic *resolved-query*
+  "The query after it has been resolved. This is bound in case methods in the later stages of the pipeline need it for one
+  reason or another."
+  nil)
+
 (defn- transduce-compiled-query [rf query-type model compiled-query]
   (u/try-with-error-context ["with compiled query" {::compiled-query compiled-query}]
     (let [xform (results-transform query-type model)
@@ -332,14 +312,10 @@
     (transduce-built-query rf query-type model built-query)))
 
 (defn- transduce-query* [rf query-type model parsed-args resolved-query]
-  (let [parsed-args    (dissoc parsed-args :queryable)
-        resolved-query (cond-> resolved-query
-                         (and (map? resolved-query)
-                              (not (record? resolved-query))
-                              (isa? (type resolved-query) clojure.lang.IPersistentMap))
-                         (vary-meta assoc :type (map/backend)))]
-    (u/try-with-error-context ["with resolved query" {::resolved-query resolved-query}]
-      (transduce-query rf query-type model parsed-args resolved-query))))
+  (let [parsed-args (dissoc parsed-args :queryable)]
+    (binding [*resolved-query* resolved-query]
+      (u/try-with-error-context ["with resolved query" {::resolved-query resolved-query}]
+        (transduce-query rf query-type model parsed-args resolved-query)))))
 
 (defn- transduce-with-model
   [rf query-type model {:keys [queryable], :as parsed-args}]
@@ -405,6 +381,13 @@
       (with-init 0)
       completing))
 
+(m/defmethod default-rf :toucan.result-type/pks
+  "The reducing function for queries returning PKs. Presumably these will come back as a map, but that map doesn't need to
+  be realized. This needs to be combined with a transducer like `map` [[toucan2.model/select-pks-fn]] to get the PKs
+  themselves."
+  [_query-type]
+  conj)
+
 (m/defmethod default-rf :toucan.result-type/*
   "The default reducing function for all query types unless otherwise specified. Returns realized maps (by default, Toucan
   2 instances)."
@@ -457,58 +440,6 @@
   version of [[transduce-parsed]]."
   [query-type parsed-args]
   (reducible-fn transduce-parsed query-type parsed-args))
-
-;;; There's no such thing as "returning instances" for INSERT/DELETE/UPDATE. So we will fake it by executing the query
-;;; with the equivalent `returning-pks` query type, and then do a `:select` query to get the matching instances and pass
-;;; those in to the original `rf`.
-
-;;; this is here in case we need to differentiate it from a regular select for some reason or another
-(derive ::select.instances-from-pks :toucan.query-type/select.instances)
-
-(defn- transduce-instances-from-pks
-  [rf model columns pks]
-  ;; make sure [[toucan2.select]] is loaded so we get the impls for `:toucan.query-type/select.instances`
-  (when-not (contains? (loaded-libs) 'toucan2.select)
-    (locking clojure.lang.RT/REQUIRE_LOCK
-      (require 'toucan2.select)))
-  (if (empty? pks)
-    []
-    (let [kv-args     {:toucan/pk [:in pks]}
-          parsed-args {:columns   columns
-                       :kv-args   kv-args
-                       :queryable {}}]
-      (transduce-with-model rf ::select.instances-from-pks model parsed-args))))
-
-(defn- DML? [query-type]
-  (isa? query-type :toucan.statement-type/DML))
-
-(m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
-                                                #_query-type :toucan.result-type/instances
-                                                #_model      :default]
-  [rf conn query-type model sql-args]
-  ;; for non-DML stuff (ie `SELECT`) JDBC can actually return instances with zero special magic, so we can just let the
-  ;; next method do it's thing. Presumably if we end up here with something that is neither DML or DQL, but maybe
-  ;; something like a DDL `CREATE TABLE` statement, we probably don't want to assume it has the possibility to have it
-  ;; return generated PKs.
-  (let [pk-query-type (when DML?
-                        (types/similar-query-type-returning query-type :toucan.result-type/pks))]
-    (if-not pk-query-type
-      ;; non-DML query or if we don't know how to do magic, let the `next-method` do it's thing.
-      (next-method rf conn query-type model sql-args)
-      ;; for DML stuff get generated PKs and then do a SELECT to get the rows. See if we know how the right
-      ;; returning-PKs query type.
-      ;;
-      ;; We're using `conj` here instead of `rf` so no row-transform nonsense or whatever is done. We will pass the
-      ;; actual instances to the original `rf` once we get them.
-      ;;
-      ;;
-      (let [pks     (transduce-execute-with-connection conj conn pk-query-type model sql-args)
-            ;; this is sort of a hack but I don't know of any other way to pass along `:columns` information with the
-            ;; original parsed args
-            columns (:columns *parsed-args*)]
-        ;; once we have a sequence of PKs then get instances as with `select` and do our magic on them using the
-        ;; ORIGINAL `rf`.
-        (transduce-instances-from-pks rf model columns pks)))))
 
 ;;;; Misc util functions. TODO -- I don't think this belongs here; hopefully this can live somewhere where we can call
 ;;;; it `compile` instead.

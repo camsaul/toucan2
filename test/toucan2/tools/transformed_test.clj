@@ -330,7 +330,8 @@
                Exception
                (case (test/current-db-type)
                  :postgres #"ERROR: null value in column .* violates not-null constraint"
-                 :h2       #"NULL not allowed for column \"CATEGORY\"")
+                 :h2       #"NULL not allowed for column \"CATEGORY\""
+                 :mariadb  #"Column 'category' cannot be null")
                (insert/insert! ::venues.category-keyword {:name "No Category", :category nil})))))
       (testing "conditions"
         (is (= nil
