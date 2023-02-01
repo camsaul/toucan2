@@ -86,7 +86,7 @@ jobs:
           ~/.m2/repository
           ~/.gitlibs
           ~/.deps.clj
-        key: v1-${{ hashFiles('./deps.edn') }}-postgres
+        key: v1-${{ hashFiles('./deps.edn') }}-mariadb
         restore-keys: |
           v1-${{ hashFiles('./deps.edn') }}-
           v1-
