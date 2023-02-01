@@ -2,7 +2,9 @@
   "MySQL and MariaDB integration (mostly workarounds for broken stuff)."
   (:require
    [methodical.core :as m]
+   [toucan2.jdbc :as jdbc]
    [toucan2.jdbc.read :as jdbc.read]
+   [toucan2.jdbc.result-set :as jdbc.rs]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -127,3 +129,40 @@
 (m/prefer-method! #'pipeline/transduce-execute-with-connection
                   [::connection :toucan.query-type/update.pks :default]
                   [java.sql.Connection :toucan.result-type/pks :default])
+
+;;;; Builder function
+
+(m/defmethod jdbc.rs/builder-fn [::connection :default]
+  "This is an icky hack for MariaDB/MySQL. Inserted rows come back with the newly inserted ID as `:insert-id` rather than
+  the actual name of the primary key column. So tweak the `:label-fn` we pass to `next.jdbc` to rename `:insert-id` to
+  the actual PK name we'd expect. This only works for tables with a single-column PK."
+  [conn model rset opts]
+  (let [opts               (jdbc/merge-options opts)
+        label-fn           (get opts :label-fn name)
+        model-pks          (model/primary-keys model)
+        insert-id-label-fn (if (= (count model-pks) 1)
+                             (fn [label]
+                               (if (= label "insert_id")
+                                 (let [pk (first model-pks)
+                                       ;; there is some weirdness afoot. If we return a keyword without a namespace
+                                       ;; then `next.jdbc` seems to qualify it regardless of whether the
+                                       ;; `:qualifier-fn` returns `nil` or not -- so a PK like `:id` gets returned
+                                       ;; as `(keyword "" "id")`. But that doesn't happen if the label function
+                                       ;; returns a String.
+                                       ;;
+                                       ;; It seems like returning a string is the preferred thing to do, but in some
+                                       ;; cases [[model/primary-keys]] returns a namespaced keyword, and we want to
+                                       ;; preserve that namespace; `next.jdbc` does not try to change keywords that
+                                       ;; already have namespaces.
+                                       ;;
+                                       ;; So return the PK name as a keyword if the PK keyword is namespaced;
+                                       ;; otherwise return a string.
+                                       pk (if (namespace pk)
+                                            pk
+                                            (name pk))]
+                                   (log/debugf :results "MySQL/MariaDB inserted ID workaround: fetching insert_id as %s" pk)
+                                   pk)
+                                 label))
+                             identity)
+        label-fn'          (comp label-fn insert-id-label-fn)]
+    (next-method conn model rset (assoc opts :label-fn label-fn'))))
