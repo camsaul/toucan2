@@ -1,12 +1,14 @@
 DROP TABLE IF EXISTS venues;
 
 CREATE TABLE venues (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(256) UNIQUE NOT NULL,
-  category VARCHAR(256) NOT NULL,
-  created_at DATETIME(3) NOT NULL DEFAULT timestamp '2017-01-01T00:00:00',
-  updated_at DATETIME(3) NOT NULL DEFAULT timestamp '2017-01-01T00:00:00'
-);
+  id bigint AUTO_INCREMENT PRIMARY KEY,
+  name varchar(256) UNIQUE NOT NULL,
+  category varchar(256) NOT NULL,
+  created_at datetime(3) NOT NULL DEFAULT timestamp '2017-01-01 00:00:00',
+  updated_at datetime(3) NOT NULL DEFAULT timestamp '2017-01-01 00:00:00'
+)
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_bin;
 
 INSERT INTO venues (name, category)
 VALUES

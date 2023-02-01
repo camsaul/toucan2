@@ -6,7 +6,9 @@ CREATE TABLE t1_venues (
   category varchar(256) NOT NULL,
   `created-at` datetime(3) NOT NULL,
   `updated-at` datetime(3) NOT NULL
-);
+)
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_bin;
 
 INSERT INTO t1_venues (name, category, `created-at`, `updated-at`)
 VALUES

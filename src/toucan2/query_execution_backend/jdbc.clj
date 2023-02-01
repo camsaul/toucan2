@@ -42,8 +42,7 @@
     (let [kv-args     {:toucan/pk [:in pks]}
           parsed-args {:columns columns
                        :kv-args kv-args}]
-      (pipeline/transduce-query rf :toucan.query-type/select.instances-from-pks model parsed-args {})
-      #_(pipeline/transduce-with-model rf  model parsed-args))))
+      (pipeline/transduce-query rf :toucan.query-type/select.instances-from-pks model parsed-args {}))))
 
 (derive ::DML-queries-returning-instances :toucan.result-type/instances)
 

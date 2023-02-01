@@ -93,6 +93,28 @@
     (is (= "Grant & Green"
            (select/select-one-fn :name ::test/venues 1)))))
 
+(deftest ^:synchronized update-no-op-test
+  (doseq [[message thunk] {`update/update!
+                           (fn []
+                             (update/update! ::test/venues :category "BAR" {:category "BARRR"}))
+
+                           "low-level pipeline methods"
+                           (fn []
+                             (conn/with-connection [_conn ::test/db]
+                               (#'pipeline/transduce-query* (pipeline/default-rf :toucan.query-type/update.update-count)
+                                                            :toucan.query-type/update.update-count
+                                                            ::test/venues
+                                                            {:changes {:category "BARRR"}}
+                                                            {:category "BAR"})))}]
+    (testing message
+      (test/with-discarded-table-changes :venues
+        (testing "results"
+          (is (= 0
+                 (thunk))))
+        (testing "updated rows"
+          (is (= []
+                 (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]}))))))))
+
 (deftest ^:synchronized update-returning-pks-test
   (doseq [[message thunk] {`update/update-returning-pks!
                            (fn []
@@ -116,6 +138,28 @@
         (testing "updated rows"
           (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
                   (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
+                 (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]}))))))))
+
+(deftest ^:synchronized update-returning-pks-no-op-test
+  (doseq [[message thunk] {`update/update-returning-pks!
+                           (fn []
+                             (update/update-returning-pks! ::test/venues :category "BAR" {:category "BARRR"}))
+
+                           "low-level pipeline methods"
+                           (fn []
+                             (conn/with-connection [_conn ::test/db]
+                               (#'pipeline/transduce-query* (pipeline/default-rf :toucan.query-type/update.pks)
+                                                            :toucan.query-type/update.pks
+                                                            ::test/venues
+                                                            {:changes {:category "BARRR"}}
+                                                            {:category "BAR"})))}]
+    (testing message
+      (test/with-discarded-table-changes :venues
+        (testing "results"
+          (is (= []
+                 (thunk))))
+        (testing "updated rows"
+          (is (= []
                  (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]}))))))))
 
 (deftest ^:synchronized update-returning-instances-test
@@ -146,6 +190,20 @@
         (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
                 (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
                (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]})))))))
+
+(deftest ^:synchronized update-returning-instances-no-op-test
+  (test/with-discarded-table-changes :venues
+    (testing "pipeline results"
+      (is (= []
+             (conn/with-connection [_conn ::test/db]
+               (#'pipeline/transduce-query* (pipeline/default-rf :toucan.query-type/update.instances)
+                                            :toucan.query-type/update.instances
+                                            ::test/venues
+                                            {:changes {:category "BARRR"}}
+                                            {:category "bar -- no-op"})))))
+    (testing "select results"
+      (is (= []
+             (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]}))))))
 
 (deftest ^:synchronized update-nil-test
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"

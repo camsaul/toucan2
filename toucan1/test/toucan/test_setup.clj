@@ -24,7 +24,8 @@
 
 (m/defmethod pipeline/transduce-query :around [:default :toucan1/model :default]
   [rf query-type model parsed-args resolved-query]
-  (binding [map.honeysql/*options* (assoc map.honeysql/*options* :dialect (test/current-honey-sql-dialect))]
+  (binding [map.honeysql/*options* (assoc map.honeysql/*options*
+                                          :dialect (test/current-honey-sql-dialect))]
     (next-method rf query-type model parsed-args resolved-query)))
 
 (defn do-with-quoted-snake-disabled [thunk]

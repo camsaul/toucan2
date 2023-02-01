@@ -425,14 +425,6 @@
                :transforms any?)
   :ret any?)
 
-;;; If [[toucan2.tools.after-update]] or [[toucan2.tools.after-insert]] need to "upgrade" the query, let them do that
-;;; before applying any transforms. Transforms will still get applied to the upgraded query.
-;;;
-;;; TODO -- not 100% sure this is still needed
-#_(m/prefer-method! #'pipeline/transduce-with-model
-                  [:toucan2.tools.after/query-type :toucan2.tools.after/model]
-                  [:toucan.result-type/instances ::transformed.model])
-
 ;;; apply results transforms before [[toucan2.tools.after-update]] or [[toucan2.tools.after-insert]]
 (m/prefer-method! #'pipeline/results-transform
                   [:toucan.result-type/instances ::transformed.model]

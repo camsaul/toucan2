@@ -4,7 +4,9 @@ CREATE TABLE category (
   name varchar(255) PRIMARY KEY NOT NULL,
   slug text,
   parent_category varchar(255) REFERENCES category (name) ON DELETE CASCADE
-);
+)
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_bin;
 
 INSERT INTO category (name, slug, parent_category)
 VALUES
