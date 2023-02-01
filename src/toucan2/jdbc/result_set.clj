@@ -89,6 +89,8 @@
                                         (inc i)))
                                     cols)))]
          (log/tracef :results "Index of column named %s (originally %s) is %s" column-name' column-name i)
+         (when-not i
+           (log/errorf :results "Could not determine index of column name %s. Found: %s" column-name cols))
          i)))))
 
 (defn instance-builder-fn
@@ -141,12 +143,16 @@
                                               (.getMetaData rset)
                                               combined-opts))
         col-name->index   (make-column-name->index col-names label-fn)]
+    (log/tracef :results "column name -> index = %s" col-name->index)
     (loop [acc init]
       (b/cond
         (not (.next rset))
-        acc
+        (do
+          (log/tracef :results "Result set has no more rows.")
+          acc)
 
         :let [row-num  (.getRow rset)
+              _        (log/tracef :results "Fetch row %s" row-num)
               i->thunk (row-num->i->thunk row-num)
               row      (jdbc.row/row model rset builder i->thunk col-name->index)
               acc'     (rf acc row)]

@@ -195,38 +195,3 @@
            result   (thunk)]
        (log/tracef :results "col %s => %s" i result)
        result))))
-
-;;;; Postgres integration
-
-;;; TODO -- why is cljdoc picking this up?
-;;;
-;;; TODO -- `org.postgresql.PGConnection` is the interface; `org.postgresql.jdbc.PgConnection` is actual concrete class.
-;;; Are there other concrete classes we might want to handle here? :
-(when-let [pg-connection-class (try
-                                 (Class/forName "org.postgresql.jdbc.PgConnection")
-                                 (catch Throwable _
-                                   nil))]
-  (m/defmethod read-column-thunk [pg-connection-class :default Types/TIMESTAMP]
-    "Both Postgres `timestamp` and `timestamp with time zone` come back as `java.sql.Types/TIMESTAMP`; check the actual
-  database column type name so we can fetch objects as the correct class."
-    [_conn _model ^ResultSet rset ^ResultSetMetaData rsmeta ^Long i]
-    (let [^Class klass (if (= (u/lower-case-en (.getColumnTypeName rsmeta i)) "timestamptz")
-                         java.time.OffsetDateTime
-                         java.time.LocalDateTime)]
-      (get-object-of-class-thunk rset i klass))))
-
-;;;; MySQL / MariaDB integration
-
-;;; TODO -- need the MySQL class here too.
-
-(when-let [mariadb-connection-class (Class/forName "org.mariadb.jdbc.MariaDbConnection")]
-  (m/defmethod read-column-thunk [mariadb-connection-class :default Types/TIMESTAMP]
-    "MySQL/MariaDB `timestamp` is normalized to UTC, so return it as an `OffsetDateTime` rather than a `LocalDateTime`.
-  `datetime` columns should be returned as `LocalDateTime`. Both `timestamp` and `datetime` seem to come back as
-  `java.sql.Types/TIMESTAMP`, so check the actual database column type name so we can fetch objects as the correct
-  class."
-    [_conn _model ^ResultSet rset ^ResultSetMetaData rsmeta ^Long i]
-    (let [^Class klass (if (= (u/lower-case-en (.getColumnTypeName rsmeta i)) "timestamp")
-                         java.time.OffsetDateTime
-                         java.time.LocalDateTime)]
-      (get-object-of-class-thunk rset i klass))))

@@ -257,7 +257,7 @@
   [query-type model honeysql]
   (let [options-map (options)
         _           (log/debugf :compile "Compiling Honey SQL 2 with options %s" options-map)
-        sql-args    (u/try-with-error-context ["compile Honey SQL query" {::honeysql honeysql, ::options-map options-map}]
+        sql-args    (u/try-with-error-context ["compile Honey SQL to SQL" {::honeysql honeysql, ::options-map options-map}]
                       (hsql/format honeysql options-map))]
     (log/debugf :compile "=> %s" sql-args)
     (pipeline/compile query-type model sql-args)))

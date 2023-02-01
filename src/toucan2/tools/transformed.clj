@@ -235,7 +235,7 @@
                result))))
     identity))
 
-(m/defmethod pipeline/build [#_query-type     ::pipeline/select.instances-from-pks
+(m/defmethod pipeline/build [#_query-type     :toucan.query-type/select.instances-from-pks
                              #_model          ::transformed.model
                              #_resolved-query :default]
   "Don't try to transform stuff when we're doing SELECT directly with PKs (e.g. to fake INSERT returning instances), We're
@@ -246,7 +246,7 @@
 
 (m/defmethod pipeline/results-transform [#_query-type :toucan.result-type/instances #_model ::transformed.model]
   [query-type model]
-  (if (isa? query-type ::pipeline/select.instances-from-pks)
+  (if (isa? query-type :toucan.query-type/select.instances-from-pks)
     (next-method query-type model)
     (let [xform (transform-result-rows-transducer model)]
       (comp xform

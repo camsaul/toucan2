@@ -75,14 +75,11 @@
 
 (defn- honeysql-options []
   (merge
-   ;; defaults
-   {:quoted true, :dialect :ansi, #_:quoted-snake #_true}
    map.honeysql/*options*
-   (when-let [style (quoting-style)]
+   (when-let [style *quoting-style*]
      {:dialect style})
-   (let [convert? (automatically-convert-dashes-and-underscores?)]
-     (when (some? convert?)
-       {:quoted-snake convert?}))))
+   (when (some? *automatically-convert-dashes-and-underscores*)
+     {:quoted-snake *automatically-convert-dashes-and-underscores*})))
 
 (defn set-default-jdbc-options!
   "DEPRECATED: Set [[toucan2.jdbc.query/global-options]] directly instead."
@@ -155,12 +152,22 @@
 
 ;;; TODO -- are we sure we need to do things this way? Can't this stuff be bound in a pipeline method?
 (deftype ^:no-doc Toucan1ReducibleQuery [honeysql-form query-jdbc-options]
+  clojure.lang.IReduce
+  (reduce [this rf]
+    (reduce rf (rf) this))
+
   clojure.lang.IReduceInit
   (reduce [this rf init]
     (log/debugf :results "reduce Toucan 1 reducible query %s" this)
     (binding [jdbc/*options*         (merge jdbc/*options* query-jdbc-options)
               map.honeysql/*options* (honeysql-options)]
       (reduce ((map realize/realize) rf) init (execute/reducible-query nil honeysql-form))))
+
+  Object
+  (equals [_this another]
+    (and (instance? Toucan1ReducibleQuery another)
+         (= (.honeysql_form ^Toucan1ReducibleQuery another) honeysql-form)
+         (= (.query_jdbc_options ^Toucan1ReducibleQuery another) query-jdbc-options)))
 
   pretty/PrettyPrintable
   (pretty [_this]
@@ -368,7 +375,6 @@
 
 (defn insert!
   "DEPRECATED: use [[toucan2.insert/insert-returning-instances!]] instead."
-  {:style/indent 1}
   ([modelable row-map]
    (first (insert/insert-returning-instances! modelable row-map)))
 
@@ -417,13 +423,11 @@
 
 (defn select-field->id
   "DEPRECATED: use [[toucan2.select/select-fn->pk]] instead."
-  {:style/indent 2}
   [field modelable & options]
   (apply select/select-fn->pk field modelable (parse-select-options options)))
 
 (defn select-id->field
   "DEPRECATED: use [[toucan2.select/select-pk->fn]] instead."
-  {:style/indent 2}
   [field modelable & options]
   (apply select/select-pk->fn field modelable (parse-select-options options)))
 
@@ -455,7 +459,6 @@
 
 (defn delete!
   "DEPRECATED: use [[toucan2.delete/delete!]] instead."
-  {:style/indent 1}
   [modelable & conditions]
   (pos? (apply delete/delete! modelable conditions)))
 

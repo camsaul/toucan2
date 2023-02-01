@@ -92,6 +92,44 @@
                                                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
               (select/select-one ::test/venues 4)))))))
 
+(deftest ^:synchronized include-pk-test
+  (testing "If a value for the PK is explicitly specified, insert! and friends should still work correctly"
+    (doseq [[insert! expected] {#'insert/insert!                     1
+                                #'insert/insert-returning-pks!       [4]
+                                #'insert/insert-returning-instances! [(instance/instance
+                                                                       ::test/venues
+                                                                       {:id         4
+                                                                        :name       "Grant & Green"
+                                                                        :category   "bar"
+                                                                        :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]}]
+      (test/with-discarded-table-changes :venues
+        (testing insert!
+          (is (= expected
+                 (insert! ::test/venues {:id 4, :name "Grant & Green", :category "bar"})))
+          (testing "Venue 4 should exist now"
+            (is (= (instance/instance ::test/venues {:id         4
+                                                     :name       "Grant & Green"
+                                                     :category   "bar"
+                                                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                   (select/select-one ::test/venues 4)))))))))
+
+(deftest ^:synchronized include-pk-non-integer-test
+  (testing "If a value for a *non-integer* PK is explicitly specified, insert! and friends should still work correctly"
+    (doseq [[insert! expected] {#'insert/insert!                     1
+                                #'insert/insert-returning-pks!       ["012345678"]
+                                #'insert/insert-returning-instances! [(instance/instance
+                                                                       ::test/phone-number
+                                                                       {:number "012345678", :country-code "US"})]}]
+      (test/with-discarded-table-changes :phone_number
+        (testing insert!
+          (is (= expected
+                 (insert! ::test/phone-number {:number "012345678", :country-code "US"})))
+          (testing "Phone Number 1 should exist now"
+            (is (= (instance/instance ::test/phone-number {:number "012345678", :country-code "US"})
+                   (select/select-one ::test/phone-number :toucan/pk "012345678")))))))))
+
 (deftest ^:synchronized string-model-test
   (testing "insert! should work with string table names as the model"
     (conn/with-connection [_conn ::test/db]

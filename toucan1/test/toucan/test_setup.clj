@@ -2,9 +2,8 @@
   "Test setup logic and helper functions. All test namespaces should require this one to make sure the env is set up
   properly."
   (:require
-   [clojure.string :as str]
-   [clojure.test :refer :all]
-   [honey.sql :as hsql]
+   [camel-snake-kebab.core :as csk]
+   [clojure.java.io :as io]
    [methodical.core :as m]
    [toucan.db :as t1.db]
    [toucan.models :as t1.models]
@@ -16,28 +15,26 @@
    [toucan2.connection :as conn]
    [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
-   [toucan2.test :as test]))
+   [toucan2.pipeline :as pipeline]
+   [toucan2.test :as test]
+   [toucan2.tools.update-returning-pks-workaround
+    :as
+    update-returning-pks-workaround]))
+
+(set! *warn-on-reflection* true)
 
 (t1.models/set-root-namespace! 'toucan.test-models)
 
-(defn- quote-for-current-db-type [quote-fn]
-  (comp (fn [s]
-          ((case (test/current-db-type)
-             :h2                  str/upper-case
-             (:postgres :mariadb) identity) s))
-        quote-fn))
+(m/defmethod pipeline/transduce-query :around [:default :toucan1/model :default]
+  [rf query-type model parsed-args resolved-query]
+  (binding [ ;; these are also set in the wrapped test var; so these aren't strictly needed but they're set here anyway
+            ;; as a REPL convenience
+            update-returning-pks-workaround/*use-update-returning-pks-workaround*
+            (#{:mysql :mariadb} (test/current-db-type))
 
-(hsql/register-dialect!
- ::quote-for-current-db-type
- (update (hsql/get-dialect :ansi) :quote quote-for-current-db-type))
-
-(defn do-with-default-quoting-style [thunk]
-  (try
-    (t1.db/set-default-quoting-style! ::quote-for-current-db-type)
-    (testing (format "With default quoting style = %s\n" ::quote-for-current-db-type)
-      (thunk))
-    (finally
-      (reset! map.honeysql/global-options test/global-honeysql-options))))
+            map.honeysql/*options*
+            (assoc map.honeysql/*options* :dialect (test/current-honey-sql-dialect))]
+    (next-method rf query-type model parsed-args resolved-query)))
 
 (defn do-with-quoted-snake-disabled [thunk]
   (binding [t1.db/*automatically-convert-dashes-and-underscores* false]
@@ -68,3 +65,21 @@
   [connectable f]
   (init-db! (test/current-db-type))
   (next-method connectable f))
+
+(m/defmethod test/create-table-sql-file [:default :toucan1/model]
+  "For a model like `PhoneNumber`, look for either `toucan/test_models/phone_number.h2.sql` or
+  `toucan/test_models/phone_number.sql`."
+  [db-type model]
+  (letfn [(filename [extension]
+            (str "toucan/test_models/" (csk/->snake_case (name model)) extension))
+          (resource-path [filename]
+            (when (io/resource filename)
+              filename))]
+    (let [db-filename      (filename (format ".%s.sql" (name db-type)))
+          generic-filename (filename ".sql")]
+      (or (resource-path db-filename)
+          (resource-path generic-filename)
+          (throw (ex-info (format "Cannot find SQL files %s or %s"
+                                  (pr-str db-filename)
+                                  (pr-str generic-filename))
+                          {:db-type db-type, :model model}))))))

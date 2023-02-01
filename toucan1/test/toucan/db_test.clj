@@ -16,6 +16,7 @@
    [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.jdbc :as jdbc]
+   [toucan2.jdbc.query :as jdbc.query]
    [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
@@ -29,8 +30,7 @@
 (set! *warn-on-reflection* true)
 
 (use-fixtures :each
-  test-setup/do-with-quoted-snake-disabled
-  test-setup/do-with-default-quoting-style)
+  test-setup/do-with-quoted-snake-disabled)
 
 (comment heroes/keep-me
          test-setup/keep-me)
@@ -169,8 +169,8 @@
                            :limit    1}))))))
 
 (deftest ^:synchronized lower-case-identifiers-test
-  ;; only test postgres, since H2 has uppercase identifiers
-  (when (= (test/current-db-type) :postgres)
+  ;; don't test H2, since it has uppercase identifiers
+  (when-not (= (test/current-db-type) :h2)
     (testing "Test that identifiers are correctly lower cased in Turkish locale (toucan#59)"
       (let [original-locale (Locale/getDefault)]
         (try
@@ -254,32 +254,26 @@
           (t1.db/simple-select Venue query)
           (into [] (t1.db/simple-select-reducible Venue query)))))))
 
-;; TODO
-#_(deftest test-37
-    (testing "reducible-query should pass default JDBC options along to clojure.java.jdbc"
-      (is (= [:connection [""] {:a 1, :b 3, :c 4}]
-             (let [fn-args (atom nil)]
-               (with-redefs [t1.db/connection             (constantly :connection)
-                             #_t1.db/default-jdbc-options #_ (atom {:a 1, :b 2})
-                             #_jdbc/reducible-query    #_ (fn [& args]
-                                                            (reset! fn-args args))]
-                 (t1.db/reducible-query {} :b 3, :c 4)))))))
+(deftest ^:synchronized reducible-query-pass-jdbc-options-test
+  (testing "reducible-query should pass default JDBC options along to clojure.java.jdbc"
+    (let [options (atom nil)]
+      (with-redefs [jdbc.query/reduce-jdbc-query (fn [_rf _init _conn _model _sql-args extra-opts]
+                                                   (reset! options (jdbc/merge-options extra-opts))
+                                                   :ok)]
+        (binding [conn/*current-connectable* ::test/db]
+          (let [reducible-query (t1.db/reducible-query {} :b 3, :c 4)]
+            (is (= (toucan.db/->Toucan1ReducibleQuery {} {:b 3, :c 4})
+                   reducible-query))
+            (is (= :ok
+                   ;; This is ok because we actually want to test the `IReduce` behavior.
+                   #_{:clj-kondo/ignore [:reduce-without-init]}
+                   (reduce conj reducible-query)))))
+        (is (= {:b 3, :c 4}
+               (select-keys @options [:b :c])))))))
 
 (deftest ^:parallel simple-select-one-test
   (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
          (t1.db/simple-select-one User {:where [:= :first-name "Cam"]}))))
-
-;; (defn do-with-default-connection [thunk]
-;;   (try
-;;     (m/defmethod conn/do-with-connection :default
-;;       [connectable f]
-;;       (next-method ::test-setup/db f))
-;;     (thunk)
-;;     (finally
-;;       (m/remove-primary-method! #'conn/do-with-connection :default))))
-
-;; (defmacro with-default-connection [& body]
-;;   `(do-with-default-connection (^:once fn* [] ~@body)))
 
 (deftest ^:synchronized update!-test
   (test/with-discarded-table-changes User
@@ -288,8 +282,10 @@
            (t1.db/select-one User :id 1))))
   (test/with-discarded-table-changes PhoneNumber
     (let [id "012345678"]
-      (t1.db/simple-insert! PhoneNumber {:number id, :country_code "US"})
-      (t1.db/update! PhoneNumber id :country_code "AU")
+      (is (= "012345678"
+             (t1.db/simple-insert! PhoneNumber {:number id, :country_code "US"})))
+      (is (= true
+             (t1.db/update! PhoneNumber id :country_code "AU")))
       (is (= {:number id, :country_code "AU"}
              (t1.db/select-one PhoneNumber :number id))))))
 

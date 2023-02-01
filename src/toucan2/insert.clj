@@ -47,8 +47,8 @@
                               :multiple-row-maps x
                               :kv-pairs          [(into {} (map (juxt :k :v)) x)]
                               :columns-rows      (let [{:keys [columns rows]} x]
-                                                   (mapv (partial zipmap columns)
-                                                         rows))))))))
+                                                   (map (partial zipmap columns)
+                                                        rows))))))))
 
 (defn- can-skip-insert? [parsed-args resolved-query]
   (and (empty? (:rows parsed-args))

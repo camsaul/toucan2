@@ -183,9 +183,12 @@
 ;;; method called if there is no current connection.
 (m/defmethod do-with-connection :default
   [_connectable _f]
-  (throw (ex-info (format "No default Toucan connection defined. You can define one by implementing %s for :default. You can also implement %s for a model."
-                          `do-with-connection
-                          'toucan2.model/default-connectable)
+  (throw (ex-info (str "No default Toucan connection defined. "
+                       (format "You can define one by implementing %s for :default. "
+                               `do-with-connection)
+                       (format "You can also implement %s for a model, or bind %s."
+                               'toucan2.model/default-connectable
+                               `*current-connectable*))
                   {})))
 
 (m/defmethod do-with-connection nil

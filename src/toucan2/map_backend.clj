@@ -18,6 +18,7 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.log :as log]
+   [toucan2.protocols :as protocols]
    [toucan2.types :as types]))
 
 (comment s/keep-me
@@ -38,7 +39,7 @@
   {:arglists            '([map-compilation-backend₁])
    :defmethod-arities   #{1}
    :dispatch-value-spec (s/nonconforming ::types/dispatch-value.keyword-or-class)}
-  keyword)
+  protocols/dispatch-value)
 
 (m/defmethod load-backend-if-needed :toucan.map-backend/honeysql2
   "Initialize the Honey SQL 2 map backend."

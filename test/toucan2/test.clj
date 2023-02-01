@@ -84,9 +84,10 @@
         :h2)
       (first (db-types))))
 
-(defn- honey-sql-dialect
+(defn current-honey-sql-dialect
+  "Honey SQL dialect name for the [[current-db-type]]."
   ([]
-   (honey-sql-dialect (current-db-type)))
+   (current-honey-sql-dialect (current-db-type)))
   ([db-type]
    (case db-type
      :h2               ::h2
@@ -129,7 +130,7 @@
                                 (#{:mysql :mariadb} db-type)
 
                                 map.honeysql/*options*
-                                (assoc map.honeysql/*options* :dialect (honey-sql-dialect db-type))]
+                                (assoc map.honeysql/*options* :dialect (current-honey-sql-dialect db-type))]
                         (t/testing (str db-type \newline)
                           (orig))))))]
     (alter-meta! varr assoc :test wrapped)))
@@ -244,6 +245,16 @@
   [_model]
   "category")
 
+(derive ::phone-number ::models)
+
+(m/defmethod model/table-name ::phone-number
+  [_model]
+  "phone_number")
+
+(m/defmethod model/primary-keys ::phone-number
+  [_model]
+  [:number])
+
 (defn- create-table-statements [db-type table-name]
   (let [filename (create-table-sql-file db-type table-name)
         file     (some-> (io/resource filename) io/file)]
@@ -289,7 +300,8 @@
           (doseq [table-name [:people
                               :venues
                               :birds
-                              :categories]]
+                              :categories
+                              :phone_number]]
             (create-table! db-type conn table-name)))
         (swap! initialized-test-dbs conj db-type)))))
 
@@ -337,7 +349,7 @@
             (#{:mysql :mariadb} (current-db-type))
 
             map.honeysql/*options*
-            (assoc map.honeysql/*options* :dialect (honey-sql-dialect))]
+            (assoc map.honeysql/*options* :dialect (current-honey-sql-dialect))]
     (next-method rf query-type model parsed-args resolved-query)))
 
 ;;;; conveniences for REPL-based usage. These are not used in tests.

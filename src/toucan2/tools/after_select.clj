@@ -14,7 +14,7 @@
 ;;; should do after-select as well.
 (tools.simple-out-transform/define-out-transform [:toucan.result-type/instances ::after-select]
   [instance]
-  (if (isa? &query-type :toucan2.pipeline/select.instances-from-pks)
+  (if (isa? &query-type :toucan.query-type/select.instances-from-pks)
     instance
     (after-select instance)))
 
