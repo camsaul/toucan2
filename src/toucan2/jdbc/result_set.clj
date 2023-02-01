@@ -167,7 +167,9 @@
 
 ;;; TODO -- need the MySQL class here too.
 
-(when-let [mariadb-connection-class (Class/forName "org.mariadb.jdbc.MariaDbConnection")]
+(when-let [mariadb-connection-class (try
+                                      (Class/forName "org.mariadb.jdbc.MariaDbConnection")
+                                      (catch Throwable _))]
   (m/defmethod builder-fn [mariadb-connection-class :default]
     "This is an icky hack for MariaDB/MySQL. Inserted rows come back with the newly inserted ID as `:insert-id` rather than
   the actual name of the primary key column. So tweak the `:label-fn` we pass to `next.jdbc` to rename `:insert-id` to
