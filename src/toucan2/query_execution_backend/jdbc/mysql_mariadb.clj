@@ -1,11 +1,9 @@
 (ns toucan2.query-execution-backend.jdbc.mysql-mariadb
-  "MySQL and MariaDB integration (mostly workarounds for broken stuff).
-
-  See also [[toucan2.tools.update-returning-pks-workaround]]. TODO -- I think we should roll that into this namespace
-  and find a way to enable it by default for MySQL/MariaDB."
+  "MySQL and MariaDB integration (mostly workarounds for broken stuff)."
   (:require
    [methodical.core :as m]
    [toucan2.jdbc.read :as jdbc.read]
+   [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.util :as u])
@@ -42,6 +40,8 @@
 (m/prefer-method! #'jdbc.read/read-column-thunk
                   [::connection :default Types/TIMESTAMP]
                   [java.sql.Connection :default Types/TIMESTAMP])
+
+;;;; INSERT RETURN_GENERATED_KEYS with explicit non-integer PK value workaround
 
 (m/defmethod pipeline/transduce-execute-with-connection [#_conn       ::connection
                                                          #_query-type :toucan.query-type/insert.pks
@@ -82,4 +82,48 @@
 
 (m/prefer-method! #'pipeline/transduce-execute-with-connection
                   [::connection :toucan.query-type/insert.pks :default]
+                  [java.sql.Connection :toucan.result-type/pks :default])
+
+;;;; UPDATE returning PKs workaround
+
+;;; MySQL and MariaDB don't support returning PKs for UPDATE, so we'll have to hack it as follows:
+;;;
+;;; 1. Rework the original query to be a SELECT, run it, and record the matching PKs somewhere. Currently only supported
+;;;    for queries we can manipulate e.g. Honey SQL
+;;;
+;;; 2. Run the original UPDATE query
+;;;
+;;; 3. Return the PKs from the rewritten SELECT query
+
+(m/defmethod pipeline/transduce-execute-with-connection [#_connection ::connection
+                                                         #_query-type :toucan.query-type/update.pks
+                                                         #_model      :default]
+  "MySQL and MariaDB don't support returning PKs for UPDATE. Execute a SELECT query to capture the PKs of the rows that
+  will be affected BEFORE performing the UPDATE. We need to capture PKs for both `:toucan.query-type/update.pks` and for
+  `:toucan.query-type/update.instances`, since ultimately the latter is implemented on top of the former."
+  [original-rf conn _query-type model sql-args]
+  ;; if for some reason we've already captured PKs, don't do it again.
+  (let [conditions-map pipeline/*resolved-query*
+        _              (log/debugf :execute "update-returning-pks workaround: doing SELECT with conditions %s"
+                                   conditions-map)
+        parsed-args    (update pipeline/*parsed-args* :kv-args merge conditions-map)
+        select-rf      (pipeline/with-init conj [])
+        xform          (map (model/select-pks-fn model))
+        pks            (pipeline/transduce-query (xform select-rf)
+                                                 :toucan.query-type/select.instances.fns
+                                                 model
+                                                 parsed-args
+                                                 {})]
+    (log/debugf :execute "update-returning-pks workaround: got PKs %s" pks)
+    (let [update-rf (pipeline/default-rf :toucan.query-type/update.update-count)]
+      (log/debugf :results "update-returning-pks workaround: performing original UPDATE")
+      (pipeline/transduce-execute-with-connection update-rf conn :toucan.query-type/update.update-count model sql-args))
+    (log/debugf :results "update-returning-pks workaround: transducing PKs with original reducing function")
+    (transduce
+     identity
+     original-rf
+     pks)))
+
+(m/prefer-method! #'pipeline/transduce-execute-with-connection
+                  [::connection :toucan.query-type/update.pks :default]
                   [java.sql.Connection :toucan.result-type/pks :default])

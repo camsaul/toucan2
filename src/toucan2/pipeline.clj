@@ -266,6 +266,11 @@
   which applies different behavior if a query was initiated with `[model & columns]` syntax vs. if it was not.)"
   nil)
 
+(def ^:dynamic *resolved-query*
+  "The query after it has been resolved. This is bound in case methods in the later stages of the pipeline need it for one
+  reason or another."
+  nil)
+
 (defn- transduce-compiled-query [rf query-type model compiled-query]
   (u/try-with-error-context ["with compiled query" {::compiled-query compiled-query}]
     (let [xform (results-transform query-type model)
@@ -306,12 +311,11 @@
   (let [built-query (*build* query-type model parsed-args resolved-query)]
     (transduce-built-query rf query-type model built-query)))
 
-;;; Special impls for implementing returning PKs and returning instances behavior for DML queries.
-
 (defn- transduce-query* [rf query-type model parsed-args resolved-query]
   (let [parsed-args (dissoc parsed-args :queryable)]
-    (u/try-with-error-context ["with resolved query" {::resolved-query resolved-query}]
-      (transduce-query rf query-type model parsed-args resolved-query))))
+    (binding [*resolved-query* resolved-query]
+      (u/try-with-error-context ["with resolved query" {::resolved-query resolved-query}]
+        (transduce-query rf query-type model parsed-args resolved-query)))))
 
 (defn- transduce-with-model
   [rf query-type model {:keys [queryable], :as parsed-args}]

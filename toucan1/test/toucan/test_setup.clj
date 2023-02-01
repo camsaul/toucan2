@@ -16,10 +16,7 @@
    [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
-   [toucan2.test :as test]
-   [toucan2.tools.update-returning-pks-workaround
-    :as
-    update-returning-pks-workaround]))
+   [toucan2.test :as test]))
 
 (set! *warn-on-reflection* true)
 
@@ -27,13 +24,7 @@
 
 (m/defmethod pipeline/transduce-query :around [:default :toucan1/model :default]
   [rf query-type model parsed-args resolved-query]
-  (binding [ ;; these are also set in the wrapped test var; so these aren't strictly needed but they're set here anyway
-            ;; as a REPL convenience
-            update-returning-pks-workaround/*use-update-returning-pks-workaround*
-            (#{:mysql :mariadb} (test/current-db-type))
-
-            map.honeysql/*options*
-            (assoc map.honeysql/*options* :dialect (test/current-honey-sql-dialect))]
+  (binding [map.honeysql/*options* (assoc map.honeysql/*options* :dialect (test/current-honey-sql-dialect))]
     (next-method rf query-type model parsed-args resolved-query)))
 
 (defn do-with-quoted-snake-disabled [thunk]

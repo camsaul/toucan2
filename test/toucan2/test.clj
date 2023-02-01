@@ -16,8 +16,6 @@
    [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
-   [toucan2.tools.update-returning-pks-workaround
-    :as update-returning-pks-workaround]
    [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
@@ -123,14 +121,8 @@
         wrapped (fn wrapped-test-fn []
                   (binding [*parallel-test* (when (parallel? varr) varr)]
                     (doseq [db-type (db-types)]
-                      (binding [*current-db-type*
-                                db-type
-
-                                update-returning-pks-workaround/*use-update-returning-pks-workaround*
-                                (#{:mysql :mariadb} db-type)
-
-                                map.honeysql/*options*
-                                (assoc map.honeysql/*options* :dialect (current-honey-sql-dialect db-type))]
+                      (binding [*current-db-type*      db-type
+                                map.honeysql/*options* (assoc map.honeysql/*options* :dialect (current-honey-sql-dialect db-type))]
                         (t/testing (str db-type \newline)
                           (orig))))))]
     (alter-meta! varr assoc :test wrapped)))
@@ -340,16 +332,8 @@
 
 (m/defmethod pipeline/transduce-query :around [:default ::models :default]
   [rf query-type model parsed-args resolved-query]
-  (binding [jdbc/*options*
-            (assoc jdbc/*options* :label-fn u/->kebab-case)
-
-            ;; these are also set in the wrapped test var; so these aren't strictly needed but they're set here anyway
-            ;; as a REPL convenience
-            update-returning-pks-workaround/*use-update-returning-pks-workaround*
-            (#{:mysql :mariadb} (current-db-type))
-
-            map.honeysql/*options*
-            (assoc map.honeysql/*options* :dialect (current-honey-sql-dialect))]
+  (binding [jdbc/*options*         (assoc jdbc/*options* :label-fn u/->kebab-case)
+            map.honeysql/*options* (assoc map.honeysql/*options* :dialect (current-honey-sql-dialect))]
     (next-method rf query-type model parsed-args resolved-query)))
 
 ;;;; conveniences for REPL-based usage. These are not used in tests.

@@ -101,11 +101,11 @@
                            "low-level pipeline methods"
                            (fn []
                              (conn/with-connection [_conn ::test/db]
-                               (pipeline/transduce-query (pipeline/default-rf :toucan.query-type/update.pks)
-                                                         :toucan.query-type/update.pks
-                                                         ::test/venues
-                                                         {:changes {:category "BARRR"}}
-                                                         {:category "bar"})))}]
+                               (#'pipeline/transduce-query* (pipeline/default-rf :toucan.query-type/update.pks)
+                                                            :toucan.query-type/update.pks
+                                                            ::test/venues
+                                                            {:changes {:category "BARRR"}}
+                                                            {:category "bar"})))}]
     (testing message
       (test/with-discarded-table-changes :venues
         (testing "results"
@@ -121,29 +121,31 @@
 (deftest ^:synchronized update-returning-instances-test
   (testing "Not officially supported -- yet. Test that we can return instances from update using low-level pipeline methods"
     (test/with-discarded-table-changes :venues
-      (is (= [(instance/instance ::test/venues
-                                 {:id         1
-                                  :name       "Tempest"
-                                  :category   "BARRR"
-                                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")
-                                  :created-at (LocalDateTime/parse "2017-01-01T00:00")})
-              (instance/instance ::test/venues
-                                 {:id         2
-                                  :name       "Ho's Tavern"
-                                  :category   "BARRR"
-                                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")
-                                  :created-at (LocalDateTime/parse "2017-01-01T00:00")})]
-             (sort-by
-              :id
-              (conn/with-connection [_conn ::test/db]
-                (pipeline/transduce-query (pipeline/default-rf :toucan.query-type/update.instances)
-                                          :toucan.query-type/update.instances
-                                          ::test/venues
-                                          {:changes {:category "BARRR"}}
-                                          {:category "bar"})))))
-      (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
-              (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
-             (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]}))))))
+      (testing "pipeline results"
+        (is (= [(instance/instance ::test/venues
+                                   {:id         1
+                                    :name       "Tempest"
+                                    :category   "BARRR"
+                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")
+                                    :created-at (LocalDateTime/parse "2017-01-01T00:00")})
+                (instance/instance ::test/venues
+                                   {:id         2
+                                    :name       "Ho's Tavern"
+                                    :category   "BARRR"
+                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")
+                                    :created-at (LocalDateTime/parse "2017-01-01T00:00")})]
+               (sort-by
+                :id
+                (conn/with-connection [_conn ::test/db]
+                  (#'pipeline/transduce-query* (pipeline/default-rf :toucan.query-type/update.instances)
+                                               :toucan.query-type/update.instances
+                                               ::test/venues
+                                               {:changes {:category "BARRR"}}
+                                               {:category "bar"}))))))
+      (testing "select results"
+        (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
+                (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
+               (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]})))))))
 
 (deftest ^:synchronized update-nil-test
   (testing "(update! model nil ...) should basically be the same as (update! model :toucan/pk nil ...)"
