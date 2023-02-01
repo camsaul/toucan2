@@ -143,7 +143,7 @@
     (catch Throwable _e
       false)))
 
-(deftest ^:parallel valid-form-test
+(deftest ^:FIXME-not-parallel ^:synchronized valid-form-test
   (testing "invalid forms"
     (doseq [form ["k"
                   'k

@@ -22,6 +22,7 @@
    [toucan2.connection :as conn]
    [toucan2.jdbc :as jdbc]
    [toucan2.jdbc.query :as jdbc.query]
+   [toucan2.log :as log]
    [toucan2.map-backend :as map]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
@@ -46,6 +47,8 @@
   (fn [_rf & args]
     (apply f args)))
 
+;;; TODO -- This name is a little long, maybe this should be called `transduce-execute` and the function should get
+;;; called something else
 (m/defmulti transduce-execute-with-connection
   "The final stage of the Toucan 2 query execution pipeline. Execute a compiled query (as returned by [[compile]]) with a
   database connection, e.g. a `java.sql.Connection`, and transduce results with reducing function `rf`.
@@ -87,13 +90,10 @@
                                                 #_model      :default]
   "JDBC query execution backend for executing queries that return PKs (`:toucan.result-type/pks`).
 
-  To get Databases to return the generated primary keys rather than the update count for SELECT/UPDATE/DELETE we need to
-  set the `next.jdbc` option `:return-keys true`. So this binds [[jdbc/*options*]] and then calls the default JDBC impl."
+  Applies transducer to call [[toucan2.model/select-pks-fn]] on each result row."
   [rf conn query-type model sql-args]
-  (let [rf* ((map (model/select-pks-fn model))
-             rf)]
-    (binding [jdbc/*options* (assoc jdbc/*options* :return-keys true)]
-      (next-method rf* conn query-type model sql-args))))
+  (let [xform (map (model/select-pks-fn model))]
+    (next-method (xform rf) conn query-type model sql-args)))
 
 (defn- transduce-execute
   "Get a connection from the current connection and call [[transduce-execute-with-connection]]. For DML queries, this
@@ -332,6 +332,8 @@
   (let [built-query (*build* query-type model parsed-args resolved-query)]
     (transduce-built-query rf query-type model built-query)))
 
+;;; Special impls for implementing returning PKs and returning instances behavior for DML queries.
+
 (defn- transduce-query* [rf query-type model parsed-args resolved-query]
   (let [parsed-args (dissoc parsed-args :queryable)]
     (u/try-with-error-context ["with resolved query" {::resolved-query resolved-query}]
@@ -401,6 +403,13 @@
       (with-init 0)
       completing))
 
+(m/defmethod default-rf :toucan.result-type/pks
+  "The reducing function for queries returning PKs. Presumably these will come back as a map, but that map doesn't need to
+  be realized. This needs to be combined with a transducer like `map` [[toucan2.model/select-pks-fn]] to get the PKs
+  themselves."
+  [_query-type]
+  conj)
+
 (m/defmethod default-rf :toucan.result-type/*
   "The default reducing function for all query types unless otherwise specified. Returns realized maps (by default, Toucan
   2 instances)."
@@ -454,9 +463,6 @@
   [query-type parsed-args]
   (reducible-fn transduce-parsed query-type parsed-args))
 
-;;; There's no such thing as "returning instances" for INSERT/DELETE/UPDATE. So we will fake it by executing the query
-;;; with the equivalent `returning-pks` query type, and then do a `:select` query to get the matching instances and pass
-;;; those in to the original `rf`.
 
 ;;; this is here in case we need to differentiate it from a regular select for some reason or another
 (derive ::select.instances-from-pks :toucan.query-type/select.instances)
@@ -482,29 +488,47 @@
                     :toucan.query-type/insert.instances]]
   (derive query-type ::DML-queries-returning-instances))
 
+;;; TODO -- Should this be JDBC-only? It was at one point, but it didn't work in combination
+;;; with [[toucan2.tools.update-returning-pks-workaround]], since that hooked in to things at [[transduce-query]]... if
+;;; we reworked it a bit then maybe this can go back to implementing [[transduce-execute-with-connection]]
+#_(m/defmethod transduce-query [#_query-type     ::DML-queries-returning-instances
+                              #_model          :default
+                              #_resolved-query :default]
+  "DML queries like `UPDATE` or `INSERT` don't usually support returning instances, at least not with JDBC. So for these
+  situations we'll fake it by first running an equivalent query returning inserted/affected PKs, and then do a
+  subsequent SELECT to get those rows. Then we'll reduce the rows with the original reducing function."
+  [original-rf original-query-type model parsed-args resolved-query]
+  (let [pk-query-type (types/similar-query-type-returning original-query-type :toucan.result-type/pks)
+        _             (log/debugf :execute "Returning instances for %s is not supported natively; running %s query instead, then SELECTing results"
+                                  original-query-type
+                                  pk-query-type)
+        pks-rf        (default-rf pk-query-type)
+        pks           (transduce-query pks-rf pk-query-type model parsed-args resolved-query)
+        ;; this is sort of a hack but I don't know of any other way to pass along `:columns` information with the
+        ;; original parsed args
+        columns       (:columns *parsed-args*)]
+    ;; once we have a sequence of PKs then get instances as with `select` and do our magic on them using the
+    ;; ORIGINAL `rf`.
+    (log/debugf :results "Fetching instances with PKs and reducing them with original reducing function")
+    (transduce-instances-from-pks original-rf model columns pks)))
+
 (m/defmethod transduce-execute-with-connection [#_connection java.sql.Connection
                                                 #_query-type ::DML-queries-returning-instances
                                                 #_model      :default]
+  "DML queries like `UPDATE` or `INSERT` don't usually support returning instances, at least not with JDBC. So for these
+  situations we'll fake it by first running an equivalent query returning inserted/affected PKs, and then do a
+  subsequent SELECT to get those rows. Then we'll reduce the rows with the original reducing function."
   [rf conn query-type model sql-args]
-  ;; for non-DML stuff (ie `SELECT`) JDBC can actually return instances with zero special magic, so we can just let the
-  ;; next method do it's thing. Presumably if we end up here with something that is neither DML or DQL, but maybe
-  ;; something like a DDL `CREATE TABLE` statement, we probably don't want to assume it has the possibility to have it
-  ;; return generated PKs.
-  (let [pk-query-type (types/similar-query-type-returning query-type :toucan.result-type/pks)]
-    ;; for DML stuff get generated PKs and then do a SELECT to get the rows. See if we know how the right
-    ;; returning-PKs query type.
-    ;;
-    ;; We're using `conj` here instead of `rf` so no row-transform nonsense or whatever is done. We will pass the
-    ;; actual instances to the original `rf` once we get them.
-    ;;
-    ;;
-    (let [pks     (transduce-execute-with-connection conj conn pk-query-type model sql-args)
-          ;; this is sort of a hack but I don't know of any other way to pass along `:columns` information with the
-          ;; original parsed args
-          columns (:columns *parsed-args*)]
-      ;; once we have a sequence of PKs then get instances as with `select` and do our magic on them using the
-      ;; ORIGINAL `rf`.
-      (transduce-instances-from-pks rf model columns pks))))
+  ;; We're using `conj` here instead of `rf` so no row-transform nonsense or whatever is done. We will pass the
+  ;; actual instances to the original `rf` once we get them.
+  (let [pk-query-type (types/similar-query-type-returning query-type :toucan.result-type/pks)
+        pks           (transduce-execute-with-connection conj conn pk-query-type model sql-args)
+        ;; this is sort of a hack but I don't know of any other way to pass along `:columns` information with the
+        ;; original parsed args
+        columns       (:columns *parsed-args*)]
+    ;; once we have a sequence of PKs then get instances as with `select` and do our magic on them using the
+    ;; ORIGINAL `rf`.
+    (transduce-instances-from-pks rf model columns pks)))
 
 ;;;; Misc util functions. TODO -- I don't think this belongs here; hopefully this can live somewhere where we can call
 ;;;; it `compile` instead.

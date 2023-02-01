@@ -108,13 +108,15 @@
                                                          {:category "bar"})))}]
     (testing message
       (test/with-discarded-table-changes :venues
-        (is (= [1 2]
-               ;; the order these come back in is indeterminate but as long as we get back a sequence of [1 2] we're
-               ;; fine
-               (sort (thunk))))
-        (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
-                (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
-               (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]})))))))
+        (testing "results"
+          (is (= [1 2]
+                 ;; the order these come back in is indeterminate but as long as we get back a sequence of [1 2] we're
+                 ;; fine
+                 (sort (thunk)))))
+        (testing "updated rows"
+          (is (= [(instance/instance ::test/venues {:id 1, :name "Tempest", :category "BARRR"})
+                  (instance/instance ::test/venues {:id 2, :name "Ho's Tavern", :category "BARRR"})]
+                 (select/select [::test/venues :id :name :category] :category "BARRR" {:order-by [[:id :asc]]}))))))))
 
 (deftest ^:synchronized update-returning-instances-test
   (testing "Not officially supported -- yet. Test that we can return instances from update using low-level pipeline methods"

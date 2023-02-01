@@ -30,7 +30,7 @@
 
 (deftest ^:synchronized after-update-test
   (doseq [f [#'update/update!
-             #_#'update/update-returning-pks!]] ; NOCOMMIT
+             #'update/update-returning-pks!]]
     (testing f
       (test/with-discarded-table-changes :venues
         (binding [*venues-awaiting-moderation* (atom [])]
@@ -133,7 +133,7 @@
                  ::venues.exception.db-land      (case (test/current-db-type)
                                                    :postgres #"ERROR: column \"venue_name\" of relation \"venues\" does not exist"
                                                    :h2       #"Column \"VENUE_NAME\" not found"
-                                                   :mariadb  #"FIXME"))
+                                                   :mariadb  #"Unknown column 'venue_name' in 'field list'"))
                (update/update! model 2 {:category "store", :name "My Store"})))
           (testing "\nShould be done inside a transaction"
             (is (= [(instance/instance model

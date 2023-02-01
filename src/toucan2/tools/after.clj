@@ -83,18 +83,14 @@
   "'Upgrade' a query so that it returns instances, and run the upgraded query so that we can apply [[each-row-fn]] to the
   results. Then apply [[result-type-rf]] to the results of the original expected type are ultimately returned."
   [rf query-type model parsed-args resolved-query]
-  (cond
-    ;; only "upgrade" the query if there's an applicable [[each-row-fn]] to apply.
-    (m/is-default-primary-method? each-row-fn [query-type model])
+  (if (or
+       ;; only "upgrade" the query if there's an applicable [[each-row-fn]] to apply.
+       (m/is-default-primary-method? each-row-fn [query-type model])
+       ;; there's no need to "upgrade" the query if it's already returning instances.
+       (isa? query-type :toucan.result-type/instances))
     (next-method rf query-type model parsed-args resolved-query)
-
-    ;; there's no need to "upgrade" the query if it's already returning instances.
-    (isa? query-type :toucan.result-type/instances)
-    (next-method rf query-type model parsed-args resolved-query)
-
     ;; otherwise we need to run an upgraded query but then transform the results back to the originals
     ;; with [[result-type-rf]]
-    :else
     (let [upgraded-type (types/similar-query-type-returning query-type :toucan.result-type/instances)
           _             (assert upgraded-type (format "Don't know how to upgrade a %s query to one returning instances"
                                                       query-type))

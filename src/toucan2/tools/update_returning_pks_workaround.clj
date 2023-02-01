@@ -39,12 +39,19 @@
     *use-update-returning-pks-workaround*
     @global-use-update-returning-pks-workaround))
 
-(m/defmethod pipeline/transduce-query [#_query-type     :toucan.query-type/update.pks
+(def ^:private ^:dynamic *pks* nil)
+
+(derive ::update.capture-pks                :toucan.query-type/abstract)
+(derive :toucan.query-type/update.pks       ::update.capture-pks)
+(derive :toucan.query-type/update.instances ::update.capture-pks)
+
+(m/defmethod pipeline/transduce-query [#_query-type     ::update.capture-pks
                                        #_model          :default
-                                       #_resolved-query :toucan.map-backend/*]
+                                       #_resolved-query :default]
   "For databases that don't support returning PKs for UPDATE, rewrite the query as a SELECT and execute that to capture
-  the PKs of the rows that will be affected. See [[toucan2.tools.update-returning-pks-workaround]] for more
-  information."
+  the PKs of the rows that will be affected. We need to capture PKs for both `:toucan.query-type/update.pks` and for
+  `:toucan.query-type/update.instances`, since ultimately the latter is implemented on top of the former.See docstring
+  for [[toucan2.tools.update-returning-pks-workaround]] for more information."
   [original-rf query-type model parsed-args conditions-map]
   (if-not (use-update-returning-pks-workaround?)
     (next-method original-rf query-type model parsed-args conditions-map)
@@ -57,15 +64,23 @@
                                                   :toucan.query-type/select.instances.fns
                                                   model
                                                   parsed-args
-                                                  (vary-meta {} assoc :type :toucan.map-backend/honeysql2))
-            update-rf   (pipeline/default-rf query-type)]
+                                                  {})]
         (log/debugf :execute "update-returning-pks-workaround: got PKs %s" pks)
-        ;; now perform the actual UPDATE using a placeholder reducing function
+        (binding [*pks* pks]
+          (next-method original-rf query-type model parsed-args conditions-map))))))
+
+(m/defmethod pipeline/transduce-execute-with-connection [#_connection java.sql.Connection
+                                                         #_query-type :toucan.query-type/update.pks
+                                                         #_model      :default]
+  [rf conn query-type model sql-args]
+  (if-not (seq *pks*)
+    (next-method rf conn query-type model sql-args)
+    (do
+      (let [update-rf (pipeline/default-rf :toucan.query-type/update.update-count)]
         (log/debugf :results "update-returning-pks-workaround: performing original UPDATE")
-        (next-method update-rf query-type model parsed-args conditions-map)
-        ;; transduce the PKs we fetched in the first step using the original reducing function
-        (log/debugf :results "update-returning-pks-workaround: transducing PKs with original reducing function")
-        (transduce
-         identity
-         original-rf
-         pks)))))
+        (pipeline/transduce-execute-with-connection update-rf conn :toucan.query-type/update.update-count model sql-args))
+      (log/debugf :results "update-returning-pks-workaround: transducing PKs with original reducing function")
+      (transduce
+       identity
+       rf
+       *pks*))))
