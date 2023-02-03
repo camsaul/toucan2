@@ -1,6 +1,8 @@
 (ns toucan2.tools.before-delete-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer :all]
+   [clojure.walk :as walk]
    [toucan2.delete :as delete]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
@@ -174,3 +176,26 @@
                @*deleted-venues*))
         (is (= nil
                (select/select-fn-set :id ::test/venues)))))))
+
+(deftest ^:parallel macroexpansion-test
+  (testing "define-before-delete should define vars with different names based on the model."
+    (letfn [(generated-name* [form]
+              (cond
+                (sequential? form)
+                (some generated-name* form)
+
+                (and (symbol? form)
+                     (str/starts-with? (name form) "before-delete"))
+                form))
+            (generated-name [form]
+              (let [expanded (walk/macroexpand-all form)]
+                (or (generated-name* expanded)
+                    ['no-match expanded])))]
+      (is (= 'before-delete-primary-method-model-1
+             (generated-name `(before-delete/define-before-delete :model-1
+                                [~'venue]
+                                ~'venue))))
+      (is (= 'before-delete-primary-method-model-2
+             (generated-name `(before-delete/define-before-delete :model-2
+                                [~'venue]
+                                ~'venue)))))))

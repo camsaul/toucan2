@@ -2,7 +2,6 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
-   [honey.sql :as hsql]
    [methodical.core :as m]
    [toucan.db :as t1.db]
    [toucan.models :as t1.models]
@@ -496,14 +495,14 @@
   (testing "it must not fail when using SQL function calls."
     (test/with-discarded-table-changes User
       (is (= [4 5]
-             (t1.db/simple-insert-many! User [{:first-name "Grass" :last-name (hsql/call :upper "Hopper")}
+             (t1.db/simple-insert-many! User [{:first-name "Grass" :last-name [:upper "Hopper"]}
                                               {:first-name "Ko" :last-name "Libri"}]))))))
 
 (deftest ^:synchronized insert-many!-test
   (testing "It must return the inserted ids, it must not fail when using SQL function calls."
     (test/with-discarded-table-changes User
       (is (= [4 5]
-             (t1.db/insert-many! User [{:first-name "Grass" :last-name (hsql/call :upper "Hopper")}
+             (t1.db/insert-many! User [{:first-name "Grass" :last-name [:upper "Hopper"]}
                                        {:first-name "Ko" :last-name "Libri"}])))))
   (testing "It must call pre-insert hooks"
     (test/with-discarded-table-changes Category
@@ -523,7 +522,7 @@
   (testing "The returned data must match what's been inserted in the table"
     (test/with-discarded-table-changes User
       (is (= {:id 4, :first-name "Grass", :last-name "HOPPER"}
-             (t1.db/insert! User {:first-name "Grass" :last-name (hsql/call :upper "Hopper")}))))))
+             (t1.db/insert! User {:first-name "Grass" :last-name [:upper "Hopper"]}))))))
 
 (deftest ^:parallel select-one-test
   (is (= {:id 1, :first-name "Cam", :last-name "Saul"}

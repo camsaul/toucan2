@@ -57,9 +57,9 @@
 (defmacro define-before-insert
   {:style/indent :defn}
   [model [instance-binding] & body]
-  `(let [model# ~model]
-     (u/maybe-derive model# ::before-insert)
-     (m/defmethod before-insert model#
+  `(do
+     (u/maybe-derive ~model ::before-insert)
+     (m/defmethod before-insert ~model
        [~'&model ~instance-binding]
        (cond->> (do ~@body)
          ~'next-method (~'next-method ~'&model)))))

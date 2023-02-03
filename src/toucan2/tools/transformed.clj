@@ -414,9 +414,9 @@
   ```"
   {:style/indent 1}
   [model column->direction->fn]
-  `(let [model# ~model]
-     (u/maybe-derive model# ::transformed.model)
-     (m/defmethod transforms model#
+  `(do
+     (u/maybe-derive ~model ::transformed.model)
+     (m/defmethod transforms ~model
        [~'model]
        ~column->direction->fn)))
 

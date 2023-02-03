@@ -79,6 +79,7 @@
 (when (class-exists? "org.postgresql.jdbc.PgConnection")
   (require 'toucan2.query-execution-backend.jdbc.postgres))
 
-(when (or (class-exists? "com.mysql.cj.MysqlConnection")
-          (class-exists? "org.mariadb.jdbc.MariaDbConnection"))
+(when (some class-exists? ["org.mariadb.jdbc.Connection"
+                           "org.mariadb.jdbc.MariaDbConnection"
+                           "com.mysql.cj.MysqlConnection"])
   (require 'toucan2.query-execution-backend.jdbc.mysql-mariadb))

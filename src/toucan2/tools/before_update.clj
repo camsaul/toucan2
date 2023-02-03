@@ -120,9 +120,9 @@
          new-args-maps)))))
 
 (defmacro define-before-update [model [instance-binding] & body]
-  `(let [model# ~model]
-     (u/maybe-derive model# ::before-update)
-     (m/defmethod before-update model#
+  `(do
+     (u/maybe-derive ~model ::before-update)
+     (m/defmethod before-update ~model
        [~'&model ~instance-binding]
        (cond->> (do ~@body)
          ~'next-method

@@ -1,6 +1,8 @@
 (ns toucan2.tools.after-insert-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer :all]
+   [clojure.walk :as walk]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.protocols :as protocols]
@@ -253,3 +255,26 @@
                        :created-at (LocalDateTime/parse "2017-01-01T00:00")
                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
                      @*venues-awaiting-moderation*)))))))))
+
+(deftest ^:parallel macroexpansion-test
+  (testing "define-after-insert should define vars with different names based on the model."
+    (letfn [(generated-name* [form]
+              (cond
+                (sequential? form)
+                (some generated-name* form)
+
+                (and (symbol? form)
+                     (str/starts-with? (name form) "each-row-fn-primary-method"))
+                form))
+            (generated-name [form]
+              (let [expanded (walk/macroexpand-all form)]
+                (or (generated-name* expanded)
+                    ['no-match expanded])))]
+      (is (= 'each-row-fn-primary-method-toucan-query-type-insert-*-model-1
+             (generated-name `(after-insert/define-after-insert :model-1
+                                [~'venue]
+                                ~'venue))))
+      (is (= 'each-row-fn-primary-method-toucan-query-type-insert-*-model-2
+             (generated-name `(after-insert/define-after-insert :model-2
+                                [~'venue]
+                                ~'venue)))))))

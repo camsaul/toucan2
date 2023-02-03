@@ -2,6 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
+   [clojure.walk :as walk]
    [methodical.core :as m]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
@@ -444,3 +445,25 @@
                 :name       "CAM 2.0"
                 :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")}
                (select/select-one ::test/people 2)))))))
+
+(deftest ^:parallel macroexpansion-test
+  (testing "define-before-update should define vars with different names based on the model."
+    (letfn [(generated-name* [form]
+              (cond
+                (sequential? form)
+                (some generated-name* form)
+
+                (and (symbol? form)
+                     (str/starts-with? (name form) "before-update")) form))
+            (generated-name [form]
+              (let [expanded (walk/macroexpand-all form)]
+                (or (generated-name* expanded)
+                    ['no-match expanded])))]
+      (is (= 'before-update-primary-method-model-1
+             (generated-name `(before-update/define-before-update :model-1
+                                [~'venue]
+                                ~'venue))))
+      (is (= 'before-update-primary-method-model-2
+             (generated-name `(before-update/define-before-update :model-2
+                                [~'venue]
+                                ~'venue)))))))

@@ -2,6 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
+   [clojure.walk :as walk]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.protocols :as protocols]
@@ -144,3 +145,26 @@
       (testing `protocols/changes
         (is (= nil
                (protocols/changes person)))))))
+
+(deftest ^:parallel macroexpansion-test
+  (testing "define-after-select should define vars with different names based on the model."
+    (letfn [(generated-name* [form]
+              (cond
+                (sequential? form)
+                (some generated-name* form)
+
+                (and (symbol? form)
+                     (str/starts-with? (name form) "after-select"))
+                form))
+            (generated-name [form]
+              (let [expanded (walk/macroexpand-all form)]
+                (or (generated-name* expanded)
+                    ['no-match expanded])))]
+      (is (= 'after-select-primary-method-model-1
+             (generated-name `(after-select/define-after-select :model-1
+                                [~'venue]
+                                ~'venue))))
+      (is (= 'after-select-primary-method-model-2
+             (generated-name `(after-select/define-after-select :model-2
+                                [~'venue]
+                                ~'venue)))))))

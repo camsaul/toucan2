@@ -1,6 +1,8 @@
 (ns toucan2.tools.before-select-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer :all]
+   [clojure.walk :as walk]
    [methodical.core :as m]
    [toucan2.instance :as instance]
    [toucan2.select :as select]
@@ -62,3 +64,25 @@
              (select/select-one [::people.increment-id :id :name] :id 1)))
       (is (= [{:id 1}]
              @*select-calls*)))))
+
+(deftest ^:parallel macroexpansion-test
+  (testing "define-before-select should define vars with different names based on the model."
+    (letfn [(generated-name* [form]
+              (cond
+                (sequential? form)
+                (some generated-name* form)
+
+                (and (symbol? form)
+                     (str/starts-with? (name form) "before-select")) form))
+            (generated-name [form]
+              (let [expanded (walk/macroexpand-all form)]
+                (or (generated-name* expanded)
+                    ['no-match expanded])))]
+      (is (= 'before-select-primary-method-model-1
+             (generated-name `(before-select/define-before-select :model-1
+                                [~'venue]
+                                ~'venue))))
+      (is (= 'before-select-primary-method-model-2
+             (generated-name `(before-select/define-before-select :model-2
+                                [~'venue]
+                                ~'venue)))))))
