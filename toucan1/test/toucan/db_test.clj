@@ -2,7 +2,6 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
-   [honey.sql :as hsql]
    [methodical.core :as m]
    [toucan.db :as t1.db]
    [toucan.models :as t1.models]
