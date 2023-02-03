@@ -184,7 +184,7 @@
 
 (defmethod default-test-db-url :mariadb
   [_db-type]
-  "jdbc:mariadb://localhost:3306/metabase_test?user=root")
+  "jdbc:mysql://localhost:3306/metabase_test?user=root")
 
 (defmethod default-test-db-url :h2
   [_db-type]
