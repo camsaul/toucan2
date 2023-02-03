@@ -1,15 +1,15 @@
 (ns toucan2.tools.before-delete-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer :all]
+   [clojure.walk :as walk]
    [toucan2.delete :as delete]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.before-delete :as before-delete]
-   [toucan2.update :as update]
-   [clojure.string :as str]
-   [clojure.walk :as walk])
+   [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
 

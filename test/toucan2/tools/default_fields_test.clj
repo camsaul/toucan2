@@ -2,6 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
+   [clojure.walk :as walk]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.pipeline :as pipeline]
@@ -13,8 +14,7 @@
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.default-fields :as default-fields]
    [toucan2.tools.named-query :as named-query]
-   [toucan2.tools.transformed :as transformed]
-   [clojure.walk :as walk])
+   [toucan2.tools.transformed :as transformed])
   (:import
    (java.time LocalDateTime)))
 

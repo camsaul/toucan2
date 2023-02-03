@@ -1,6 +1,8 @@
 (ns toucan2.tools.transformed-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer :all]
+   [clojure.walk :as walk]
    [methodical.core :as m]
    [toucan2.delete :as delete]
    [toucan2.insert :as insert]
@@ -18,9 +20,7 @@
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.named-query :as named-query]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update]
-   [clojure.string :as str]
-   [clojure.walk :as walk])
+   [toucan2.update :as update])
   (:import
    (java.time LocalDateTime)))
 
