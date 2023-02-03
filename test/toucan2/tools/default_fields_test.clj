@@ -13,7 +13,8 @@
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.default-fields :as default-fields]
    [toucan2.tools.named-query :as named-query]
-   [toucan2.tools.transformed :as transformed])
+   [toucan2.tools.transformed :as transformed]
+   [clojure.walk :as walk])
   (:import
    (java.time LocalDateTime)))
 
@@ -185,3 +186,25 @@
                         (select/select-one ::venues.default-fields query))
           {select [:id :name :updated-at], :where [:= :id 1]}
           ::named-query.select-venues-override-default-fields)))))
+
+(deftest ^:parallel macroexpansion-test
+  (testing "define-default-fields should define vars with different names based on the model."
+    (letfn [(generated-name* [form]
+              (cond
+                (sequential? form)
+                (some generated-name* form)
+
+                (and (symbol? form)
+                     (str/starts-with? (name form) "default-fields")) form))
+            (generated-name [form]
+              (let [expanded (walk/macroexpand-all form)]
+                (or (generated-name* expanded)
+                    ['no-match expanded])))]
+      (is (= 'default-fields-primary-method-model-1
+             (generated-name `(default-fields/define-default-fields :model-1
+                                [~'venue]
+                                ~'venue))))
+      (is (= 'default-fields-primary-method-model-2
+             (generated-name `(default-fields/define-default-fields :model-2
+                                [~'venue]
+                                ~'venue)))))))

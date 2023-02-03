@@ -3,6 +3,7 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer :all]
+   [clojure.walk :as walk]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.select :as select]
@@ -196,3 +197,26 @@
                           :h2                  (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")
                           (:postgres :mariadb) (OffsetDateTime/parse "2023-01-01T01:26Z"))}
            (select/select-one ::people.default-values 5)))))
+
+(deftest ^:parallel macroexpansion-test
+  (testing "define-before-insert should define vars with different names based on the model."
+    (letfn [(generated-name* [form]
+              (cond
+                (sequential? form)
+                (some generated-name* form)
+
+                (and (symbol? form)
+                     (str/starts-with? (name form) "before-insert-primary-method"))
+                form))
+            (generated-name [form]
+              (let [expanded (walk/macroexpand-all form)]
+                (or (generated-name* expanded)
+                    ['no-match expanded])))]
+      (is (= 'before-insert-primary-method-model-1
+             (generated-name `(before-insert/define-before-insert :model-1
+                                [~'venue]
+                                ~'venue))))
+      (is (= 'before-insert-primary-method-model-2
+             (generated-name `(before-insert/define-before-insert :model-2
+                                [~'venue]
+                                ~'venue)))))))

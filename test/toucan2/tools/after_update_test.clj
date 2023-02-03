@@ -1,6 +1,8 @@
 (ns toucan2.tools.after-update-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer :all]
+   [clojure.walk :as walk]
    [toucan2.instance :as instance]
    [toucan2.select :as select]
    [toucan2.test :as test]
@@ -150,3 +152,26 @@
                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
                    (select/select [model :id :name :updated-at]
                                   {:order-by [[:id :asc]]})))))))))
+
+(deftest ^:parallel macroexpansion-test
+  (testing "define-after-update should define vars with different names based on the model."
+    (letfn [(generated-name* [form]
+              (cond
+                (sequential? form)
+                (some generated-name* form)
+
+                (and (symbol? form)
+                     (str/starts-with? (name form) "each-row-fn-primary-method-toucan-query-type-update"))
+                form))
+            (generated-name [form]
+              (let [expanded (walk/macroexpand-all form)]
+                (or (generated-name* expanded)
+                    ['no-match expanded])))]
+      (is (= 'each-row-fn-primary-method-toucan-query-type-update-*-model-1
+             (generated-name `(after-update/define-after-update :model-1
+                                [~'venue]
+                                ~'venue))))
+      (is (= 'each-row-fn-primary-method-toucan-query-type-update-*-model-2
+             (generated-name `(after-update/define-after-update :model-2
+                                [~'venue]
+                                ~'venue)))))))

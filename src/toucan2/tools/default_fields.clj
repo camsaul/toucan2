@@ -113,9 +113,9 @@
                   [:toucan.result-type/instances :toucan2.tools.after/model])
 
 (defmacro define-default-fields {:style/indent :defn} [model & body]
-  `(let [model# ~model]
-     (u/maybe-derive model# ::default-fields)
-     (m/defmethod default-fields model# [~'&model] ~@body)))
+  `(do
+     (u/maybe-derive ~model ::default-fields)
+     (m/defmethod default-fields ~model [~'&model] ~@body)))
 
 (s/fdef define-default-fields
   :args (s/cat :model some?

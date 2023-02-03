@@ -18,7 +18,9 @@
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.named-query :as named-query]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update])
+   [toucan2.update :as update]
+   [clojure.string :as str]
+   [clojure.walk :as walk])
   (:import
    (java.time LocalDateTime)))
 
@@ -521,3 +523,23 @@
        Throwable
        #"Invalid deftransforms map"
        (transformed/transforms ::invalid))))
+
+(deftest ^:parallel macroexpansion-test
+  (testing "deftransforms should define vars with different names based on the model."
+    (letfn [(generated-name* [form]
+              (cond
+                (sequential? form)
+                (some generated-name* form)
+
+                (and (symbol? form)
+                     (str/starts-with? (name form) "transforms-primary-method")) form))
+            (generated-name [form]
+              (let [expanded (walk/macroexpand-all form)]
+                (or (generated-name* expanded)
+                    ['no-match expanded])))]
+      (is (= 'transforms-primary-method-model-1
+             (generated-name `(transformed/deftransforms :model-1
+                                {:x {:in ~'inc}}))))
+      (is (= 'transforms-primary-method-model-2
+             (generated-name `(transformed/deftransforms :model-2
+                                {:x {:in ~'inc}})))))))
