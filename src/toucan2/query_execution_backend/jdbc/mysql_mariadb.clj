@@ -16,15 +16,13 @@
 
 ;;; TODO -- need the MySQL class here too.
 
-(when-let [mariadb-connection-class (try
-                                      (Class/forName "org.mariadb.jdbc.MariaDbConnection")
-                                      (catch Throwable _))]
-  (derive mariadb-connection-class ::connection))
-
-(when-let [mysql-connection-class (try
-                                    (Class/forName "com.mysql.cj.MysqlConnection")
-                                    (catch Throwable _))]
-  (derive mysql-connection-class ::connection))
+(doseq [^String connection-class-name ["org.mariadb.jdbc.Connection"
+                                       "org.mariadb.jdbc.MariaDbConnection"
+                                       "com.mysql.cj.MysqlConnection"]]
+  (when-let [connection-class (try
+                                (Class/forName connection-class-name)
+                                (catch Throwable _))]
+    (derive connection-class ::connection)))
 
 (m/defmethod jdbc.read/read-column-thunk [#_conn  ::connection
                                           #_model :default
