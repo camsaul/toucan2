@@ -46,7 +46,11 @@
       (log/debugf :results
                   "Column %s %s is of JDBC type %s, native type %s"
                   i
-                  (str (some->> (.getTableName rsmeta i) not-empty (str \.)) (.getColumnLabel rsmeta i))
+                  (let [table-name (some->> (.getTableName rsmeta i) not-empty)
+                        column-name (.getColumnLabel rsmeta i)]
+                    (if table-name
+                      (str table-name \. column-name)
+                      column-name))
                   (symbol "java.sql.Types" (type-name col-type))
                   (.getColumnTypeName rsmeta i))
       [(protocols/dispatch-value conn) (protocols/dispatch-value model) col-type])))
