@@ -635,3 +635,9 @@
             :mariadb  "SELECT * FROM `user` WHERE `name` = ?")
           "Cam"]
          (t1.db/honeysql->sql {:select [:*], :from [:user], :where [:= :name "Cam"]}))))
+
+(deftest ^:parallel debug-print-queries-test
+  (let [s (with-out-str
+            (t1.db/debug-print-queries
+              (t1.db/select-one User)))]
+    (is (str/includes? s "Compiling Honey SQL 2 with options"))))
