@@ -141,7 +141,7 @@
   "DEPRECATED: Bind [[toucan2.util/*debug*]] directly instead."
   {:style/indent 0}
   [& body]
-  `(binding [u/*debug* true]
+  `(binding [log/*level* :debug]
      ~@body))
 
 (defn honeysql->sql
