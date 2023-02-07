@@ -260,21 +260,10 @@
     (is (= [{:one 1}]
            (execute/query ::test/db "SELECT 1 AS one;")))))
 
-;;; TODO
-#_(deftest readable-column-test
-    (testing "Toucan 2 should call next.jdbc.result-set/read-column-by-index"
-      (is (= [{:n 100.0M}]
-             (execute/query ::test/db "SELECT '100.0'::decimal AS n;")))
-      (try
-        (extend-protocol next.jdbc.rs/ReadableColumn
-          java.math.BigDecimal
-          (read-column-by-index [n _ _]
-            (str n)))
-        (is (= [{:n "100.0"}]
-               (execute/query ::test/db "SELECT '100.0'::decimal AS n;")))
-        (finally
-          ;; reverse the changes.
-          (extend-protocol next.jdbc.rs/ReadableColumn
-            java.math.BigDecimal
-            (read-column-by-index [n _ _]
-              n))))))
+(deftest ^:parallel query-returning-no-columns-test
+  ;; this syntax doesn't seem to work on MariaDB
+  (when (#{:h2 :postgres} (test/current-db-type))
+    (is (= [(instance/instance nil {})
+            (instance/instance nil {})
+            (instance/instance nil {})]
+           (execute/query ::test/db ["SELECT FROM venues;"])))))

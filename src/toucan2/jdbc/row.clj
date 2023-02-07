@@ -357,7 +357,6 @@
   shouldn't be using this directly!"
   [model ^ResultSet rset builder i->thunk col-name->index]
   (assert (not (.isClosed rset)) "ResultSet is already closed")
-  (assert (seq (:cols builder)) "builder must have :cols")
   (let [transient-row      (next.jdbc.rs/->row builder)
         i->thunk           (atom i->thunk)
         realized-row-delay (make-realized-row-delay builder i->thunk transient-row)
