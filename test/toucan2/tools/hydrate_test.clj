@@ -381,6 +381,27 @@
   (for [row rows]
     (assoc row ::is-bird? true)))
 
+(m/defmethod hydrate/batched-hydrate [:default ::reviews]
+  [_model _k birds]
+  (when (seq birds)
+    (let [bird-ids    (not-empty (keep :id birds))
+          all-reviews (when bird-ids
+                        {1 [{:reviewer-id 1
+                             :review      "This is a great bird!"}
+                            {:reviewer-id 2
+                             :review      "I've seen better."}]})]
+      (for [bird birds]
+        (when (some? bird)
+          (assoc bird ::reviews (get all-reviews (:id bird) [])))))))
+
+(m/defmethod hydrate/batched-hydrate [:default ::review-details]
+  [_model _k reviews]
+  (when (seq reviews)
+    (let [id->user {1 {:name "Cam"}
+                    2 {:name "Sam"}}]
+      (for [review reviews]
+        (assoc review :user (get id->user (:reviewer-id review)))))))
+
 (deftest ^:parallel batched-hydration-test
   (testing "Check that batched hydration doesn't try to hydrate fields that already exist and are not delays"
     (is (= (instance/instance :user {:user-id 1, :user "OK <3"})
@@ -391,7 +412,26 @@
           {:type :pigeon, ::is-bird? true}]
          (hydrate/hydrate [(instance/instance :bird {:type :toucan})
                            (instance/instance :bird {:type :pigeon})]
-                          ::is-bird?))))
+                          ::is-bird?)))
+  (testing "Nested hydration"
+    (is (= [(instance/instance :bird {:type     :toucan
+                                      :id       1
+                                      ::reviews [{:reviewer-id 1, :review "This is a great bird!", :user {:name "Cam"}}
+                                                 {:reviewer-id 2, :review "I've seen better.", :user {:name "Sam"}}]})
+            (instance/instance :bird {:type :pigeon, :id 2, ::reviews []})]
+           (hydrate/hydrate [(instance/instance :bird {:type :toucan, :id 1})
+                             (instance/instance :bird {:type :pigeon, :id 2})]
+                            [::reviews ::review-details])))
+    (testing "with nils"
+      (is (= nil
+             (hydrate/hydrate nil [::reviews ::review-details])))
+      (is (= [nil]
+             (hydrate/hydrate [nil] [::reviews ::review-details])))
+      (is (= [nil
+              (instance/instance :bird {:type :pigeon, :id 2, ::reviews []})]
+             (hydrate/hydrate [nil
+                               (instance/instance :bird {:type :pigeon, :id 2})]
+                              [::reviews ::review-details]))))))
 
 (derive ::people.composite-pk ::people)
 
