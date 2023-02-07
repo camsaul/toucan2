@@ -89,7 +89,7 @@
                                     cols)))]
          (log/tracef :results "Index of column named %s (originally %s) is %s" column-name' column-name i)
          (when-not i
-           (log/warnf :results "Could not determine index of column name %s. Found: %s" column-name cols))
+           (log/debugf :results "Could not determine index of column name %s. Found: %s" column-name cols))
          i)))))
 
 (defn instance-builder-fn

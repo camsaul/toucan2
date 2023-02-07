@@ -1,10 +1,12 @@
 (ns toucan2.select-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer :all]
    [honey.sql :as hsql]
    [methodical.core :as m]
    [toucan2.connection :as conn]
    [toucan2.instance :as instance]
+   [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
@@ -447,13 +449,82 @@
   (is (= 3
          (select/count ::test/venues)))
   (is (= 2
-         (select/count ::test/venues :category "bar"))))
+         (select/count ::test/venues :category "bar")))
+  (testing "Should build an efficient query"
+    (is (= (case (test/current-db-type)
+             :mariadb  ["SELECT COUNT(*) AS `count` FROM `venues` WHERE `id` = ?" 1]
+             :postgres ["SELECT COUNT(*) AS \"count\" FROM \"venues\" WHERE \"id\" = ?" 1]
+             :h2       ["SELECT COUNT(*) AS \"COUNT\" FROM \"VENUES\" WHERE \"ID\" = ?" 1])
+           (tools.compile/compile
+             (select/count ::test/venues 1)))))
+  (testing "Should be possible to do count with a raw SQL query"
+    (is (= 3
+           (select/count ::test/venues ["SELECT count(*) AS count FROM venues;"])))
+    (testing "should not log a warning, since this query returns :count"
+      (let [s (with-out-str (binding [log/*level* :warn]
+                              (select/count ::test/venues ["SELECT count(*) AS count FROM venues;"])))]
+        (is (not (str/includes? s "inefficient count query")))))
+    (testing "Query that returns multiple rows"
+      (is (= 3
+             (select/count ::test/venues ["(SELECT 1 AS count) UNION ALL (SELECT 2 AS count);"]))))
+    (testing "(inefficient query)"
+      (is (= 3
+             (select/count ::test/venues ["SELECT * FROM venues;"])))
+      (testing "should log a warning"
+        (let [s (with-out-str (binding [log/*level* :warn]
+                                (select/count ::test/venues ["SELECT * FROM venues;"])))]
+          (is (str/includes? s "inefficient count query. See documentation for toucan2.select/count."))))))
+  (testing "Hairy query"
+    (is (= 2
+           (select/count ::test/venues :category [:not= "saloon"]
+                         {:where [:not= :name "BevMo"]
+                          :limit 1})))))
 
 (deftest ^:parallel exists?-test
-  (is (= true
-         (select/exists? ::test/people :name "Cam")))
-  (is (= false
-         (select/exists? ::test/people :name "Cam Era"))))
+  (is (true? (select/exists? ::test/people :name "Cam")))
+  (is (false? (select/exists? ::test/people :name "Cam Era")))
+  (testing "Should build an efficient query"
+    (is (= (case (test/current-db-type)
+             :mariadb  ["SELECT EXISTS (SELECT 1 FROM `venues` WHERE `id` = ?) AS `exists`" 1]
+             :postgres ["SELECT EXISTS (SELECT 1 FROM \"venues\" WHERE \"id\" = ?) AS \"exists\"" 1]
+             :h2       ["SELECT EXISTS (SELECT 1 FROM \"VENUES\" WHERE \"ID\" = ?) AS \"EXISTS\"" 1])
+           (tools.compile/compile
+             (select/exists? ::test/venues 1)))))
+  (testing "Should be possible to do count with a raw SQL query"
+    (let [exists-identifier (case (test/current-db-type)
+                              :mariadb        "`exists`"
+                              (:h2 :postgres) "\"exists\"")]
+      (is (true? (select/exists? ::test/venues  [(format "SELECT exists(SELECT 1 FROM venues WHERE id = 1) AS %s;"
+                                                         exists-identifier)])))
+      (is (false? (select/exists? ::test/venues  [(format "SELECT exists(SELECT 1 FROM venues WHERE id < 1) AS %s;"
+                                                          exists-identifier)])))
+      (testing "query that returns an integer"
+        (is (true? (select/exists? ::test/venues  [(format "SELECT 1 AS %s;" exists-identifier)])))
+        (is (false? (select/exists? ::test/venues [(format "SELECT 0 AS %s;" exists-identifier)]))))
+      (testing "query that returns multiple rows"
+        (is (true? (select/exists? ::test/venues  [(format "(SELECT false AS %s) UNION ALL (SELECT true AS %s);"
+                                                           exists-identifier
+                                                           exists-identifier)])))
+        (is (false? (select/exists? ::test/venues  [(format "(SELECT false AS %s) UNION ALL (SELECT false AS %s);"
+                                                            exists-identifier
+                                                            exists-identifier)]))))
+      (testing "should not log a warning, since this query returns :exists"
+        (let [s (with-out-str
+                  (binding [log/*level* :warn]
+                    (select/exists? ::test/venues [(format "SELECT exists(SELECT 1 FROM venues WHERE id = 1) AS %s;"
+                                                           exists-identifier)])
+                    (select/exists? ::test/venues [(format "SELECT exists(SELECT 1 FROM venues WHERE id < 1) AS %s;"
+                                                           exists-identifier)])))]
+          (is (not (str/includes? s "inefficient exists? query"))))))
+    (testing "(inefficient query)"
+      (is (true? (select/exists? ::test/venues ["SELECT * FROM venues;"])))
+      (is (true? (select/exists? ::test/venues ["SELECT * FROM venues LIMIT 1;"])))
+      (is (false? (select/exists? ::test/venues ["SELECT * FROM venues WHERE id < 1;"])))
+      (is (false? (select/exists? ::test/venues ["SELECT * FROM venues LIMIT 0;"])))
+      (testing "should log a warning"
+        (let [s (with-out-str (binding [log/*level* :warn]
+                                (select/exists? ::test/venues ["SELECT * FROM venues;"])))]
+          (is (str/includes? s "inefficient exists? query. See documentation for toucan2.select/exists?.")))))))
 
 (deftest ^:parallel dont-add-from-if-it-already-exists-test
   (testing "Select shouldn't add a :from clause if one is passed in explicitly already"
@@ -667,10 +738,18 @@
            (select/select :conn ::test/db [:venues :id :name] 1)))
     (is (= {:id 1, :name "Tempest"}
            (select/select-one :conn ::test/db [:venues :id :name] 1)))
-    (is (= 1
-           (select/count :conn ::test/db [:venues :id :name] 1)))
-    (is (= true
-           (select/exists? :conn ::test/db [:venues :id :name] 1)))
+    (testing `select/count
+      (is (= 1
+             (select/count :conn ::test/db :venues 1)
+             (select/count :conn ::test/db :venues :id 1)
+             (select/count :conn ::test/db :venues {:where [:= :id 1]})
+             (select/count :conn ::test/db [:venues :id :name] 1))))
+    (testing `select/exists?
+      (is (= true
+             (select/exists? :conn ::test/db :venues 1)
+             (select/exists? :conn ::test/db :venues :id 1)
+             (select/exists? :conn ::test/db :venues {:where [:= :id 1]})
+             (select/exists? :conn ::test/db [:venues :id :name] 1))))
     (testing "nil :conn should not override current connectable"
       (binding [conn/*current-connectable* ::test/db]
         (is (= [{:id 1, :name "Tempest"}]
@@ -678,7 +757,7 @@
     (testing "Explicit connectable should override current connectable"
       (binding [conn/*current-connectable* :fake-db]
         (is (= true
-               (select/exists? :conn ::test/db [:venues :id :name] 1)))))
+               (select/exists? :conn ::test/db :venues 1)))))
     (testing "Explicit connectable should override model default connectable"
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo

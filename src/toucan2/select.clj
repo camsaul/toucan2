@@ -25,12 +25,10 @@
   (:refer-clojure :exclude [count])
   (:require
    [clojure.spec.alpha :as s]
-   [methodical.core :as m]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
-   [toucan2.types :as types]
-   [toucan2.util :as u]))
+   [toucan2.types :as types]))
 
 (comment s/keep-me
          types/keep-me)
@@ -216,51 +214,67 @@
   (let [pks-fn (model/select-pks-fn modelable)]
     (apply select-fn->fn pks-fn f modelable args)))
 
-(m/defmulti count*
-  {:arglists            '([model₁ unparsed-args])
-   :defmethod-arities   #{2}
-   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
-  u/dispatch-on-first-arg)
-
-;;; TODO -- the default implementation is evil, we need to do something better.
-
-(m/defmethod count* :default
-  [model unparsed-args]
-  (log/debugf :compile "No efficient implementation of count* for %s, doing reducible-select and counting the
-  instances..." model)
-  (reduce
-   (fn [acc _]
-     (inc acc))
-   0
-   (apply reducible-select model unparsed-args)))
+(defn- count-rf []
+  (let [logged-warning? (atom false)
+        log-warning     (fn []
+                          (when-not @logged-warning?
+                            (log/warnf :results "Warning: inefficient count query. See documentation for toucan2.select/count.")
+                            (reset! logged-warning? true)))]
+    (fn count-rf*
+      ([] 0)
+      ([acc] acc)
+      ([acc row]
+       (if (:count row)
+         (+ acc (:count row))
+         (do (log-warning)
+             (inc acc)))))))
 
 (defn count
+  "Like [[select]], but returns the number of rows that match in an efficient way.
+
+  ### Implementation note:
+
+  The default Honey SQL 2 map query compilation backend builds an efficient
+
+  ```sql
+  SELECT count(*) AS \"count\" FROM ...
+  ```
+
+  query. Custom query compilation backends should do the equivalent by implementing [[toucan2.pipeline/build]] for the
+  query type `:toucan.query-type/select.count` and build a query that returns the key `:count`, If an efficient
+  implementation does not exist, this will fall back to simply counting all matching rows."
   {:arglists '([modelable-columns & kv-args? query?]
                [:conn connectable modelable-columns & kv-args? query?])}
-  [modelable & unparsed-args]
-  (let [model (model/resolve-model modelable)]
-    (count* model unparsed-args)))
+  [& unparsed-args]
+  (pipeline/transduce-unparsed (count-rf) :toucan.query-type/select.count unparsed-args))
 
-(m/defmulti exists?*
-  {:arglists '([model₁ unparsed-args]), :defmethod-arities #{2}}
-  u/dispatch-on-first-arg)
-
-(m/defmethod exists?* :default
-  [model unparsed-args]
-  (log/debugf :compile "No efficient implementation of exists?* for %s, doing reducible-select and seeing if it returns a row..." model)
-  (transduce
-   (take 1)
-   (fn
-     ([acc]
-      acc)
-     ([_ _]
-      true))
-   false
-   (apply reducible-select model unparsed-args)))
+(defn- exists?-rf
+  ([] false)
+  ([acc] acc)
+  ([_acc row]
+   (if (contains? row :exists)
+     (let [exists (:exists row)
+           result (if (integer? exists)
+                    (pos? exists)
+                    (boolean exists))]
+       (if (true? result)
+         (reduced true)
+         false))
+     (do
+       (log/warnf :results "Warning: inefficient exists? query. See documentation for toucan2.select/exists?.")
+       (reduced true)))))
 
 (defn exists?
+  "Like [[select]], but returns whether or not *any* rows match in an efficient way.
+
+  ### Implementation note:
+
+  The default Honey SQL 2 map query compilation backend builds an efficient
+
+  ```sql
+  SELECT exists(SELECT 1 FROM ... WHERE ...) AS exists
+  ```"
   {:arglists '([modelable-columns & kv-args? query?]
                [:conn connectable modelable-columns & kv-args? query?])}
-  [modelable & unparsed-args]
-  (let [model (model/resolve-model modelable)]
-    (exists?* model unparsed-args)))
+  [& unparsed-args]
+  (pipeline/transduce-unparsed exists?-rf :toucan.query-type/select.exists unparsed-args))

@@ -130,6 +130,23 @@
     (log/debugf :compile "=> %s" resolved-query)
     (next-method query-type model parsed-args resolved-query)))
 
+(m/defmethod pipeline/build [#_query-type :toucan.query-type/select.count
+                             #_model      :default
+                             #_query      :toucan.map-backend/honeysql2]
+  "Build an efficient `count(*)` query to power [[toucan2.select/count]]."
+  [query-type model parsed-args resolved-query]
+  (let [parsed-args (assoc parsed-args :columns [[:%count.* :count]])]
+    (next-method query-type model parsed-args resolved-query)))
+
+(m/defmethod pipeline/build [#_query-type :toucan.query-type/select.exists
+                             #_model      :default
+                             #_query      :toucan.map-backend/honeysql2]
+  "Build an efficient query like `SELECT exists(SELECT 1 FROM ...)` query to power [[toucan2.select/exists?]]."
+  [query-type model parsed-args resolved-query]
+  (let [parsed-args (assoc parsed-args :columns [[[:inline 1]]])
+        subselect   (next-method query-type model parsed-args resolved-query)]
+    {:select [[[:exists subselect] :exists]]}))
+
 (defn- empty-insert [_model dialect]
   (if (#{:mysql :mariadb} dialect)
     {:columns []
