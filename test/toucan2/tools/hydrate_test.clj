@@ -397,7 +397,6 @@
 (m/defmethod hydrate/batched-hydrate [:default ::review-details]
   [_model _k reviews]
   (when (seq reviews)
-    (println "reviews:" reviews) ; NOCOMMIT
     (let [id->user {1 {:name "Cam"}
                     2 {:name "Sam"}}]
       (for [review reviews]
