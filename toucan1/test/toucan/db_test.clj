@@ -74,8 +74,13 @@
       (partial t1.db/select-ids Venue)                                  #{2}
       (partial t1.db/select-field->field :id :category Venue)           {2 :bar}
       (partial t1.db/select-id->field :category Venue)                  {2 :bar}
-      (fn [& args] (into [] (apply t1.db/select-reducible Venue args))) [{:id 2, :name "Ho's Tavern", :category :bar}]
-      (partial t1.db/count Venue)                                       1)))
+      (fn [& args] (into [] (apply t1.db/select-reducible Venue args))) [{:id 2, :name "Ho's Tavern", :category :bar}])
+    ;; count doesn't really work with the ORDER BY, so try it with the other stuff.
+    (is (= 2
+           (t1.db/count Venue
+                        {:limit 1}
+                        :category [:not= "saloon"]
+                        {:where [:not= :name "BevMo"]})))))
 
 (deftest ^:parallel override-quote-style-test
   (is (= "`toucan`"

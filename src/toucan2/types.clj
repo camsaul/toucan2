@@ -36,6 +36,22 @@
 ;;; transform to the results, so we don't want to apply a default fields transform or other stuff like that.
 (derive :toucan.query-type/select.instances.fns :toucan.query-type/select.instances)
 
+;;; A special query type that is just supposed to return the count of matching rows rather than the actual matching
+;;; rows. This is used to implement [[toucan2.select/count]]. Query compilation backends should build something that
+;;; returns a row with the key `:count`.
+;;;
+;;; If the query does not return a row with the key `:count`, [[toucan2.select/count]] will count up all the rows
+;;; returned.
+(derive :toucan.query-type/select.count :toucan.query-type/select.instances.fns)
+
+;;; A special query type that should just return whether or not *any* rows matching the conditions exist. Used to
+;;; implement [[toucan2.select/exists?]]. Similar to `:toucan.query-type/select.count`, but this should return a result
+;;; row with the key `:exists`, which may be either a boolean or integer (positive = truthy).
+;;;
+;;; If the query does not return a row with the key `:exists`, [[toucan2.select/exists?]] will simply check whether or
+;;; not a row is returned.
+(derive :toucan.query-type/select.exists :toucan.query-type/select.instances.fns)
+
 ;;; A special subtype of a SELECT query that should use the syntax of update. Used to
 ;;; power [[toucan2.tools.before-update]].
 ;;;
