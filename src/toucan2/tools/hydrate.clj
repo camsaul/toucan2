@@ -629,7 +629,11 @@
          (empty? results))
     results
 
-    (sequential? (first results))
+    ;; check whether the first non-nil result is a sequence. If it is, then hydrate sequences-of-sequences
+    (sequential? (some (fn [result]
+                         (when (some? result)
+                           result))
+                       results))
     (hydrate-sequence-of-sequences model results k)
 
     (keyword? k)
