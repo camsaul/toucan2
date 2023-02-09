@@ -456,7 +456,7 @@
     (if (empty? hydrated-instances)
       (concat acc (map :instance annotated-instances))
       (let [[not-hydrated [_needed-hydration & more]] (split-with (complement :needs-hydration?) annotated-instances)]
-        (recur (concat acc (map :instance not-hydrated) [(first hydrated-instances)])
+        (recur (vec (concat acc (map :instance not-hydrated) [(first hydrated-instances)]))
                more
                (rest hydrated-instances))))))
 
