@@ -46,7 +46,6 @@ jobs:
         path: |
           ~/.m2/repository
           ~/.gitlibs
-          ~/.deps.clj
         key: v1-${{ hashFiles('./deps.edn') }}-postgres
         restore-keys: |
           v1-${{ hashFiles('./deps.edn') }}-
