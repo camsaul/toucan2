@@ -212,3 +212,8 @@ jobs:
       uses: codecov/codecov-action@v3
       with:
         files: ./target/coverage/codecov.json
+
+  codespell:
+    runs-on: ubuntu-20.04
+    steps:
+      uses: codespell-project/actions-codespell@v1
