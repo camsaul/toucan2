@@ -220,3 +220,5 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: codespell-project/actions-codespell@v1
+        with:
+          ignore_words_file: .codespellignore
