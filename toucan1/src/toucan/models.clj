@@ -327,7 +327,7 @@
   ```"
   [modelable]
   (let [model (model/resolve-model modelable)]
-    ;; programatically try all the hydration methods with `[:default <k>]` dispatch values and see which of them returns
+    ;; programmatically try all the hydration methods with `[:default <k>]` dispatch values and see which of them returns
     ;; our `model` when invoked. This is a totally wacky way of doing this. But it lets us introspect things even if
     ;; they weren't defined with [[define-hydration-keys]].
     (for [[dispatch-value f] (m/primary-methods hydrate/model-for-automagic-hydration)

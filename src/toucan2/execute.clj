@@ -113,7 +113,7 @@
 
 (defmacro with-call-count
   "Execute `body`, trackingthe number of database queries and statements executed. This number can be fetched at any
-  time withing `body` by calling function bound to `call-count-fn-binding`:
+  time within `body` by calling function bound to `call-count-fn-binding`:
 
   ```clj
   (with-call-count [call-count]

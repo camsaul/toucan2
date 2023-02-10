@@ -414,16 +414,16 @@
   (test/with-discarded-table-changes Category
     (is (= true
            (t1.db/delete! Category :id 1)))
-    (is (= #{{:id 3, :name "resturaunt", :parent-category-id nil}
-             {:id 4, :name "mexican-resturaunt", :parent-category-id 3}}
+    (is (= #{{:id 3, :name "restaurant", :parent-category-id nil}
+             {:id 4, :name "mexican-restaurant", :parent-category-id 3}}
            (set (t1.db/select Category)))))
   (testing "shouldn't delete anything else if the Category is not parent of anybody else"
     (test/with-discarded-table-changes Category
       (is (= true
              (t1.db/delete! Category :id 2)))
       (is (= #{{:id 1, :name "bar", :parent-category-id nil}
-               {:id 3, :name "resturaunt", :parent-category-id nil}
-               {:id 4, :name "mexican-resturaunt", :parent-category-id 3}}
+               {:id 3, :name "restaurant", :parent-category-id nil}
+               {:id 4, :name "mexican-restaurant", :parent-category-id 3}}
              (set (t1.db/select Category)))))))
 
 ;; (def ^:private pre-deleted (atom []))

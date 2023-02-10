@@ -27,7 +27,7 @@
   nil)
 
 (defonce ^{:doc "The default log level to log messages directly to stdout with. Takes the value of the env var
-  `TOUCAN_DEBUG_LEVEL`, if set. Can be overriden with [[*level*]]. This is stored as an atom, so you can `swap!` or
+  `TOUCAN_DEBUG_LEVEL`, if set. Can be overridden with [[*level*]]. This is stored as an atom, so you can `swap!` or
   `reset!` it."} level
   (atom (some-> (env/env :toucan-debug-level) keyword)))
 

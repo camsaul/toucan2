@@ -37,7 +37,7 @@
 (defn condition->honeysql-where-clause
   "Something sequential like `:id [:> 5]` becomes `[:> :id 5]`. Other stuff like `:id 5` just becomes `[:= :id 5]`."
   [k v]
-  ;; don't think there's any situtation where `nil` on the LHS is on purpose and not a bug.
+  ;; don't think there's any situation where `nil` on the LHS is on purpose and not a bug.
   {:pre [(some? k)]}
   (if (sequential? v)
     (fn-condition->honeysql-where-clause k v)
