@@ -12,5 +12,5 @@ INSERT INTO t1_categories (name, `parent-category-id`)
 VALUES
 ('bar', NULL),             -- 1
 ('dive-bar', 1),           -- 2
-('resturaunt', NULL),      -- 3
-('mexican-resturaunt', 3); -- 4
+('restaurant', NULL),      -- 3
+('mexican-restaurant', 3); -- 4
