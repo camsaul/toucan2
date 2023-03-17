@@ -313,8 +313,14 @@
 
 (defmacro with-discarded-table-changes
   {:style/indent 1}
-  [table-name & body]
-  `(do-with-discarded-table-changes (current-db-type) ~table-name (^:once fn* [] ~@body)))
+  [table-name-or-names & body]
+  (let [table-names (if (sequential? table-name-or-names)
+                      table-name-or-names
+                      [table-name-or-names])]
+    (reduce (fn [expr table-name]
+              `(do-with-discarded-table-changes (current-db-type) ~table-name (^:once fn* [] ~expr)))
+            `(do ~@body)
+            table-names)))
 
 (defn discard-table-changes-all-dbs! [table-name]
   (doseq [db-type (db-types)]
@@ -322,7 +328,9 @@
       (create-table! table-name))))
 
 (s/fdef with-discarded-table-changes
-  :args (s/cat :table-name (some-fn symbol? keyword? string?)
+  :args (s/cat :table-name (let [table-name (some-fn symbol? simple-keyword? string?)]
+                             (s/alt :table-name  table-name
+                                    :table-names (s/coll-of table-name :min-count 1)))
                :body       (s/+ any?))
   :ret  any?)
 

@@ -13,6 +13,7 @@
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
    [toucan2.connection :as conn]
+   [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.jdbc :as jdbc]
    [toucan2.jdbc.query :as jdbc.query]
@@ -528,6 +529,41 @@
     (test/with-discarded-table-changes User
       (is (= {:id 4, :first-name "Grass", :last-name "HOPPER"}
              (t1.db/insert! User {:first-name "Grass" :last-name [:upper "Hopper"]}))))))
+
+(derive ::venues.edn-category ::test/venues)
+
+(t1.models/add-type!
+ ::edn
+ :in  pr-str
+ :out (fn [s]
+        (binding [*read-eval* false]
+          (read-string s))))
+
+(t1.models/deftypes
+ ::venues.edn-category
+ {:category ::edn})
+
+(deftest ^:synchronized insert!-deftypes-test
+  (test/with-discarded-table-changes "venues"
+    (is (= 2
+           (insert/insert! ::venues.edn-category
+                           [{:name "Venue 1", :category {:name "Category 1"}}
+                            {:name "Venue 2", :category {:name :category-2}}])))
+    (is (= [(instance/instance
+             ::venues.edn-category
+             {:id         5
+              :name       "Venue 2"
+              :category   {:name :category-2}
+              :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00")
+              :updated-at (java.time.LocalDateTime/parse "2017-01-01T00:00")})
+            (instance/instance
+             ::venues.edn-category
+             {:id         4
+              :name       "Venue 1"
+              :category   {:name "Category 1"}
+              :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00")
+              :updated-at (java.time.LocalDateTime/parse "2017-01-01T00:00")})]
+           (t1.db/select ::venues.edn-category {:order-by [[:id :desc]], :limit 2})))))
 
 (deftest ^:parallel select-one-test
   (is (= {:id 1, :first-name "Cam", :last-name "Saul"}
