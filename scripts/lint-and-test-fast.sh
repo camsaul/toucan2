@@ -4,6 +4,8 @@
 
 set -euxo pipefail
 
+codespell
+
 clj-kondo --parallel --lint src test toucan1/src/ toucan1/test/
 
 clojure -X:dev:test:test-h2 $@
