@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v3
-    - uses: DeLaGuardo/clojure-lint-action@master
+    - uses: DeLaGuardo/clojure-lint-action@2d6013175031096ae07bc9b90a07173029ad7dc9
       with:
         check-name: Run clj-kondo
         clj-kondo-args: >-
