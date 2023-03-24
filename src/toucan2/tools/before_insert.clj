@@ -15,9 +15,9 @@
   (mapv
    (fn [row]
      (u/try-with-error-context [`before-insert {::model model, ::row row}]
-       (log/tracef :compile "Do before-insert for %s %s" model row)
+       (log/tracef "Do before-insert for %s %s" model row)
        (let [result (before-insert model row)]
-         (log/tracef :compile "[before insert] => %s" row)
+         (log/tracef "[before insert] => %s" row)
          result)))
    rows))
 

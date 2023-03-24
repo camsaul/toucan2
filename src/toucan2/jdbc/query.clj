@@ -28,29 +28,29 @@
         opts (merge (when-not (:return-keys opts)
                       read-forward-options)
                     opts)]
-    (log/debugf :execute "Preparing JDBC query with next.jdbc options %s" opts)
+    (log/debugf "Preparing JDBC query with next.jdbc options %s" opts)
     (u/try-with-error-context [(format "execute SQL with %s" (class conn)) {::sql-args sql-args}]
       (with-open [stmt (next.jdbc/prepare conn sql-args opts)]
         (when-not (= (.getFetchDirection stmt) ResultSet/FETCH_FORWARD)
           (try
             (.setFetchDirection stmt ResultSet/FETCH_FORWARD)
             (catch Throwable e
-              (log/debugf :results e "Error setting fetch direction"))))
-        (log/tracef :execute "Executing statement with %s" (class conn))
+              (log/debugf e "Error setting fetch direction"))))
+        (log/tracef "Executing statement with %s" (class conn))
         (let [result-set? (.execute stmt)]
           (cond
             (:return-keys opts)
             (do
-              (log/debugf :execute "Query was executed with %s; returning generated keys" :return-keys)
+              (log/debugf "Query was executed with %s; returning generated keys" :return-keys)
               (with-open [rset (.getGeneratedKeys stmt)]
                 (jdbc.rs/reduce-result-set rf init conn model rset opts)))
 
             result-set?
             (with-open [rset (.getResultSet stmt)]
-              (log/debugf :execute "Query returned normal result set")
+              (log/debugf "Query returned normal result set")
               (jdbc.rs/reduce-result-set rf init conn model rset opts))
 
             :else
             (do
-              (log/debugf :execute "Query did not return a ResultSet; nothing to reduce. Returning update count.")
+              (log/debugf "Query did not return a ResultSet; nothing to reduce. Returning update count.")
               (reduce rf init [(.getUpdateCount stmt)]))))))))

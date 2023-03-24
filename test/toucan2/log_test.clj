@@ -6,14 +6,6 @@
 
 (set! *warn-on-reflection* true)
 
-(deftest ^:parallel env-var-topics-test
-  (are [s expected] (= expected
-                       (#'log/env-var-topics s))
-    nil       nil
-    ""        nil
-    "abc"     #{:abc}
-    "abc,def" #{:abc :def}))
-
 (defrecord Reducible [is-realized?]
   clojure.lang.IReduceInit
   (reduce [_this rf init]
@@ -37,7 +29,7 @@
               reducible    (->Reducible is-realized?)
               x            (log/->Doc [(f reducible)])]
           (testing (.getCanonicalName (class x))
-            (is (string? (#'log/pprint-doc-to-str x)))
+            (is (string? (log/-pprint-doc-to-str x)))
             (is (false? @is-realized?))))))))
 
 (deftest ^:parallel interleave-all-test
@@ -57,7 +49,7 @@
 (deftest ^:parallel enable-level-test
   (binding [log/*level* :info]
     (are [level expected] (= expected
-                             (log/enable-level? level))
+                             (log/-enable-level? level))
       :error true
       :warn  true
       :info  true
@@ -68,15 +60,15 @@
 
 (deftest ^:parallel log-macro-validation-test
   (testing "valid forms"
-    (is (some? (macroexpand `(log/infof :compile "VERY NICE MESSAGE %s" 100))))
-    (is (some? (macroexpand `(log/infof :compile ~'e "VERY NICE MESSAGE %s" 100)))))
+    (is (some? (macroexpand `(log/infof "VERY NICE MESSAGE %s" 100))))
+    (is (some? (macroexpand `(log/infof ~'e "VERY NICE MESSAGE %s" 100)))))
   (testing "wrong number of args"
     (is (thrown?
          clojure.lang.Compiler$CompilerException
-         (macroexpand `(log/infof :compile "VERY NICE MESSAGE %s"))))
+         (macroexpand `(log/infof "VERY NICE MESSAGE %s"))))
     (is (thrown?
          clojure.lang.Compiler$CompilerException
-         (macroexpand `(log/infof :compile "VERY NICE MESSAGE %s" 100 200)))))
+         (macroexpand `(log/infof "VERY NICE MESSAGE %s" 100 200)))))
   (testing "invalid topic"
     (is (thrown?
          clojure.lang.Compiler$CompilerException
@@ -84,8 +76,8 @@
   (testing "second arg is not a format string"
     (is (thrown?
          clojure.lang.Compiler$CompilerException
-         (macroexpand `(log/infof :compile ~'e 100 "VERY NICE MESSAGE %s")))))
+         (macroexpand `(log/infof ~'e 100 "VERY NICE MESSAGE %s")))))
   (testing "don't use pr-str inside log calls"
     (is (thrown?
          clojure.lang.Compiler$CompilerException
-         (macroexpand (list `log/infof :compile "VERY NICE MESSAGE %s" '(pr-str 100)))))))
+         (macroexpand (list `log/infof "VERY NICE MESSAGE %s" '(pr-str 100)))))))

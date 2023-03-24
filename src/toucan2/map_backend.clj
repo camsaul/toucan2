@@ -58,7 +58,7 @@
     (assert (isa? bckend :toucan.map-backend/*)
             (format "Invalid map backend %s: map backends must derive from :toucan.map-backend/*"
                     (pr-str bckend)))
-    (log/debugf :compile "Using map backend %s" bckend)
+    (log/debugf "Using map backend %s" bckend)
     bckend))
 
 (defn available-backends

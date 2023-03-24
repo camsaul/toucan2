@@ -13,11 +13,6 @@
 
 (set! *warn-on-reflection* true)
 
-(defonce ^{:doc "All known Toucan 2 logging topics. Log messages must be associated with one of these topics. Some
-  namespaces define additional topics, such as [[toucan2.tools.hydrate]]."} ^:no-doc
-  all-topics
-  (atom #{:compile :execute :results}))
-
 (def ^:dynamic *level*
   "The current log level (as a keyword) to log messages directly to stdout with. By default this is `nil`, which means
   don't log any messages to stdout regardless of their level. (They are still logged via `clojure.tools.logging`.)
@@ -30,25 +25,6 @@
   `TOUCAN_DEBUG_LEVEL`, if set. Can be overridden with [[*level*]]. This is stored as an atom, so you can `swap!` or
   `reset!` it."} level
   (atom (some-> (env/env :toucan-debug-level) keyword)))
-
-(def ^:dynamic *topics*
-  "The set of topics to log directly to stdout, if the [[*level*]] is high enough. By default, this is `nil`, which means
-  log *all* topics. You can specify default topics by setting the atom [[topics]]."
-  nil)
-
-(defn- env-var-topics
-  ([]
-   (env-var-topics (env/env :toucan-debug-topics)))
-  ([s]
-   (when (seq s)
-     (when-let [topic-strs (str/split s #",")]
-       (into #{} (map keyword) topic-strs)))))
-
-(defonce ^{:doc "Default *topics* to log directly to stdout, if the level is high enough. This can be set with a
-  comma-separated list with the env var `TOUCAN_DEBUG_TOPICS`. It is an atom, so you can also `swap!` or `reset!` it at
-  runtime."}
-  topics
-  (atom (env-var-topics)))
 
 (def ^:private ^:dynamic *color*
   "Whether or not to print the trace in color. True by default, unless the env var `NO_COLOR` is true."
@@ -132,10 +108,10 @@
     default-color-printer
     default-boring-printer))
 
-(defn ^:no-doc pprint-doc
+(defn ^:no-doc -pprint-doc
   "Pretty print a `doc`."
   ([doc]
-   (pprint-doc nil doc))
+   (-pprint-doc nil doc))
   ([ns-symb doc]
    (try
      ((pretty-printer) (assoc doc :ns-symb ns-symb))
@@ -144,10 +120,10 @@
                        {:doc doc}
                        e))))))
 
-(defn ^:no-doc pprint-doc-to-str
+(defn ^:no-doc -pprint-doc-to-str
   "Implementation of the `log` macros. You shouldn't need to use this directly."
   [doc]
-  (str/trim (with-out-str (pprint-doc doc))))
+  (str/trim (with-out-str (-pprint-doc doc))))
 
 (defn- interleave-all
   "Exactly like [[interleave]] but includes the entirety of both collections even if the other collection is shorter. If
@@ -182,32 +158,22 @@
     :trace    0
     default))
 
-(defn ^:no-doc enable-level?
-  "Whether to enable logging for `a-level`."
+;;; TODO -- better idea, why don't we just change [[*level*]] and [[level]] to store ints so we don't have to convert
+;;; them over and over again. We could introduce a `with-level` macro or something to make changing the level
+;;; convenient.
+(defn ^:no-doc -current-level-int
+  "Current log level, as an integer."
+  []
+  (level->int (or *level* @level) Integer/MAX_VALUE))
+
+(defmacro ^:no-doc -enable-level?
+  "Whether to enable logging for `a-level`. This is a macro for performance reasons, so we can do the [[level->int]]
+  conversion at compile time rather than on every call."
   [a-level]
-  (let [current-level (or *level* @level)
-        level-int     (level->int current-level Integer/MAX_VALUE)
-        a-level-int   (level->int a-level 0)]
-    (>= a-level-int level-int)))
+  (let [a-level-int (level->int a-level 0)]
+    `(>= ~a-level-int (-current-level-int))))
 
-(defn ^:no-doc enable-topic?
-  "Whether to enable logging for `a-topic`."
-  [a-topic]
-  (if-let [current-topics (or *topics* @topics)]
-    (contains? current-topics a-topic)
-    true))
-
-;;; TODO -- this gets called all over the place over and over again; we could easily optimize it by turning this into a
-;;; macro and doing some of the calculations like level keyword => int in the macroexpansion itself instead of over and
-;;; over at runtime
-
-(defn ^:no-doc enable-debug-message?
-  "Whether to enable logging for `a-level` *and* `a-topic`"
-  [a-level a-topic]
-  (and (enable-level? a-level)
-       (enable-topic? a-topic)))
-
-(defn ^:no-doc enabled-logger
+(defn ^:no-doc -enabled-logger
   "Get a logger factor for the namespace named by symbol `ns-symb` at `a-level`, **iff** logging is enabled for that
   namespace and level. The logger returned is something that satisfies the `clojure.tools.logging.impl.LoggerFactory`
   protocol."
@@ -216,24 +182,24 @@
     (when (tools.log.impl/enabled? logger a-level)
       logger)))
 
-(defmacro ^:no-doc log*
+(defmacro ^:no-doc -log
   "Implementation of various `log` macros. Don't use this directly."
-  [a-level a-topic e doc]
+  [a-level e doc]
   `(let [doc# (delay ~doc)]
-     (when (enable-debug-message? ~a-level ~a-topic)
-       (pprint-doc '~(ns-name *ns*) @doc#))
-     (when-let [logger# (enabled-logger '~(ns-name *ns*) ~a-level)]
-       (tools.log/log* logger# ~a-level ~e (pprint-doc-to-str @doc#)))))
+     (when (-enable-level? ~a-level)
+       (-pprint-doc '~(ns-name *ns*) @doc#))
+     (when-let [logger# (-enabled-logger '~(ns-name *ns*) ~a-level)]
+       (tools.log/log* logger# ~a-level ~e (-pprint-doc-to-str @doc#)))))
 
 (defmacro ^:no-doc logf
   "Implementation of various `log` macros. Don't use this directly."
-  [a-level a-topic & args]
+  [a-level & args]
   (let [[e format-string & args] (if (string? (first args))
                                    (cons nil args)
                                    args)]
     (assert (string? format-string))
     (let [doc (apply build-doc format-string args)]
-      `(log* ~a-level ~a-topic ~e ~doc))))
+      `(-log ~a-level ~e ~doc))))
 
 ;;; The log macros only work with `%s` for now.
 (defn- correct-number-of-args-for-format-string? [{:keys [msg args]}]
@@ -246,16 +212,15 @@
        (= (first form) 'pr-str)))
 
 (s/def ::args
-  (s/& (s/cat :topic #(contains? @all-topics %)
-              :e     (s/? (complement string?))
-              :msg   string?
-              :args  (s/* (complement pr-str-form?)))
+  (s/& (s/cat :e    (s/? (complement string?))
+              :msg  string?
+              :args (s/* (complement pr-str-form?)))
        correct-number-of-args-for-format-string?))
 
 (defmacro errorf
   "Log an error message for a `topic`. Optionally include a `throwable`. Only things that are actually serious errors
   should be logged at this level."
-  {:arglists '([topic throwable? s] [topic throwable? format-string & args])}
+  {:arglists '([throwable? s] [throwable? format-string & args])}
   [& args]
   `(logf :error ~@args))
 
@@ -266,7 +231,7 @@
 (defmacro warnf
   "Log a warning for a `topic`. Optionally include a `throwable`. Bad things that can be worked around should be logged at
   this level."
-  {:arglists '([topic throwable? s] [topic throwable? format-string & args])}
+  {:arglists '([throwable? s] [throwable? format-string & args])}
   [& args]
   `(logf :warn ~@args))
 
@@ -276,7 +241,7 @@
 
 (defmacro infof
   "Only things that all users should see by default without configuring a logger should be this level."
-  {:arglists '([topic throwable? s] [topic throwable? format-string & args])}
+  {:arglists '([throwable? s] [throwable? format-string & args])}
   [& args]
   `(logf :info ~@args))
 
@@ -286,7 +251,7 @@
 
 (defmacro debugf
   "Most log messages should be this level."
-  {:arglists '([topic throwable? s] [topic throwable? format-string & args])}
+  {:arglists '([throwable? s] [throwable? format-string & args])}
   [& args]
   `(logf :debug ~@args))
 
@@ -296,7 +261,7 @@
 
 (defmacro tracef
   "Log messages that are done once-per-row should be this level."
-  {:arglists '([topic throwable? s] [topic throwable? format-string & args])}
+  {:arglists '([throwable? s] [throwable? format-string & args])}
   [& args]
   `(logf :trace ~@args))
 
@@ -304,12 +269,7 @@
   :args ::args
   :ret  any?)
 
-(doseq [varr [#'errorf #'warnf #'infof #'debugf #'tracef]]
-  (alter-meta! varr assoc :arglists (list
-                                     [@all-topics 'e? 'msg]
-                                     [@all-topics 'e? 'format-string '& 'args])))
-
 (comment
-  (reset! topics #{:compile})
   (reset! level :debug)
-  (tracef :compile "VERY NICE MESSAGE %s 1000" :abc))
+  (tracef "VERY NICE MESSAGE %s 1000" :abc)
+  (debugf "VERY NICE MESSAGE %s 1000" :abc))

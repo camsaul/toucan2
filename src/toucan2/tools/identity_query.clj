@@ -21,7 +21,7 @@
 
   clojure.lang.IReduceInit
   (reduce [_this rf init]
-    (log/debugf :execute "reduce IdentityQuery rows")
+    (log/debugf "reduce IdentityQuery rows")
     (reduce rf init rows)))
 
 (defn identity-query
@@ -43,7 +43,7 @@
 
 ;; (m/defmethod pipeline/transduce-execute [#_query-type :default #_model :default #_query IdentityQuery]
 ;;   [rf _query-type model {:keys [rows], :as _query}]
-;;   (log/debugf :execute "transduce IdentityQuery rows %s" rows)
+;;   (log/debugf "transduce IdentityQuery rows %s" rows)
 ;;   (transduce (if model
 ;;                (map (fn [result-row]
 ;;                       (instance/instance model result-row)))

@@ -113,7 +113,7 @@
   (let [connectable-class (if (instance? pretty.core.PrettyPrintable connectable)
                             (pretty/pretty connectable)
                             (protocols/dispatch-value connectable))]
-    (log/debugf :execute "Resolve connection %s" connectable-class)
+    (log/debugf "Resolve connection %s" connectable-class)
     (u/try-with-error-context ["resolve connection" {::connectable connectable-class}]
       (next-method connectable (bind-current-connectable-fn f)))))
 
@@ -264,14 +264,14 @@
 (m/defmethod do-with-transaction :around ::default
   "Bind [[*current-connectable*]] to the connection `f` is called with inside of `f`."
   [connection options f]
-  (log/debugf :execute "do with transaction %s %s" options (some-> connection class .getCanonicalName symbol))
+  (log/debugf "do with transaction %s %s" options (some-> connection class .getCanonicalName symbol))
   (next-method connection options (bind-current-connectable-fn f)))
 
 (m/defmethod do-with-transaction java.sql.Connection
   [^java.sql.Connection conn options f]
   (let [nested-tx-rule (get options :nested-transaction-rule :allow)
         options        (dissoc options :nested-transaction-rule)]
-    (log/debugf :execute "do with JDBC transaction (nested rule: %s) with options %s" nested-tx-rule options)
+    (log/debugf "do with JDBC transaction (nested rule: %s) with options %s" nested-tx-rule options)
     (binding [next.jdbc.transaction/*nested-tx* nested-tx-rule]
       (next.jdbc/with-transaction [t-conn conn options]
         (f t-conn)))))

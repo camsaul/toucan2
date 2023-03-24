@@ -23,7 +23,7 @@
 
 (m/defmethod before-delete :around :default
   [model instance]
-  (log/tracef :compile "Do before-delete for %s %s" model instance)
+  (log/tracef "Do before-delete for %s %s" model instance)
   (next-method model instance))
 
 (defn- do-before-delete-for-matching-rows!

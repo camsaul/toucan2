@@ -36,7 +36,7 @@
   "Log model resolution as it happens for debugging purposes."
   [modelable]
   (let [model (next-method modelable)]
-    (log/debugf :compile "Resolved modelable %s => model %s" modelable model)
+    (log/debugf "Resolved modelable %s => model %s" modelable model)
     model))
 
 (m/defmulti default-connectable

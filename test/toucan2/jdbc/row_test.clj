@@ -78,7 +78,7 @@
 (deftest ^:synchronized assoc-with-debug-logging-test
   (testing "Debug logging should not affect assoc"
     (binding [log/*level* :trace]
-      (with-redefs [log/pprint-doc (constantly nil)]
+      (with-redefs [log/-pprint-doc (constantly nil)]
         (do-with-row
          (fn [row]
            (is (transient-row? (assoc row :k nil)))

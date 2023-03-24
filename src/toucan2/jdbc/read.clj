@@ -43,7 +43,7 @@
   {:arglists '([^Connection conn₁ model₂ ^ResultSet rset ^ResultSetMetaData rsmeta₍₃₎ ^Long i])}
   (fn [^Connection conn model _rset ^ResultSetMetaData rsmeta ^Long i]
     (let [col-type (.getColumnType rsmeta i)]
-      (log/debugf :results
+      (log/debugf
                   "Column %s %s is of JDBC type %s, native type %s"
                   i
                   (let [table-name (some->> (.getTableName rsmeta i) not-empty)
@@ -57,9 +57,9 @@
 
 (m/defmethod read-column-thunk :default
   [_conn _model ^ResultSet rset _rsmeta ^Long i]
-  (log/debugf :results "Fetching values in column %s with %s" i (list '.getObject 'rs i))
+  (log/debugf "Fetching values in column %s with %s" i (list '.getObject 'rs i))
   (fn default-read-column-thunk []
-    (log/tracef :results "col %s => %s" i (list '.getObject 'rset i))
+    (log/tracef "col %s => %s" i (list '.getObject 'rset i))
     (.getObject rset i)))
 
 (m/defmethod read-column-thunk :after :default
@@ -78,7 +78,7 @@
 
   but includes extra logging."
   [^ResultSet rset ^Long i ^Class klass]
-  (log/debugf :results
+  (log/debugf
               "Fetching values in column %s with %s"
               i
               (list '.getObject 'rs i klass))
@@ -88,7 +88,7 @@
     ;; from Criterium: a no-op call takes about 20ns locally. So 10m rows => 200ms from this no-op call. That's a little
     ;; expensive, but probably not as bad as the overhead we get from other nonsense here in Toucan 2. We'll have to do
     ;; some general performance tuning in the future.
-    (log/tracef :results "col %s => %s" i (list '.getObject 'rset i klass))
+    (log/tracef "col %s => %s" i (list '.getObject 'rset i klass))
     (.getObject rset i klass)))
 
 ;;;; Default column read methods
@@ -119,7 +119,7 @@
   (get-object-of-class-thunk rset i java.time.OffsetTime))
 
 (defn- make-column-thunk [conn model ^ResultSet rset i]
-  (log/tracef :results "Building thunk to read column %s" i)
+  (log/tracef "Building thunk to read column %s" i)
   (fn column-thunk []
     (let [rsmeta (.getMetaData rset)
           thunk  (read-column-thunk conn model rset rsmeta i)
@@ -164,7 +164,7 @@
         (fn cached-column-thunk []
           (let [cached-value (get @cached-values i ::not-found)]
             (if-not (= cached-value ::not-found)
-              (log/tracef :results "Using cached value for column %s: %s" i cached-value)
+              (log/tracef "Using cached value for column %s: %s" i cached-value)
               cached-value)
             (let [thunk (i->thunk i)
                   v     (thunk)]
@@ -197,5 +197,5 @@
      (let [i->thunk (row-num->i->thunk (.getRow rset))
            thunk    (i->thunk i)
            result   (thunk)]
-       (log/tracef :results "col %s => %s" i result)
+       (log/tracef "col %s => %s" i result)
        result))))

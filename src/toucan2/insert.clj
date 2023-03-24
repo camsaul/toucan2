@@ -65,10 +65,10 @@
   (let [rows (some (comp not-empty :rows) [parsed-args resolved-query])]
     (if (can-skip-insert? parsed-args resolved-query)
       (do
-        (log/debugf :compile "Query has no changes, skipping update")
+        (log/debugf "Query has no changes, skipping update")
         ::pipeline/no-op)
       (do
-        (log/debugf :compile "Inserting %s rows into %s" (if (seq rows) (count rows) "?") model)
+        (log/debugf "Inserting %s rows into %s" (if (seq rows) (count rows) "?") model)
         (next-method query-type model parsed-args resolved-query)))))
 
 (defn insert!

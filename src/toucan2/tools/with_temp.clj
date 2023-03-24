@@ -10,8 +10,6 @@
    [toucan2.model :as model]
    [toucan2.util :as u]))
 
-(swap! log/all-topics conj :with-temp)
-
 (m/defmulti with-temp-defaults
   {:arglists '([model])}
   u/dispatch-on-first-arg)
@@ -52,9 +50,9 @@
                                             ::explicit-attributes explicit-attributes
                                             ::default-attributes  defaults
                                             ::merged-attributes   merged-attributes}]
-      (log/debugf :with-temp "Create temporary %s with attributes %s" model merged-attributes)
+      (log/debugf "Create temporary %s with attributes %s" model merged-attributes)
       (let [temp-object (first (insert/insert-returning-instances! model merged-attributes))]
-        (log/debugf :with-temp "[with-temp] => %s" temp-object)
+        (log/debugf "[with-temp] => %s" temp-object)
         (try
           (t/testing (format "\nwith temporary %s with attributes\n%s\n"
                              (pr-str model)
