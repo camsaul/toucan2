@@ -121,7 +121,12 @@
                  toucan2.log/warnf]
 
                 :ns-regex
-                ["^toucan\\..*" "^toucan2\\..*"]}}
+                ["^toucan\\..*" "^toucan2\\..*"]
+
+                ;; ignore namespaces we don't test with Cloverage.
+                :ns-exclude-regex
+                ["^toucan2\\.query-execution-backend\\.jdbc\\.mysql-mariadb.*"
+                 "^toucan2\\.query-execution-backend\\.jdbc\\.postgres.*"]}}
 
   ;; clojure -T:build
   :build

@@ -130,8 +130,6 @@
    [toucan2.types :as types]
    [toucan2.util :as u]))
 
-(swap! log/all-topics conj :hydrate)
-
 (derive ::automagic-batched   ::strategy)
 (derive ::multimethod-batched ::strategy)
 (derive ::multimethod-simple  ::strategy)
@@ -327,17 +325,17 @@
     (for [instance instances]
       (if-not (needs-hydration? model dest-key instance)
         (do
-          (log/tracef :hydrate "Don't need to hydrate %s: %s does not need hydration" instance dest-key)
+          (log/tracef "Don't need to hydrate %s: %s does not need hydration" instance dest-key)
           instance)
         (do
-          (log/tracef :hydrate "Getting values of %s for instance" fk-keys)
+          (log/tracef "Getting values of %s for instance" fk-keys)
           (let [fk-vals (get-fk-values instance)]
             (if (every? some? fk-vals)
               (do
-                (log/tracef :hydrate "Attempting to hydrate %s with values of %s %s" instance fk-keys fk-vals)
+                (log/tracef "Attempting to hydrate %s with values of %s %s" instance fk-keys fk-vals)
                 (assoc instance ::fk fk-vals))
               (do
-                (log/tracef :hydrate "Skipping %s: values of %s are %s" instance fk-keys fk-vals)
+                (log/tracef "Skipping %s: values of %s are %s" instance fk-keys fk-vals)
                 instance))))))))
 
 (defn- automagic-batched-hydration-fetch-pk->instance [hydrating-model instances]
@@ -347,13 +345,13 @@
       (let [fk-values-set (if (= (count pk-keys) 1)
                             (into #{} (map first) fk-values-set)
                             fk-values-set)]
-        (log/debugf :hydrate "Fetching %s with PK columns %s values %s" hydrating-model pk-keys fk-values-set)
+        (log/debugf "Fetching %s with PK columns %s values %s" hydrating-model pk-keys fk-values-set)
         ;; TODO -- not sure if we need to be realizing stuff here?
         (select/select-pk->fn realize/realize hydrating-model :toucan/pk [:in fk-values-set]))
-      (log/debugf :hydrate "Not hydrating %s because no instances have non-nil FK values" hydrating-model))))
+      (log/debugf "Not hydrating %s because no instances have non-nil FK values" hydrating-model))))
 
 (defn- do-automagic-batched-hydration [dest-key instances pk->fetched-instance]
-  (log/debugf :hydrate "Attempting to hydrate %s instances out of %s" (count (filter ::fk instances)) (count instances))
+  (log/debugf "Attempting to hydrate %s instances out of %s" (count (filter ::fk instances)) (count instances))
   (for [instance instances]
     (if-not (::fk instance)
       ;; If `::fk` doesn't exist for this instance...
@@ -370,22 +368,22 @@
                                (first fk-vals)
                                fk-vals)
             fetched-instance (get pk->fetched-instance fk-vals)]
-        (log/tracef :hydrate "Hydrate %s %s with %s" dest-key [instance] (or fetched-instance
-                                                                             "nil (no matching fetched instance)"))
+        (log/tracef "Hydrate %s %s with %s" dest-key [instance] (or fetched-instance
+                                                                    "nil (no matching fetched instance)"))
         (-> (dissoc instance ::fk)
             (assoc dest-key fetched-instance))))))
 
 (m/defmethod hydrate-with-strategy ::automagic-batched
   [model _strategy dest-key instances]
   (u/try-with-error-context ["automagic batched hydration" {::model model, ::dest-key dest-key}]
-    (let [hydrating-model      (model-for-automagic-hydration model dest-key)
-          _                    (log/debugf :hydrate "Hydrating %s key %s with instances from %s" (or model "map") dest-key hydrating-model)
-          fk-keys              (fk-keys-for-automagic-hydration model dest-key hydrating-model)
-          _                    (log/debugf :hydrate "Hydrating with FKs %s" fk-keys)
-          instances                 (automagic-batched-hydration-add-fks model dest-key instances fk-keys)
-          pk->fetched-instance (automagic-batched-hydration-fetch-pk->instance hydrating-model instances)]
-      (log/debugf :hydrate "Fetched %s instances of %s" (count pk->fetched-instance) hydrating-model)
-      (do-automagic-batched-hydration dest-key instances pk->fetched-instance))))
+                            (let [hydrating-model      (model-for-automagic-hydration model dest-key)
+                                  _                    (log/debugf "Hydrating %s key %s with instances from %s" (or model "map") dest-key hydrating-model)
+                                  fk-keys              (fk-keys-for-automagic-hydration model dest-key hydrating-model)
+                                  _                    (log/debugf "Hydrating with FKs %s" fk-keys)
+                                  instances                 (automagic-batched-hydration-add-fks model dest-key instances fk-keys)
+                                  pk->fetched-instance (automagic-batched-hydration-fetch-pk->instance hydrating-model instances)]
+                              (log/debugf "Fetched %s instances of %s" (count pk->fetched-instance) hydrating-model)
+                              (do-automagic-batched-hydration dest-key instances pk->fetched-instance))))
 
 
 ;;;                         Method-Based Batched Hydration (using impls of [[batched-hydrate]])
@@ -546,10 +544,10 @@
   [model instances k]
   (if-let [strategy (hydration-strategy model k)]
     (u/try-with-error-context ["hydrate key" {:model model, :key k, :strategy strategy}]
-      (log/debugf :hydrate "Hydrating %s %s with strategy %s" (or model "map") k strategy)
-      (hydrate-with-strategy model strategy k instances))
+                              (log/debugf "Hydrating %s %s with strategy %s" (or model "map") k strategy)
+                              (hydrate-with-strategy model strategy k instances))
     (do
-      (log/warnf :hydrate "Don't know how to hydrate %s for model %s instances %s" k model (take 1 instances))
+      (log/warnf "Don't know how to hydrate %s for model %s instances %s" k model (take 1 instances))
       (when (error-on-unknown-key?)
         (throw (ex-info (format "Don't know how to hydrate %s" (pr-str k))
                         {:model model, :instances instances, :k k})))
@@ -623,7 +621,7 @@
 (defn- hydrate-one-form
   "Hydrate for a single hydration key or form `k`."
   [model results k]
-  (log/debugf :hydrate "hydrate %s for model %s instances %s" k model (take 1 results))
+  (log/debugf "hydrate %s for model %s instances %s" k model (take 1 results))
   (cond
     (and (sequential? results)
          (empty? results))

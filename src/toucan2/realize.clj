@@ -12,11 +12,11 @@
     "Fully realize either a reducible query, or a result row from that query."))
 
 (defn- realize-IReduceInit [this]
-  (log/tracef :results "realize IReduceInit %s" (symbol (.getCanonicalName (class this))))
+  (log/tracef "realize IReduceInit %s" (symbol (.getCanonicalName (class this))))
   (u/try-with-error-context ["realize IReduceInit" {::reducible this}]
     (into []
           (map (fn [row]
-                 (log/tracef :results "realize row ^%s %s" (some-> row class .getCanonicalName symbol) row)
+                 (log/tracef "realize row ^%s %s" (some-> row class .getCanonicalName symbol) row)
                  (u/try-with-error-context ["realize row" {::row row}]
                    (realize row))))
           this)))
@@ -24,7 +24,7 @@
 (extend-protocol Realize
   Object
   (realize [this]
-    (log/tracef :execute "Already realized: %s" (class this))
+    (log/tracef "Already realized: %s" (class this))
     this)
 
   ;; Eduction is assumed to be for query results.

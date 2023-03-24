@@ -254,7 +254,7 @@
   "Return a function that when invoked will invoke the matching function from [[transforms-registry]]"
   [type-name direction]
   (fn [x]
-    (log/tracef :results "Using type function %s" type-name)
+    (log/tracef "Using type function %s" type-name)
     ((type-fn type-name direction) x)))
 
 (defn- type-name->direction->resolving-fn

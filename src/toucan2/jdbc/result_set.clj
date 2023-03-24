@@ -37,7 +37,7 @@
 (defrecord ^:no-doc InstanceBuilder [model ^ResultSet rset ^ResultSetMetaData rsmeta cols]
   next.jdbc.rs/RowBuilder
   (->row [_this]
-    (log/tracef :results "Fetching row %s" (.getRow rset))
+    (log/tracef "Fetching row %s" (.getRow rset))
     (transient (instance/instance model)))
 
   (column-count [_this]
@@ -55,7 +55,7 @@
     (assoc! row col v))
 
   (row! [_this row]
-    (log/tracef :results "Converting transient row to persistent row")
+    (log/tracef "Converting transient row to persistent row")
     (persistent! row))
 
   next.jdbc.rs/ResultSetBuilder
@@ -89,9 +89,9 @@
                                         (when (= col column-name')
                                           (inc i)))
                                       cols)))]
-           (log/tracef :results "Index of column named %s (originally %s) is %s" column-name' column-name i)
+           (log/tracef "Index of column named %s (originally %s) is %s" column-name' column-name i)
            (when-not i
-             (log/debugf :results "Could not determine index of column name %s. Found: %s" column-name cols))
+             (log/debugf "Could not determine index of column name %s. Found: %s" column-name cols))
            i))))))
 
 (defn instance-builder-fn
@@ -105,15 +105,15 @@
                         (fn [table]
                           (let [table    (some-> table not-empty name label-fn)
                                 table-ns (some-> (get table-name->ns table) name)]
-                            (log/tracef :results "Using namespace %s for columns in table %s" table-ns table)
+                            (log/tracef "Using namespace %s for columns in table %s" table-ns table)
                             table-ns)))
         opts           (merge {:label-fn     label-fn
                                :qualifier-fn qualifier-fn}
                               opts)
         rsmeta         (.getMetaData rset)
-        _              (log/debugf :results "Getting modified column names with next.jdbc options %s" opts)
+        _              (log/debugf "Getting modified column names with next.jdbc options %s" opts)
         col-names      (next.jdbc.rs/get-modified-column-names rsmeta opts)]
-    (log/debugf :results "Column names: %s" col-names)
+    (log/debugf "Column names: %s" col-names)
     (constantly
      (assoc (->InstanceBuilder model rset rsmeta col-names) :opts opts))))
 
@@ -131,7 +131,7 @@
   Part of the low-level implementation of the JDBC query execution backend -- you probably shouldn't be using this
   directly."
   [rf init conn model ^ResultSet rset opts]
-  (log/debugf :execute "Reduce JDBC result set for model %s with rf %s and init %s" model rf init)
+  (log/debugf "Reduce JDBC result set for model %s with rf %s and init %s" model rf init)
   (let [row-num->i->thunk (jdbc.read/make-cached-row-num->i->thunk conn model rset)
         builder-fn*       (next.jdbc.rs/builder-adapter
                            (builder-fn conn model rset opts)
@@ -144,16 +144,16 @@
                                               (.getMetaData rset)
                                               combined-opts))
         col-name->index   (make-column-name->index col-names label-fn)]
-    (log/tracef :results "column name -> index = %s" col-name->index)
+    (log/tracef "column name -> index = %s" col-name->index)
     (loop [acc init]
       (b/cond
         (not (.next rset))
         (do
-          (log/tracef :results "Result set has no more rows.")
+          (log/tracef "Result set has no more rows.")
           acc)
 
         :let [row-num  (.getRow rset)
-              _        (log/tracef :results "Fetch row %s" row-num)
+              _        (log/tracef "Fetch row %s" row-num)
               i->thunk (row-num->i->thunk row-num)
               row      (jdbc.row/row model rset builder i->thunk col-name->index)
               acc'     (rf acc row)]

@@ -21,9 +21,9 @@
 (m/defmethod before-select :around :default
   [model parsed-args]
   (u/try-with-error-context ["before select" {::model model}]
-    (log/debugf :compile "do before-select for %s" model)
+    (log/debugf "do before-select for %s" model)
     (let [result (next-method model parsed-args)]
-      (log/debugf :compile "[before select] => %s" result)
+      (log/debugf "[before select] => %s" result)
       result)))
 
 (m/defmethod pipeline/build [#_query-type     :toucan.query-type/select.*

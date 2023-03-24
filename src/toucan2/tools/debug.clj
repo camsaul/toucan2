@@ -4,7 +4,7 @@
    [toucan2.pipeline :as pipeline]))
 
 (defn- print-result [message result]
-  (log/pprint-doc (log/->Doc [(log/->Text message) result]))
+  (log/-pprint-doc (log/->Doc [(log/->Text message) result]))
   result)
 
 (defn -debug [thunk]

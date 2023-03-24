@@ -68,14 +68,14 @@
   "Parse `unparsed-args` for `query-type` with the given `spec`. See documentation for [[parse-args]] for more details."
   [query-type spec unparsed-args]
   (u/try-with-error-context ["parse args" {::query-type query-type, ::unparsed-args unparsed-args}]
-    (log/debugf :compile "Parse args for query type %s %s" query-type unparsed-args)
+    (log/debugf "Parse args for query type %s %s" query-type unparsed-args)
     (let [parsed (s/conform spec unparsed-args)]
       (when (s/invalid? parsed)
         (throw (ex-info (format "Don't know how to interpret %s args: %s"
                                 (pr-str query-type)
                                 (s/explain-str spec unparsed-args))
                         (s/explain-data spec unparsed-args))))
-      (log/tracef :compile "Conformed args: %s" parsed)
+      (log/tracef "Conformed args: %s" parsed)
       (let [parsed (cond-> parsed
                      (:modelable parsed)                 (merge (let [[modelable-type x] (:modelable parsed)]
                                                                   (case modelable-type
@@ -85,7 +85,7 @@
                      (not (contains? parsed :queryable)) (assoc :queryable {})
                      (seq (:kv-args parsed))             (update :kv-args (fn [kv-args]
                                                                             (into {} (map (juxt :k :v)) kv-args))))]
-        (log/debugf :compile "Parsed => %s" parsed)
+        (log/debugf "Parsed => %s" parsed)
         (validate-parsed-args parsed)
         parsed))))
 
@@ -222,7 +222,7 @@
   ;; `fn-name` here would be if you passed something like `:toucan/pk [:in 1 2]` -- the fn name would be `:in` -- and we
   ;; pass that to [[condition->honeysql-where-clause]]
   (let [pk-columns (model/primary-keys model)]
-    (log/debugf :compile "apply :toucan/pk %s for primary keys" v)
+    (log/debugf "apply :toucan/pk %s for primary keys" v)
     (if (= (count pk-columns) 1)
       (apply-non-composite-toucan-pk model honeysql (first pk-columns) v)
       (apply-composite-toucan-pk model honeysql pk-columns v))))
@@ -230,7 +230,7 @@
 (defn apply-kv-args
   "Convenience. Merge a map of `kv-args` into a resolved `query` with repeated calls to [[apply-kv-arg]]."
   [model query kv-args]
-  (log/debugf :compile "Apply kv-args %s" kv-args)
+  (log/debugf "Apply kv-args %s" kv-args)
   (reduce
    (fn [query [k v]]
      (apply-kv-arg model query k v))

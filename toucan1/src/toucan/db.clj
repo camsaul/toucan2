@@ -98,7 +98,7 @@
 
 (m/defmethod pipeline/transduce-query [#_query-type :default #_model :toucan1/model #_resolved-query :default]
   [rf query-type model parsed-args resolved-query]
-  (log/debugf :compile "Compiling Honey SQL query for legacy Toucan 1 model %s" model)
+  (log/debugf "Compiling Honey SQL query for legacy Toucan 1 model %s" model)
   (binding [map.honeysql/*options* (honeysql-options)
             jdbc/*options*         (jdbc-options)]
     (next-method rf query-type model parsed-args resolved-query)))
@@ -158,7 +158,7 @@
 
   clojure.lang.IReduceInit
   (reduce [this rf init]
-    (log/debugf :results "reduce Toucan 1 reducible query %s" this)
+    (log/debugf "reduce Toucan 1 reducible query %s" this)
     (binding [jdbc/*options*         (merge jdbc/*options* query-jdbc-options)
               map.honeysql/*options* (honeysql-options)]
       (reduce ((map realize/realize) rf) init (execute/reducible-query nil honeysql-form))))

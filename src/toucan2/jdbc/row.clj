@@ -34,7 +34,7 @@
                  :let        [thunk (i->thunk i)]
                  (not thunk) not-found
                  :else       (thunk))]
-    (log/tracef :results "=> %s" result)
+    (log/tracef "=> %s" result)
     result))
 
 (def ^:private ^:dynamic *fetch-all-columns* true)
@@ -71,7 +71,7 @@
 
   clojure.lang.IPersistentMap
   (assoc [this k v]
-    (log/tracef :results ".assoc %s %s" k v)
+    (log/tracef ".assoc %s %s" k v)
     (if @already-realized?
       (assoc @realized-row k v)
       (let [^clojure.lang.ITransientMap transient-row' (assoc! transient-row k v)]
@@ -99,11 +99,11 @@
 
   ;; TODO -- can we `assocEx` the transient row?
   (assocEx [_this k v]
-    (log/tracef :results ".assocEx %s %s" k v)
+    (log/tracef ".assocEx %s %s" k v)
     (.assocEx ^clojure.lang.IPersistentMap @realized-row k v))
 
   (without [this k]
-    (log/tracef :results ".without %s" k)
+    (log/tracef ".without %s" k)
     (if @already-realized?
       (dissoc @realized-row k)
       (let [transient-row' (dissoc! transient-row k)]
@@ -127,16 +127,16 @@
   ;; TODO -- not sure if we need/want this
   java.lang.Iterable
   (iterator [_this]
-    (log/tracef :results ".iterator")
+    (log/tracef ".iterator")
     (.iterator ^java.lang.Iterable @realized-row))
 
   clojure.lang.Associative
   (containsKey [_this k]
-    (log/tracef :results ".containsKey %s" k)
+    (log/tracef ".containsKey %s" k)
     (boolean (column-name->index k)))
 
   (entryAt [this k]
-    (log/tracef :results ".entryAt %s" k)
+    (log/tracef ".entryAt %s" k)
     (let [v (.valAt this k ::not-found)]
       (when-not (= v ::not-found)
         (clojure.lang.MapEntry. k v))))
@@ -144,14 +144,14 @@
 ;;; TODO -- this should probably also include any extra keys added with `assoc` or whatever
   clojure.lang.Counted
   (count [_this]
-    (log/tracef :results ".count")
+    (log/tracef ".count")
     (let [cols (:cols builder)]
       (assert (seq cols))
       (count cols)))
 
   clojure.lang.IPersistentCollection
   (cons [this o]
-    (log/tracef :results ".cons %s" o)
+    (log/tracef ".cons %s" o)
     (cond
       (map? o)
       (reduce #(apply assoc %1 %2) this o)
@@ -165,21 +165,21 @@
         this)))
 
   (empty [_this]
-    (log/tracef :results ".empty")
+    (log/tracef ".empty")
     (instance/instance model))
 
   (equiv [_this obj]
-    (log/tracef :results ".equiv %s" obj)
+    (log/tracef ".equiv %s" obj)
     (.equiv ^clojure.lang.IPersistentCollection @realized-row obj))
 
   ;; we support get with a numeric key for array-based builders:
   clojure.lang.ILookup
   (valAt [this k]
-    (log/tracef :results ".valAt %s" k)
+    (log/tracef ".valAt %s" k)
     (.valAt this k nil))
 
   (valAt [this k not-found]
-    (log/tracef :results ".valAt %s %s" k not-found)
+    (log/tracef ".valAt %s %s" k not-found)
     (cond
       @already-realized?
       (get @realized-row k not-found)
@@ -205,12 +205,12 @@
   ;; we support nth for array-based builderset (i is primitive int here!):
   ;; clojure.lang.Indexed
   ;; (nth [_this i]
-  ;;   (log/tracef :results ".nth %s" i)
+  ;;   (log/tracef ".nth %s" i)
   ;;   (try
   ;;     (i->thunk (inc i))
   ;;     (catch java.sql.SQLException _)))
   ;; (nth [_this i not-found]
-  ;;   (log/tracef :results ".nth %s %s" i not-found)
+  ;;   (log/tracef ".nth %s %s" i not-found)
   ;;   (try
   ;;     (i->thunk (inc i))
   ;;     (catch java.sql.SQLException _
@@ -218,13 +218,13 @@
 
   clojure.lang.Seqable
   (seq [_this]
-    (log/tracef :results ".seq")
+    (log/tracef ".seq")
     (seq @realized-row))
 
   ;; calling [[persistent!]] on a transient row will convert it to a persistent object WITHOUT realizing all the columns.
   clojure.lang.ITransientCollection
   (persistent [_this]
-    (log/tracef :results ".persistent")
+    (log/tracef ".persistent")
     (binding [*fetch-all-columns* false]
       @realized-row))
 
@@ -254,7 +254,7 @@
 
   protocols/IDeferrableUpdate
   (deferrable-update [this k f]
-    (log/tracef :results "Doing deferrable update of %s with %s" k f)
+    (log/tracef "Doing deferrable update of %s with %s" k f)
     (b/cond
       @already-realized?
       (update @realized-row k f)
@@ -339,7 +339,7 @@
       transient-row)))
 
 (defn- fetch-all-columns! [builder i->thunk transient-row]
-  (log/tracef :results "Fetching all columns")
+  (log/tracef "Fetching all columns")
   (reduce
    (partial fetch-column! builder i->thunk)
    transient-row
@@ -347,7 +347,7 @@
 
 (defn- make-realized-row-delay [builder i->thunk transient-row]
   (delay
-    (log/tracef :results "Fully realizing row. *fetch-all-columns* = %s" *fetch-all-columns*)
+    (log/tracef "Fully realizing row. *fetch-all-columns* = %s" *fetch-all-columns*)
     (let [row (cond->> transient-row
                 *fetch-all-columns* (fetch-all-columns! builder i->thunk))]
       (next.jdbc.rs/row! builder row))))

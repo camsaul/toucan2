@@ -38,7 +38,7 @@
   [query-type model {:keys [changes], :as parsed-args} resolved-query]
   (if (empty? changes)
     (do
-      (log/debugf :compile "Query has no changes, skipping update")
+      (log/debugf "Query has no changes, skipping update")
       ::pipeline/no-op)
     (next-method query-type model parsed-args resolved-query)))
 

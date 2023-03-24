@@ -218,7 +218,7 @@
   (let [logged-warning? (atom false)
         log-warning     (fn []
                           (when-not @logged-warning?
-                            (log/warnf :results "Warning: inefficient count query. See documentation for toucan2.select/count.")
+                            (log/warnf "Warning: inefficient count query. See documentation for toucan2.select/count.")
                             (reset! logged-warning? true)))]
     (fn count-rf*
       ([] 0)
@@ -261,7 +261,7 @@
          (reduced true)
          false))
      (do
-       (log/warnf :results "Warning: inefficient exists? query. See documentation for toucan2.select/exists?.")
+       (log/warnf "Warning: inefficient exists? query. See documentation for toucan2.select/exists?.")
        (reduced true)))))
 
 (defn exists?

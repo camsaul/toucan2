@@ -5,6 +5,8 @@
 
 (set! *warn-on-reflection* true)
 
+;;; Work around https://github.com/clj-kondo/clj-kondo/issues/2026
+#_{:clj-kondo/ignore [:invalid-arity]}
 (t1.models/defmodel Venue :t1_venues)
 
 (defn- now [] (java.time.LocalDateTime/now))

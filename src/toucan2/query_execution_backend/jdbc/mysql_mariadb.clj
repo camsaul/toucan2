@@ -104,7 +104,7 @@
   [original-rf conn _query-type model sql-args]
   ;; if for some reason we've already captured PKs, don't do it again.
   (let [conditions-map pipeline/*resolved-query*
-        _              (log/debugf :execute "update-returning-pks workaround: doing SELECT with conditions %s"
+        _              (log/debugf "update-returning-pks workaround: doing SELECT with conditions %s"
                                    conditions-map)
         parsed-args    (update pipeline/*parsed-args* :kv-args merge conditions-map)
         select-rf      (pipeline/with-init conj [])
@@ -114,11 +114,11 @@
                                                  model
                                                  parsed-args
                                                  {})]
-    (log/debugf :execute "update-returning-pks workaround: got PKs %s" pks)
+    (log/debugf "update-returning-pks workaround: got PKs %s" pks)
     (let [update-rf (pipeline/default-rf :toucan.query-type/update.update-count)]
-      (log/debugf :results "update-returning-pks workaround: performing original UPDATE")
+      (log/debugf "update-returning-pks workaround: performing original UPDATE")
       (pipeline/transduce-execute-with-connection update-rf conn :toucan.query-type/update.update-count model sql-args))
-    (log/debugf :results "update-returning-pks workaround: transducing PKs with original reducing function")
+    (log/debugf "update-returning-pks workaround: transducing PKs with original reducing function")
     (transduce
      identity
      original-rf
@@ -158,7 +158,7 @@
                                        pk (if (namespace pk)
                                             pk
                                             (name pk))]
-                                   (log/debugf :results "MySQL/MariaDB inserted ID workaround: fetching insert_id as %s" pk)
+                                   (log/debugf "MySQL/MariaDB inserted ID workaround: fetching insert_id as %s" pk)
                                    pk)
                                  label))
                              identity)

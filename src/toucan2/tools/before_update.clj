@@ -30,10 +30,10 @@
 (m/defmethod before-update :around :default
   [model row]
   (assert (map? row) (format "Expected a map row, got ^%s %s" (some-> row class .getCanonicalName) (pr-str row)))
-  (log/debugf :compile "before-update %s %s" model row)
+  (log/debugf "before-update %s %s" model row)
   (let [result (next-method model row)]
     (assert (map? result) (format "%s for %s should return a map, got %s" `before-update model (pr-str result)))
-    (log/debugf :compile "[before-update] => %s" result)
+    (log/debugf "[before-update] => %s" result)
     result))
 
 (defn- changes->affected-pk-maps-rf [model changes]
@@ -59,7 +59,7 @@
            row-changes (if (instance/instance? row)
                          (protocols/changes row)
                          row)]
-       (log/tracef :compile "The following values have changed: %s" changes)
+       (log/tracef "The following values have changed: %s" changes)
        (cond-> changes->pks
          (seq row-changes) (update row-changes (fn [pks]
                                                  (conj (set pks) (model/primary-key-values-map model row)))))))))
@@ -79,9 +79,9 @@
   parsed args maps that should be used to perform 'replacement' update operations."
   [model {:keys [changes], :as parsed-args} resolved-query]
   (u/try-with-error-context ["apply before-update to matching rows" {::model model, ::changes changes}]
-    (log/debugf :compile "apply before-update to matching rows for %s" model)
+    (log/debugf "apply before-update to matching rows for %s" model)
     (when-let [changes->pk-maps (fetch-changes->pk-maps model parsed-args resolved-query)]
-      (log/tracef :compile "changes->pk-maps = %s" changes->pk-maps)
+      (log/tracef "changes->pk-maps = %s" changes->pk-maps)
       (if (= (count changes->pk-maps) 1)
         ;; every row has the same exact changes: we only need to perform a single update, using the original
         ;; conditions.
@@ -108,7 +108,7 @@
     (let [new-args-maps (apply-before-update-to-matching-rows model
                                                               (assoc parsed-args ::doing-before-update? true)
                                                               resolved-query)]
-      (log/debugf :execute "Doing recursive updates with new args maps %s" new-args-maps)
+      (log/debugf "Doing recursive updates with new args maps %s" new-args-maps)
       (conn/with-transaction [_conn nil {:nested-transaction-rule :ignore}]
         (transduce
          (comp (map (fn [args-map]

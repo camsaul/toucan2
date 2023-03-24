@@ -511,7 +511,7 @@
     (is (= :bar
            (select/select-one-fn :category ::venues.category-keyword 1)))
     (binding [log/*level* :trace]
-      (with-redefs [log/pprint-doc (constantly nil)]
+      (with-redefs [log/-pprint-doc (constantly nil)]
         (is (= :bar
                (select/select-one-fn :category ::venues.category-keyword 1)))))))
 

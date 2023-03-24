@@ -43,7 +43,7 @@
     (let [row-fn (each-row-fn query-type model)
           row-fn (fn [row]
                    (u/try-with-error-context ["Apply after row fn" {::query-type query-type, ::model model}]
-                     (log/debugf :results "Apply after %s for %s" query-type model)
+                     (log/debugf "Apply after %s for %s" query-type model)
                      (let [result (row-fn row)]
                        ;; if the row fn didn't return something (not generally necessary for something like
                        ;; `after-update` which is always done for side effects) then return the original row. We still

@@ -29,7 +29,7 @@
     (when (s/invalid? (s/conform ::default-fields fields))
       (throw (ex-info (format "Invalid default fields for %s: %s" (pr-str model) (s/explain-str ::default-fields fields))
                       (s/explain-data ::default-fields fields))))
-    (log/debugf :results "Default fields for %s: %s" model fields)
+    (log/debugf "Default fields for %s: %s" model fields)
     fields))
 
 (defn- default-fields-xform [model]
@@ -42,7 +42,7 @@
                                               [k (f instance)]))))
                         (s/conform ::default-fields (default-fields model)))]
     (map (fn [instance]
-           (log/tracef :results "Selecting default-fields from instance")
+           (log/tracef "Selecting default-fields from instance")
            (into (empty instance) (map (fn [field-fn]
                                          (field-fn instance))
                                        field-fns))))))
@@ -61,12 +61,12 @@
   (if (map.honeysql/include-default-select? honeysql)
     (next-method rf query-type model parsed-args honeysql)
     (binding [*skip-default-fields* true]
-      (log/debugf :results "Not adding default fields because query already contains `:select` or `:select-distinct`")
+      (log/debugf "Not adding default fields because query already contains `:select` or `:select-distinct`")
       (next-method rf query-type model parsed-args honeysql))))
 
 (m/defmethod pipeline/results-transform [#_query-type :toucan.result-type/instances #_model ::default-fields]
   [query-type model]
-  (log/debugf :results "Model %s has default fields" model)
+  (log/debugf "Model %s has default fields" model)
   (cond
     *skip-default-fields*
     (next-method query-type model)
@@ -74,14 +74,14 @@
     ;; don't apply default fields for queries that specify other columns e.g. `(select [SomeModel :col])`
     (seq (:columns pipeline/*parsed-args*))
     (do
-      (log/debugf :results "Not adding default fields transducer since query already has `:columns`")
+      (log/debugf "Not adding default fields transducer since query already has `:columns`")
       (next-method query-type model))
 
     ;; don't apply default fields for queries like [[toucan2.select/select-fn-set]] since they are already doing their
     ;; own transforms
     (isa? query-type :toucan.query-type/select.instances.fns)
     (do
-      (log/debugf :results "Not adding default fields transducer since query type derives from :toucan.query-type/select.instances.fns")
+      (log/debugf "Not adding default fields transducer since query type derives from :toucan.query-type/select.instances.fns")
       (next-method query-type model))
 
     ;; don't apply default fields for the recursive select done by before-update, because it busts things when we want
@@ -90,12 +90,12 @@
     ;; See [[toucan2.tools.before-update-test/before-update-with-default-fields-test]]
     (isa? query-type :toucan2.tools.before-update/select-for-before-update)
     (do
-      (log/debugf :results "Not adding default fields transducer since query type is done for the purposes of before-update")
+      (log/debugf "Not adding default fields transducer since query type is done for the purposes of before-update")
       (next-method query-type model))
 
     :else
     (do
-      (log/debugf :results "adding transducer to return default fields for %s" model)
+      (log/debugf "adding transducer to return default fields for %s" model)
       (let [xform (default-fields-xform model)]
         (comp xform
               (next-method query-type model))))))

@@ -21,7 +21,7 @@
   (u/try-with-error-context ["save changes" {::model   (protocols/model object)
                                              ::object  object
                                              ::changes (protocols/changes object)}]
-    (log/debugf :compile "Save %s %s changes %s" (protocols/model object) object (protocols/changes object))
+    (log/debugf "Save %s %s changes %s" (protocols/model object) object (protocols/changes object))
     (next-method object)))
 
 (m/defmethod save!* :default
@@ -41,7 +41,7 @@
                         {:object object
                          :pk     pk-values})))
       (when (> rows-affected 1)
-        (log/warnf :results "Warning: more than 1 row affected when saving %s with primary key %s" model pk-values))
+        (log/warnf "Warning: more than 1 row affected when saving %s with primary key %s" model pk-values))
       (instance/reset-original object))
     object))
 

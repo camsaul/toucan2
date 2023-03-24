@@ -50,7 +50,7 @@
   (let [result (update honeysql :where (fn [existing-where]
                                          (:where (hsql.helpers/where existing-where
                                                                      (condition->honeysql-where-clause k v)))))]
-    (log/tracef :compile "=> %s" result)
+    (log/tracef "=> %s" result)
     result))
 
 (defn table-and-alias
@@ -115,7 +115,7 @@
                              #_query      :toucan.map-backend/honeysql2]
   "Build a Honey SQL 2 SELECT query."
   [query-type model {:keys [columns], :as parsed-args} resolved-query]
-  (log/debugf :compile "Building SELECT query for %s with columns %s" model columns)
+  (log/debugf "Building SELECT query for %s with columns %s" model columns)
   (let [parsed-args    (dissoc parsed-args :columns)
         table+alias    (table-and-alias model)
         resolved-query (-> (merge
@@ -127,7 +127,7 @@
                               {:from [table+alias]})
                             resolved-query)
                            (with-meta (meta resolved-query)))]
-    (log/debugf :compile "=> %s" resolved-query)
+    (log/debugf "=> %s" resolved-query)
     (next-method query-type model parsed-args resolved-query)))
 
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.count
@@ -174,7 +174,7 @@
 
   (MySQL/MariaDB)"
   [query-type model parsed-args resolved-query]
-  (log/debugf :compile "Building INSERT query for %s" model)
+  (log/debugf "Building INSERT query for %s" model)
   (let [rows        (some (comp not-empty :rows) [parsed-args resolved-query])
         built-query (-> (merge {:insert-into [(keyword (model/table-name model))]}
                                (if (= rows [{}])
@@ -182,7 +182,7 @@
                                  {:values (map (partial instance/instance model)
                                                rows)}))
                         (with-meta (meta resolved-query)))]
-    (log/debugf :compile "=> %s" built-query)
+    (log/debugf "=> %s" built-query)
     ;; rows is only added so we can get the default methods' no-op logic if there are no rows at all.
     (next-method query-type model (assoc parsed-args :rows rows) built-query)))
 
@@ -191,12 +191,12 @@
                              #_query      :toucan.map-backend/honeysql2]
   "Build a Honey SQL 2 UPDATE query."
   [query-type model {:keys [kv-args changes], :as parsed-args} conditions-map]
-  (log/debugf :compile "Building UPDATE query for %s" model)
+  (log/debugf "Building UPDATE query for %s" model)
   (let [parsed-args (assoc parsed-args :kv-args (merge kv-args conditions-map))
         built-query (-> {:update (table-and-alias model)
                          :set    changes}
                         (with-meta (meta conditions-map)))]
-    (log/debugf :compile "=> %s" built-query)
+    (log/debugf "=> %s" built-query)
     ;; `:changes` are added to `parsed-args` so we can get the no-op behavior in the default method.
     (next-method query-type model (assoc parsed-args :changes changes) built-query)))
 
@@ -258,11 +258,11 @@
   for MySQL/MariaDB. MySQL/MariaDB does not seem to support aliases in `DELETE FROM`, so we need to use this alternative
   syntax; H2 doesn't support it however. So it has to be compiled differently based on the DB."
   [query-type model parsed-args resolved-query]
-  (log/debugf :compile "Building DELETE query for %s" model)
+  (log/debugf "Building DELETE query for %s" model)
   (let [built-query (-> (merge (delete-from (table-and-alias model) (:dialect (options)))
                                resolved-query)
                         (with-meta (meta resolved-query)))]
-    (log/debugf :compile "=> %s" built-query)
+    (log/debugf "=> %s" built-query)
     (next-method query-type model parsed-args built-query)))
 
 ;;;; Query compilation
@@ -273,8 +273,8 @@
   "Compile a Honey SQL 2 map to [sql & args]."
   [query-type model honeysql]
   (let [options-map (options)
-        _           (log/debugf :compile "Compiling Honey SQL 2 with options %s" options-map)
+        _           (log/debugf "Compiling Honey SQL 2 with options %s" options-map)
         sql-args    (u/try-with-error-context ["compile Honey SQL to SQL" {::honeysql honeysql, ::options-map options-map}]
                       (hsql/format honeysql options-map))]
-    (log/debugf :compile "=> %s" sql-args)
+    (log/debugf "=> %s" sql-args)
     (pipeline/compile query-type model sql-args)))

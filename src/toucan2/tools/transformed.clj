@@ -184,7 +184,7 @@
      ;; Special Optimization 2: if the underlying original/current maps of `instance` are instances of something
      ;; like [[toucan2.jdbc.row/->TransientRow]] we can do a 'deferred update' that only applies the transform if and
      ;; when the value is realized.
-     (log/tracef :results "Transform %s %s" k (get row k))
+     (log/tracef "Transform %s %s" k (get row k))
      (u/try-with-error-context ["Transform result column" {::k k, ::xform xform, ::row row}]
        (protocols/deferrable-update row k xform)))))
 
@@ -228,10 +228,10 @@
     (map (let [f (result-row-transform-fn k->transform)]
            (fn [row]
              (assert (map? row) (format "Expected map row, got ^%s %s" (some-> row class .getCanonicalName) (pr-str row)))
-             (log/tracef :results "Transform %s row %s" model row)
+             (log/tracef "Transform %s row %s" model row)
              (let [result (u/try-with-error-context ["transform result row" {::model model, ::row row}]
                             (f row))]
-               (log/tracef :results "[transform] => %s" result)
+               (log/tracef "[transform] => %s" result)
                result))))
     identity))
 
@@ -315,7 +315,7 @@
                                                                             ::model       model
                                                                             ::parsed-args parsed-args
                                                                             ::transforms  k->transform}]
-      (log/debugf :compile "Apply %s transforms to %s" k->transform parsed-args)
+      (log/debugf "Apply %s transforms to %s" k->transform parsed-args)
       (let [parsed-args    (cond-> parsed-args
                              (seq (:rows parsed-args))
                              (update :rows transform-insert-rows k->transform)
@@ -334,11 +334,11 @@
         xform   (comp
                  ;; 1. convert result PKs to a map of PK key -> value
                  (map (fn [pk-or-pks]
-                        (log/tracef :compile "convert result PKs %s to map of PK key -> value" pk-or-pks)
+                        (log/tracef "convert result PKs %s to map of PK key -> value" pk-or-pks)
                         (let [m (zipmap pk-keys (if (sequential? pk-or-pks)
                                                   pk-or-pks
                                                   [pk-or-pks]))]
-                          (log/tracef :compile "=> %s" pk-or-pks)
+                          (log/tracef "=> %s" pk-or-pks)
                           m)))
                  ;; 2. transform the PK results using the model's [[out-transforms]]
                  (transform-result-rows-transducer model)
@@ -348,9 +348,9 @@
                                 (first pk-keys)
                                 (juxt pk-keys))]
                         (fn [row]
-                          (log/tracef :results "convert PKs map back to flat PKs")
+                          (log/tracef "convert PKs map back to flat PKs")
                           (let [row (f row)]
-                            (log/tracef :results "=> %s" row)
+                            (log/tracef "=> %s" row)
                             row)))))]
     (comp xform
           (next-method query-type model))))
