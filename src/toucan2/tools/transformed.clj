@@ -252,15 +252,15 @@
       (comp xform
             (next-method query-type model)))))
 
-;;;; before update
-
-(defn- transform-update-changes [m k->transform]
-  {:pre [(map? k->transform) (seq k->transform)]}
-  (into {} (for [[k v] m]
+(defn- transform-row [row k->transform]
+  {:pre [(map? row) (map? k->transform) (seq k->transform)]}
+  (into {} (for [[k v] row]
              [k (when (some? v)
                   (if-let [xform (get k->transform k)]
                     (xform v)
                     v))])))
+
+;;;; before update
 
 (m/defmethod pipeline/build [#_query-type     :toucan.query-type/update.*
                              #_model          ::transformed.model
@@ -276,25 +276,14 @@
     (not k->transform)
     (next-method query-type model parsed-args resolved-query)
 
-    (let [parsed-args (update parsed-args :changes transform-update-changes k->transform)]
+    (let [parsed-args (update parsed-args :changes transform-row k->transform)]
       (next-method query-type model parsed-args resolved-query))))
 
 ;;;; before insert
 
-;;; TODO -- this shares a lot of code with [[transform-update-changes]]
 (defn- transform-insert-rows [[first-row :as rows] k->transform]
   {:pre [(map? first-row) (map? k->transform)]}
-  ;; all rows should have the same keys, so we just need to look at the keys in the first row
-  (let [row-xforms (for [k     (keys first-row)
-                         :let  [xform (get k->transform k)]
-                         :when xform]
-                     (fn [row]
-                       (update row k (fn [v]
-                                       (if (some? v)
-                                         (xform v)
-                                         v)))))
-        row-xform  (apply comp row-xforms)]
-    (map row-xform rows)))
+  (map #(transform-row % k->transform) rows))
 
 (m/defmethod pipeline/build [#_query-type     :toucan.query-type/insert.*
                              #_model          ::transformed.model

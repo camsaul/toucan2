@@ -543,3 +543,19 @@
       (is (= 'transforms-primary-method-model-2
              (generated-name `(transformed/deftransforms :model-2
                                 {:x {:in ~'inc}})))))))
+
+(derive ::venues.edn-category ::test/venues)
+
+(transformed/deftransforms ::venues.edn-category
+  {:category {:in  pr-str
+              :out (fn [s]
+                     (binding [*read-eval* false]
+                       (read-string s)))}})
+
+(deftest ^:parallel transform-insert-rows-test
+  (is (= [{:name "Venue 1"}
+          {:name "Venue 2", :category "{:name \"Category 2\"}"}]
+         (#'toucan2.tools.transformed/transform-insert-rows
+          '[{:name "Venue 1"}
+            {:name "Venue 2", :category {:name "Category 2"}}]
+          (#'toucan2.tools.transformed/in-transforms ::venues.edn-category)))))
