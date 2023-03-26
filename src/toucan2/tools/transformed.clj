@@ -252,15 +252,15 @@
       (comp xform
             (next-method query-type model)))))
 
-(defn- transform-row [row k->transform]
-  {:pre [(map? row) (map? k->transform) (seq k->transform)]}
-  (into {} (for [[k v] row]
+;;;; before update
+
+(defn- transform-update-changes [m k->transform]
+  {:pre [(map? k->transform) (seq k->transform)]}
+  (into {} (for [[k v] m]
              [k (when (some? v)
                   (if-let [xform (get k->transform k)]
                     (xform v)
                     v))])))
-
-;;;; before update
 
 (m/defmethod pipeline/build [#_query-type     :toucan.query-type/update.*
                              #_model          ::transformed.model
@@ -276,14 +276,20 @@
     (not k->transform)
     (next-method query-type model parsed-args resolved-query)
 
-    (let [parsed-args (update parsed-args :changes transform-row k->transform)]
+    (let [parsed-args (update parsed-args :changes transform-update-changes k->transform)]
       (next-method query-type model parsed-args resolved-query))))
 
 ;;;; before insert
 
 (defn- transform-insert-rows [[first-row :as rows] k->transform]
   {:pre [(map? first-row) (map? k->transform)]}
-  (map #(transform-row % k->transform) rows))
+  (let [x-forms (for [[k transform] k->transform]
+                  (fn [row]
+                    (if (some? (get row k))
+                      (update row k transform)
+                      row)))
+        x-form  (apply comp x-forms)]
+   (map x-form rows)))
 
 (m/defmethod pipeline/build [#_query-type     :toucan.query-type/insert.*
                              #_model          ::transformed.model
