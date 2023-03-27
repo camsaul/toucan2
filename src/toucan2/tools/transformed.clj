@@ -281,20 +281,15 @@
 
 ;;;; before insert
 
-;;; TODO -- this shares a lot of code with [[transform-update-changes]]
 (defn- transform-insert-rows [[first-row :as rows] k->transform]
   {:pre [(map? first-row) (map? k->transform)]}
-  ;; all rows should have the same keys, so we just need to look at the keys in the first row
-  (let [row-xforms (for [k     (keys first-row)
-                         :let  [xform (get k->transform k)]
-                         :when xform]
-                     (fn [row]
-                       (update row k (fn [v]
-                                       (if (some? v)
-                                         (xform v)
-                                         v)))))
-        row-xform  (apply comp row-xforms)]
-    (map row-xform rows)))
+  (let [x-forms (for [[k transform] k->transform]
+                  (fn [row]
+                    (if (some? (get row k))
+                      (update row k transform)
+                      row)))
+        x-form  (apply comp x-forms)]
+   (map x-form rows)))
 
 (m/defmethod pipeline/build [#_query-type     :toucan.query-type/insert.*
                              #_model          ::transformed.model
