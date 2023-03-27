@@ -553,9 +553,10 @@
                        (read-string s)))}})
 
 (deftest ^:parallel transform-insert-rows-test
-  (is (= [{:name "Venue 1"}
-          {:name "Venue 2", :category "{:name \"Category 2\"}"}]
-         (#'toucan2.tools.transformed/transform-insert-rows
-          '[{:name "Venue 1"}
-            {:name "Venue 2", :category {:name "Category 2"}}]
-          (#'toucan2.tools.transformed/in-transforms ::venues.edn-category)))))
+  (testing "insert multiple rows in which each row has different key set will still do transformation properly (#130)"
+    (is (= [{:name "Venue 1"}
+            {:name "Venue 2", :category "{:name \"Category 2\"}"}]
+           (#'toucan2.tools.transformed/transform-insert-rows
+             '[{:name "Venue 1"}
+               {:name "Venue 2", :category {:name "Category 2"}}]
+             (#'toucan2.tools.transformed/in-transforms ::venues.edn-category))))))
