@@ -21,7 +21,6 @@ jobs:
           test
           toucan1/src
           toucan1/test
-        github_token: ${{ secrets.GITHUB_TOKEN }}
 
   tests-postgres:
     runs-on: ubuntu-20.04
