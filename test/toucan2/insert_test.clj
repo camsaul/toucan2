@@ -94,41 +94,47 @@
 
 (deftest ^:synchronized include-pk-test
   (testing "If a value for the PK is explicitly specified, insert! and friends should still work correctly"
-    (doseq [[insert! expected] {#'insert/insert!                     1
-                                #'insert/insert-returning-pks!       [4]
-                                #'insert/insert-returning-instances! [(instance/instance
-                                                                       ::test/venues
-                                                                       {:id         4
-                                                                        :name       "Grant & Green"
-                                                                        :category   "bar"
-                                                                        :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]}]
-      (test/with-discarded-table-changes :venues
-        (testing insert!
-          (is (= expected
-                 (insert! ::test/venues {:id 4, :name "Grant & Green", :category "bar"})))
-          (testing "Venue 4 should exist now"
-            (is (= (instance/instance ::test/venues {:id         4
-                                                     :name       "Grant & Green"
-                                                     :category   "bar"
-                                                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
-                   (select/select-one ::test/venues 4)))))))))
+    (let [new-venue (instance/instance
+                     ::test/venues
+                     {:id         4
+                      :name       "Grant & Green"
+                      :category   "bar"
+                      :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+      (doseq [[insert! expected] {#'insert/insert!                     1
+                                  #'insert/insert-returning-pk!        4
+                                  #'insert/insert-returning-pks!       [4]
+                                  #'insert/insert-returning-instance!  new-venue
+                                  #'insert/insert-returning-instances! [new-venue]}]
+        (test/with-discarded-table-changes :venues
+          (testing insert!
+            (is (= expected
+                   (insert! ::test/venues {:id 4, :name "Grant & Green", :category "bar"})))
+            (testing "Venue 4 should exist now"
+              (is (= (instance/instance ::test/venues {:id         4
+                                                       :name       "Grant & Green"
+                                                       :category   "bar"
+                                                       :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                                                       :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                     (select/select-one ::test/venues 4))))))))))
 
 (deftest ^:synchronized include-pk-non-integer-test
   (testing "If a value for a *non-integer* PK is explicitly specified, insert! and friends should still work correctly"
-    (doseq [[insert! expected] {#'insert/insert!                     1
-                                #'insert/insert-returning-pks!       ["012345678"]
-                                #'insert/insert-returning-instances! [(instance/instance
-                                                                       ::test/phone-number
-                                                                       {:number "012345678", :country-code "US"})]}]
-      (test/with-discarded-table-changes :phone_number
-        (testing insert!
-          (is (= expected
-                 (insert! ::test/phone-number {:number "012345678", :country-code "US"})))
-          (testing "Phone Number 1 should exist now"
-            (is (= (instance/instance ::test/phone-number {:number "012345678", :country-code "US"})
-                   (select/select-one ::test/phone-number :toucan/pk "012345678")))))))))
+    (let [new-phone-number (instance/instance
+                            ::test/phone-number
+                            {:number "012345678", :country-code "US"})]
+      (doseq [[insert! expected] {#'insert/insert!                     1
+                                  #'insert/insert-returning-pk!        "012345678"
+                                  #'insert/insert-returning-pks!       ["012345678"]
+                                  #'insert/insert-returning-instance!  new-phone-number
+                                  #'insert/insert-returning-instances! [new-phone-number]}]
+        (test/with-discarded-table-changes :phone_number
+          (testing insert!
+            (is (= expected
+                   (insert! ::test/phone-number {:number "012345678", :country-code "US"})))
+            (testing "Phone Number 1 should exist now"
+              (is (= (instance/instance ::test/phone-number {:number "012345678", :country-code "US"})
+                     (select/select-one ::test/phone-number :toucan/pk "012345678"))))))))))
 
 (deftest ^:synchronized string-model-test
   (testing "insert! should work with string table names as the model"
@@ -275,19 +281,18 @@
 
 (deftest ^:synchronized empty-rows-no-op-test
   (testing "insert! empty rows should no-op"
-    (doseq [insert!     [#'insert/insert!
-                         #'insert/insert-returning-pks!
-                         #'insert/insert-returning-instances!]
-            model       [::test/venues
-                         :venues]
-            row-or-rows [nil
-                         []]]
+    (doseq [[insert! expected] [[#'insert/insert! 0]
+                                [#'insert/insert-returning-pk! nil]
+                                [#'insert/insert-returning-pks! []]
+                                [#'insert/insert-returning-instance! nil]
+                                [#'insert/insert-returning-instances! []]]
+            model              [::test/venues
+                                :venues]
+            row-or-rows        [nil
+                                []]]
       (testing (pr-str (list insert! model row-or-rows))
         (execute/with-call-count [call-count]
-          (is (= (condp = insert!
-                   #'insert/insert!                     0
-                   #'insert/insert-returning-pks!       []
-                   #'insert/insert-returning-instances! [])
+          (is (= expected
                  (insert! model row-or-rows)))
           (testing "\ncall count"
             (is (= 0
@@ -329,26 +334,26 @@
   {::test/venues :venue})
 
 (deftest ^:synchronized namespaced-test
-  (doseq [insert! [#'insert/insert!
-                   #'insert/insert-returning-pks!
-                   #'insert/insert-returning-instances!]]
-    (test/with-discarded-table-changes :venues
-      (testing insert!
-        (is (= (condp = insert!
-                 #'insert/insert!                     1
-                 #'insert/insert-returning-pks!       [4]
-                 #'insert/insert-returning-instances! [(instance/instance
-                                                        ::venues.namespaced
-                                                        {:venue/name     "Grant & Green"
-                                                         :venue/category "bar"})])
-               (insert! [::venues.namespaced :venue/name :venue/category]
-                        {:venue/name "Grant & Green", :venue/category "bar"})))
-        (is (= (instance/instance
-                ::test/venues
-                {:id       4
-                 :name     "Grant & Green"
-                 :category "bar"})
-               (select/select-one [::test/venues :id :name :category] :id 4)))))))
+  (let [new-venue (instance/instance
+                   ::venues.namespaced
+                   {:venue/name     "Grant & Green"
+                    :venue/category "bar"})]
+    (doseq [[insert! expected] [[#'insert/insert! 1]
+                                [#'insert/insert-returning-pk! 4]
+                                [#'insert/insert-returning-pks! [4]]
+                                [#'insert/insert-returning-instance! new-venue]
+                                [#'insert/insert-returning-instances! [new-venue]]]]
+      (test/with-discarded-table-changes :venues
+        (testing insert!
+          (is (= expected
+                 (insert! [::venues.namespaced :venue/name :venue/category]
+                          {:venue/name "Grant & Green", :venue/category "bar"})))
+          (is (= (instance/instance
+                   ::test/venues
+                   {:id       4
+                    :name     "Grant & Green"
+                    :category "bar"})
+                 (select/select-one [::test/venues :id :name :category] :id 4))))))))
 
 (deftest ^:synchronized positional-connectable-test
   (testing "Support :conn positional connectable arg"
@@ -374,12 +379,14 @@
              (insert/insert! :conn :fake-db ::test/venues {:name "Grant & Green", :category "bar"})))))))
 
 (deftest ^:synchronized insert-returning-pks-should-not-realize-all-columns-test
-  (testing "insert-returning-pks! should only fetch the PK column(s) when fetching results"
-    (test/with-discarded-table-changes :venues
-      (test.track-realized/with-realized-columns [realized-columns]
-        (is (= [4]
-               (insert/insert-returning-pks! ::test.track-realized/venues {:name "Walgreens", :category "store"})))
-        (is (= (case (test/current-db-type)
-                 (:postgres :h2) #{:venues/id}
-                 :mariadb        #{:insert-id})
-               (realized-columns)))))))
+  (testing "insert-returning-pk(s)! should only fetch the PK column(s) when fetching results"
+    (doseq [[insert! expected] [[insert/insert-returning-pk!  4]
+                                [insert/insert-returning-pks! [4]]]]
+      (test/with-discarded-table-changes :venues
+        (test.track-realized/with-realized-columns [realized-columns]
+          (is (= expected
+                 (insert! ::test.track-realized/venues {:name "Walgreens", :category "store"})))
+          (is (= (case (test/current-db-type)
+                   (:postgres :h2) #{:venues/id}
+                   :mariadb        #{:insert-id})
+                 (realized-columns))))))))
