@@ -138,12 +138,21 @@
   [& unparsed-args]
   (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/insert.pks unparsed-args))
 
+(defn insert-returning-pk!
+  "Like [[insert-returning-pks!]], but for one-row insertions. For models with a single primary key, this returns just the
+  new primary key as a scalar value (e.g. `1`). For models with a composite primary key, it will return a single tuple
+  as determined by [[model/primary-keys]] (e.g. `[1 \"Cam\"]`)."
+  {:arglists '([modelable row-or-rows-or-queryable]
+               [modelable k v & more]
+               [modelable columns row-vectors]
+               [:conn connectable modelable row-or-rows]
+               [:conn connectable modelable k v & more]
+               [:conn connectable modelable columns row-vectors])}
+  [& unparsed-args]
+  (first (apply insert-returning-pks! unparsed-args)))
+
 (defn insert-returning-instances!
-  "Like [[insert!]], but returns a vector of the primary keys of the newly inserted rows rather than the number of rows
-  inserted. The primary keys are determined by [[model/primary-keys]]. For models with a single primary key, this
-  returns a vector of single values, e.g. `[1 2]` if the primary key is `:id` and you've inserted rows 1 and 2; for
-  composite primary keys this returns a vector of tuples where each tuple has the value of corresponding primary key as
-  returned by [[model/primary-keys]], e.g. for composite PK `[:id :name]` you might get `[[1 \"Cam\"] [2 \"Sam\"]]`."
+  "Like [[insert!]], but returns a vector of maps representing the inserted objects."
   {:arglists '([modelable-columns row-or-rows-or-queryable]
                [modelable-columns k v & more]
                [modelable-columns columns row-vectors]
@@ -152,3 +161,14 @@
                [:conn connectable modelable-columns columns row-vectors])}
   [& unparsed-args]
   (pipeline/transduce-unparsed-with-default-rf :toucan.query-type/insert.instances unparsed-args))
+
+(defn insert-returning-instance!
+  "Like [[insert-returning-instances!]], but for one-row insertions. Returns the inserted object as a map."
+  {:arglists '([modelable row-or-rows-or-queryable]
+               [modelable k v & more]
+               [modelable columns row-vectors]
+               [:conn connectable modelable row-or-rows]
+               [:conn connectable modelable k v & more]
+               [:conn connectable modelable columns row-vectors])}
+  [& unparsed-args]
+  (first (apply insert-returning-instances! unparsed-args)))
