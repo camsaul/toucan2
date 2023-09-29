@@ -54,12 +54,9 @@
       (let [temp-object (first (insert/insert-returning-instances! model merged-attributes))]
         (log/debugf "[with-temp] => %s" temp-object)
         (try
-          (t/testing (format "\nwith temporary %s with attributes\n%s\n"
-                             (pr-str model)
-                             (with-out-str (pprint/pprint merged-attributes)))
-            (f temp-object))
-          (finally
-            (delete/delete! model :toucan/pk ((model/select-pks-fn model) temp-object))))))))
+         (f temp-object)
+         (finally
+          (delete/delete! model :toucan/pk ((model/select-pks-fn model) temp-object))))))))
 
 (defn do-with-temp [modelable attributes f]
   (let [model (model/resolve-model modelable)]
