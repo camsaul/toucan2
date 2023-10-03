@@ -205,6 +205,11 @@
         (is (= [1]
                (.valAt m ::key)))))))
 
+(deftest ^:parallel transient-contains?-test
+  (let [m (transient (instance/instance :wow {:a 100}))]
+    (is (contains? m :a))
+    (is (not (contains? m :b)))))
+
 (deftest ^:parallel transient-count-test
   (let [^clojure.lang.ITransientMap m (transient (instance/instance :wow {:a 100}))]
     (is (= 1
