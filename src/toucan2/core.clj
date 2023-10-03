@@ -7,8 +7,10 @@
    [toucan2.connection]
    [toucan2.delete]
    [toucan2.execute]
+   [toucan2.honeysql2]
    [toucan2.insert]
    [toucan2.instance]
+   [toucan2.jdbc]
    [toucan2.model]
    [toucan2.protocols]
    [toucan2.save]
@@ -34,8 +36,10 @@
   toucan2.connection/keep-me
   toucan2.delete/keep-me
   toucan2.execute/keep-me
+  toucan2.honeysql2/keep-me
   toucan2.insert/keep-me
   toucan2.instance/keep-me
+  toucan2.jdbc/keep-me
   toucan2.model/keep-me
   toucan2.protocols/keep-me
   toucan2.save/keep-me

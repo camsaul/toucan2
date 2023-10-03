@@ -6,7 +6,7 @@
    [toucan2.connection :as conn]
    [toucan2.execute :as execute]
    [toucan2.instance :as instance]
-   [toucan2.jdbc :as jdbc]
+   [toucan2.jdbc.options :as jdbc.options]
    [toucan2.pipeline :as pipeline]
    [toucan2.realize :as realize]
    [toucan2.test :as test]
@@ -90,7 +90,7 @@
   (let [expected [{:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")}
                   {:id 2, :created-at (LocalDateTime/parse "2017-01-01T00:00")}
                   {:id 3, :created-at (LocalDateTime/parse "2017-01-01T00:00")}]]
-    (binding [jdbc/*options* {:label-fn csk/->kebab-case}]
+    (binding [jdbc.options/*options* {:label-fn csk/->kebab-case}]
       (testing "SQL"
         (is (= expected
                (execute/query ::test/db "SELECT id, created_at FROM venues ORDER BY id ASC;"))))
@@ -161,7 +161,7 @@
          (realize/realize (execute/reducible-query ::test/db :people "SELECT * FROM people WHERE id = 1;")))))
 
 (deftest ^:parallel kebab-case-reducible-query-as-test
-  (binding [jdbc/*options* {:label-fn csk/->kebab-case}]
+  (binding [jdbc.options/*options* {:label-fn csk/->kebab-case}]
     (is (= [(instance/instance :people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]
            (realize/realize (execute/reducible-query ::test/db :people "SELECT * FROM people WHERE id = 1;"))))))
 
