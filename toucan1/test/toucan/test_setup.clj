@@ -13,7 +13,7 @@
    [toucan.test-models.user :refer [User]]
    [toucan.test-models.venue :refer [Venue]]
    [toucan2.connection :as conn]
-   [toucan2.map-backend.honeysql2 :as map.honeysql]
+   [toucan2.honeysql2 :as t2.honeysql]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.test :as test]))
@@ -24,7 +24,7 @@
 
 (m/defmethod pipeline/transduce-query :around [:default :toucan1/model :default]
   [rf query-type model parsed-args resolved-query]
-  (binding [map.honeysql/*options* (assoc map.honeysql/*options*
+  (binding [t2.honeysql/*options* (assoc t2.honeysql/*options*
                                           :dialect (test/current-honey-sql-dialect))]
     (next-method rf query-type model parsed-args resolved-query)))
 

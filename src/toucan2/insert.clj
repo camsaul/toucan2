@@ -1,7 +1,7 @@
 (ns toucan2.insert
   "Implementation of [[insert!]].
 
-  The code for building an INSERT query as Honey SQL lives in [[toucan2.map-backend.honeysql2]]"
+  The code for building an INSERT query as Honey SQL lives in [[toucan2.honeysql2]]"
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]

@@ -1,7 +1,7 @@
 (ns toucan2.delete
   "Implementation of [[delete!]].
 
-  Code for building Honey SQL for DELETE lives in [[toucan2.map-backend.honeysql2]]"
+  Code for building Honey SQL for DELETE lives in [[toucan2.honeysql2]]"
   (:require
    [toucan2.pipeline :as pipeline]))
 

@@ -3,7 +3,7 @@
 
   The args spec used by [[select]] lives in [[toucan2.query]], specifically `:toucan2.query/default-args`.
 
-  Code for building Honey SQL for a SELECT lives in [[toucan2.map-backend.honeysql2]].
+  Code for building Honey SQL for a SELECT lives in [[toucan2.honeysql2]].
 
   ### Functions that return primary keys
 
