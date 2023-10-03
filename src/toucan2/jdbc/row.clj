@@ -103,16 +103,30 @@
     (log/tracef ".without %s" k)
     (if (realized? realized-row)
       (dissoc @realized-row k)
-      (let [transient-row' (dissoc! transient-row k)]
+      (let [transient-row'      (dissoc! transient-row k)
+            k-index             (column-name->index k)
+            column-name->index' (if-not k-index
+                                  column-name->index
+                                  (fn [column-name]
+                                    (let [index (column-name->index column-name)]
+                                      (when-not (= index k-index)
+                                        index))))]
+        (when k-index
+          (swap! i->thunk (fn [i->thunk]
+                            (fn [index]
+                              (if (= index k-index)
+                                (constantly ::not-found)
+                                (i->thunk index))))))
         (swap! realized-keys disj k)
         ;; as in the `assoc` method above, we can optimize a bit and return `this` instead of creating a new object if
         ;; `assoc!` returned the original `transient-row` rather than a different object
-        (if (identical? transient-row transient-row')
+        (if (and (identical? transient-row      transient-row')
+                 (identical? column-name->index column-name->index'))
           this
           (TransientRow. model
                          rset
                          builder
-                         column-name->index
+                         column-name->index'
                          realized-keys
                          i->thunk
                          transient-row'
@@ -129,7 +143,10 @@
   clojure.lang.Associative
   (containsKey [_this k]
     (log/tracef ".containsKey %s" k)
-    (boolean (column-name->index k)))
+    (if (realized? realized-row)
+      (contains? @realized-row k)
+      (or (contains? transient-row k)
+          (boolean (column-name->index k)))))
 
   (entryAt [this k]
     (log/tracef ".entryAt %s" k)
@@ -197,20 +214,6 @@
               (do
                 (.assoc this k fetched-value)
                 fetched-value)))))))
-
-  ;; we support nth for array-based builderset (i is primitive int here!):
-  ;; clojure.lang.Indexed
-  ;; (nth [_this i]
-  ;;   (log/tracef ".nth %s" i)
-  ;;   (try
-  ;;     (i->thunk (inc i))
-  ;;     (catch java.sql.SQLException _)))
-  ;; (nth [_this i not-found]
-  ;;   (log/tracef ".nth %s %s" i not-found)
-  ;;   (try
-  ;;     (i->thunk (inc i))
-  ;;     (catch java.sql.SQLException _
-  ;;       not-found)))
 
   clojure.lang.Seqable
   (seq [_this]
@@ -327,7 +330,10 @@
     (if (= (.valAt transient-row col-name ::not-found) ::not-found)
       (let [thunk (@i->thunk i)]
         (assert (fn? thunk))
-        (next.jdbc.rs/with-column-value builder transient-row col-name (thunk)))
+        (let [value (thunk)]
+          (if (= value ::not-found)
+            transient-row
+            (next.jdbc.rs/with-column-value builder transient-row col-name value))))
       transient-row)))
 
 (defn- fetch-all-columns! [builder i->thunk transient-row]
