@@ -1,5 +1,6 @@
 (ns toucan2.protocols
-  (:require [potemkin :as p]))
+  (:require
+   [potemkin :as p]))
 
 (set! *warn-on-reflection* true)
 
@@ -103,22 +104,6 @@
   clojure.lang.Keyword
   (dispatch-value [k]
     k))
-
-;;; c3p0 and Hikari integration: when we encounter a wrapped connection pool connection, dispatch off of the class of
-;;; connection it wraps
-(doseq [^String pool-connection-class-name ["com.mchange.v2.c3p0.impl.NewProxyConnection"
-                                            "com.zaxxer.hikari.pool.HikariProxyConnection"]]
-  (when-let [pool-connection-class (try
-                                     (Class/forName pool-connection-class-name)
-                                     (catch Throwable _
-                                       nil))]
-    (extend pool-connection-class
-      IDispatchValue
-      {:dispatch-value (fn [^java.sql.Wrapper conn]
-                         (try
-                           (dispatch-value (.unwrap conn java.sql.Connection))
-                           (catch Throwable _
-                             pool-connection-class)))})))
 
 (p/defprotocol+ IDeferrableUpdate
   (deferrable-update [this k f]

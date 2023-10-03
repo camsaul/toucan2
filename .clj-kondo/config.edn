@@ -37,7 +37,9 @@
     toucan2.insert                      insert
     toucan2.instance                    instance
     toucan2.jdbc                        jdbc
+    toucan2.jdbc.connection             jdbc.conn
     toucan2.jdbc.options                jdbc.options
+    toucan2.jdbc.pipeline               jdbc.pipeline
     toucan2.jdbc.query                  jdbc.query
     toucan2.jdbc.read                   jdbc.read
     toucan2.jdbc.result-set             jdbc.rs
