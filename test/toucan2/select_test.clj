@@ -763,3 +763,27 @@
            clojure.lang.ExceptionInfo
            #"Don't know how to get a connection from .* :fake-db"
            (select/exists? :conn :fake-db [::test/venues :id :name] 1))))))
+
+(deftest ^:parallel select-fn-identity-test
+  (testing "select-fn->fn and the like should work as expected when using identity as an argument (#144)"
+    (doseq [identity-fn [identity
+                         (fn identity-fn [x]
+                           x)]]
+      (testing (format "\nidentity-fn = %s" identity-fn)
+        (let [venue-1 (select/select-one ::test/venues 1)]
+          (is (map? venue-1))
+          (is (= {venue-1 1}
+                 (select/select-fn->fn identity-fn :id ::test/venues 1)))
+          (is (= {1 venue-1}
+                 (select/select-fn->fn :id identity-fn ::test/venues 1)))
+          (is (= {venue-1 1}
+                 (select/select-fn->pk identity-fn ::test/venues 1)))
+          (is (= #{venue-1}
+                 (select/select-fn-set identity-fn ::test/venues 1)))
+          (is (= [venue-1]
+                 (select/select-fn-vec identity-fn ::test/venues 1)))
+          (is (= venue-1
+                 (select/select-one-fn identity-fn ::test/venues 1)))
+          (is (= {1 venue-1}
+                 (select/select-pk->fn identity-fn ::test/venues 1)))
+          select/select-fn-reducible)))))
