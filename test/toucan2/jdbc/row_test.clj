@@ -178,6 +178,24 @@
                   ::people
                   ::without-created-at)
 
+(t2/define-after-select ::without-created-at-2
+  [row]
+  (let [row' (dissoc row :created-at)]
+    (is (not (contains? row' :created-at)))
+    (is (nil? (:created-at row')))
+    (let [row'' (assoc row' :created-at 1000)]
+      (is (contains? row'' :created-at))
+      (is (= 1000
+             (:created-at row'')))
+      row'')))
+
+(derive ::people.without-created-at-2 ::people)
+(derive ::people.without-created-at-2 ::without-created-at-2)
+
+(m/prefer-method! #'after-select/after-select
+                  ::people
+                  ::without-created-at-2)
+
 (deftest ^:parallel transient-row-dissoc-test
   (testing "Dissoc should work correctly for transient rows (#105)"
     (is (= {:name       "Cam"
@@ -185,7 +203,12 @@
             :id         1
             :created-at (java.time.OffsetDateTime/parse "2020-04-21T23:56Z")}
            (t2/select-one ::people 1)))
+    (is (= {:name      "Cam"
+            :cool-name "Cool Cam"
+            :id        1}
+           (t2/select-one ::people.without-created-at 1)))
     (is (= {:name       "Cam"
             :cool-name  "Cool Cam"
-            :id         1}
-           (t2/select-one ::people.without-created-at 1)))))
+            :id         1
+            :created-at 1000}
+           (t2/select-one ::people.without-created-at-2 1)))))
