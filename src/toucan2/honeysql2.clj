@@ -108,6 +108,15 @@
             (not (contains? honeysql-query k)))
           [:union :union-all]))
 
+(m/defmethod pipeline/build [#_query-type     :default
+                             #_model          :default
+                             #_resolved-query clojure.lang.IPersistentMap]
+  "Base map backend implementation. Applies the `:kv-args` in `parsed-args` using [[query/apply-kv-args]], and ignores
+  other parsed args."
+  [query-type model {:keys [kv-args], :as parsed-args} m]
+  (let [m (query/apply-kv-args model m kv-args)]
+    (next-method query-type model (dissoc parsed-args :kv-args) m)))
+
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.*
                              #_model      :default
                              #_query      clojure.lang.IPersistentMap]

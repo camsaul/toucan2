@@ -145,6 +145,8 @@
   [query-type model sql]
   (compile query-type model [sql]))
 
+;;; default implementation of [[compile]] for maps lives in [[toucan2.honeysql2]]
+
 ;;; TODO -- does this belong here, or in [[toucan2.query]]?
 (m/defmulti build
   "Build a query by applying `parsed-args` to `resolved-query` into something that can be compiled by [[compile]], e.g.
@@ -182,13 +184,6 @@
   [query-type model parsed-args pk]
   (build query-type model (update parsed-args :kv-args assoc :toucan/pk pk) {}))
 
-(m/defmethod build [#_query-type :default #_model :default #_resolved-query clojure.lang.IPersistentMap]
-  "Base map backend implementation. Applies the `:kv-args` in `parsed-args` using [[query/apply-kv-args]], and ignores
-  other parsed args."
-  [query-type model {:keys [kv-args], :as parsed-args} m]
-  (let [m (query/apply-kv-args model m kv-args)]
-    (next-method query-type model (dissoc parsed-args :kv-args) m)))
-
 (m/defmethod build [#_query-type :default #_model :default #_query String]
   "Default implementation for plain strings. Wrap the string in a vector and recurse."
   [query-type model parsed-args sql]
@@ -205,6 +200,8 @@
                      :method         #'build
                      :dispatch-value (m/dispatch-value build query-type model parsed-args sql-args)})))
   (next-method query-type model parsed-args sql-args))
+
+;;; default implementation of [[build]] for maps lives in [[toucan2.honeysql2]]
 
 (m/defmulti resolve
   "Resolve a `queryable` to an actual query, e.g. resolve a named query defined by [[toucan2.tools.named-query]] to an
