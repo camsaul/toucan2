@@ -59,8 +59,6 @@
                                 i->thunk
                                 ;; underlying transient map representing this row.
                                 ^clojure.lang.ITransientMap transient-row
-                                ;; an atom recording whether we've already been realized.
-                                already-realized?
                                 ;; a delay that should return a persistent map for the current row. Once this is called
                                 ;; we should return the realized row directly and work with that going forward.
                                 realized-row]
@@ -72,7 +70,7 @@
   clojure.lang.IPersistentMap
   (assoc [this k v]
     (log/tracef ".assoc %s %s" k v)
-    (if @already-realized?
+    (if (realized? realized-row)
       (assoc @realized-row k v)
       (let [^clojure.lang.ITransientMap transient-row' (assoc! transient-row k v)]
         (swap! realized-keys conj k)
@@ -94,7 +92,6 @@
                          realized-keys
                          i->thunk
                          transient-row'
-                         already-realized?
                          realized-row)))))
 
   ;; TODO -- can we `assocEx` the transient row?
@@ -104,7 +101,7 @@
 
   (without [this k]
     (log/tracef ".without %s" k)
-    (if @already-realized?
+    (if (realized? realized-row)
       (dissoc @realized-row k)
       (let [transient-row' (dissoc! transient-row k)]
         (swap! realized-keys disj k)
@@ -119,7 +116,6 @@
                          realized-keys
                          i->thunk
                          transient-row'
-                         already-realized?
                          realized-row)))))
 
   ;; Java 7 compatible: no forEach / spliterator
@@ -181,7 +177,7 @@
   (valAt [this k not-found]
     (log/tracef ".valAt %s %s" k not-found)
     (cond
-      @already-realized?
+      (realized? realized-row)
       (get @realized-row k not-found)
 
       (number? k)
@@ -256,7 +252,7 @@
   (deferrable-update [this k f]
     (log/tracef "Doing deferrable update of %s with %s" k f)
     (b/cond
-      @already-realized?
+      (realized? realized-row)
       (update @realized-row k f)
 
       :let [existing-value (.valAt transient-row k ::not-found)]
@@ -276,10 +272,6 @@
                                 (comp f thunk)
                                 thunk)))))
         this)))
-
-  ;; protocols/IRealizedKeys
-  ;; (realized-keys [_this]
-  ;;   @realized-keys)
 
   realize/Realize
   (realize [_this]
@@ -360,11 +352,7 @@
   (let [transient-row      (next.jdbc.rs/->row builder)
         i->thunk           (atom i->thunk)
         realized-row-delay (make-realized-row-delay builder i->thunk transient-row)
-        already-realized?  (atom false)
-        realized-keys      (atom #{})
-        realized-row-delay (delay
-                             (reset! already-realized? true)
-                             @realized-row-delay)]
+        realized-keys      (atom #{})]
     ;; this is a gross amount of positional args. But using `reify` makes debugging things too hard IMO.
     (->TransientRow model
                     rset
@@ -373,5 +361,4 @@
                     realized-keys
                     i->thunk
                     transient-row
-                    already-realized?
                     realized-row-delay)))
