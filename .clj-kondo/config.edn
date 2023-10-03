@@ -33,6 +33,7 @@
     toucan2.connection                  conn
     toucan2.delete                      delete
     toucan2.execute                     execute
+    toucan2.honeysql2                   t2.honeysql
     toucan2.insert                      insert
     toucan2.instance                    instance
     toucan2.jdbc.query                  jdbc.query
@@ -40,8 +41,6 @@
     toucan2.jdbc.result-set             jdbc.rs
     toucan2.jdbc.row                    jdbc.row
     toucan2.log                         log
-    toucan2.map-backend                 map
-    toucan2.map-backend.honeysql2       map.honeysql
     toucan2.model                       model
     toucan2.operation                   op
     toucan2.protocols                   protocols

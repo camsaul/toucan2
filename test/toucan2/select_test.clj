@@ -78,7 +78,7 @@
       {:union []}
       {:union-all []})))
 
-(m/defmethod query/apply-kv-arg [#_model :default #_query :toucan.map-backend/honeysql2 #_k ::custom.limit]
+(m/defmethod query/apply-kv-arg [#_model :default #_query clojure.lang.IPersistentMap #_k ::custom.limit]
   [_model honeysql-form _k limit]
   (assoc honeysql-form :limit limit))
 
@@ -295,7 +295,7 @@
 ;; TODO this is probably not the way you'd want to accomplish this in real life -- I think you'd probably actually want
 ;; to implement [[toucan2.pipeline/build]] instead. But it does do a good job of letting us test that combining aux
 ;; methods work like we'd expect.
-(m/defmethod pipeline/compile :before [#_query-type :toucan.query-type/select.* #_model ::people.limit-2 #_query :toucan.map-backend/honeysql2]
+(m/defmethod pipeline/compile :before [#_query-type :toucan.query-type/select.* #_model ::people.limit-2 #_query clojure.lang.IPersistentMap]
   [_query-type _model built-query]
   (assoc built-query :limit 2))
 
@@ -598,7 +598,7 @@
 
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.*
                              #_model      ::venues.with-category
-                             #_query      :toucan.map-backend/honeysql2]
+                             #_query      clojure.lang.IPersistentMap]
   [query-type model parsed-args resolved-query]
   (let [model-ns-str    (some-> (model/namespace model) name)
         venues-category (keyword

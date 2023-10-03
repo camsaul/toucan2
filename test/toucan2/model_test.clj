@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
-   [toucan2.map-backend.honeysql2 :as map.honeysql]
+   [toucan2.honeysql2 :as t2.honeysql]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.select :as select]
@@ -57,7 +57,7 @@
 
 (m/defmethod pipeline/transduce-query [#_query-type :default #_model ::people.unquoted #_resolved-query :default]
   [rf query-type model parsed-args resolved-query]
-  (binding [map.honeysql/*options* {:quoted false}]
+  (binding [t2.honeysql/*options* {:quoted false}]
     (next-method rf query-type model parsed-args resolved-query)))
 
 (deftest ^:parallel default-honeysql-options-for-a-model-test

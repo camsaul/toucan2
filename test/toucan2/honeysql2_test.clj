@@ -1,14 +1,14 @@
-(ns toucan2.map-backend.honeysql2-test
+(ns toucan2.honeysql2-test
   (:require
    [clojure.test :refer :all]
    [methodical.core :as m]
-   [toucan2.map-backend.honeysql2 :as map.honeysql]
+   [toucan2.honeysql2 :as t2.honeysql]
    [toucan2.model :as model]
    [toucan2.test :as test]))
 
 (deftest ^:parallel condition->honeysql-where-clause-test
   (are [k v expected] (= expected
-                         (map.honeysql/condition->honeysql-where-clause k v))
+                         (t2.honeysql/condition->honeysql-where-clause k v))
     :id :id            [:= :id :id]
     1   :id            [:= 1 :id]
     :id 1              [:= :id 1]
@@ -26,14 +26,14 @@
 
 (deftest ^:parallel table-and-alias-test
   (are [model expected] (= expected
-                           (map.honeysql/table-and-alias model))
+                           (t2.honeysql/table-and-alias model))
     ::test/venues       [:venues]
     ::venues.namespaced [:venues :venue]
     "venues"            [:venues]))
 
 (deftest ^:parallel maybe-qualify-columns-test
   (are [columns table-alias expected] (= expected
-                                         (#'map.honeysql/maybe-qualify-columns columns table-alias))
+                                         (#'t2.honeysql/maybe-qualify-columns columns table-alias))
     [:a.b :a.c :a.d]  [:x]    [:a.b :a.c :a.d]    ; everything already qualified
     [:a/b :a/c :a/d]  [:x]    [:a/b :a/c :a/d]    ; everything already qualified (namespaced)
     [:b :a.c :d]      [:x]    [:x/b :a.c :x/d]    ; some things unqualified

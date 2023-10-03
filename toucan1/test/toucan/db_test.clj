@@ -13,11 +13,11 @@
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
    [toucan2.connection :as conn]
+   [toucan2.honeysql2 :as t2.honeysql]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
    [toucan2.jdbc :as jdbc]
    [toucan2.jdbc.query :as jdbc.query]
-   [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.test :as test]
@@ -182,7 +182,7 @@
           (Locale/setDefault (Locale/forLanguageTag "tr"))
           (test/create-table! ::heroes/heroes)
           (conn/with-connection [_conn ::test-setup/db]
-            (binding [map.honeysql/*options* (assoc map.honeysql/*options* :quoted true)]
+            (binding [t2.honeysql/*options* (assoc t2.honeysql/*options* :quoted true)]
               (let [first-row (first (t1.db/query {:select [:ID] :from [:t1_heroes]}))]
                 ;; If `t1.db/query` (jdbc) uses [[clojure.string/lower-case]], `:ID` will be converted to `:ıd` in Turkish locale
                 (is (= :id

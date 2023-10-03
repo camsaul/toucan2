@@ -33,7 +33,7 @@
 
 (m/defmethod pipeline/build [#_query-type     :toucan.query-type/insert.*
                              #_model          ::before-insert
-                             #_resolved-query :toucan.map-backend/honeysql2]
+                             #_resolved-query clojure.lang.IPersistentMap]
   "Apply [[before-insert]] to `:rows` in the `resolved-query` or `parsed-args` for Honey SQL queries."
   [query-type model parsed-args resolved-query]
   ;; not 100% sure why either `parsed-args` OR `resolved-query` can have `:rows` but I guess we have to update either

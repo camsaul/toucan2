@@ -20,9 +20,7 @@
    [methodical.core :as m]
    [pretty.core :as pretty]
    [toucan2.connection :as conn]
-   [toucan2.map-backend :as map]
    [toucan2.model :as model]
-   [toucan2.protocols :as protocols]
    [toucan2.query :as query]
    [toucan2.query-execution-backend :as query-execution]
    [toucan2.realize :as realize]
@@ -114,41 +112,19 @@
   [_query-type _model]
   identity)
 
-(defn query-dispatch-value
-  "Dispatch value for a resolved or built query, e.g. a Honey SQL map. Dispatch value is determined in this order:
-
-  1. If the query is a map, but not a record type:
-
-     1. Dispatch on `:type` metadata if present;
-
-     2. otherwise dispatch on the current [[map/backend]].
-
-  2. If query is not a plain map, dispatch on [[protocols/dispatch-value]]. For a keyword, this is itself; otherwise it
-     is normally the result of `type`.
-
-  This lets us dispatch on the default [[map/backend]] when we encounter bare Clojure maps with no `:type` metadata."
-  [query]
-  (or (when (and (map? query)
-                 (not (record? query)))
-        (or (:type (meta query))
-            (map/backend)))
-      (protocols/dispatch-value query)))
-
 (m/defmulti compile
   "Compile a `built-query` to something that can be executed natively by the query execution backend, e.g. compile a Honey
   SQL map to a `[sql & args]` vector.
 
-  You should implement this method when writing a custom map backend; see [[toucan2.map-backend]] for more information.
+  You can implement this method to write a custom query compilation backend, for example to compile some certain record
+  type in a special way. See [[toucan2.honeysql2]] for an example implementation.
 
   In addition to dispatching on `query-type` and `model`, this dispatches on the type of `built-query`, in a special
   way: for plain maps this will dispatch on the current [[map/backend]]."
   {:arglists            '([query-type₁ model₂ built-query₃])
    :defmethod-arities   #{3}
    :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-query)}
-  (fn [query-type model built-query]
-    [(protocols/dispatch-value query-type)
-     (protocols/dispatch-value model)
-     (query-dispatch-value built-query)]))
+  u/dispatch-on-first-three-args)
 
 (m/defmethod compile :default
   "Default implementation: return query as-is (i.e., consider it to already be compiled). Check that the query is non-nil
@@ -169,12 +145,15 @@
   [query-type model sql]
   (compile query-type model [sql]))
 
+;;; default implementation of [[compile]] for maps lives in [[toucan2.honeysql2]]
+
 ;;; TODO -- does this belong here, or in [[toucan2.query]]?
 (m/defmulti build
   "Build a query by applying `parsed-args` to `resolved-query` into something that can be compiled by [[compile]], e.g.
   build a Honey SQL query by applying `parsed-args` to an initial `resolved-query` map.
 
-  You should implement this method when writing a custom map backend; see [[toucan2.map-backend]] for more information.
+  You can implement this method to write a custom query compilation backend, for example to compile some certain record
+  type in a special way. See [[toucan2.honeysql2]] for an example implementation.
 
   In addition to dispatching on `query-type` and `model`, this dispatches on the type of `resolved-query`, in a special
   way: for plain maps this will dispatch on the current [[map/backend]]."
@@ -182,9 +161,7 @@
    :defmethod-arities   #{4}
    :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-query)}
   (fn [query-type model _parsed-args resolved-query]
-    [(protocols/dispatch-value query-type)
-     (protocols/dispatch-value model)
-     (query-dispatch-value resolved-query)]))
+    (u/dispatch-on-first-three-args query-type model resolved-query)))
 
 (m/defmethod build :default
   [_query-type _model _parsed-args resolved-query]
@@ -207,13 +184,6 @@
   [query-type model parsed-args pk]
   (build query-type model (update parsed-args :kv-args assoc :toucan/pk pk) {}))
 
-(m/defmethod build [#_query-type :default #_model :default #_resolved-query :toucan.map-backend/*]
-  "Base map backend implementation. Applies the `:kv-args` in `parsed-args` using [[query/apply-kv-args]], and ignores
-  other parsed args."
-  [query-type model {:keys [kv-args], :as parsed-args} m]
-  (let [m (query/apply-kv-args model m kv-args)]
-    (next-method query-type model (dissoc parsed-args :kv-args) m)))
-
 (m/defmethod build [#_query-type :default #_model :default #_query String]
   "Default implementation for plain strings. Wrap the string in a vector and recurse."
   [query-type model parsed-args sql]
@@ -230,6 +200,8 @@
                      :method         #'build
                      :dispatch-value (m/dispatch-value build query-type model parsed-args sql-args)})))
   (next-method query-type model parsed-args sql-args))
+
+;;; default implementation of [[build]] for maps lives in [[toucan2.honeysql2]]
 
 (m/defmulti resolve
   "Resolve a `queryable` to an actual query, e.g. resolve a named query defined by [[toucan2.tools.named-query]] to an
@@ -293,18 +265,12 @@
   You can implement this method to introduce custom behavior that should happen before a query is built or compiled,
   e.g. transformations to the `parsed-args` or other shenanigans like changing underlying query type being
   executed (e.g. [[toucan2.tools.after]], which 'upgrades' queries returning update counts or PKs to ones returning
-  instances so [[toucan2.tools.after-update]] and [[toucan2.tools.after-insert]] can be applied to affected rows).
-
-  As with [[build]] and [[compile]], the dispatch value of `resolved-query` uses special rules, and is calculated
-  with [[query-dispatch-value]] rather than [[protocols/dispatch-value]]; map queries with no `:type` metadata will
-  dispatch on the [[map/backend]] rather than on `clojure.lang.IPersistentMap` (or similar)."
+  instances so [[toucan2.tools.after-update]] and [[toucan2.tools.after-insert]] can be applied to affected rows)."
   {:arglists            '([rf query-type₁ model₂ parsed-args resolved-query₃])
    :defmethod-arities   #{5}
    :dispatch-value-spec (s/nonconforming ::types/dispatch-value.query-type-model-query)}
   (fn [_rf query-type model _parsed-args resolved-query]
-    [(protocols/dispatch-value query-type)
-     (protocols/dispatch-value model)
-     (query-dispatch-value resolved-query)]))
+    (u/dispatch-on-first-three-args query-type model resolved-query)))
 
 (m/defmethod transduce-query :default
   [rf query-type model parsed-args resolved-query]
