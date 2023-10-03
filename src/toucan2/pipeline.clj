@@ -22,7 +22,6 @@
    [toucan2.connection :as conn]
    [toucan2.model :as model]
    [toucan2.query :as query]
-   [toucan2.query-execution-backend :as query-execution]
    [toucan2.realize :as realize]
    [toucan2.types :as types]
    [toucan2.util :as u]))
@@ -45,9 +44,7 @@
   "The final stage of the Toucan 2 query execution pipeline. Execute a compiled query (as returned by [[compile]]) with a
   database connection, e.g. a `java.sql.Connection`, and transduce results with reducing function `rf`.
 
-  The only reason you should need to implement this method is if you are writing a new query execution backend. If
-  needed, you can specify initialization logic for your query execution backend by
-  implementing [[toucan2.query-execution-backend/load-backend-if-needed]] for your connection class."
+  The only reason you should need to implement this method is if you are writing a new query execution backend."
   {:arglists            '([rf conn₁ query-type₂ model₃ compiled-query])
    :defmethod-arities   #{5}
    :dispatch-value-spec (s/nonconforming
@@ -76,11 +73,9 @@
       ;; necessary since we would probably already be in one if we needed to be because stuff
       ;; like [[toucan2.tools.before-delete]] have to put us in one much earlier.
       (conn/with-transaction [conn nil {:nested-transaction-rule :ignore}]
-        (query-execution/load-backend-if-needed conn)
         (transduce-execute-with-connection rf conn query-type model compiled-query))
       ;; otherwise we can just execute with a normal non-transaction query.
       (conn/with-connection [conn]
-        (query-execution/load-backend-if-needed conn)
         (transduce-execute-with-connection rf conn query-type model compiled-query)))))
 
 (m/defmulti results-transform

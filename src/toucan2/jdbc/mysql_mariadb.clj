@@ -1,8 +1,8 @@
-(ns toucan2.query-execution-backend.jdbc.mysql-mariadb
+(ns toucan2.jdbc.mysql-mariadb
   "MySQL and MariaDB integration (mostly workarounds for broken stuff)."
   (:require
    [methodical.core :as m]
-   [toucan2.jdbc :as jdbc]
+   [toucan2.jdbc.options :as jdbc.options]
    [toucan2.jdbc.read :as jdbc.read]
    [toucan2.jdbc.result-set :as jdbc.rs]
    [toucan2.log :as log]
@@ -135,7 +135,7 @@
   the actual name of the primary key column. So tweak the `:label-fn` we pass to `next.jdbc` to rename `:insert-id` to
   the actual PK name we'd expect. This only works for tables with a single-column PK."
   [conn model rset opts]
-  (let [opts               (jdbc/merge-options opts)
+  (let [opts               (jdbc.options/merge-options opts)
         label-fn           (get opts :label-fn name)
         model-pks          (model/primary-keys model)
         insert-id-label-fn (if (= (count model-pks) 1)

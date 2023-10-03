@@ -7,7 +7,7 @@
    [methodical.core :as m]
    [next.jdbc.result-set :as next.jdbc.rs]
    [toucan2.instance :as instance]
-   [toucan2.jdbc :as jdbc]
+   [toucan2.jdbc.options :as jdbc.options]
    [toucan2.jdbc.read :as jdbc.read]
    [toucan2.jdbc.row :as jdbc.row]
    [toucan2.log :as log]
@@ -120,7 +120,7 @@
 (m/defmethod builder-fn :default
   "Default `next.jdbc` builder function. Uses [[instance-builder-fn]] to return Toucan 2 instances."
   [_conn model rset opts]
-  (let [merged-opts (jdbc/merge-options opts)]
+  (let [merged-opts (jdbc.options/merge-options opts)]
     (instance-builder-fn model rset merged-opts)))
 
 (defn ^:no-doc reduce-result-set
@@ -137,7 +137,7 @@
                            (builder-fn conn model rset opts)
                            (jdbc.read/read-column-by-index-fn row-num->i->thunk))
         builder           (builder-fn* rset opts)
-        combined-opts     (jdbc/merge-options (merge (:opts builder) opts))
+        combined-opts     (jdbc.options/merge-options (merge (:opts builder) opts))
         label-fn          (get combined-opts :label-fn)
         _                 (assert (fn? label-fn) "Options must include :label-fn")
         col-names         (get builder :cols (next.jdbc.rs/get-modified-column-names

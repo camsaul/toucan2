@@ -1,4 +1,4 @@
-(ns toucan2.query-execution-backend.jdbc.postgres
+(ns toucan2.jdbc.postgres
   "PostgreSQL integration."
   (:require
    [methodical.core :as m]

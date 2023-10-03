@@ -125,8 +125,8 @@
 
                 ;; ignore namespaces we don't test with Cloverage.
                 :ns-exclude-regex
-                ["^toucan2\\.query-execution-backend\\.jdbc\\.mysql-mariadb.*"
-                 "^toucan2\\.query-execution-backend\\.jdbc\\.postgres.*"]}}
+                ["^toucan2\\.jdbc\\.mysql-mariadb.*"
+                 "^toucan2\\.jdbc\\.postgres.*"]}}
 
   ;; clojure -T:build
   :build

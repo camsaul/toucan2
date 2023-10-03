@@ -1,7 +1,7 @@
 (ns ^:no-doc toucan2.jdbc.query
   (:require
    [next.jdbc :as next.jdbc]
-   [toucan2.jdbc :as jdbc]
+   [toucan2.jdbc.options :as jdbc.options]
    [toucan2.jdbc.result-set :as jdbc.rs]
    [toucan2.log :as log]
    [toucan2.util :as u])
@@ -24,7 +24,7 @@
   `init`. Part of the implementation of the JDBC backend; you shouldn't need to call this directly."
   [rf init ^java.sql.Connection conn model sql-args extra-options]
   {:pre [(instance? java.sql.Connection conn) (sequential? sql-args) (string? (first sql-args)) (ifn? rf)]}
-  (let [opts (jdbc/merge-options extra-options)
+  (let [opts (jdbc.options/merge-options extra-options)
         opts (merge (when-not (:return-keys opts)
                       read-forward-options)
                     opts)]

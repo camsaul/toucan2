@@ -15,7 +15,7 @@
    [toucan2.execute :as execute]
    [toucan2.honeysql2 :as t2.honeysql]
    [toucan2.insert :as insert]
-   [toucan2.jdbc :as jdbc]
+   [toucan2.jdbc.options :as jdbc.options]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -54,7 +54,7 @@
   and to convert underscores in result column names to dashes (i.e., convert to `lisp-case`). This is `false` by
   default.
 
-  DEPRECATED: bind [[toucan2.honeysql/*options*]] and [[toucan2.jdbc/*options*]] instead."
+  DEPRECATED: bind [[toucan2.honeysql/*options*]] and [[toucan2.jdbc.options/*options*]] instead."
   nil)
 
 ;;; TODO -- this is NOT TESTED ANYWHERE !!!!
@@ -63,8 +63,8 @@
   [automatically-convert-dashes-and-underscores]
   (swap! t2.honeysql/global-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores))
   (if automatically-convert-dashes-and-underscores
-    (swap! jdbc/global-options assoc :label-fn csk/->kebab-case)
-    (swap! jdbc/global-options dissoc :label-fn)))
+    (swap! jdbc.options/global-options assoc :label-fn csk/->kebab-case)
+    (swap! jdbc.options/global-options dissoc :label-fn)))
 
 (defn automatically-convert-dashes-and-underscores?
   []
@@ -83,7 +83,7 @@
 (defn set-default-jdbc-options!
   "DEPRECATED: Set [[toucan2.jdbc.query/global-options]] directly instead."
   [jdbc-options]
-  (swap! jdbc/global-options merge (merge
+  (swap! jdbc.options/global-options merge (merge
                                     ;; apparently if you don't set `:identifiers` we're supposed to be defaulting
                                     ;; to [[u/lower-case-en]]
                                     {:label-fn u/lower-case-en}
@@ -93,13 +93,13 @@
   (merge
    (when *automatically-convert-dashes-and-underscores*
      {:label-fn u/->kebab-case})
-   jdbc/*options*))
+   jdbc.options/*options*))
 
 (m/defmethod pipeline/transduce-query [#_query-type :default #_model :toucan1/model #_resolved-query :default]
   [rf query-type model parsed-args resolved-query]
   (log/debugf "Compiling Honey SQL query for legacy Toucan 1 model %s" model)
-  (binding [t2.honeysql/*options* (honeysql-options)
-            jdbc/*options*         (jdbc-options)]
+  (binding [t2.honeysql/*options*  (honeysql-options)
+            jdbc.options/*options* (jdbc-options)]
     (next-method rf query-type model parsed-args resolved-query)))
 
 ;; replaces `*db-connection*`
@@ -158,8 +158,8 @@
   clojure.lang.IReduceInit
   (reduce [this rf init]
     (log/debugf "reduce Toucan 1 reducible query %s" this)
-    (binding [jdbc/*options*         (merge jdbc/*options* query-jdbc-options)
-              t2.honeysql/*options* (honeysql-options)]
+    (binding [jdbc.options/*options* (merge jdbc.options/*options* query-jdbc-options)
+              t2.honeysql/*options*  (honeysql-options)]
       (reduce ((map realize/realize) rf) init (execute/reducible-query nil honeysql-form))))
 
   Object
@@ -263,7 +263,7 @@
 (defn execute!
   "DEPRECATED: use [[toucan2.execute/query-one]] instead."
   [honeysql-form & {:as options}]
-  (binding [jdbc/*options* (merge jdbc/*options* options)]
+  (binding [jdbc.options/*options* (merge jdbc.options/*options* options)]
     (execute/query-one honeysql-form)))
 
 (defn update!

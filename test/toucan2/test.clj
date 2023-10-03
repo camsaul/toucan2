@@ -12,7 +12,7 @@
    [puget.printer :as puget]
    [toucan2.connection :as conn]
    [toucan2.honeysql2 :as t2.honeysql]
-   [toucan2.jdbc :as jdbc]
+   [toucan2.jdbc.options :as jdbc.options]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -340,8 +340,8 @@
 
 (m/defmethod pipeline/transduce-query :around [:default ::models :default]
   [rf query-type model parsed-args resolved-query]
-  (binding [jdbc/*options*         (assoc jdbc/*options* :label-fn u/->kebab-case)
-            t2.honeysql/*options* (assoc t2.honeysql/*options* :dialect (current-honey-sql-dialect))]
+  (binding [jdbc.options/*options* (assoc jdbc.options/*options* :label-fn u/->kebab-case)
+            t2.honeysql/*options*  (assoc t2.honeysql/*options* :dialect (current-honey-sql-dialect))]
     (next-method rf query-type model parsed-args resolved-query)))
 
 ;;;; conveniences for REPL-based usage. These are not used in tests.
