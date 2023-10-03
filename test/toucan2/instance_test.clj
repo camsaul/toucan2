@@ -412,3 +412,15 @@
                           (merge m m2))
       {:type :parakeet} {:name "Parroty", :type :parakeet}
       nil               {:name "Parroty"})))
+
+(deftest ^:parallel changes-do-not-ignore-nil-test
+  (testing "changes should not ignore keys set to nil (#145)"
+    (is (= {:location nil}
+           (#'instance/changes* {:type "cockatiel"}
+                                {:type "cockatiel", :location nil})))
+    (is (nil? (#'toucan2.instance/changes* {:type "cockatiel", :location nil}
+                                           {:type "cockatiel"})))
+    (let [m  (instance/instance :bird {:type "cockatiel"})
+          m2 (assoc m :location nil)]
+      (is (= {:location nil}
+             (protocols/changes m2))))))
