@@ -117,7 +117,9 @@
   If an implementation returns a single keyword, the default `:around` method will automatically wrap it in a vector. It
   also validates that the ultimate result is a sequence of keywords, so it is safe to assume that calls to this will
   always return a sequence of keywords."
-  {:arglists '([model₁]), :defmethod-arities #{1}}
+  {:arglists            '([model₁])
+   :defmethod-arities   #{1}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 (m/defmethod primary-keys :around :default
@@ -166,7 +168,9 @@
     {::my-model      \"x\"
      ::another-model \"y\"})
   ```"
-  {:arglists '([model₁])}
+  {:arglists            '([model₁])
+   :defmethod-arities   #{1}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 (m/defmethod model->namespace :default

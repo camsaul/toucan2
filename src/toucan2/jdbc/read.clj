@@ -2,13 +2,18 @@
   "[[read-column-thunk]] method, which is used to determine how to read values of columns in results, and default
   implementations"
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [next.jdbc.result-set :as next.jdbc.rs]
    [toucan2.log :as log]
    [toucan2.protocols :as protocols]
+   [toucan2.types :as types]
    [toucan2.util :as u])
   (:import
    (java.sql Connection ResultSet ResultSetMetaData Types)))
+
+(comment s/keep-me
+         types/keep-me)
 
 (set! *warn-on-reflection* true)
 
@@ -40,19 +45,24 @@
 
   3. Should this dispatch off of the underlying database column type name string, e.g. `timestamp` or `timestamptz`? It
      seems like a lot of the time we need to do different things based on that type name."
-  {:arglists '([^Connection conn₁ model₂ ^ResultSet rset ^ResultSetMetaData rsmeta₍₃₎ ^Long i])}
+  {:arglists            '([^Connection conn₁ model₂ ^ResultSet rset ^ResultSetMetaData rsmeta₍₃₎ ^Long i])
+   :defmethod-arities   #{5}
+   :dispatch-value-spec (types/or-default-spec
+                         (s/cat :connection-class ::types/dispatch-value.keyword-or-class
+                                :model            ::types/dispatch-value.model
+                                :column-type      any?))}
   (fn [^Connection conn model _rset ^ResultSetMetaData rsmeta ^Long i]
     (let [col-type (.getColumnType rsmeta i)]
       (log/debugf
-                  "Column %s %s is of JDBC type %s, native type %s"
-                  i
-                  (let [table-name (some->> (.getTableName rsmeta i) not-empty)
-                        column-name (.getColumnLabel rsmeta i)]
-                    (if table-name
-                      (str table-name \. column-name)
-                      column-name))
-                  (symbol "java.sql.Types" (type-name col-type))
-                  (.getColumnTypeName rsmeta i))
+       "Column %s %s is of JDBC type %s, native type %s"
+       i
+       (let [table-name  (some->> (.getTableName rsmeta i) not-empty)
+             column-name (.getColumnLabel rsmeta i)]
+         (if table-name
+           (str table-name \. column-name)
+           column-name))
+       (symbol "java.sql.Types" (type-name col-type))
+       (.getColumnTypeName rsmeta i))
       [(protocols/dispatch-value conn) (protocols/dispatch-value model) col-type])))
 
 (m/defmethod read-column-thunk :default

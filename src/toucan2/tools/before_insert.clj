@@ -5,10 +5,15 @@
    [toucan2.connection :as conn]
    [toucan2.log :as log]
    [toucan2.pipeline :as pipeline]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
+(comment types/keep-me)
+
 (m/defmulti before-insert
-  {:arglists '([model row])}
+  {:arglists            '([model₁ row])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 (defn- do-before-insert-to-rows [rows model]

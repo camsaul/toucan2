@@ -220,7 +220,9 @@
 (m/defmulti do-with-connection-string
   "Implementation of [[do-with-connection]] for strings. Dispatches on the [[connection-string-protocol]] of the string,
   e.g. `\"jdbc\"` for `\"jdbc:postgresql://localhost:3000/toucan\"`."
-  {:arglists '([^java.lang.String connection-string f])}
+  {:arglists            '([^java.lang.String connection-string f])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec string?}
   (fn [connection-string _f]
     (connection-string-protocol connection-string)))
 
@@ -234,7 +236,9 @@
 (m/defmulti do-with-transaction
   "`options` are options for determining what type of transaction we'll get. See dox for [[with-transaction]] for more
   information."
-  {:arglists '([connection₁ options f])}
+  {:arglists            '([connection₁ options f])
+   :defmethod-arities   #{3}
+   :dispatch-value-spec ::types/dispatch-value.keyword-or-class}
   u/dispatch-on-first-arg
   :default-value ::default)
 

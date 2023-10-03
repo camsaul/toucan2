@@ -152,15 +152,24 @@
 (s/def ::dispatch-value.default
   (partial = :default))
 
+(defn or-default-spec
+  "Helper for creating a spec that also accepts the `:default` keyword."
+  [spec]
+  (s/nonconforming
+   (s/or :default     ::dispatch-value.default
+         :non-default spec)))
+
 ;;; `:toucan.query-type/abstract` exists for things that aren't actually supposed to go in the query type hierarchy, but
 ;;; we want to be able to derive other query types FROM them. See [[toucan2.tools.after]] and
 ;;; `:toucan2.tools.after/query-type` for example.
 (s/def ::dispatch-value.query-type
-  (s/or :default             ::dispatch-value.default
-        :abstract-query-type #(isa? % :toucan.query-type/abstract)
-        :query-type          query-type?))
+  (or-default-spec
+   (s/or :abstract-query-type #(isa? % :toucan.query-type/abstract)
+         :query-type          query-type?)))
 
-;; technically `nil` is valid and it's not read in as a Symbol
+;;; technically `nil` is valid and it's not read in as a Symbol
+;;;
+;;; What about (Class/forName "...") forms? Those are valid classes...
 (s/def ::dispatch-value.keyword-or-class
   (some-fn keyword? symbol? nil?))
 
@@ -171,13 +180,12 @@
   ::dispatch-value.keyword-or-class)
 
 (s/def ::dispatch-value.query-type-model
-  (s/or :default          ::dispatch-value.default
-        :query-type-model (s/cat :query-type ::dispatch-value.query-type
-                                 :model      ::dispatch-value.model)))
+  (or-default-spec
+   (s/cat :query-type ::dispatch-value.query-type
+          :model      ::dispatch-value.model)))
 
 (s/def ::dispatch-value.query-type-model-query
-  (s/or
-   :default                         ::dispatch-value.default
-   :query-type-model-resolved-query (s/cat :query-type ::dispatch-value.query-type
-                                           :model      ::dispatch-value.model
-                                           :query      ::dispatch-value.query)))
+  (or-default-spec
+   (s/cat :query-type ::dispatch-value.query-type
+          :model      ::dispatch-value.model
+          :query      ::dispatch-value.query)))

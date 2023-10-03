@@ -136,11 +136,10 @@
   query backends. `:toucan/pk` support is implemented this way."
   {:arglists            '([model₁ resolved-query₂ k₃ v])
    :defmethod-arities   #{4}
-   :dispatch-value-spec (s/nonconforming (s/or
-                                          :default       ::types/dispatch-value.default
-                                          :model-query-k (s/cat :model          ::types/dispatch-value.model
-                                                                :resolved-query ::types/dispatch-value.query
-                                                                :k              keyword?)))}
+   :dispatch-value-spec (types/or-default-spec
+                         (s/cat :model          ::types/dispatch-value.model
+                                :resolved-query ::types/dispatch-value.query
+                                :k              keyword?))}
   u/dispatch-on-first-three-args)
 
 (comment
