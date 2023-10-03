@@ -224,6 +224,10 @@
   (count [_this]
     (count m))
 
+  clojure.lang.Associative
+  (containsKey [_this k]
+    (contains? m k))
+
   pretty/PrettyPrintable
   (pretty [_this]
     (list `->TransientInstance model m mta)))
