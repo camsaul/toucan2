@@ -45,12 +45,12 @@
   with no default connection available and execute it later with one bound. (This also means
   that [[toucan2.execute/reducible-query]] does not capture dynamic bindings such
   as [[toucan2.connection/*current-connectable*]] -- you probably wouldn't want it to, anyway, since we have no
-  guarantees and open connection will be around when we go to use the reducible query later.)"
+  guarantees and open connection will be around when we go to use the reducible query later.
+
+  The default JDBC implementations for methods here live in [[toucan2.jdbc.connection]]."
   (:require
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
-   [next.jdbc :as next.jdbc]
-   [next.jdbc.transaction :as next.jdbc.transaction]
    [pretty.core :as pretty]
    [toucan2.log :as log]
    [toucan2.protocols :as protocols]
@@ -203,24 +203,6 @@
                               *current-connectable*)]
     (do-with-connection current-connectable f)))
 
-(m/defmethod do-with-connection java.sql.Connection
-  [conn f]
-  (f conn))
-
-(m/defmethod do-with-connection javax.sql.DataSource
-  [^javax.sql.DataSource data-source f]
-  (with-open [conn (.getConnection data-source)]
-    (f conn)))
-
-(m/defmethod do-with-connection clojure.lang.IPersistentMap
-  "Implementation for map connectables. Treats them as a `clojure.java.jdbc`-style connection spec map, converting them to
-  a `java.sql.DataSource` with [[next.jdbc/get-datasource]]."
-  [m f]
-  (do-with-connection (next.jdbc/get-datasource m) f))
-
-;;; for record types that implement `DataSource`, prefer the `DataSource` impl over the map impl.
-(m/prefer-method! #'do-with-connection javax.sql.DataSource clojure.lang.IPersistentMap)
-
 ;;;; connection string support
 
 (defn connection-string-protocol
@@ -247,12 +229,7 @@
   [connection-string f]
   (do-with-connection-string connection-string f))
 
-(m/defmethod do-with-connection-string "jdbc"
-  "Implementation of `do-with-connection-string` (and thus [[do-with-connection]]) for all strings starting with `jdbc:`.
-  Calls `java.sql.DriverManager/getConnection` on the connection string."
-  [^String connection-string f]
-  (with-open [conn (java.sql.DriverManager/getConnection connection-string)]
-    (f conn)))
+;;; JDBC implementations live in [[toucan2.jdbc.connection]]
 
 (m/defmulti do-with-transaction
   "`options` are options for determining what type of transaction we'll get. See dox for [[with-transaction]] for more
@@ -266,15 +243,6 @@
   [connection options f]
   (log/debugf "do with transaction %s %s" options (some-> connection class .getCanonicalName symbol))
   (next-method connection options (bind-current-connectable-fn f)))
-
-(m/defmethod do-with-transaction java.sql.Connection
-  [^java.sql.Connection conn options f]
-  (let [nested-tx-rule (get options :nested-transaction-rule :allow)
-        options        (dissoc options :nested-transaction-rule)]
-    (log/debugf "do with JDBC transaction (nested rule: %s) with options %s" nested-tx-rule options)
-    (binding [next.jdbc.transaction/*nested-tx* nested-tx-rule]
-      (next.jdbc/with-transaction [t-conn conn options]
-        (f t-conn)))))
 
 (defmacro with-transaction
   "Gets a connection with [[with-connection]], and executes `body` within that transaction.
@@ -302,3 +270,5 @@
                                         :options            (s/? ::with-transaction-options)))
                :body (s/+ any?))
   :ret  any?)
+
+;;; JDBC implementation lives in [[toucan2.jdbc.connection]]

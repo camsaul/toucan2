@@ -1,6 +1,6 @@
 (ns ^:no-doc toucan2.jdbc.query
   (:require
-   [next.jdbc :as next.jdbc]
+   [next.jdbc]
    [toucan2.jdbc.options :as jdbc.options]
    [toucan2.jdbc.result-set :as jdbc.rs]
    [toucan2.log :as log]
