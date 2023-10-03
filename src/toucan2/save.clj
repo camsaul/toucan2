@@ -1,18 +1,25 @@
 (ns toucan2.save
   (:require
+   [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.connection :as conn]
    [toucan2.instance :as instance]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.protocols :as protocols]
+   [toucan2.types :as types]
    [toucan2.update :as update]
    [toucan2.util :as u]))
+
+(comment s/keep-me
+         types/keep-me)
 
 (set! *warn-on-reflection* true)
 
 (m/defmulti save!*
-  {:arglists '([object])}
+  {:arglists            '([object])
+   :defmethod-arities   #{1}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   (fn [object]
     (protocols/dispatch-value (protocols/model object))))
 

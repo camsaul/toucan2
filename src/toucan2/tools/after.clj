@@ -21,7 +21,9 @@
   ```
 
   This function is only done for side-effects for query types that return update counts or PKs."
-  {:arglists '([query-type₁ model₂]), :defmethod-arities #{2}}
+  {:arglists '([query-type₁ model₂])
+   :defmethod-arities #{2}
+   :dispatch-value-spec ::types/dispatch-value.query-type-model}
   u/dispatch-on-first-two-args)
 
 (m/defmethod each-row-fn :after :default
@@ -56,7 +58,9 @@
             (next-method query-type model)))))
 
 (m/defmulti ^:private result-type-rf
-  {:arglists '([original-query-type₁ model rf]), :defmethod-arities #{3}}
+  {:arglists            '([original-query-type₁ model rf])
+   :defmethod-arities   #{3}
+   :dispatch-value-spec ::types/dispatch-value.query-type}
   u/dispatch-on-first-arg)
 
 (m/defmethod result-type-rf :toucan.result-type/update-count

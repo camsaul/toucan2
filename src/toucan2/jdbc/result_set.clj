@@ -28,10 +28,9 @@
   other builder functions that ships with `next.jdbc`, or write your own custom builder function."
   {:arglists            '([^java.sql.Connection conn₁ model₂ ^java.sql.ResultSet rset opts])
    :defmethod-arities   #{4}
-   :dispatch-value-spec (s/nonconforming
-                         (s/or :default    ::types/dispatch-value.default
-                               :conn-model (s/cat :conn  ::types/dispatch-value.keyword-or-class
-                                                  :model ::types/dispatch-value.model)))}
+   :dispatch-value-spec (types/or-default-spec
+                         (s/cat :conn  ::types/dispatch-value.keyword-or-class
+                                :model ::types/dispatch-value.model))}
   u/dispatch-on-first-two-args)
 
 (defrecord ^:no-doc InstanceBuilder [model ^ResultSet rset ^ResultSetMetaData rsmeta cols]

@@ -47,11 +47,10 @@
   The only reason you should need to implement this method is if you are writing a new query execution backend."
   {:arglists            '([rf conn₁ query-type₂ model₃ compiled-query])
    :defmethod-arities   #{5}
-   :dispatch-value-spec (s/nonconforming
-                         (s/or :default               ::types/dispatch-value.default
-                               :conn-query-type-model (s/cat :conn       ::types/dispatch-value.keyword-or-class
-                                                             :query-type ::types/dispatch-value.query-type
-                                                             :model      ::types/dispatch-value.model)))}
+   :dispatch-value-spec (types/or-default-spec
+                         (s/cat :conn       ::types/dispatch-value.keyword-or-class
+                                :query-type ::types/dispatch-value.query-type
+                                :model      ::types/dispatch-value.model))}
   (fn [_rf conn query-type model _compiled-query]
     (u/dispatch-on-first-three-args conn query-type model)))
 

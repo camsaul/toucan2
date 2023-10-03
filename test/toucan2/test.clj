@@ -16,7 +16,10 @@
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
+
+(comment types/keep-me)
 
 (set! *warn-on-reflection* true)
 
@@ -201,7 +204,14 @@
 ;;;; creating test tables, and the default test models.
 
 (m/defmulti create-table-sql-file
-  {:arglists '([db-type model-or-table-name])}
+  {:arglists            '([db-type model-or-table-name])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec (types/or-default-spec
+                         (s/cat
+                          :db-type             keyword?
+                          :model-or-table-name (s/or
+                                                :model      ::types/dispatch-value.model
+                                                :table-name keyword?)))}
   (fn [db-type model-or-table-name]
     [(keyword db-type) (keyword model-or-table-name)]))
 

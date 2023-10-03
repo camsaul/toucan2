@@ -5,7 +5,10 @@
    [toucan2.honeysql2 :as t2.honeysql]
    [toucan2.log :as log]
    [toucan2.pipeline :as pipeline]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
+
+(comment types/keep-me)
 
 (set! *warn-on-reflection* true)
 
@@ -20,7 +23,9 @@
 (m/defmulti default-fields
   "The default fields to return for a model `model` that derives from `:toucan2.tools.default-fields/default-fields`. You
   probably don't need to use this directly; use [[toucan2.tools.default-fields/define-default-fields]] instead."
-  {:arglists '([model]), :defmethod-arities #{1}, :dispatch-value-spec (complement vector?)}
+  {:arglists            '([model])
+   :defmethod-arities   #{1}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 (m/defmethod default-fields :around :default

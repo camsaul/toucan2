@@ -4,10 +4,15 @@
    [methodical.core :as m]
    [toucan2.pipeline :as pipeline]
    [toucan2.tools.simple-out-transform :as tools.simple-out-transform]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
+(comment types/keep-me)
+
 (m/defmulti after-select
-  {:arglists '([instance]), :defmethod-arities #{1}}
+  {:arglists            '([instance])
+   :defmethod-arities   #{1}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 ;;; Do after-select for anything returning instances, not just SELECT. [[toucan2.insert/insert-returning-instances!]]
