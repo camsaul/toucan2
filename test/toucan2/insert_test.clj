@@ -273,7 +273,7 @@
           (is (= [(case (test/current-db-type)
                     :h2       "INSERT INTO \"BIRDS\" DEFAULT VALUES"
                     :postgres "INSERT INTO \"birds\" DEFAULT VALUES"
-                    :mariadb  "INSERT INTO `birds` () VALUES ()")]
+                    :mariadb  "INSERT INTO `birds` VALUES ()")]
                  (tools.compile/compile
                    (insert/insert! ::test/birds row-or-rows))))
           (is (= 1
