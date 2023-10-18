@@ -77,6 +77,8 @@
 
  [toucan2.insert
   insert!
+  insert-returning-instance!
+  insert-returning-pk!
   insert-returning-instances!
   insert-returning-pks!]
 
