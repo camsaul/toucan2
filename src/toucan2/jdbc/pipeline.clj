@@ -1,12 +1,10 @@
-(ns toucan2.query-execution-backend.jdbc
+(ns toucan2.jdbc.pipeline
   (:require
    [methodical.core :as m]
    [toucan2.jdbc.query :as jdbc.query]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.types :as types]))
-
-(set! *warn-on-reflection* true)
 
 (m/defmethod pipeline/transduce-execute-with-connection [#_connection java.sql.Connection
                                                          #_query-type :default
@@ -68,18 +66,3 @@
     ;; once we have a sequence of PKs then get instances as with `select` and do our magic on them using the
     ;; ORIGINAL `rf`.
     (transduce-instances-from-pks rf model columns pks)))
-
-;;;; load the miscellaneous integrations
-
-(defn- class-exists? [^String class-name]
-  (try
-    (Class/forName class-name)
-    (catch Throwable _)))
-
-(when (class-exists? "org.postgresql.jdbc.PgConnection")
-  (require 'toucan2.query-execution-backend.jdbc.postgres))
-
-(when (some class-exists? ["org.mariadb.jdbc.Connection"
-                           "org.mariadb.jdbc.MariaDbConnection"
-                           "com.mysql.cj.MysqlConnection"])
-  (require 'toucan2.query-execution-backend.jdbc.mysql-mariadb))

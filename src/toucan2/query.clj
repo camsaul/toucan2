@@ -3,7 +3,6 @@
    [clojure.spec.alpha :as s]
    [methodical.core :as m]
    [toucan2.log :as log]
-   [toucan2.map-backend :as map]
    [toucan2.model :as model]
    [toucan2.types :as types]
    [toucan2.util :as u]))
@@ -124,10 +123,8 @@
 
 (m/defmulti apply-kv-arg
   "Merge a key-value pair into a `query`, presumably a map. What this means depends on
-  the [[toucan2.protocols/dispatch-value]] of `query` -- for a plain map, this is given `:type` metadata at some point
-  for the [[toucan2.map-backend/default-backend]].
-
-  Example: the default Honey SQL backend, applies `k` and `v` as a `:where` condition:
+  the [[toucan2.protocols/dispatch-value]] of `query` -- for a plain map, the default Honey SQL backend applies `k` and
+  `v` as a `:where` condition:
 
   ```clj
   (apply-kv-arg :default {} :k :v)
@@ -139,22 +136,11 @@
   query backends. `:toucan/pk` support is implemented this way."
   {:arglists            '([model₁ resolved-query₂ k₃ v])
    :defmethod-arities   #{4}
-   :dispatch-value-spec (s/nonconforming (s/or
-                                          :default       ::types/dispatch-value.default
-                                          :model-query-k (s/cat :model          ::types/dispatch-value.model
-                                                                :resolved-query ::types/dispatch-value.query
-                                                                :k              keyword?)))}
+   :dispatch-value-spec (types/or-default-spec
+                         (s/cat :model          ::types/dispatch-value.model
+                                :resolved-query ::types/dispatch-value.query
+                                :k              keyword?))}
   u/dispatch-on-first-three-args)
-
-;;; not 100% sure we need this method since the query should already have `:type` metadata, but it's nice to have it
-;;; anyway so we can play around with this stuff from the REPL
-(m/defmethod apply-kv-arg [#_model :default #_query clojure.lang.IPersistentMap #_k :default]
-  "Default implementation for maps. This adds `:type` metadata to the map (from [[map/backend]]) and recurses,
-  ultimately handing off to the map backend's implementation.
-
-  See [[toucan2.map-backend.honeysql2]] for the Honey SQL-specific impl for this."
-  [model query k v]
-  (apply-kv-arg model (vary-meta query assoc :type (map/backend)) k v))
 
 (comment
   ;; with a composite PK like

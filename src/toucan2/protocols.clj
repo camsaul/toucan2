@@ -1,5 +1,6 @@
 (ns toucan2.protocols
-  (:require [potemkin :as p]))
+  (:require
+   [potemkin :as p]))
 
 (set! *warn-on-reflection* true)
 
@@ -103,30 +104,6 @@
   clojure.lang.Keyword
   (dispatch-value [k]
     k))
-
-;;; c3p0 integration: when we encounter a c3p0 connection dispatch off of the class of connection it wraps
-(when-let [c3p0-connection-class (try
-                                   (Class/forName "com.mchange.v2.c3p0.impl.NewProxyConnection")
-                                   (catch Throwable _
-                                     nil))]
-  (extend c3p0-connection-class
-    IDispatchValue
-    {:dispatch-value (fn [^java.sql.Wrapper conn]
-                       (try
-                         (dispatch-value (.unwrap conn java.sql.Connection))
-                         (catch Throwable _
-                           c3p0-connection-class)))}))
-
-;; (p/defprotocol+ IRealizedKeys
-;;   (realized-keys [m]
-;;     "Return the keys in map `m` that have already been fully realized (e.g., fetched from a Database)."))
-
-;; (extend-protocol IRealizedKeys
-;;   nil
-;;   (realized-keys [_this] nil)
-
-;;   clojure.lang.IPersistentMap
-;;   (realized-keys [this] (keys this)))
 
 (p/defprotocol+ IDeferrableUpdate
   (deferrable-update [this k f]

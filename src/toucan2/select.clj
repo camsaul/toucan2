@@ -3,7 +3,7 @@
 
   The args spec used by [[select]] lives in [[toucan2.query]], specifically `:toucan2.query/default-args`.
 
-  Code for building Honey SQL for a SELECT lives in [[toucan2.map-backend.honeysql2]].
+  Code for building Honey SQL for a SELECT lives in [[toucan2.honeysql2]].
 
   ### Functions that return primary keys
 
@@ -28,6 +28,7 @@
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
+   [toucan2.realize :as realize]
    [toucan2.types :as types]))
 
 (comment s/keep-me
@@ -76,7 +77,8 @@
   {:arglists '([f modelable-columns & kv-args? query?]
                [f :conn connectable modelable-columns & kv-args? query?])}
   [f & unparsed-args]
-  (let [rf    (pipeline/with-init conj #{})
+  (let [f     (comp realize/realize f)
+        rf    (pipeline/with-init conj #{})
         xform (map f)]
     (not-empty (pipeline/transduce-unparsed (xform rf) :toucan.query-type/select.instances.fns unparsed-args))))
 
@@ -95,7 +97,8 @@
   {:arglists '([f modelable-columns & kv-args? query?]
                [f :conn connectable modelable-columns & kv-args? query?])}
   [f & unparsed-args]
-  (let [rf    (pipeline/with-init conj [])
+  (let [f     (comp realize/realize f)
+        rf    (pipeline/with-init conj [])
         xform (map f)]
     (not-empty (pipeline/transduce-unparsed (xform rf) :toucan.query-type/select.instances.fns unparsed-args))))
 
@@ -110,6 +113,7 @@
                [f :conn connectable modelable-columns & kv-args? query?])}
   [f & unparsed-args]
   (let [query-type :toucan.query-type/select.instances.fns
+        f          (comp realize/realize f)
         rf         (pipeline/with-init conj [])
         xform      (comp (map f)
                          (pipeline/first-result-xform-fn query-type))]
@@ -184,7 +188,9 @@
   {:arglists '([f1 f2 modelable-columns & kv-args? query?]
                [f1 f2 :conn connectable modelable-columns & kv-args? query?])}
   [f1 f2 & unparsed-args]
-  (let [rf    (pipeline/with-init conj {})
+  (let [f1    (comp realize/realize f1)
+        f2    (comp realize/realize f2)
+        rf    (pipeline/with-init conj {})
         xform (map (juxt f1 f2))]
     (pipeline/transduce-unparsed (xform rf) :toucan.query-type/select.instances unparsed-args)))
 

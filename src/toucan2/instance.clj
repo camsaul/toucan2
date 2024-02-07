@@ -58,7 +58,7 @@
      (into
       (empty original)
       (map (fn [k]
-             (let [original-value (get original k)
+             (let [original-value (get original k ::not-found)
                    current-value  (get current k)]
                (when-not (= original-value current-value)
                  [k current-value]))))
@@ -223,6 +223,10 @@
 
   (count [_this]
     (count m))
+
+  clojure.lang.Associative
+  (containsKey [_this k]
+    (contains? m k))
 
   pretty/PrettyPrintable
   (pretty [_this]

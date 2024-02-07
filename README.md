@@ -228,7 +228,6 @@ Let's define another after-select method, `::without-created-at`, to remove the
 ```clj
 (t2/define-after-select ::without-created-at
   [row]
-  (println "row:" row) ; NOCOMMIT
   (dissoc row :created-at))
 
 (derive :models/people.cool.without-created-at :models/people.cool)

@@ -1,20 +1,38 @@
 (ns toucan2.jdbc
-  "The Toucan 2 `next.jdbc` query execution backend."
   (:require
-   [toucan2.util :as u]))
+   [toucan2.jdbc.connection :as jdbc.conn]
+   [toucan2.jdbc.pipeline :as jdbc.pipeline]
+   [toucan2.protocols :as protocols]))
 
-(defonce ^{:doc "Default options automatically passed to all `next.jdbc` queries and builder functions. This is stored
-  as an atom; `reset!` or `swap!` it to define other default options."} global-options
-  (atom {:label-fn u/lower-case-en}))
+(comment jdbc.conn/keep-me
+         jdbc.pipeline/keep-me)
 
-(def ^:dynamic *options*
-  "Options to pass to `next.jdbc` when executing queries or statements. Overrides the [[global-options]]."
-  nil)
+(set! *warn-on-reflection* true)
 
-(defn merge-options
-  "Merge maps of `next.jdbc` options together. `extra-options` are ones passed in as part of the query execution pipeline
-  and override [[*options*]], which in turn override the default [[global-options]]."
-  [extra-options]
-  (merge @global-options
-         *options*
-         extra-options))
+;;;; load the miscellaneous integrations
+
+(defn- class-for-name ^Class [^String class-name]
+  (try
+    (Class/forName class-name)
+    (catch Throwable _)))
+
+(when (class-for-name "org.postgresql.jdbc.PgConnection")
+  (require 'toucan2.jdbc.postgres))
+
+(when (some class-for-name ["org.mariadb.jdbc.Connection"
+                           "org.mariadb.jdbc.MariaDbConnection"
+                           "com.mysql.cj.MysqlConnection"])
+  (require 'toucan2.jdbc.mysql-mariadb))
+
+;;; c3p0 and Hikari integration: when we encounter a wrapped connection pool connection, dispatch off of the class of
+;;; connection it wraps
+(doseq [pool-connection-class-name ["com.mchange.v2.c3p0.impl.NewProxyConnection"
+                                    "com.zaxxer.hikari.pool.HikariProxyConnection"]]
+  (when-let [pool-connection-class (class-for-name pool-connection-class-name)]
+    (extend pool-connection-class
+      protocols/IDispatchValue
+      {:dispatch-value (fn [^java.sql.Wrapper conn]
+                         (try
+                           (protocols/dispatch-value (.unwrap conn java.sql.Connection))
+                           (catch Throwable _
+                             pool-connection-class)))})))

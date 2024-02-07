@@ -32,7 +32,7 @@
                              #_model      :default
                              #_query      :default]
   "Default method for building UPDATE queries. Code for building Honey SQL for UPDATE lives
-  in [[toucan2.map-backend.honeysql2]].
+  in [[toucan2.honeysql2]].
 
   This doesn't really do much, but if the query has no `:changes`, returns the special flag `:toucan2.pipeline/no-op`."
   [query-type model {:keys [changes], :as parsed-args} resolved-query]

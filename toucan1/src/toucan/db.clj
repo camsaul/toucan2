@@ -13,10 +13,10 @@
    [toucan2.connection :as conn]
    [toucan2.delete :as delete]
    [toucan2.execute :as execute]
+   [toucan2.honeysql2 :as t2.honeysql]
    [toucan2.insert :as insert]
-   [toucan2.jdbc :as jdbc]
+   [toucan2.jdbc.options :as jdbc.options]
    [toucan2.log :as log]
-   [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
@@ -34,48 +34,47 @@
  [t1.models resolve-model])
 
 (def ^:dynamic *quoting-style*
-  "Temporarily override the default [[quoting-style]]. DEPRECATED: bind [[toucan2.map-backend.honeysql/*options*]]
-  instead."
+  "Temporarily override the default [[quoting-style]]. DEPRECATED: bind [[toucan2.honeysql/*options*]] instead."
   nil)
 
 (defn set-default-quoting-style!
-  "Set the default [[quoting-style]]. DEPRECATED: set [[toucan2.map-backend.honeysql2/global-options]] directly."
+  "Set the default [[quoting-style]]. DEPRECATED: set [[toucan2.honeysql2/global-options]] directly."
   [new-quoting-style]
-  (swap! map.honeysql/global-options assoc :dialect new-quoting-style, :quoted (boolean new-quoting-style)))
+  (swap! t2.honeysql/global-options assoc :dialect new-quoting-style, :quoted (boolean new-quoting-style)))
 
 (defn quoting-style
   "In Toucan 1, this was the `:quoting` option to pass to Honey SQL 1. This now corresponds to the `:dialect` option
   passed to Honey SQL 2."
   []
   (or *quoting-style*
-      (get @map.honeysql/global-options :dialect)))
+      (get @t2.honeysql/global-options :dialect)))
 
 (def ^:dynamic *automatically-convert-dashes-and-underscores*
   "Whether to automatically convert dashes in keywords to `snake_case` when compiling HoneySQL queries, even when quoting,
   and to convert underscores in result column names to dashes (i.e., convert to `lisp-case`). This is `false` by
   default.
 
-  DEPRECATED: bind [[toucan2.map-backend.honeysql/*options*]] and [[toucan2.jdbc/*options*]] instead."
+  DEPRECATED: bind [[toucan2.honeysql/*options*]] and [[toucan2.jdbc.options/*options*]] instead."
   nil)
 
 ;;; TODO -- this is NOT TESTED ANYWHERE !!!!
 (defn set-default-automatically-convert-dashes-and-underscores!
-  "DEPRECATED: set [[toucan2.map-backend.honeysql2/global-options]] directly."
+  "DEPRECATED: set [[toucan2.honeysql2/global-options]] directly."
   [automatically-convert-dashes-and-underscores]
-  (swap! map.honeysql/global-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores))
+  (swap! t2.honeysql/global-options assoc :quoted-snake (boolean automatically-convert-dashes-and-underscores))
   (if automatically-convert-dashes-and-underscores
-    (swap! jdbc/global-options assoc :label-fn csk/->kebab-case)
-    (swap! jdbc/global-options dissoc :label-fn)))
+    (swap! jdbc.options/global-options assoc :label-fn csk/->kebab-case)
+    (swap! jdbc.options/global-options dissoc :label-fn)))
 
 (defn automatically-convert-dashes-and-underscores?
   []
   (if (nil? *automatically-convert-dashes-and-underscores*)
-    (get @map.honeysql/global-options :quoted-snake)
+    (get @t2.honeysql/global-options :quoted-snake)
     *automatically-convert-dashes-and-underscores*))
 
 (defn- honeysql-options []
   (merge
-   map.honeysql/*options*
+   t2.honeysql/*options*
    (when-let [style *quoting-style*]
      {:dialect style})
    (when (some? *automatically-convert-dashes-and-underscores*)
@@ -84,7 +83,7 @@
 (defn set-default-jdbc-options!
   "DEPRECATED: Set [[toucan2.jdbc.query/global-options]] directly instead."
   [jdbc-options]
-  (swap! jdbc/global-options merge (merge
+  (swap! jdbc.options/global-options merge (merge
                                     ;; apparently if you don't set `:identifiers` we're supposed to be defaulting
                                     ;; to [[u/lower-case-en]]
                                     {:label-fn u/lower-case-en}
@@ -94,13 +93,13 @@
   (merge
    (when *automatically-convert-dashes-and-underscores*
      {:label-fn u/->kebab-case})
-   jdbc/*options*))
+   jdbc.options/*options*))
 
 (m/defmethod pipeline/transduce-query [#_query-type :default #_model :toucan1/model #_resolved-query :default]
   [rf query-type model parsed-args resolved-query]
   (log/debugf "Compiling Honey SQL query for legacy Toucan 1 model %s" model)
-  (binding [map.honeysql/*options* (honeysql-options)
-            jdbc/*options*         (jdbc-options)]
+  (binding [t2.honeysql/*options*  (honeysql-options)
+            jdbc.options/*options* (jdbc-options)]
     (next-method rf query-type model parsed-args resolved-query)))
 
 ;; replaces `*db-connection*`
@@ -147,7 +146,7 @@
 (defn honeysql->sql
   "DEPRECATED: Use [[toucan2.pipeline/compile*]] instead."
   [honeysql-form]
-  (binding [map.honeysql/*options* (honeysql-options)]
+  (binding [t2.honeysql/*options* (honeysql-options)]
     (pipeline/compile* honeysql-form)))
 
 ;;; TODO -- are we sure we need to do things this way? Can't this stuff be bound in a pipeline method?
@@ -159,8 +158,8 @@
   clojure.lang.IReduceInit
   (reduce [this rf init]
     (log/debugf "reduce Toucan 1 reducible query %s" this)
-    (binding [jdbc/*options*         (merge jdbc/*options* query-jdbc-options)
-              map.honeysql/*options* (honeysql-options)]
+    (binding [jdbc.options/*options* (merge jdbc.options/*options* query-jdbc-options)
+              t2.honeysql/*options*  (honeysql-options)]
       (reduce ((map realize/realize) rf) init (execute/reducible-query nil honeysql-form))))
 
   Object
@@ -264,7 +263,7 @@
 (defn execute!
   "DEPRECATED: use [[toucan2.execute/query-one]] instead."
   [honeysql-form & {:as options}]
-  (binding [jdbc/*options* (merge jdbc/*options* options)]
+  (binding [jdbc.options/*options* (merge jdbc.options/*options* options)]
     (execute/query-one honeysql-form)))
 
 (defn update!
@@ -328,7 +327,7 @@
 
 (m/defmethod pipeline/transduce-query [#_query-type :default #_model SimpleModel #_resolved-query :default]
   [rf query-type model parsed-args resolved-query]
-  (binding [map.honeysql/*options* (honeysql-options)]
+  (binding [t2.honeysql/*options* (honeysql-options)]
     (next-method rf query-type model parsed-args resolved-query)))
 
 (defn update-where!

@@ -219,7 +219,7 @@
 
 (m/defmethod pipeline/compile [#_query-type  :toucan.query-type/update.*
                                #_model       ::venues.capture-updates
-                               #_built-query :toucan.map-backend/*]
+                               #_built-query clojure.lang.IPersistentMap]
   [query-type model built-query]
   (when *venues-update-queries*
     (swap! *venues-update-queries* conj built-query))

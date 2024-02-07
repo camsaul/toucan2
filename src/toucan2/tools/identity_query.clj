@@ -57,7 +57,7 @@
   [_query-type _model query]
   query)
 
-(m/defmethod pipeline/build [#_query-type :default #_model :default #_query IdentityQuery]
+(m/defmethod pipeline/build :around [#_query-type :default #_model :default #_query IdentityQuery]
   "This is an around method so we can intercept anything else that might normally be considered a more specific method
   when it dispatches off of more-specific values of `query-type`."
   [_query-type _model _parsed-args resolved-query]

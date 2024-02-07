@@ -83,7 +83,7 @@
 
 (derive ::people.record-updates ::test/people)
 
-(def ^:private ^:dynamic *updated-people*)
+(def ^:private ^:dynamic *updated-people* nil)
 
 (after-update/define-after-update ::people.record-updates
   [person]

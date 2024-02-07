@@ -13,11 +13,11 @@
    [toucan.test-models.venue :refer [Venue]]
    [toucan.test-setup :as test-setup]
    [toucan2.connection :as conn]
+   [toucan2.honeysql2 :as t2.honeysql]
    [toucan2.insert :as insert]
    [toucan2.instance :as instance]
-   [toucan2.jdbc :as jdbc]
+   [toucan2.jdbc.options :as jdbc.options]
    [toucan2.jdbc.query :as jdbc.query]
-   [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.pipeline :as pipeline]
    [toucan2.protocols :as protocols]
    [toucan2.test :as test]
@@ -119,7 +119,7 @@
 
 (m/defmethod pipeline/transduce-query [:default ::mangled-identifiers :default]
   [rf query-type model parsed-args resolved-query]
-  (binding [jdbc/*options* (assoc jdbc/*options* :label-fn mangle-a-chars)]
+  (binding [jdbc.options/*options* (assoc jdbc.options/*options* :label-fn mangle-a-chars)]
     (next-method rf query-type model parsed-args resolved-query)))
 
 (m/prefer-method! #'pipeline/transduce-query
@@ -132,7 +132,7 @@
            (-> (t1.db/select-one ::UserWithMangledIdentifiers) keys set)))))
 
 (deftest ^:synchronized default-to-lower-case-key-xform-test
-  (let [original-options @jdbc/global-options]
+  (let [original-options @jdbc.options/global-options]
     (try
       (t1.db/set-default-jdbc-options! {:identifiers mangle-a-chars})
       (testing "Setting default options without `:identifiers` should default to str/lower-case. "
@@ -142,7 +142,7 @@
         (is (= #{:first-name :last-name :id}
                (-> (t1.db/select-one 'User) keys set))))
       (finally
-        (reset! jdbc/global-options original-options)))))
+        (reset! jdbc.options/global-options original-options)))))
 
 (deftest ^:synchronized transaction-test
   (testing "Test transaction"
@@ -182,7 +182,7 @@
           (Locale/setDefault (Locale/forLanguageTag "tr"))
           (test/create-table! ::heroes/heroes)
           (conn/with-connection [_conn ::test-setup/db]
-            (binding [map.honeysql/*options* (assoc map.honeysql/*options* :quoted true)]
+            (binding [t2.honeysql/*options* (assoc t2.honeysql/*options* :quoted true)]
               (let [first-row (first (t1.db/query {:select [:ID] :from [:t1_heroes]}))]
                 ;; If `t1.db/query` (jdbc) uses [[clojure.string/lower-case]], `:ID` will be converted to `:ıd` in Turkish locale
                 (is (= :id
@@ -263,7 +263,7 @@
   (testing "reducible-query should pass default JDBC options along to clojure.java.jdbc"
     (let [options (atom nil)]
       (with-redefs [jdbc.query/reduce-jdbc-query (fn [_rf _init _conn _model _sql-args extra-opts]
-                                                   (reset! options (jdbc/merge-options extra-opts))
+                                                   (reset! options (jdbc.options/merge-options extra-opts))
                                                    :ok)]
         (binding [conn/*current-connectable* ::test/db]
           (let [reducible-query (t1.db/reducible-query {} :b 3, :c 4)]

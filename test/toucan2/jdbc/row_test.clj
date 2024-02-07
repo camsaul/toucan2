@@ -2,17 +2,25 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer :all]
+   [methodical.core :as m]
+   [toucan2.core :as t2]
    [toucan2.instance :as instance]
+   [toucan2.jdbc.row :as jdbc.row]
    [toucan2.log :as log]
    [toucan2.protocols :as protocols]
    [toucan2.realize :as realize]
    [toucan2.select :as select]
-   [toucan2.test :as test]))
+   [toucan2.test :as test]
+   [toucan2.tools.after-select :as after-select])
+  (:import
+   (toucan2.jdbc.row TransientRow)))
+
+(comment jdbc.row/keep-me)
 
 (set! *warn-on-reflection* true)
 
 (defn- transient-row? [row]
-  (instance? toucan2.jdbc.row.TransientRow row))
+  (instance? TransientRow row))
 
 (defn- do-with-row [f]
   (is (= [:ok]
@@ -24,11 +32,11 @@
           conj
           (select/reducible-select ::test/venues 1)))))
 
-(defn- realized-keys [^toucan2.jdbc.row.TransientRow row]
+(defn- realized-keys [^TransientRow row]
   @(.realized_keys row))
 
-(defn- already-realized? [^toucan2.jdbc.row.TransientRow row]
-  @(.already_realized_QMARK_ row))
+(defn- already-realized? [^TransientRow row]
+  (realized? (.realized_row row)))
 
 (deftest ^:parallel get-test
   (do-with-row
@@ -51,6 +59,7 @@
      (is (transient-row? (assoc row :k 1000)))
      (is (= #{:k}
             (realized-keys row)))
+     (is (contains? row :k))
      (is (not (already-realized? row)))
      (is (= 1000
             (get row :k)
@@ -59,6 +68,8 @@
        (is (transient-row? (assoc row :namespaced/k 500)))
        (is (= #{:k :namespaced/k}
               (realized-keys row)))
+       (is (contains? row :k))
+       (is (contains? row :namespaced/k))
        (is (not (already-realized? row)))
        (is (= 1000
               (get row :k)
@@ -146,3 +157,58 @@
      (let [empty-instance (empty row)]
        (is (instance/instance? empty-instance))
        (is (instance/instance-of? ::test/venues empty-instance))))))
+
+(derive ::people ::test/people)
+
+(t2/define-after-select ::people
+  [person]
+  (assoc person :cool-name (str "Cool " (:name person))))
+
+(t2/define-after-select ::without-created-at
+  [row]
+  (let [row' (dissoc row :created-at)]
+    (is (not (contains? row' :created-at)))
+    (is (nil? (:created-at row')))
+    row'))
+
+(derive ::people.without-created-at ::people)
+(derive ::people.without-created-at ::without-created-at)
+
+(m/prefer-method! #'after-select/after-select
+                  ::people
+                  ::without-created-at)
+
+(t2/define-after-select ::without-created-at-2
+  [row]
+  (let [row' (dissoc row :created-at)]
+    (is (not (contains? row' :created-at)))
+    (is (nil? (:created-at row')))
+    (let [row'' (assoc row' :created-at 1000)]
+      (is (contains? row'' :created-at))
+      (is (= 1000
+             (:created-at row'')))
+      row'')))
+
+(derive ::people.without-created-at-2 ::people)
+(derive ::people.without-created-at-2 ::without-created-at-2)
+
+(m/prefer-method! #'after-select/after-select
+                  ::people
+                  ::without-created-at-2)
+
+(deftest ^:parallel transient-row-dissoc-test
+  (testing "Dissoc should work correctly for transient rows (#105)"
+    (is (= {:name       "Cam"
+            :cool-name  "Cool Cam"
+            :id         1
+            :created-at (java.time.OffsetDateTime/parse "2020-04-21T23:56Z")}
+           (t2/select-one ::people 1)))
+    (is (= {:name      "Cam"
+            :cool-name "Cool Cam"
+            :id        1}
+           (t2/select-one ::people.without-created-at 1)))
+    (is (= {:name       "Cam"
+            :cool-name  "Cool Cam"
+            :id         1
+            :created-at 1000}
+           (t2/select-one ::people.without-created-at-2 1)))))

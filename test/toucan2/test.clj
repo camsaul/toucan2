@@ -11,12 +11,15 @@
    [pjstadig.humane-test-output :as humane-test-output]
    [puget.printer :as puget]
    [toucan2.connection :as conn]
-   [toucan2.jdbc :as jdbc]
+   [toucan2.honeysql2 :as t2.honeysql]
+   [toucan2.jdbc.options :as jdbc.options]
    [toucan2.log :as log]
-   [toucan2.map-backend.honeysql2 :as map.honeysql]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
+
+(comment types/keep-me)
 
 (set! *warn-on-reflection* true)
 
@@ -122,7 +125,7 @@
                   (binding [*parallel-test* (when (parallel? varr) varr)]
                     (doseq [db-type (db-types)]
                       (binding [*current-db-type*      db-type
-                                map.honeysql/*options* (assoc map.honeysql/*options* :dialect (current-honey-sql-dialect db-type))]
+                                t2.honeysql/*options* (assoc t2.honeysql/*options* :dialect (current-honey-sql-dialect db-type))]
                         (t/testing (str db-type \newline)
                           (orig))))))]
     (alter-meta! varr assoc :test wrapped)))
@@ -170,7 +173,7 @@
            (comp str/upper-case f))))
 
 ;;; in case we need it later, so we can reset it. See [[toucan.test-setup/do-with-default-quoting-style]]
-(defonce global-honeysql-options @map.honeysql/global-options)
+(defonce global-honeysql-options @t2.honeysql/global-options)
 
 ;;;; URLs for test DBs.
 
@@ -201,7 +204,14 @@
 ;;;; creating test tables, and the default test models.
 
 (m/defmulti create-table-sql-file
-  {:arglists '([db-type model-or-table-name])}
+  {:arglists            '([db-type model-or-table-name])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec (types/or-default-spec
+                         (s/cat
+                          :db-type             keyword?
+                          :model-or-table-name (s/or
+                                                :model      ::types/dispatch-value.model
+                                                :table-name keyword?)))}
   (fn [db-type model-or-table-name]
     [(keyword db-type) (keyword model-or-table-name)]))
 
@@ -340,8 +350,8 @@
 
 (m/defmethod pipeline/transduce-query :around [:default ::models :default]
   [rf query-type model parsed-args resolved-query]
-  (binding [jdbc/*options*         (assoc jdbc/*options* :label-fn u/->kebab-case)
-            map.honeysql/*options* (assoc map.honeysql/*options* :dialect (current-honey-sql-dialect))]
+  (binding [jdbc.options/*options* (assoc jdbc.options/*options* :label-fn u/->kebab-case)
+            t2.honeysql/*options*  (assoc t2.honeysql/*options* :dialect (current-honey-sql-dialect))]
     (next-method rf query-type model parsed-args resolved-query)))
 
 ;;;; conveniences for REPL-based usage. These are not used in tests.

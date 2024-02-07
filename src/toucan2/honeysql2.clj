@@ -1,4 +1,4 @@
-(ns toucan2.map-backend.honeysql2
+(ns toucan2.honeysql2
   (:require
    [better-cond.core :as b]
    [clojure.string :as str]
@@ -11,8 +11,6 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.query :as query]
    [toucan2.util :as u]))
-
-(derive :toucan.map-backend/honeysql2 :toucan.map-backend/*)
 
 (defonce ^{:doc "Default global options to pass to [[honey.sql/format]]."} global-options
   (atom {:quoted true, :dialect :ansi, :quoted-snake true}))
@@ -43,10 +41,10 @@
     (fn-condition->honeysql-where-clause k v)
     [:= k v]))
 
-(m/defmethod query/apply-kv-arg [#_model :default #_query :toucan.map-backend/honeysql2 #_k :default]
+(m/defmethod query/apply-kv-arg [#_model :default #_query clojure.lang.IPersistentMap #_k :default]
   "Apply key-value args to a Honey SQL 2 query map."
   [_model honeysql k v]
-  (log/debugf  :compile "apply kv-arg %s %s" k v)
+  (log/debugf "apply kv-arg %s %s" k v)
   (let [result (update honeysql :where (fn [existing-where]
                                          (:where (hsql.helpers/where existing-where
                                                                      (condition->honeysql-where-clause k v)))))]
@@ -110,9 +108,18 @@
             (not (contains? honeysql-query k)))
           [:union :union-all]))
 
+(m/defmethod pipeline/build [#_query-type     :default
+                             #_model          :default
+                             #_resolved-query clojure.lang.IPersistentMap]
+  "Base map backend implementation. Applies the `:kv-args` in `parsed-args` using [[query/apply-kv-args]], and ignores
+  other parsed args."
+  [query-type model {:keys [kv-args], :as parsed-args} m]
+  (let [m (query/apply-kv-args model m kv-args)]
+    (next-method query-type model (dissoc parsed-args :kv-args) m)))
+
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.*
                              #_model      :default
-                             #_query      :toucan.map-backend/honeysql2]
+                             #_query      clojure.lang.IPersistentMap]
   "Build a Honey SQL 2 SELECT query."
   [query-type model {:keys [columns], :as parsed-args} resolved-query]
   (log/debugf "Building SELECT query for %s with columns %s" model columns)
@@ -132,7 +139,7 @@
 
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.count
                              #_model      :default
-                             #_query      :toucan.map-backend/honeysql2]
+                             #_query      clojure.lang.IPersistentMap]
   "Build an efficient `count(*)` query to power [[toucan2.select/count]]."
   [query-type model parsed-args resolved-query]
   (let [parsed-args (assoc parsed-args :columns [[:%count.* :count]])]
@@ -140,7 +147,7 @@
 
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.exists
                              #_model      :default
-                             #_query      :toucan.map-backend/honeysql2]
+                             #_query      clojure.lang.IPersistentMap]
   "Build an efficient query like `SELECT exists(SELECT 1 FROM ...)` query to power [[toucan2.select/exists?]]."
   [query-type model parsed-args resolved-query]
   (let [parsed-args (assoc parsed-args :columns [[[:inline 1]]])
@@ -155,7 +162,7 @@
 
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/insert.*
                              #_model      :default
-                             #_query      :toucan.map-backend/honeysql2]
+                             #_query      clojure.lang.IPersistentMap]
   "Build a Honey SQL 2 INSERT query.
 
   if `rows` is just a single empty row then insert it with
@@ -188,7 +195,7 @@
 
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/update.*
                              #_model      :default
-                             #_query      :toucan.map-backend/honeysql2]
+                             #_query      clojure.lang.IPersistentMap]
   "Build a Honey SQL 2 UPDATE query."
   [query-type model {:keys [kv-args changes], :as parsed-args} conditions-map]
   (log/debugf "Building UPDATE query for %s" model)
@@ -204,12 +211,12 @@
 ;;; implement [[toucan2.tools.before-update]]. The main syntax difference is a map 'resolved-query' is supposed to be
 ;;; treated as a conditions map for update instead of as a raw Honey SQL query.
 ;;;
-;;; TODO -- a conditions map should probably not be given a type of `:toucan.map-backend/honeysql2` -- conditions maps
+;;; TODO -- a conditions map should probably not be given a type of `clojure.lang.IPersistentMap` -- conditions maps
 ;;; should be a separate map backend I think.
 
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/select.instances.from-update
                              #_model      :default
-                             #_query      :toucan.map-backend/honeysql2]
+                             #_query      clojure.lang.IPersistentMap]
   "Treat the resolved query as a conditions map but otherwise behave the same as the `:toucan.query-type/select.instances`
   impl."
   [query-type model parsed-args conditions-map]
@@ -229,7 +236,7 @@
 
 (m/defmethod pipeline/build [#_query-type :toucan.query-type/delete.*
                              #_model      :default
-                             #_query      :toucan.map-backend/honeysql2]
+                             #_query      clojure.lang.IPersistentMap]
   "Build a Honey SQL 2 DELETE query.
 
   If the table for `model` should not be aliased (i.e., [[toucan2.model/namespace]] returns `nil`), builds a query that
@@ -269,7 +276,7 @@
 
 (m/defmethod pipeline/compile [#_query-type :default
                                #_model      :default
-                               #_query      :toucan.map-backend/honeysql2]
+                               #_query      clojure.lang.IPersistentMap]
   "Compile a Honey SQL 2 map to [sql & args]."
   [query-type model honeysql]
   (let [options-map (options)

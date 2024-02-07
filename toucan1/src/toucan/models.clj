@@ -23,9 +23,11 @@
    [toucan2.tools.hydrate :as hydrate]
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.transformed :as transformed]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
-(comment default-fields/keep-me)
+(comment default-fields/keep-me
+         types/keep-me)
 
 (defonce ^:private -root-namespace (atom 'models))
 
@@ -207,7 +209,11 @@
 ;;; We'll try to replicate something like that below using an atom to store the registered types.
 
 (m/defmulti ^:private type-fn
-  {:arglists '([type-name direction])}
+  {:arglists            '([type-name₁ direction₂])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec (types/or-default-spec
+                         (s/cat :type-name (some-fn symbol? keyword?)
+                                :direction #{:in :out}))}
   (fn [type-name direction]
     {:pre [(#{:in :out} direction)]}
     [(keyword type-name) direction]))
@@ -359,7 +365,9 @@
 ;;;; these let you use method maps passed to [[extend]] for the old `IModel` protocol to implement Toucan 2 multimethods.
 
 (m/defmulti ^:private define-method-with-IModel-method
-  {:arglists '([method-name model f])}
+  {:arglists            '([method-name₁ model f])
+   :defmethod-arities   #{3}
+   :dispatch-value-spec keyword?}
   u/dispatch-on-first-arg)
 
 (m/defmethod define-method-with-IModel-method :default-fields

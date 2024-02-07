@@ -5,10 +5,15 @@
    [toucan2.connection :as conn]
    [toucan2.log :as log]
    [toucan2.pipeline :as pipeline]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
+(comment types/keep-me)
+
 (m/defmulti before-insert
-  {:arglists '([model row])}
+  {:arglists            '([model₁ row])
+   :defmethod-arities   #{2}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 (defn- do-before-insert-to-rows [rows model]
@@ -33,7 +38,7 @@
 
 (m/defmethod pipeline/build [#_query-type     :toucan.query-type/insert.*
                              #_model          ::before-insert
-                             #_resolved-query :toucan.map-backend/honeysql2]
+                             #_resolved-query clojure.lang.IPersistentMap]
   "Apply [[before-insert]] to `:rows` in the `resolved-query` or `parsed-args` for Honey SQL queries."
   [query-type model parsed-args resolved-query]
   ;; not 100% sure why either `parsed-args` OR `resolved-query` can have `:rows` but I guess we have to update either

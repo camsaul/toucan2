@@ -8,10 +8,15 @@
    [toucan2.insert :as insert]
    [toucan2.log :as log]
    [toucan2.model :as model]
+   [toucan2.types :as types]
    [toucan2.util :as u]))
 
+(comment types/keep-me)
+
 (m/defmulti with-temp-defaults
-  {:arglists '([model])}
+  {:arglists            '([model])
+   :defmethod-arities   #{1}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 (m/defmethod with-temp-defaults :default
@@ -36,7 +41,9 @@
   ```clj
   (merge {} (with-temp-defaults model) explict-attributes)
   ```"
-  {:arglists '([model₁ explicit-attributes f])}
+  {:arglists            '([model₁ explicit-attributes f])
+   :defmethod-arities   #{3}
+   :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
 (m/defmethod do-with-temp* :default
