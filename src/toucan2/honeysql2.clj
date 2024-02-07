@@ -44,7 +44,7 @@
 (m/defmethod query/apply-kv-arg [#_model :default #_query clojure.lang.IPersistentMap #_k :default]
   "Apply key-value args to a Honey SQL 2 query map."
   [_model honeysql k v]
-  (log/debugf  :compile "apply kv-arg %s %s" k v)
+  (log/debugf "apply kv-arg %s %s" k v)
   (let [result (update honeysql :where (fn [existing-where]
                                          (:where (hsql.helpers/where existing-where
                                                                      (condition->honeysql-where-clause k v)))))]
