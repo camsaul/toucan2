@@ -101,6 +101,7 @@
   ```
 
   If you want to implement custom behavior for a model other than default values, you can implement [[do-with-temp*]]."
+  {:style/indent :defn}
   [[modelable temp-object-binding attributes & more] & body]
   `(do-with-temp ~modelable ~attributes
                  (^:once fn* [temp-object#]
