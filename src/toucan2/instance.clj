@@ -232,6 +232,11 @@
   (pretty [_this]
     (list `->TransientInstance model m mta)))
 
+(defn custom-map?
+  "Is this a map created using p/def-map-type? This includes Instances."
+  [m]
+  (instance-of? potemkin.collections.PotemkinMap m))
+
 (defn instance
   "Create a new Toucan 2 instance. See the namespace docstring for [[toucan2.instance]] for more information about *what*
   a Toucan 2 instance is.
@@ -261,11 +266,14 @@
           (= (protocols/model m) model))
      m
 
-      (instance? m)
      ;; DISABLED FOR NOW BECAUSE MAYBE THE OTHER MODEL HAS A DIFFERENT UNDERLYING EMPTY MAP OR KEY TRANSFORM
      ;;
      ;; ;; optimization 2: if `m` is an instance of something else use [[protocols/with-model]]
+     ;; (instance? m)
      ;; (protocols/with-model m model)
+
+     ;; Strip any customizations, e.g. a different underlying empty map or key transform.
+     (custom-map? m)
      (let [m* (into {} m)]
        (->Instance model m* m* (meta m)))
 
