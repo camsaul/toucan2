@@ -261,15 +261,16 @@
           (= (protocols/model m) model))
      m
 
+      (instance? m)
      ;; DISABLED FOR NOW BECAUSE MAYBE THE OTHER MODEL HAS A DIFFERENT UNDERLYING EMPTY MAP OR KEY TRANSFORM
      ;;
      ;; ;; optimization 2: if `m` is an instance of something else use [[protocols/with-model]]
-     ;; (instance? m)
      ;; (protocols/with-model m model)
+     (let [m* (into {} m)]
+       (->Instance model m* m* (meta m)))
 
      :else
-     (let [m* (into {} m)]
-       (->Instance model m* m* (meta m)))))
+     (->Instance model m m (meta m))))
 
   (^toucan2.instance.Instance [model k v & more]
    (let [m (into {} (partition-all 2) (list* k v more))]
