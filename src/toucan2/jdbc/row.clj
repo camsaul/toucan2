@@ -15,7 +15,8 @@
    [toucan2.instance :as instance]
    [toucan2.log :as log]
    [toucan2.protocols :as protocols]
-   [toucan2.realize :as realize])
+   [toucan2.realize :as realize]
+   [toucan2.util :as u])
   (:import
    (java.sql ResultSet)))
 
@@ -279,6 +280,9 @@
   realize/Realize
   (realize [_this]
     @realized-row)
+
+  u/IsCustomMap
+  (custom-map? [_] true)
 
   (toString [this]
     (str/join \space (map str (print-representation-parts this)))))
