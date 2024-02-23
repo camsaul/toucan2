@@ -16,7 +16,8 @@
    [potemkin :as p]
    [pretty.core :as pretty]
    [toucan2.protocols :as protocols]
-   [toucan2.realize :as realize]))
+   [toucan2.realize :as realize]
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
@@ -232,11 +233,6 @@
   (pretty [_this]
     (list `->TransientInstance model m mta)))
 
-(defn custom-map?
-  "Is this a map created using p/def-map-type? This includes Instances."
-  [m]
-  (instance-of? potemkin.collections.PotemkinMap m))
-
 (defn instance
   "Create a new Toucan 2 instance. See the namespace docstring for [[toucan2.instance]] for more information about *what*
   a Toucan 2 instance is.
@@ -273,7 +269,7 @@
      ;; (protocols/with-model m model)
 
      ;; Strip any customizations, e.g. a different underlying empty map or key transform.
-     (custom-map? m)
+     (u/custom-map? m)
      (let [m* (into {} m)]
        (->Instance model m* m* (meta m)))
 
