@@ -3,7 +3,9 @@
    [clojure.string :as str]
    [clojure.test :refer :all]
    [clojure.walk :as walk]
+   [toucan2.insert :as insert]
    [toucan2.instance :as instance]
+   [toucan2.protocols :as protocols]
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
@@ -175,3 +177,28 @@
              (generated-name `(after-update/define-after-update :model-2
                                 [~'venue]
                                 ~'venue)))))))
+
+(derive ::people.bird-lovers ::test/people)
+
+;; Unfortunately the changes-available-test needs to do something side-effecty since the value of after-update is
+;; discarded. Toggling an atom seemed like the easiest side effect.
+(def ^:private bird-lover-found? (atom false))
+
+(after-update/define-after-update ::people.bird-lovers
+  [person]
+  (when ((fnil str/includes? "") (:name (protocols/changes person)) "Cam")
+    (reset! bird-lover-found? true))
+  person)
+
+(deftest ^:synchronized changes-available-test
+  (test/with-discarded-table-changes :people
+    (testing "Changes made via update should be available in after-update"
+      (reset! bird-lover-found? false)
+      (let [[{row-id :id}] (insert/insert-returning-instances! ::people.bird-lovers
+                                                               {:name "Gwynydd Purves Wynne-Aubrey Meredith"})]
+        ;; Update without the relevant changes:
+        (update/update! ::people.bird-lovers row-id {:created-at (LocalDateTime/parse "2017-01-01T00:00")})
+        (is (false? @bird-lover-found?))
+        ;; Update with relevant changes:
+        (update/update! ::people.bird-lovers row-id {:name "Cam Era"})
+        (is (true? @bird-lover-found?))))))

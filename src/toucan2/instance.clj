@@ -41,7 +41,7 @@
 
   ```clj
   (instance-of? ::bird (instance ::toucan {})) ; -> true
-  (instance-of?  ::toucan (instance ::bird {})) ; -> false
+  (instance-of? ::toucan (instance ::bird {})) ; -> false
   ```"
   [model x]
   (and (instance? x)

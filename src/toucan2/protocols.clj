@@ -45,8 +45,8 @@
     "Get a map with any changes made to `instance` since it came out of the DB. Only includes keys that have been
     added or given different values; keys that were removed are not counted. Returns `nil` if there are no changes."))
 
-;;; `nil` and `IPersistentMap` can implement so of the methods that make sense for them -- `nil` or a plain map doesn't
-;;; have any changes, so [[changes]] can return `nil`. I don't know what sort of implementation for stuff like
+;;; `nil` and `IPersistentMap` can implement the methods that make sense for them: `nil` or a plain map doesn't have any
+;;; changes, so [[changes]] can return `nil`. I don't know what sort of implementation for stuff like
 ;;; [[with-original]] or [[with-current]] makes sense so I'm not implementing those for now.
 (extend-protocol IRecordChanges
   nil
@@ -76,6 +76,7 @@
     this)
   (with-current [_this new-current]
     new-current)
+
   ;; treat the entire map as `changes` -- that way if you accidentally do something like
   ;;
   ;; (merge plain-map instance)
