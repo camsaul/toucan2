@@ -193,8 +193,9 @@
 (deftest ^:synchronized changes-available-test
   (test/with-discarded-table-changes :people
     (testing "Changes made via update should be available in after-update"
+      (reset! bird-lover-found? false)
       (let [[{row-id :id}] (insert/insert-returning-instances! ::people.bird-lovers
-                                                      {:name "Gwynydd Purves Wynne-Aubrey Meredith"})]
+                                                               {:name "Gwynydd Purves Wynne-Aubrey Meredith"})]
         ;; Update without the relevant changes:
         (update/update! ::people.bird-lovers row-id {:created-at (LocalDateTime/parse "2017-01-01T00:00")})
         (is (false? @bird-lover-found?))
