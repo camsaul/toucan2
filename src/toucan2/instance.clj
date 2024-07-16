@@ -16,7 +16,8 @@
    [potemkin :as p]
    [pretty.core :as pretty]
    [toucan2.protocols :as protocols]
-   [toucan2.realize :as realize]))
+   [toucan2.realize :as realize]
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
@@ -267,9 +268,13 @@
      ;; (instance? m)
      ;; (protocols/with-model m model)
 
-     :else
+     ;; Strip any customizations, e.g. a different underlying empty map or key transform.
+     (u/custom-map? m)
      (let [m* (into {} m)]
-       (->Instance model m* m* (meta m)))))
+       (->Instance model m* m* (meta m)))
+
+     :else
+     (->Instance model m m (meta m))))
 
   (^toucan2.instance.Instance [model k v & more]
    (let [m (into {} (partition-all 2) (list* k v more))]

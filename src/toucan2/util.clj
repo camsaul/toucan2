@@ -5,7 +5,10 @@
    [clojure.walk :as walk]
    [methodical.util.dispatch :as m.dispatch]
    [pretty.core :as pretty]
-   [toucan2.protocols :as protocols]))
+   [toucan2.protocols :as protocols])
+  (:import
+   (clojure.lang IPersistentMap)
+   (potemkin.collections PotemkinMap)))
 
 ;;; TODO -- there is a lot of repeated code in here to make sure we don't accidentally realize and print `IReduceInit`,
 ;;; and at least 3 places we turn an `eduction` into the same pretty form. Maybe we should try to consolidate some of
@@ -110,3 +113,14 @@
     (keyword (csk/->kebab-case (namespace x))
              (csk/->kebab-case (name x)))
     (csk/->kebab-case x)))
+
+(defprotocol IsCustomMap
+  "Is this a map a transient row, or created using p/def-map-type? This includes Instances."
+  (custom-map? [m]))
+
+(extend-protocol IsCustomMap
+  IPersistentMap
+  (custom-map? [_] false)
+
+  PotemkinMap
+  (custom-map? [_] true))
