@@ -430,33 +430,45 @@
 ;;;    `:needs-hydration?`, replace it with the first hydrated instance; repeat this process until we have spliced all
 ;;;    the hydrated instances back in.
 
-(defn- merge-hydrated-instances
-  "Merge the annotated instances as returned by [[annotate-instances]] and the hydrated instances as returned
-  by [[hydrate-annotated-instances]] back into a single un-annotated sequence.
+(defn- xform-merge-hydrated-instances
+  "Returns a transducer that, when processing a stream of annotated instances (as returned by [[annotate-instances]]),
+  does two things:
+  - Splices the provided `hydrated-instances` back into their places in the sequence.
+  - Unwraps the annotations, returning just the instances themselves.
 
-    (merge-hydrated-instances
-     [{:needs-hydration? false, :instance {:x 1, :y 1}}
-      {:needs-hydration? false, :instance {:x 2, :y 2}}
-      {:needs-hydration? true,  :instance {:x 3}}
-      {:needs-hydration? true,  :instance {:x 4}}
-      {:needs-hydration? false, :instance {:x 5, :y 5}}
-      {:needs-hydration? true,  :instance {:x 6}}]
-     [{:x 3, :y 3} {:x 4, :y 4} {:x 6, :y 6}])
-    =>
-    [{:x 1, :y 1}
-     {:x 2, :y 2}
-     {:x 3, :y 3}
-     {:x 4, :y 4}
-     {:x 5, :y 5}
-     {:x 6, :y 6}]"
-  [annotated-instances hydrated-instances]
-  (loop [acc [], annotated-instances annotated-instances, hydrated-instances hydrated-instances]
-    (if (empty? hydrated-instances)
-      (concat acc (map :instance annotated-instances))
-      (let [[not-hydrated [_needed-hydration & more]] (split-with (complement :needs-hydration?) annotated-instances)]
-        (recur (vec (concat acc (map :instance not-hydrated) [(first hydrated-instances)]))
-               more
-               (rest hydrated-instances))))))
+  Splices the `hydrated-instances` (as returned by [[hydrate-annotated-instances]]) back into their places in
+  `annotated-instances` (as returned by [[annotate-instances]]). Removes the annotations, returning just the instances.
+
+  (into [] (xform-merge-hydrated-instances [{:x 3, :y 3} {:x 4, :y 4} {:x 6, :y 6}])
+        [{:needs-hydration? false, :instance {:x 1, :y 1}}
+         {:needs-hydration? false, :instance {:x 2, :y 2}}
+         {:needs-hydration? true,  :instance {:x 3}}
+         {:needs-hydration? true,  :instance {:x 4}}
+         {:needs-hydration? false, :instance {:x 5, :y 5}}
+         {:needs-hydration? true,  :instance {:x 6}}])
+  =>
+  [{:x 1, :y 1}
+   {:x 2, :y 2}
+   {:x 3, :y 3}
+   {:x 4, :y 4}
+   {:x 5, :y 5}
+   {:x 6, :y 6}]"
+  [hydrated-instances]
+  (fn [xf]
+    (let [hydrated (volatile! hydrated-instances)]
+      (fn
+        ([] (xf))
+        ([result]
+         ;; TODO: Maybe throw a "can't happen" error here if there are any hydrated instances left?
+         (xf result))
+        ([result annotated]
+         (if (:needs-hydration? annotated)
+           ;; If this instance needed hydration, splice in its hydrated form instead.
+           (let [hydrated-instance (first @hydrated)]
+             (vswap! hydrated rest)
+             (xf result hydrated-instance))
+           ;; If it didn't need hydration, just unwrap the instance.
+           (xf result (:instance annotated))))))))
 
 (defn- annotate-instances [model k instances]
   (for [instance instances]
@@ -471,7 +483,8 @@
   [model _strategy k instances]
   (let [annotated-instances (annotate-instances model k instances)
         hydrated-instances  (hydrate-annotated-instances model k annotated-instances)]
-    (merge-hydrated-instances annotated-instances hydrated-instances)))
+    (into [] (xform-merge-hydrated-instances hydrated-instances)
+          annotated-instances)))
 
 
 ;;;                          Method-Based Simple Hydration (using impls of [[simple-hydrate]])
