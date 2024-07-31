@@ -430,48 +430,29 @@
 ;;;    `:needs-hydration?`, replace it with the first hydrated instance; repeat this process until we have spliced all
 ;;;    the hydrated instances back in.
 
-(defn- merge-hydrated-instances
-  "Merge the annotated instances as returned by [[annotate-instances]] and the hydrated instances as returned
-  by [[hydrate-annotated-instances]] back into a single un-annotated sequence.
-
-    (merge-hydrated-instances
-     [{:needs-hydration? false, :instance {:x 1, :y 1}}
-      {:needs-hydration? false, :instance {:x 2, :y 2}}
-      {:needs-hydration? true,  :instance {:x 3}}
-      {:needs-hydration? true,  :instance {:x 4}}
-      {:needs-hydration? false, :instance {:x 5, :y 5}}
-      {:needs-hydration? true,  :instance {:x 6}}]
-     [{:x 3, :y 3} {:x 4, :y 4} {:x 6, :y 6}])
-    =>
-    [{:x 1, :y 1}
-     {:x 2, :y 2}
-     {:x 3, :y 3}
-     {:x 4, :y 4}
-     {:x 5, :y 5}
-     {:x 6, :y 6}]"
-  [annotated-instances hydrated-instances]
-  (loop [acc [], annotated-instances annotated-instances, hydrated-instances hydrated-instances]
-    (if (empty? hydrated-instances)
-      (concat acc (map :instance annotated-instances))
-      (let [[not-hydrated [_needed-hydration & more]] (split-with (complement :needs-hydration?) annotated-instances)]
-        (recur (vec (concat acc (map :instance not-hydrated) [(first hydrated-instances)]))
-               more
-               (rest hydrated-instances))))))
-
-(defn- annotate-instances [model k instances]
-  (for [instance instances]
-    {:needs-hydration? (needs-hydration? model k instance)
-     :instance         instance}))
-
-(defn- hydrate-annotated-instances [model k annotated-instances]
-  (when-let [instances-that-need-hydration (not-empty (map :instance (filter :needs-hydration? annotated-instances)))]
-    (batched-hydrate model k instances-that-need-hydration)))
+(defn- index-instances-needing-hydration
+  "Given a list of instances, return a list of the same length and order where each element is a tuple `[i instance]`.
+  For instances that need hydration, `i` represents the serial number of instances needing hydration. For instances that
+  don't need hydration, `i` is nil."
+  [model k instances]
+  (let [idx (volatile! -1)]
+    (mapv (fn [instance]
+            [(when (needs-hydration? model k instance)
+               (vswap! idx inc))
+             instance])
+          instances)))
 
 (m/defmethod hydrate-with-strategy ::multimethod-batched
   [model _strategy k instances]
-  (let [annotated-instances (annotate-instances model k instances)
-        hydrated-instances  (hydrate-annotated-instances model k annotated-instances)]
-    (merge-hydrated-instances annotated-instances hydrated-instances)))
+  (let [indexed (index-instances-needing-hydration model k instances)
+        instances-to-hydrate (not-empty (map second (filter first indexed))) ;; Important: keep doesn't work here.
+        hydrated-instances (when instances-to-hydrate
+                             (vec (batched-hydrate model k instances-to-hydrate)))]
+    (mapv (fn [[i unhydrated-instance]]
+            (if i
+              (nth hydrated-instances i)
+              unhydrated-instance))
+          indexed)))
 
 
 ;;;                          Method-Based Simple Hydration (using impls of [[simple-hydrate]])
