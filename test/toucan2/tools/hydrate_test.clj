@@ -1,6 +1,5 @@
 (ns toucan2.tools.hydrate-test
   (:require
-   [clojure.math.combinatorics :as math.combo]
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.connection :as conn]
@@ -352,29 +351,22 @@
     (is (= {:f [:a 100]}
            (hydrate/hydrate {:f [:a 100]} :p)))))
 
-(deftest ^:parallel merge-hydrated-instances-test
-  (doseq [[a b c d e f :as order] (take 1 (math.combo/permutations (range 1 7)))
-          :let                    [annotated-instances (map (fn [i]
-                                                              (case (long i)
-                                                                1 {:needs-hydration? false, :instance {:x 1, :y 1}}
-                                                                2 {:needs-hydration? false, :instance {:x 2, :y 2}}
-                                                                3 {:needs-hydration? true, :instance {:x 3}}
-                                                                4 {:needs-hydration? true, :instance {:x 4}}
-                                                                5 {:needs-hydration? false, :instance {:x 5, :y 5}}
-                                                                6 {:needs-hydration? true, :instance {:x 6}}))
-                                                            order)
-                                   hydrated-instances (->> order
-                                                           (filter #{3 4 6})
-                                                           (map (fn [i]
-                                                                  {:x i, :y i})))]]
-    (testing (pr-str order)
-      (is (= [{:x a, :y a}
-              {:x b, :y b}
-              {:x c, :y c}
-              {:x d, :y d}
-              {:x e, :y e}
-              {:x f, :y f}]
-             (#'hydrate/merge-hydrated-instances annotated-instances hydrated-instances))))))
+(deftest ^:synchronized index-instances-needing-hydration-test
+  (let [instances [{:x 1, :y 1}
+                   {:x 2, :y 2}
+                   {:x 3}
+                   {:x 4}
+                   {:x 5, :y 5}
+                   {:x 6}]]
+    (with-redefs [hydrate/needs-hydration? (fn [_ _ instance]
+                                             (= (count instance) 1))]
+      (is (= [[nil {:x 1, :y 1}]
+              [nil {:x 2, :y 2}]
+              [0 {:x 3}]
+              [1 {:x 4}]
+              [nil {:x 5, :y 5}]
+              [2 {:x 6}]]
+             (#'hydrate/index-instances-needing-hydration nil nil instances))))))
 
 (m/defmethod hydrate/batched-hydrate [:default ::is-bird?]
   [_model _k rows]
