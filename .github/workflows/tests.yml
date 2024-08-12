@@ -10,18 +10,41 @@ jobs:
   kondo:
     runs-on: ubuntu-20.04
     timeout-minutes: 10
+    env:
+      CLJ_KONDO_VERSION: "2023.09.07"
+      DOWNLOAD_URL: https://github.com/clj-kondo/clj-kondo/releases/download
     steps:
     - uses: actions/checkout@v4.1.0
-    - uses: DeLaGuardo/clojure-lint-action@master
+    - name: Setup Java & Clojure
+      uses: ./.github/actions/setup
       with:
-        check-name: Run clj-kondo
-        clj-kondo-args: >-
-          --lint
-          src
-          test
-          toucan1/src
-          toucan1/test
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        cache-key: kondo
+    - name: Install clj-kondo
+      run: |
+        curl -OL ${DOWNLOAD_URL}/v${CLJ_KONDO_VERSION}/clj-kondo-${CLJ_KONDO_VERSION}-linux-static-amd64.zip
+        curl -OL ${DOWNLOAD_URL}/v${CLJ_KONDO_VERSION}/clj-kondo-${CLJ_KONDO_VERSION}-linux-static-amd64.zip.sha256
+        cat clj-kondo-${CLJ_KONDO_VERSION}-linux-static-amd64.zip.sha256 >> SHA256sum.txt
+        echo " clj-kondo-${CLJ_KONDO_VERSION}-linux-static-amd64.zip" >> SHA256sum.txt
+        sha256sum -c SHA256sum.txt
+        unzip -d /usr/local/bin clj-kondo-${CLJ_KONDO_VERSION}-linux-static-amd64.zip
+    - run: clj-kondo --version
+    - name: Copy Kondo config from deps
+      run: >-
+        clj-kondo
+        --copy-configs
+        --dependencies
+        --lint "$(clojure -A:dev -Spath)"
+        --skip-lint
+        --parallel
+    - name: Run clj-kondo
+      run: >-
+        clj-kondo
+        --parallel
+        --lint
+        src
+        test
+        toucan1/src
+        toucan1/test
 
   tests-postgres:
     runs-on: ubuntu-20.04
@@ -34,25 +57,10 @@ jobs:
         postgresql db: 'toucan2'
         postgresql user: 'cam'
         postgresql password: 'cam'
-    - name: Prepare JDK 17
-      uses: actions/setup-java@v3
+    - name: Setup Java & Clojure
+      uses: ./.github/actions/setup
       with:
-        java-version: 17
-        distribution: 'temurin'
-    - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@12.1
-      with:
-        cli: 1.11.1.1413
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.m2/repository
-          ~/.gitlibs
-        key: v1-${{ hashFiles('./deps.edn') }}-postgres
-        restore-keys: |
-          v1-${{ hashFiles('./deps.edn') }}-
-          v1-
+        cache-key: tests-postgres
     - run: clojure -X:dev:test:test-postgres
       name: Run tests
       env:
@@ -72,26 +80,10 @@ jobs:
           MYSQL_ALLOW_EMPTY_PASSWORD: yes
     steps:
     - uses: actions/checkout@v4.1.0
-    - name: Prepare JDK 17
-      uses: actions/setup-java@v3
+    - name: Setup Java & Clojure
+      uses: ./.github/actions/setup
       with:
-        java-version: 17
-        distribution: 'temurin'
-    - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@12.1
-      with:
-        cli: 1.11.1.1413
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.m2/repository
-          ~/.gitlibs
-          ~/.deps.clj
-        key: v1-${{ hashFiles('./deps.edn') }}-mariadb
-        restore-keys: |
-          v1-${{ hashFiles('./deps.edn') }}-
-          v1-
+        cache-key: tests-mariadb
     - run: clojure -X:dev:test:test-mariadb
       name: Run tests
       env:
@@ -102,26 +94,10 @@ jobs:
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4.1.0
-    - name: Prepare JDK 17
-      uses: actions/setup-java@v3
+    - name: Setup Java & Clojure
+      uses: ./.github/actions/setup
       with:
-        java-version: 17
-        distribution: 'temurin'
-    - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@12.1
-      with:
-        cli: 1.11.1.1413
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.m2/repository
-          ~/.gitlibs
-          ~/.deps.clj
-        key: v1-${{ hashFiles('./deps.edn') }}-h2
-        restore-keys: |
-          v1-${{ hashFiles('./deps.edn') }}-
-          v1-
+        cache-key: tests-h2
     - run: clojure -X:dev:test:test-h2
       name: Run tests
       env:
@@ -131,26 +107,10 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v4.1.0
-    - name: Prepare JDK 17
-      uses: actions/setup-java@v3
+    - name: Setup Java & Clojure
+      uses: ./.github/actions/setup
       with:
-        java-version: 17
-        distribution: 'temurin'
-    - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@12.1
-      with:
-        cli: 1.11.1.1413
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.m2/repository
-          ~/.gitlibs
-          ~/.deps.clj
-        key: v1-${{ hashFiles('./deps.edn') }}-whitespace-linter
-        restore-keys: |
-          v1-${{ hashFiles('./deps.edn') }}-
-          v1-
+        cache-key: whitespace-linter
     - run: clojure -T:whitespace-linter
       name: Run whitespace linter
 
@@ -158,26 +118,10 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v4.1.0
-    - name: Prepare JDK 17
-      uses: actions/setup-java@v3
+    - name: Setup Java & Clojure
+      uses: ./.github/actions/setup
       with:
-        java-version: 17
-        distribution: 'temurin'
-    - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@12.1
-      with:
-        cli: 1.11.1.1413
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.m2/repository
-          ~/.gitlibs
-          ~/.deps.clj
-        key: v1-${{ hashFiles('./deps.edn') }}-check
-        restore-keys: |
-          v1-${{ hashFiles('./deps.edn') }}-
-          v1-
+        cache-key: check
     - run: clojure -M:check
       name: Check Toucan 2 core namespaces
     - run: clojure -M:check
@@ -188,26 +132,10 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v4.1.0
-    - name: Prepare JDK 17
-      uses: actions/setup-java@v3
+    - name: Setup Java & Clojure
+      uses: ./.github/actions/setup
       with:
-        java-version: 17
-        distribution: 'temurin'
-    - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@12.1
-      with:
-        cli: 1.11.1.1413
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.m2/repository
-          ~/.gitlibs
-          ~/.deps.clj
-        key: v1-${{ hashFiles('./deps.edn') }}-codecov
-        restore-keys: |
-          v1-${{ hashFiles('./deps.edn') }}-
-          v1-
+        cache-key: codecov
     - run: clojure -X:dev:test-h2:cloverage
       name: Run tests with Cloverage
     - name: Upload results to codecov.io
