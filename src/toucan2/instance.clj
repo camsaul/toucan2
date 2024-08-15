@@ -13,6 +13,7 @@
   current value and their model is the same."
   (:refer-clojure :exclude [instance?])
   (:require
+   clojure.core.protocols
    [potemkin :as p]
    [pretty.core :as pretty]
    [toucan2.protocols :as protocols]
@@ -136,6 +137,10 @@
   clojure.lang.IEditableCollection
   (asTransient [_this]
     (->TransientInstance model (transient m) mta))
+
+  clojure.lang.IKVReduce
+  (kvreduce [_this f init]
+    (clojure.core.protocols/kv-reduce m f init))
 
   protocols/IModel
   (protocols/model [_this]
