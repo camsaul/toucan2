@@ -429,3 +429,8 @@
           m2 (assoc m :location nil)]
       (is (= {:location nil}
              (protocols/changes m2))))))
+
+(deftest ^:parallel reduce-kv-test
+  (testing "instance supports IKVReduce iteration natively"
+    (let [instance (instance/instance ::foo (zipmap (range 100) (range)))]
+      (is (= 100 (.kvreduce instance (fn [c _ _] (inc c)) 0))))))
