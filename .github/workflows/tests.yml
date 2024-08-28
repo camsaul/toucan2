@@ -14,7 +14,7 @@ jobs:
       CLJ_KONDO_VERSION: "2023.09.07"
       DOWNLOAD_URL: https://github.com/clj-kondo/clj-kondo/releases/download
     steps:
-    - uses: actions/checkout@v4.1.0
+    - uses: actions/checkout@v4.1.7
     - name: Setup Java & Clojure
       uses: ./.github/actions/setup
       with:
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v4.1.0
+    - uses: actions/checkout@v4.1.7
     - uses: harmon758/postgresql-action@v1
       with:
         postgresql version: 14
@@ -79,7 +79,7 @@ jobs:
           MYSQL_USER: root
           MYSQL_ALLOW_EMPTY_PASSWORD: yes
     steps:
-    - uses: actions/checkout@v4.1.0
+    - uses: actions/checkout@v4.1.7
     - name: Setup Java & Clojure
       uses: ./.github/actions/setup
       with:
@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v4.1.0
+    - uses: actions/checkout@v4.1.7
     - name: Setup Java & Clojure
       uses: ./.github/actions/setup
       with:
@@ -106,7 +106,7 @@ jobs:
   whitespace-linter:
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v4.1.0
+    - uses: actions/checkout@v4.1.7
     - name: Setup Java & Clojure
       uses: ./.github/actions/setup
       with:
@@ -117,7 +117,7 @@ jobs:
   check:
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v4.1.0
+    - uses: actions/checkout@v4.1.7
     - name: Setup Java & Clojure
       uses: ./.github/actions/setup
       with:
@@ -131,7 +131,7 @@ jobs:
   codecov:
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v4.1.0
+    - uses: actions/checkout@v4.1.7
     - name: Setup Java & Clojure
       uses: ./.github/actions/setup
       with:
@@ -146,7 +146,7 @@ jobs:
   codespell:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v4.1.0
+      - uses: actions/checkout@v4.1.7
       - uses: codespell-project/actions-codespell@v2
         with:
           ignore_words_file: .codespellignore
