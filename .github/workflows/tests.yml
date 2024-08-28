@@ -139,7 +139,7 @@ jobs:
     - run: clojure -X:dev:test-h2:cloverage
       name: Run tests with Cloverage
     - name: Upload results to codecov.io
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v3
       with:
         files: ./target/coverage/codecov.json
 

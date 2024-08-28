@@ -3,6 +3,7 @@
    [clojure.test :refer :all]
    [methodical.core :as m]
    [toucan2.connection :as conn]
+   [toucan2.core]
    [toucan2.delete :as delete]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -11,6 +12,8 @@
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.named-query :as tools.named-query]))
+
+(comment toucan2.core/keep-me)
 
 (deftest ^:parallel parse-args-test
   ;; these are basically the same as the select args so we don't need a ton of coverage here.
