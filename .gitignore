@@ -1,5 +1,6 @@
 *.class
 *.jar
+*.~undo-tree~
 .\#*
 .cache
 .cpcache

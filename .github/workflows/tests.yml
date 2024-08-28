@@ -42,7 +42,7 @@ jobs:
     - name: Setup Clojure
       uses: DeLaGuardo/setup-clojure@12.1
       with:
-        cli: 1.11.1.1413
+        cli: 1.11.4.1474
     - name: Restore cache
       uses: actions/cache@v3
       with:
@@ -80,7 +80,7 @@ jobs:
     - name: Setup Clojure
       uses: DeLaGuardo/setup-clojure@12.1
       with:
-        cli: 1.11.1.1413
+        cli: 1.11.4.1474
     - name: Restore cache
       uses: actions/cache@v3
       with:
@@ -110,7 +110,7 @@ jobs:
     - name: Setup Clojure
       uses: DeLaGuardo/setup-clojure@12.1
       with:
-        cli: 1.11.1.1413
+        cli: 1.11.4.1474
     - name: Restore cache
       uses: actions/cache@v3
       with:
@@ -139,7 +139,7 @@ jobs:
     - name: Setup Clojure
       uses: DeLaGuardo/setup-clojure@12.1
       with:
-        cli: 1.11.1.1413
+        cli: 1.11.4.1474
     - name: Restore cache
       uses: actions/cache@v3
       with:
@@ -166,7 +166,7 @@ jobs:
     - name: Setup Clojure
       uses: DeLaGuardo/setup-clojure@12.1
       with:
-        cli: 1.11.1.1413
+        cli: 1.11.4.1474
     - name: Restore cache
       uses: actions/cache@v3
       with:
@@ -196,7 +196,7 @@ jobs:
     - name: Setup Clojure
       uses: DeLaGuardo/setup-clojure@12.1
       with:
-        cli: 1.11.1.1413
+        cli: 1.11.4.1474
     - name: Restore cache
       uses: actions/cache@v3
       with:
@@ -218,7 +218,7 @@ jobs:
   codespell:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v4.1.0
+      - uses: actions/checkout@v4.1.7
       - uses: codespell-project/actions-codespell@v2
         with:
           ignore_words_file: .codespellignore
