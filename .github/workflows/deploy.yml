@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-20.04
     environment: Deployment
     steps:
-    - uses: actions/checkout@v4.1.0
+    - uses: actions/checkout@v4.1.7
       with:
         fetch-depth: 0
     - name: Setup Java & Clojure
