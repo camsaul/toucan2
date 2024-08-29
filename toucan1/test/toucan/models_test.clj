@@ -350,7 +350,7 @@
 ;; queue
 (deftest ^:synchronized post-insert-test
   (test/with-discarded-table-changes Category
-    (binding [category/*categories-awaiting-moderation* (atom (clojure.lang.PersistentQueue/EMPTY))]
+    (binding [category/*categories-awaiting-moderation* (atom clojure.lang.PersistentQueue/EMPTY)]
       (is (= (instance/instance Category {:id 5, :name "toucannery", :parent-category-id nil})
              (t1.db/insert! Category :name "toucannery")))
       (testing `category/*categories-awaiting-moderation*
@@ -385,13 +385,13 @@
 ;; queue
 (deftest ^:synchronized post-update-test
   (test/with-discarded-table-changes Category
-    (binding [category/*categories-recently-updated* (atom (clojure.lang.PersistentQueue/EMPTY))]
+    (binding [category/*categories-recently-updated* (atom clojure.lang.PersistentQueue/EMPTY)]
       (is (= true
              (t1.db/update! Category 2 :name "lobster")))
       (is (= 2
              (peek @category/*categories-recently-updated*)))))
   (test/with-discarded-table-changes Category
-    (binding [category/*categories-recently-updated* (atom (clojure.lang.PersistentQueue/EMPTY))]
+    (binding [category/*categories-recently-updated* (atom clojure.lang.PersistentQueue/EMPTY)]
       (is (= true
              (t1.db/update! Category 1 :name "fine-dining")))
       (is (= true

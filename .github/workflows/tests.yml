@@ -124,6 +124,8 @@ jobs:
       uses: codecov/codecov-action@v4.5.0
       with:
         files: ./target/coverage/codecov.json
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   codespell:
     runs-on: ubuntu-20.04

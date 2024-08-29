@@ -38,7 +38,7 @@
 
 (def ^:dynamic *categories-awaiting-moderation*
   "A poor man's message queue of newly added Category IDs that are \"awating moderation\"."
-  (atom (clojure.lang.PersistentQueue/EMPTY)))
+  (atom clojure.lang.PersistentQueue/EMPTY))
 
 (defn add-category-to-moderation-queue! [{:keys [id], :as new-category}]
   (swap! *categories-awaiting-moderation* conj id)
@@ -46,7 +46,7 @@
 
 (def ^:dynamic *categories-recently-updated*
   "A simple queue of recently updated Category IDs."
-  (atom (clojure.lang.PersistentQueue/EMPTY)))
+  (atom clojure.lang.PersistentQueue/EMPTY))
 
 (defn add-category-to-updated-queue! [{:keys [id]}]
   (swap! *categories-recently-updated* conj id))
