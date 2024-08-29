@@ -4,7 +4,7 @@
  :deps
  {better-cond/better-cond             {:mvn/version "2.1.5"}
   camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-  com.github.seancorfield/honeysql    {:mvn/version "2.4.1066"} ; don't upgrade yet because of https://github.com/seancorfield/honeysql/issues/537
+  com.github.seancorfield/honeysql    {:mvn/version "2.6.1147"}
   com.github.seancorfield/next.jdbc   {:mvn/version "1.3.939"}
   environ/environ                     {:mvn/version "1.2.0"}
   methodical/methodical               {:mvn/version "1.0.123"}
@@ -59,6 +59,28 @@
    :exec-args  {:paths            ["deps.edn" "src" "test" "toucan1/src" "toucan1/test" ".github" "docs"]
                 :include-patterns ["\\.clj[cs]?$" "\\.edn$" "\\.yaml$" "\\.sql$" "\\.md$"]}}
 
+  ;; Run Kondo
+  ;;
+  ;;    clojure -M:kondo --lint ...
+  ;;
+  ;; Copy configs
+  ;;
+  ;;    clojure -M:kondo --copy-configs --dependencies --lint "$(clojure -A:dev -Spath)" --skip-lint --parallel
+  :kondo
+  {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2023.09.07" #_"2024.08.01"}}
+   :main-opts    ["-m" "clj-kondo.main"]}
+
+  ;; lint everything with Kondo
+  ;;
+  ;; clojure -M:kondo:kondo/all
+  :kondo/all
+  {:main-opts ["-m" "clj-kondo.main"
+               "--lint"
+               "src"
+               "test"
+               "toucan1/src"
+               "toucan1/test"]}
+
   ;; Run tests against the value of `TEST_DBS`, by default `postgres,h2,mariadb`.
   ;;
   ;; clojure -X:dev:test
@@ -102,7 +124,10 @@
 
   ;; clj -X:dev:cloverage
   :cloverage
-  {:extra-deps {cloverage/cloverage {:mvn/version "1.2.4"}}
+  {:extra-deps
+   {cloverage/cloverage              {:mvn/version "1.2.4"}
+    com.github.seancorfield/honeysql {:sha "bf34a23e6874c0c7c03b81e69b9eaddf06c2caa9"}} ; override pinned version with fix for https://github.com/seancorfield/honeysql/issues/537 which is not released yet
+
    :exec-fn    toucan2.cloverage-runner/run-project
    :exec-args  {:codecov? true
 
