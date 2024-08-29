@@ -67,7 +67,7 @@
   ;;
   ;;    clojure -M:kondo --copy-configs --dependencies --lint "$(clojure -A:dev -Spath)" --skip-lint --parallel
   :kondo
-  {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2023.09.07" #_"2024.08.01"}}
+  {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.08.29"}}
    :main-opts    ["-m" "clj-kondo.main"]}
 
   ;; lint everything with Kondo
