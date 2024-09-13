@@ -128,18 +128,12 @@
   [_conn _model rset _rsmeta i]
   (get-object-of-class-thunk rset i java.time.OffsetTime))
 
-(defn- make-column-thunk [conn model ^ResultSet rset i]
-  (log/tracef "Building thunk to read column %s" i)
-  (fn column-thunk []
-    (let [rsmeta (.getMetaData rset)
-          thunk  (read-column-thunk conn model rset rsmeta i)
-          v      (thunk)]
-      (next.jdbc.rs/read-column-by-index v rsmeta i))))
-
-(defn- make-i->thunk [conn model rset]
-  (comp (memoize (fn [i]
-                   (make-column-thunk conn model rset i)))
-        int))
+(defn- read-column-value [conn model ^ResultSet rset i]
+  (let [i (int i)
+        rsmeta (.getMetaData rset)
+        thunk  (read-column-thunk conn model rset rsmeta i)
+        v      (thunk)]
+    (next.jdbc.rs/read-column-by-index v rsmeta i)))
 
 (defn ^:no-doc make-cached-row-num->i->thunk
   "Returns a function that, given the current row number, returns a function that, given a column number, returns a cached
@@ -163,8 +157,7 @@
   accidentally cache values from the first row and return them for all the rows). The row number passed in here doesn't
   need to correspond to the actual row number from a JDBC standpoint; it's used only for cache-busting purposes."
   [conn model ^ResultSet rset]
-  (let [i->thunk       (make-i->thunk conn model rset)
-        cached-row-num (atom -1)
+  (let [cached-row-num (atom -1)
         cached-values  (atom {})]
     (fn row-num->i->thunk* [current-row-num]
       (when-not (= current-row-num @cached-row-num)
@@ -175,8 +168,7 @@
           (let [cached-value (get @cached-values i ::not-found)]
             (if (= cached-value ::not-found)
               ;; miss
-              (let [thunk (i->thunk i)
-                    v     (thunk)]
+              (let [v (read-column-value conn model rset i)]
                 (swap! cached-values assoc i v)
                 v)
               ;; hit
