@@ -173,13 +173,15 @@
       (fn i->thunk* [i]
         (fn cached-column-thunk []
           (let [cached-value (get @cached-values i ::not-found)]
-            (if-not (= cached-value ::not-found)
-              (log/tracef "Using cached value for column %s: %s" i cached-value)
-              cached-value)
-            (let [thunk (i->thunk i)
-                  v     (thunk)]
-              (swap! cached-values assoc i v)
-              v)))))))
+            (if (= cached-value ::not-found)
+              ;; miss
+              (let [thunk (i->thunk i)
+                    v     (thunk)]
+                (swap! cached-values assoc i v)
+                v)
+              ;; hit
+              (do (log/tracef "Using cached value for column %s: %s" i cached-value)
+                  cached-value))))))))
 
 (defn ^:no-doc read-column-by-index-fn
   "Given a `java.sql.Connection` `conn`, a `model`, and a `java.sql.ResultSet` `rset`, return a function that can be used
