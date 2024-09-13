@@ -418,7 +418,7 @@
 
 (m/defmethod can-hydrate-with-strategy? [#_model :default #_strategy ::multimethod-batched #_k :default]
   [model _strategy k]
-  (boolean (m/effective-primary-method batched-hydrate (m/dispatch-value batched-hydrate model k))))
+  (some? (m/effective-method batched-hydrate (m/dispatch-value batched-hydrate model k))))
 
 ;;; The basic strategy behind batched hydration is thus:
 ;;;
@@ -491,7 +491,7 @@
 
 (m/defmethod can-hydrate-with-strategy? [#_model :default #_strategy ::multimethod-simple #_k :default]
   [model _strategy k]
-  (boolean (m/effective-primary-method simple-hydrate (m/dispatch-value simple-hydrate model k))))
+  (some? (m/effective-method simple-hydrate (m/dispatch-value simple-hydrate model k))))
 
 (m/defmethod hydrate-with-strategy ::multimethod-simple
   [model _strategy k instances]
