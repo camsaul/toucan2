@@ -33,10 +33,9 @@
 
   Toucan instances need to implement [[protocols/IModel]], [[protocols/IWithModel]], and [[protocols/IRecordChanges]]."
   [x]
-  (every? #(clojure.core/instance? % x)
-          [toucan2.protocols.IModel
-           toucan2.protocols.IWithModel
-           toucan2.protocols.IRecordChanges]))
+  (and (clojure.core/instance? toucan2.protocols.IModel x)
+       (clojure.core/instance? toucan2.protocols.IWithModel x)
+       (clojure.core/instance? toucan2.protocols.IRecordChanges x)))
 
 (defn instance-of?
   "True if `x` is a Toucan2 instance, and its [[protocols/model]] `isa?` `model`.
@@ -307,16 +306,22 @@
 (defn update-original
   "Applies `f` directly to the underlying `original` map of `an-instance`. No-ops if `an-instance` is not
   an [[Instance]]."
-  [an-instance f & args]
-  (if (instance? an-instance)
-    (protocols/with-original an-instance (apply f (protocols/original an-instance) args))
-    an-instance))
+  ([an-instance f]
+   (if (instance? an-instance)
+     (protocols/with-original an-instance (f (protocols/original an-instance)))
+     an-instance))
+  ([an-instance f & args]
+   (if (instance? an-instance)
+     (protocols/with-original an-instance (apply f (protocols/original an-instance) args))
+     an-instance)))
 
 (defn update-current
   "Applies `f` directly to the underlying `current` map of `an-instance`; useful if you need to operate on it directly.
   Acts like regular `(apply f instance args)` if `an-instance` is not an [[Instance]]."
-  [an-instance f & args]
-  (protocols/with-current an-instance (apply f (protocols/current an-instance) args)))
+  ([an-instance f]
+   (protocols/with-current an-instance (f (protocols/current an-instance))))
+  ([an-instance f & args]
+   (protocols/with-current an-instance (apply f (protocols/current an-instance) args))))
 
 (defn update-original-and-current
   "Like `(apply f instance args)`, but affects both the `original` map and `current` map of `an-instance` rather than
@@ -325,9 +330,15 @@
   `f` is applied directly to the underlying `original` and `current` maps of `instance` itself. `f` is only applied
   once if `original` and `current` are currently the same object (i.e., the new `original` and `current` will also be
   the same object). If `current` and `original` are not the same object, `f` is applied twice."
-  [an-instance f & args]
-  (if (identical? (protocols/original an-instance) (protocols/current an-instance))
-    (reset-original (apply update-current an-instance f args))
-    (as-> an-instance an-instance
-      (apply update-original an-instance f args)
-      (apply update-current  an-instance f args))))
+  ([an-instance f]
+   (if (identical? (protocols/original an-instance) (protocols/current an-instance))
+     (reset-original (update-current an-instance f))
+     (as-> an-instance an-instance
+       (update-original an-instance f)
+       (update-current  an-instance f))))
+  ([an-instance f & args]
+   (if (identical? (protocols/original an-instance) (protocols/current an-instance))
+     (reset-original (apply update-current an-instance f args))
+     (as-> an-instance an-instance
+       (apply update-original an-instance f args)
+       (apply update-current  an-instance f args)))))
