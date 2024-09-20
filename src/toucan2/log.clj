@@ -148,7 +148,7 @@
         texts   (map ->Text* (str/split format-string #"%s"))]
     `(->Doc ~(vec (interleave-all texts args)))))
 
-(defn- level->int [a-level default]
+(defn- level->int ^long [a-level ^long default]
   (case a-level
     :disabled 5
     :error    4
@@ -163,7 +163,7 @@
 ;;; convenient.
 (defn ^:no-doc -current-level-int
   "Current log level, as an integer."
-  []
+  ^long []
   (level->int (or *level* @level) Integer/MAX_VALUE))
 
 (defmacro ^:no-doc -enable-level?
