@@ -173,23 +173,31 @@
   (let [a-level-int (level->int a-level 0)]
     `(>= ~a-level-int (-current-level-int))))
 
-(defn ^:no-doc -enabled-logger
-  "Get a logger factor for the namespace named by symbol `ns-symb` at `a-level`, **iff** logging is enabled for that
-  namespace and level. The logger returned is something that satisfies the `clojure.tools.logging.impl.LoggerFactory`
-  protocol."
-  [ns-symb a-level]
-  (let [logger (tools.log.impl/get-logger tools.log/*logger-factory* ns-symb)]
-    (when (tools.log.impl/enabled? logger a-level)
-      logger)))
+(def ^:private logger-var-sym
+  "Unique var that is automatically created and interned into the namespace that uses any toucan2.log logging macros."
+  (with-meta (gensym "__toucan2_log_logger") {:private true}))
+
+(defn ^:no-doc -get-logger
+  "Get the logger value from the provided Var if it already bound, otherwise compute the logger object and bind it to the
+  var."
+  [^clojure.lang.Var logger-var ns-sym]
+  (when-not (.hasRoot logger-var)
+    (.bindRoot logger-var (tools.log.impl/get-logger tools.log/*logger-factory* ns-sym)))
+  (.getRawRoot logger-var))
 
 (defmacro ^:no-doc -log
   "Implementation of various `log` macros. Don't use this directly."
   [a-level e doc]
-  `(let [doc# (delay ~doc)]
-     (when (-enable-level? ~a-level)
-       (-pprint-doc '~(ns-name *ns*) @doc#))
-     (when-let [logger# (-enabled-logger '~(ns-name *ns*) ~a-level)]
-       (tools.log/log* logger# ~a-level ~e (-pprint-doc-to-str @doc#)))))
+  (intern *ns* logger-var-sym)
+  `(let [enable-level?# (-enable-level? ~a-level)
+         logger# (-get-logger (var ~logger-var-sym) '~(ns-name *ns*))
+         enable-logger?# (some-> logger# (tools.log.impl/enabled? ~a-level))]
+     (when (or enable-level?# enable-logger?#)
+       (let [doc# ~doc]
+         (when enable-level?#
+           (-pprint-doc '~(ns-name *ns*) doc#))
+         (when enable-logger?#
+           (tools.log/log* logger# ~a-level ~e (-pprint-doc-to-str doc#)))))))
 
 (defmacro ^:no-doc logf
   "Implementation of various `log` macros. Don't use this directly."
