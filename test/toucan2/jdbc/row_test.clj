@@ -53,6 +53,37 @@
             (realized-keys row)))
      (is (not (already-realized? row))))))
 
+(def ^:private array-map-max-num-keys-before-switching-to-hash-map
+  "Max number of keys in a `clojure.lang.PersistentArrayMap` before it switches to `clojure.lang.PersistentHashMap`. At
+  the time of this writing it is 8, but we're looking it up here in case it changes in the future."
+  ;; HASHTABLE_THRESHOLD is for the size of the underlying array which stores both keys AND values
+  (let [field (doto (.getDeclaredField clojure.lang.PersistentArrayMap "HASHTABLE_THRESHOLD")
+                (.setAccessible true))
+        int-val (.getInt field clojure.lang.PersistentArrayMap)]
+    (int (/ int-val 2))))
+
+(deftest ^:parallel get-persists-changes-test
+  (testing ".valAt implementation must persist changes to underlying transient row (#187)"
+    (do-with-row
+     (fn [^TransientRow row]
+       ;; first we need to load up the row with exactly enough values that the next value added to it will cause the
+       ;; underlying transient row to change from an array map to a hash map. See
+       ;; https://github.com/clojure/clojure/blob/56d37996b18df811c20f391c840e7fd26ed2f58d/src/jvm/clojure/lang/PersistentArrayMap.java#L516-L517
+       (let [^TransientRow row     (reduce
+                                    (fn [row n]
+                                      (assoc row n n))
+                                    row
+                                    (range array-map-max-num-keys-before-switching-to-hash-map))
+             underlying-row-before @(.volatile_transient_row row)]
+         ;; now accessing an actual value should update the underlying transient row and put it over the threshold that
+         ;; converts it from an array map to a hash map
+         (is (= "Tempest"
+                (:name row)))
+         (let [underlying-row-after @(.volatile_transient_row row)]
+           (testing (format "\nbefore = %s\nafter = %s" (pr-str underlying-row-before) (pr-str underlying-row-after))
+             (is (not (identical? underlying-row-before
+                                  underlying-row-after))))))))))
+
 (deftest ^:parallel assoc-test
   (do-with-row
    (fn [row]
