@@ -136,54 +136,17 @@
           v      (thunk)]
       (next.jdbc.rs/read-column-by-index v rsmeta i))))
 
-(defn- make-i->thunk [conn model rset]
+(defn ^:no-doc make-i->thunk
+  "Given a connection `conn`, a `model` and a result set `rset`, return a function which given a column number `i` returns
+  a thunk that retrieves the column value of the current row from the result set."
+  [conn model rset]
   (comp (memoize (fn [i]
                    (make-column-thunk conn model rset i)))
         int))
 
-(defn ^:no-doc make-cached-row-num->i->thunk
-  "Returns a function that, given the current row number, returns a function that, given a column number, returns a cached
-  thunk to fetch values of that column. Confusing, huh? Here's a chart to make it a bit easier to visualize:
-
-  ```clj
-  (make-cached-row-num->i->thunk conn model rset)
-  =>
-  (f current-row-number)
-  =>
-  (f column-index)
-  =>
-  (column-value-thunk)
-  ```
-
-  What's the point of this? The main point is to cache values that come out of the database, so we only fetch them once.
-  This is used to implement our transient rows in [[toucan2.jdbc.result-set]] -- accessing the value of a transient row
-  twice should not result in two calls to `.getObject`.
-
-  The row number is used for cache-busting purposes, so we can reset the cache after each row is returned (so we don't
-  accidentally cache values from the first row and return them for all the rows). The row number passed in here doesn't
-  need to correspond to the actual row number from a JDBC standpoint; it's used only for cache-busting purposes."
-  [conn model ^ResultSet rset]
-  (let [i->thunk       (make-i->thunk conn model rset)
-        cached-row-num (atom -1)
-        cached-values  (atom {})]
-    (fn row-num->i->thunk* [current-row-num]
-      (when-not (= current-row-num @cached-row-num)
-        (reset! cached-row-num current-row-num)
-        (reset! cached-values {}))
-      (fn i->thunk* [i]
-        (fn cached-column-thunk []
-          (let [cached-value (get @cached-values i ::not-found)]
-            (if-not (= cached-value ::not-found)
-              (log/tracef "Using cached value for column %s: %s" i cached-value)
-              cached-value)
-            (let [thunk (i->thunk i)
-                  v     (thunk)]
-              (swap! cached-values assoc i v)
-              v)))))))
-
 (defn ^:no-doc read-column-by-index-fn
-  "Given a `java.sql.Connection` `conn`, a `model`, and a `java.sql.ResultSet` `rset`, return a function that can be used
-  with [[next.jdbc.result-set/builder-adapter]]. The function has the signature
+  "Given a `i->thunk` function, return a function that can be used with [[next.jdbc.result-set/builder-adapter]]. The
+  function has the signature
 
   ```clj
   (f builder rset i) => result
@@ -193,19 +156,12 @@
   index `i`, it will return the value of that column for the current row.
 
   The function used to fetch the column is built by combining [[read-column-thunk]]
-  and [[next.jdbc.result-set/read-column-by-index]]; the function is built once and used repeatedly for each new row.
-
-  Values are cached for the current row -- fetching the same column twice for a given row will only result in fetching
-  it from the database once."
-  ([conn model ^ResultSet rset]
-   (read-column-by-index-fn (make-cached-row-num->i->thunk conn model rset)))
-
-  ([row-num->i->thunk]
-   (fn read-column-by-index-fn* [_builder ^ResultSet rset ^Integer i]
-     (assert (not (.isClosed ^ResultSet rset))
-             "ResultSet is already closed. Do you need call toucan2.realize/realize on the row before the Connection is closed?")
-     (let [i->thunk (row-num->i->thunk (.getRow rset))
-           thunk    (i->thunk i)
-           result   (thunk)]
-       (log/tracef "col %s => %s" i result)
-       result))))
+  and [[next.jdbc.result-set/read-column-by-index]]; the function is built once and used repeatedly for each new row."
+  [i->thunk]
+  (fn read-column-by-index-fn* [_builder ^ResultSet rset ^Integer i]
+    (assert (not (.isClosed ^ResultSet rset))
+            "ResultSet is already closed. Do you need call toucan2.realize/realize on the row before the Connection is closed?")
+    (let [thunk    (i->thunk i)
+          result   (thunk)]
+      (log/tracef "col %s => %s" i result)
+      result)))

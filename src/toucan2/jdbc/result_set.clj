@@ -131,10 +131,10 @@
   directly."
   [rf init conn model ^ResultSet rset opts]
   (log/debugf "Reduce JDBC result set for model %s with rf %s and init %s" model rf init)
-  (let [row-num->i->thunk (jdbc.read/make-cached-row-num->i->thunk conn model rset)
+  (let [i->thunk          (jdbc.read/make-i->thunk conn model rset)
         builder-fn*       (next.jdbc.rs/builder-adapter
                            (builder-fn conn model rset opts)
-                           (jdbc.read/read-column-by-index-fn row-num->i->thunk))
+                           (jdbc.read/read-column-by-index-fn i->thunk))
         builder           (builder-fn* rset opts)
         combined-opts     (jdbc.options/merge-options (merge (:opts builder) opts))
         label-fn          (get combined-opts :label-fn)
@@ -151,9 +151,7 @@
           (log/tracef "Result set has no more rows.")
           acc)
 
-        :let [row-num  (.getRow rset)
-              _        (log/tracef "Fetch row %s" row-num)
-              i->thunk (row-num->i->thunk row-num)
+        :let [_        (log/tracef "Fetch row %s" (.getRow rset))
               row      (jdbc.row/row model rset builder i->thunk col-name->index)
               acc'     (rf acc row)]
 
