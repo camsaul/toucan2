@@ -58,8 +58,8 @@
                                 ;; used to fetch the column. This usually comes
                                 ;; from [[toucan2.jdbc.read/make-cached-i->thunk]].
                                 i->thunk
-                                ;; underlying transient map representing this row.
-                                ^clojure.lang.ITransientMap transient-row
+                                ;; a Volatile that contains the underlying transient map representing this row.
+                                ^clojure.lang.Volatile volatile-transient-row
                                 ;; a delay that should return a persistent map for the current row. Once this is called
                                 ;; we should return the realized row directly and work with that going forward.
                                 realized-row]
@@ -73,27 +73,18 @@
     (log/tracef ".assoc %s %s" k v)
     (if (realized? realized-row)
       (assoc @realized-row k v)
-      (let [^clojure.lang.ITransientMap transient-row' (assoc! transient-row k v)]
+      (do
+        (vswap! volatile-transient-row (fn [^clojure.lang.ITransientMap transient-row]
+                                         (let [^clojure.lang.ITransientMap transient-row' (assoc! transient-row k v)]
+                                           (assert (= (.valAt transient-row' k) v)
+                                                   (format "assoc! did not do what we expected. k = %s v = %s row = %s .valAt = %s"
+                                                           (pr-str k)
+                                                           (pr-str v)
+                                                           (pr-str transient-row')
+                                                           (pr-str (.valAt transient-row' k))))
+                                           transient-row')))
         (swap! realized-keys conj k)
-        (assert (= (.valAt transient-row' k) v)
-                (format "assoc! did not do what we expected. k = %s v = %s row = %s .valAt = %s"
-                        (pr-str k)
-                        (pr-str v)
-                        (pr-str transient-row')
-                        (pr-str (.valAt transient-row' k))))
-        ;; `assoc!` might return a different object. In practice, I think it usually doesn't; optimize for that case
-        ;; and return `this` rather than creating a new instance of `TransientRow`.
-        (if (identical? transient-row transient-row')
-          this
-          ;; If `assoc!` did return a different object, then we need to create a new `TransientRow` with the new value
-          (TransientRow. model
-                         rset
-                         builder
-                         column-name->index
-                         realized-keys
-                         i->thunk
-                         transient-row'
-                         realized-row)))))
+        this)))
 
   ;; TODO -- can we `assocEx` the transient row?
   (assocEx [_this k v]
@@ -104,34 +95,32 @@
     (log/tracef ".without %s" k)
     (if (realized? realized-row)
       (dissoc @realized-row k)
-      (let [transient-row'      (dissoc! transient-row k)
-            k-index             (column-name->index k)
-            column-name->index' (if-not k-index
-                                  column-name->index
-                                  (fn [column-name]
-                                    (let [index (column-name->index column-name)]
-                                      (when-not (= index k-index)
-                                        index))))]
-        (when k-index
-          (swap! i->thunk (fn [i->thunk]
-                            (fn [index]
-                              (if (= index k-index)
-                                (constantly ::not-found)
-                                (i->thunk index))))))
-        (swap! realized-keys disj k)
-        ;; as in the `assoc` method above, we can optimize a bit and return `this` instead of creating a new object if
-        ;; `assoc!` returned the original `transient-row` rather than a different object
-        (if (and (identical? transient-row      transient-row')
-                 (identical? column-name->index column-name->index'))
-          this
-          (TransientRow. model
-                         rset
-                         builder
-                         column-name->index'
-                         realized-keys
-                         i->thunk
-                         transient-row'
-                         realized-row)))))
+      (do
+        (vswap! volatile-transient-row dissoc! k)
+        (let [k-index             (column-name->index k)
+              column-name->index' (if-not k-index
+                                    column-name->index
+                                    (fn [column-name]
+                                      (let [index (column-name->index column-name)]
+                                        (when-not (= index k-index)
+                                          index))))]
+          (when k-index
+            (swap! i->thunk (fn [i->thunk]
+                              (fn [index]
+                                (if (= index k-index)
+                                  (constantly ::not-found)
+                                  (i->thunk index))))))
+          (swap! realized-keys disj k)
+          (if (identical? column-name->index column-name->index')
+            this
+            (TransientRow. model
+                           rset
+                           builder
+                           column-name->index'
+                           realized-keys
+                           i->thunk
+                           volatile-transient-row
+                           realized-row))))))
 
   ;; Java 7 compatible: no forEach / spliterator
   ;;
@@ -146,7 +135,7 @@
     (log/tracef ".containsKey %s" k)
     (if (realized? realized-row)
       (contains? @realized-row k)
-      (or (contains? transient-row k)
+      (or (contains? @volatile-transient-row k)
           (boolean (column-name->index k)))))
 
   (entryAt [this k]
@@ -155,7 +144,7 @@
       (when-not (= v ::not-found)
         (clojure.lang.MapEntry. k v))))
 
-;;; TODO -- this should probably also include any extra keys added with `assoc` or whatever
+  ;; TODO -- this should probably also include any extra keys added with `assoc` or whatever
   clojure.lang.Counted
   (count [_this]
     (log/tracef ".count")
@@ -206,7 +195,7 @@
 
       ;; non-number column name
       :else
-      (let [existing-value (.valAt transient-row k ::not-found)]
+      (let [existing-value (.valAt ^clojure.lang.ITransientMap @volatile-transient-row k ::not-found)]
         (if-not (= existing-value ::not-found)
           existing-value
           (let [fetched-value (fetch-column-with-name column-name->index @i->thunk k ::not-found)]
@@ -259,7 +248,7 @@
       (realized? realized-row)
       (update @realized-row k f)
 
-      :let [existing-value (.valAt transient-row k ::not-found)]
+      :let [existing-value (.valAt ^clojure.lang.ITransientMap @volatile-transient-row k ::not-found)]
 
       ;; value already exists: update the value in the transient row and call it a day
       (not= existing-value ::not-found)
@@ -295,7 +284,7 @@
   'transient' mode."
   [^toucan2.jdbc.row.TransientRow row]
   (try
-    (let [transient-row (.transient_row row)
+    (let [transient-row @(.volatile_transient_row row)
           realized-keys (.realized_keys row)]
       [(symbol (format "^%s " `TransientRow))
        ;; (instance? pretty.core.PrettyPrintable transient-row) (pretty/pretty transient-row)
@@ -347,10 +336,10 @@
    transient-row
    (range 1 (inc (next.jdbc.rs/column-count builder)))))
 
-(defn- make-realized-row-delay [builder i->thunk transient-row]
+(defn- make-realized-row-delay [builder i->thunk ^clojure.lang.Volatile volatile-transient-row]
   (delay
     (log/tracef "Fully realizing row. *fetch-all-columns* = %s" *fetch-all-columns*)
-    (let [row (cond->> transient-row
+    (let [row (cond->> @volatile-transient-row
                 *fetch-all-columns* (fetch-all-columns! builder i->thunk))]
       (next.jdbc.rs/row! builder row))))
 
@@ -359,10 +348,10 @@
   shouldn't be using this directly!"
   [model ^ResultSet rset builder i->thunk col-name->index]
   (assert (not (.isClosed rset)) "ResultSet is already closed")
-  (let [transient-row      (next.jdbc.rs/->row builder)
-        i->thunk           (atom i->thunk)
-        realized-row-delay (make-realized-row-delay builder i->thunk transient-row)
-        realized-keys      (atom #{})]
+  (let [volatile-transient-row (volatile! (next.jdbc.rs/->row builder))
+        i->thunk               (atom i->thunk)
+        realized-row-delay     (make-realized-row-delay builder i->thunk volatile-transient-row)
+        realized-keys          (atom #{})]
     ;; this is a gross amount of positional args. But using `reify` makes debugging things too hard IMO.
     (->TransientRow model
                     rset
@@ -370,5 +359,5 @@
                     col-name->index
                     realized-keys
                     i->thunk
-                    transient-row
+                    volatile-transient-row
                     realized-row-delay)))
