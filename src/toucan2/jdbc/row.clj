@@ -331,10 +331,12 @@
 
 (defn- fetch-all-columns! [builder i->thunk transient-row]
   (log/tracef "Fetching all columns")
-  (reduce
-   (partial fetch-column! builder i->thunk)
-   transient-row
-   (range 1 (inc (next.jdbc.rs/column-count builder)))))
+  (let [n (next.jdbc.rs/column-count builder)]
+    (loop [i 1
+           transient-row transient-row]
+      (if (<= i n)
+        (recur (inc i) (fetch-column! builder i->thunk transient-row i))
+        transient-row))))
 
 (defn- make-realized-row-delay [builder i->thunk ^clojure.lang.Volatile volatile-transient-row]
   (delay
