@@ -352,7 +352,10 @@
   "The default reducing function for all query types unless otherwise specified. Returns realized maps (by default, Toucan
   2 instances)."
   [_query-type]
-  ((map realize/realize) conj))
+  (fn
+    ([] (transient []))
+    ([acc] (persistent! acc))
+    ([acc x] (conj! acc (realize/realize x)))))
 
 (defn ^:no-doc first-result-xform-fn
   "Return a transducer that transforms a reducing function `rf` so it always takes at most one value and returns the first
@@ -361,7 +364,13 @@
   (if (isa? query-type :toucan.result-type/update-count)
     identity
     (fn [rf]
-      (completing ((take 1) rf) first))))
+      (fn first-result-rf
+        ([] ::nothing)
+        ([acc] (when-not (= acc ::nothing)
+                 (first (rf acc))))
+        ([acc x] (if (= acc ::nothing)
+                   (rf (rf) x)
+                   acc))))))
 
 ;;;; Helper functions for implementing stuff like [[toucan2.select/select]]
 
