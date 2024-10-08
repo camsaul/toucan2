@@ -67,31 +67,34 @@
   (rs! [_this acc]
     (persistent! acc)))
 
+(defn- column-name->keyword [column-name label-fn]
+  (when (or (string? column-name)
+            (instance? clojure.lang.Named column-name))
+    (keyword
+     (when (instance? clojure.lang.Named column-name)
+       (when-let [col-ns (namespace column-name)]
+         (name (label-fn (name col-ns)))))
+     (name (label-fn (name column-name))))))
+
 (defn- make-column-name->index [cols label-fn]
   {:pre [(fn? label-fn)]}
   (if (empty? cols)
     (constantly nil)
     (memoize
      (fn [column-name]
-       (when (or (string? column-name)
-                 (instance? clojure.lang.Named column-name))
-         ;; TODO FIXME -- it seems like the column name we get here has already went thru the label fn/qualifying
-         ;; functions. The `(originally ...)` in the log message is wrong. Are we applying label function twice?!
-         (let [column-name' (keyword
-                             (when (instance? clojure.lang.Named column-name)
-                               (when-let [col-ns (namespace column-name)]
-                                 (label-fn (name col-ns))))
-                             (label-fn (name column-name)))
-               i            (when column-name'
-                              (first (keep-indexed
-                                      (fn [i col]
-                                        (when (= col column-name')
-                                          (inc i)))
-                                      cols)))]
-           (log/tracef "Index of column named %s (originally %s) is %s" column-name' column-name i)
-           (when-not i
-             (log/debugf "Could not determine index of column name %s. Found: %s" column-name cols))
-           i))))))
+       ;; TODO FIXME -- it seems like the column name we get here has already went thru the label fn/qualifying
+       ;; functions. The `(originally ...)` in the log message is wrong. Are we applying label function twice?!
+       (let [column-name' (column-name->keyword column-name label-fn)
+             i            (when column-name'
+                            (first (keep-indexed
+                                    (fn [i col]
+                                      (when (= col column-name')
+                                        (inc i)))
+                                    cols)))]
+         (log/tracef "Index of column named %s (originally %s) is %s" column-name' column-name i)
+         (when-not i
+           (log/debugf "Could not determine index of column name %s. Found: %s" column-name cols))
+         i)))))
 
 (defn instance-builder-fn
   "Create a result set map builder function appropriate for passing as the `:builder-fn` option to `next.jdbc` that
@@ -142,6 +145,7 @@
         col-names         (get builder :cols (next.jdbc.rs/get-modified-column-names
                                               (.getMetaData rset)
                                               combined-opts))
+        col-names-kw      (into [] (keep #(column-name->keyword % label-fn)) col-names)
         col-name->index   (make-column-name->index col-names label-fn)]
     (log/tracef "column name -> index = %s" col-name->index)
     (loop [acc init]
@@ -152,7 +156,7 @@
           acc)
 
         :let [_        (log/tracef "Fetch row %s" (.getRow rset))
-              row      (jdbc.row/row model rset builder i->thunk col-name->index)
+              row      (jdbc.row/row model rset builder i->thunk col-name->index col-names-kw)
               acc'     (rf acc row)]
 
         (reduced? acc')
