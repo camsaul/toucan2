@@ -130,11 +130,10 @@
 
 (defn- make-column-thunk [conn model ^ResultSet rset i]
   (log/tracef "Building thunk to read column %s" i)
-  (fn column-thunk []
-    (let [rsmeta (.getMetaData rset)
-          thunk  (read-column-thunk conn model rset rsmeta i)
-          v      (thunk)]
-      (next.jdbc.rs/read-column-by-index v rsmeta i))))
+  (let [rsmeta (.getMetaData rset)
+        thunk (read-column-thunk conn model rset rsmeta i)]
+    (fn column-thunk []
+      (next.jdbc.rs/read-column-by-index (thunk) rsmeta i))))
 
 (defn ^:no-doc make-i->thunk
   "Given a connection `conn`, a `model` and a result set `rset`, return a function which given a column number `i` returns
