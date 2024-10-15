@@ -33,7 +33,11 @@
           (select/reducible-select ::test/venues 1)))))
 
 (defn- realized-keys [^TransientRow row]
-  @(.realized_keys row))
+  (let [transient-row @(.volatile_transient_row row)
+        column-names (.column_names row)]
+    (set (filter #(let [v (get transient-row % ::not-found)]
+                    (not= v ::not-found))
+                 column-names))))
 
 (defn- already-realized? [^TransientRow row]
   (realized? (.realized_row row)))
