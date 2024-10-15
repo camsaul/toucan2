@@ -36,7 +36,7 @@
 (defrecord ^:no-doc InstanceBuilder [model ^ResultSet rset ^ResultSetMetaData rsmeta cols]
   next.jdbc.rs/RowBuilder
   (->row [_this]
-    (log/tracef "Fetching row %s" (.getRow rset))
+    ;; (log/tracef "Fetching row %s" (.getRow rset))
     (transient (instance/instance model)))
 
   (column-count [_this]
@@ -54,7 +54,7 @@
     (assoc! row col v))
 
   (row! [_this row]
-    (log/tracef "Converting transient row to persistent row")
+    ;; (log/tracef "Converting transient row to persistent row")
     (persistent! row))
 
   next.jdbc.rs/ResultSetBuilder
@@ -151,7 +151,7 @@
           (log/tracef "Result set has no more rows.")
           acc)
 
-        :let [_        (log/tracef "Fetch row %s" (.getRow rset))
+        :let [;; _     (log/tracef "Fetch row %s" (.getRow rset))
               row      (jdbc.row/row model rset builder i->thunk col-name->index)
               acc'     (rf acc row)]
 

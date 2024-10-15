@@ -69,7 +69,7 @@
   [_conn _model ^ResultSet rset _rsmeta ^Long i]
   (log/debugf "Fetching values in column %s with %s" i (list '.getObject 'rs i))
   (fn default-read-column-thunk []
-    (log/tracef "col %s => %s" i (list '.getObject 'rset i))
+    ;; (log/tracef "col %s => %s" i (list '.getObject 'rset i))
     (.getObject rset i)))
 
 (m/defmethod read-column-thunk :after :default
@@ -98,7 +98,7 @@
     ;; from Criterium: a no-op call takes about 20ns locally. So 10m rows => 200ms from this no-op call. That's a little
     ;; expensive, but probably not as bad as the overhead we get from other nonsense here in Toucan 2. We'll have to do
     ;; some general performance tuning in the future.
-    (log/tracef "col %s => %s" i (list '.getObject 'rset i klass))
+    ;; (log/tracef "col %s => %s" i (list '.getObject 'rset i klass))
     (.getObject rset i klass)))
 
 ;;;; Default column read methods
