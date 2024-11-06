@@ -138,10 +138,13 @@
 (defn ^:no-doc make-i->thunk
   "Given a connection `conn`, a `model` and a result set `rset`, return a function which given a column number `i` returns
   a thunk that retrieves the column value of the current row from the result set."
-  [conn model rset]
-  (comp (memoize (fn [i]
-                   (make-column-thunk conn model rset i)))
-        int))
+  [conn model ^ResultSet rset]
+  (let [n (.getColumnCount (.getMetaData rset))
+        thunks (mapv (fn [i]
+                       (delay (make-column-thunk conn model rset (inc i))))
+                     (range n))]
+    (fn [i]
+      @(nth thunks (dec i)))))
 
 (defn ^:no-doc read-column-by-index-fn
   "Given a `i->thunk` function, return a function that can be used with [[next.jdbc.result-set/builder-adapter]]. The
