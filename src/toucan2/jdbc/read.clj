@@ -140,8 +140,9 @@
   a thunk that retrieves the column value of the current row from the result set."
   [conn model ^ResultSet rset]
   (let [n (.getColumnCount (.getMetaData rset))
-        thunks (vec (for [i (range n)]
-                      (delay (make-column-thunk conn model rset (inc i)))))]
+        thunks (mapv (fn [i]
+                       (delay (make-column-thunk conn model rset (inc i))))
+                     (range n))]
     (fn [i]
       @(nth thunks (dec i)))))
 
