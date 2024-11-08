@@ -317,25 +317,25 @@
 ;;; preferred to not have to do this but a lot of it was necessary to make things work in the Toucan 2 work. See this
 ;;; Slack thread for more information: https://clojurians.slack.com/archives/C1Q164V29/p1662494291800529
 
-(defn- fetch-column! [builder i->thunk ^clojure.lang.ITransientMap transient-row i]
+(defn- fetch-column! [builder i->thunk ^clojure.lang.ITransientMap transient-row i col-name]
   ;; make sure the key is not already present. If it is we don't want to stomp over existing values.
-  (let [col-name (nth (:cols builder) (dec i))]
-    (if (= (.valAt transient-row col-name ::not-found) ::not-found)
-      (let [thunk (@i->thunk i)]
-        (assert (fn? thunk))
-        (let [value (thunk)]
-          (if (= value ::not-found)
-            transient-row
-            (next.jdbc.rs/with-column-value builder transient-row col-name value))))
-      transient-row)))
+  (if (identical? (.valAt transient-row col-name ::not-found) ::not-found)
+    (let [thunk (@i->thunk i)]
+      (assert (fn? thunk))
+      (let [value (thunk)]
+        (if (identical? value ::not-found)
+          transient-row
+          (next.jdbc.rs/with-column-value builder transient-row col-name value))))
+    transient-row))
 
 (defn- fetch-all-columns! [builder i->thunk transient-row]
   ;; (log/tracef "Fetching all columns")
-  (let [n (next.jdbc.rs/column-count builder)]
+  (let [cols (:cols builder)
+        n (count cols)]
     (loop [i 1
            transient-row transient-row]
       (if (<= i n)
-        (recur (inc i) (fetch-column! builder i->thunk transient-row i))
+        (recur (inc i) (fetch-column! builder i->thunk transient-row i (nth cols (dec i))))
         transient-row))))
 
 (defn- make-realized-row-delay [builder i->thunk ^clojure.lang.Volatile volatile-transient-row]
