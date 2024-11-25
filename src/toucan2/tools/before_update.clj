@@ -50,7 +50,7 @@
      ;; There are a lot of situations where we don't need to do this, but it means we have to step on eggshells
      ;; everywhere else in order to make things work nicely. Maybe we can revisit this in the future.
      (let [realized-row (realize/realize row)
-           row          (merge row changes)
+           row          (merge realized-row changes)
            row          (before-update model row)
            ;; if the `before-update` method returned a plain map then consider that to be the changes.
            ;; `protocols/changes` will return `nil` for non-instances. TODO -- does that behavior make sense? Clearly,
