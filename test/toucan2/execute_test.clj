@@ -186,7 +186,7 @@
                                                          #_query-type :default
                                                          #_model      :default]
   [rf _conn _query-type _model [{k :key}, :as _compiled-query]]
-  (reduce rf (rf) [{k 1} {k 2} {k 3}]))
+  (transduce identity rf [{k 1} {k 2} {k 3}]))
 
 (deftest ^:parallel wow-dont-even-need-to-use-jdbc-test
   (is (= [{:a 1} {:a 2} {:a 3}]
@@ -203,7 +203,7 @@
                                                          #_query-type :default
                                                          #_model      ::model.not-even-jdbc]
   [rf _conn _query-type _model {k :key, :as _compiled-query}]
-  (reduce rf (rf) [{k 4} {k 5} {k 6}]))
+  (transduce identity rf [{k 4} {k 5} {k 6}]))
 
 (deftest ^:parallel wow-dont-even-need-to-use-jdbc-custom-model-test
   (is (= [{:a 4} {:a 5} {:a 6}]

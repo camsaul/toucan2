@@ -107,7 +107,7 @@
         _              (log/debugf "update-returning-pks workaround: doing SELECT with conditions %s"
                                    conditions-map)
         parsed-args    (update pipeline/*parsed-args* :kv-args merge conditions-map)
-        select-rf      (pipeline/with-init conj [])
+        select-rf      (pipeline/conj-with-init! [])
         xform          (map (model/select-pks-fn model))
         pks            (pipeline/transduce-query (xform select-rf)
                                                  :toucan.query-type/select.instances.fns
