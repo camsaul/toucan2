@@ -65,6 +65,34 @@
                 :updated-at (LocalDateTime/parse "2021-06-09T15:18:00")}
                (select/select-one ::venues.update-updated-at 1)))))))
 
+(derive ::venues.with-removed-primary-key ::venues.before-update)
+
+(before-update/define-before-update ::venues.with-removed-primary-key
+  [venue]
+  (dissoc venue :id))
+
+(deftest ^:synchronized missing-id-test
+  (testing "Removing the ID in the `before-update` method isn't catastrophic"
+    (test/with-discarded-table-changes :venues
+      (test.track-realized/with-realized-columns [_realized-columns]
+        ;; The bad case tested here only happened in very precise conditions:
+        ;; - your `updated-at` method's result did not have a primary key
+        ;; - your "where" matches multiple rows
+        ;; - *part* of your update will change all the matched rows
+        ;; - another part of your update will change a subset of matched rows
+        ;;
+        ;; In this test:
+        ;; - we're matching rows 1 and 3
+        ;; - `:updated-at` will change for both rows 1 and 3
+        ;; - `:category` will only change for row 1 (3 is already a "store")
+        (let [row-2 {:id 2 :name "Ho's Tavern" :category "bar"}]
+          (testing "sanity check"
+            (is (= row-2 (select/select-one [::venues.with-removed-primary-key :id :name :category] :id 2))))
+          (testing "we only update 2 rows"
+            (is (= 2 (update/update! ::venues.with-removed-primary-key :id [:in [1 3]] {:category "store" :updated-at (LocalDateTime/parse "2024-11-22T00:00")}))))
+          (testing "the other row is unchanged"
+            (is (= row-2 (select/select-one [::venues.with-removed-primary-key :id :name :category] :id 2)))))))))
+
 (derive ::venues.discard-category-change ::venues.before-update)
 
 (before-update/define-before-update ::venues.discard-category-change

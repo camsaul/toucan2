@@ -49,20 +49,22 @@
      ;; After going back and forth on this I've concluded that it's probably best to just realize the entire row here.
      ;; There are a lot of situations where we don't need to do this, but it means we have to step on eggshells
      ;; everywhere else in order to make things work nicely. Maybe we can revisit this in the future.
-     (let [row         (realize/realize row)
-           row         (merge row changes)
-           row         (before-update model row)
+     (let [realized-row (realize/realize row)
+           row          (merge realized-row changes)
+           row          (before-update model row)
            ;; if the `before-update` method returned a plain map then consider that to be the changes.
            ;; `protocols/changes` will return `nil` for non-instances. TODO -- does that behavior make sense? Clearly,
            ;; it's easy to use wrong -- it took me hours to figure out why something was working and that I needed to
            ;; make this change :sad:
-           row-changes (if (instance/instance? row)
-                         (protocols/changes row)
-                         row)]
+           row-changes  (if (instance/instance? row)
+                          (protocols/changes row)
+                          row)
+           pks          (model/primary-key-values-map model realized-row)]
        (log/tracef "The following values have changed: %s" changes)
+       (assert (seq pks) "No primary key(s) were found on the realized row")
        (cond-> changes->pks
-         (seq row-changes) (update row-changes (fn [pks]
-                                                 (conj (set pks) (model/primary-key-values-map model row)))))))))
+         (seq row-changes) (update row-changes (fn [pks*]
+                                                 (conj (set pks*) pks))))))))
 
 (defn- fetch-changes->pk-maps [model {:keys [changes], :as parsed-args} resolved-query]
   (not-empty
