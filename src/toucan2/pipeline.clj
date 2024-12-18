@@ -326,6 +326,15 @@
     ([x]   (rf x))
     ([x y] (rf x y))))
 
+(defn ^:no-doc conj-with-init!
+  "Returns a reducing function with a zero-arity (initial value arity) that returns transient version of `init`, `conj!`s
+  values into it, and finally returns a persistent collection in 1-arity."
+  [init]
+  (fn
+    ([]      (transient init))
+    ([acc]   (persistent! acc))
+    ([acc y] (conj! acc y))))
+
 (m/defmulti default-rf
   "The default reducing function for queries of `query-type`. Used for non-reducible operations
   like [[toucan2.select/select]] or [[toucan2.execute/query]]."

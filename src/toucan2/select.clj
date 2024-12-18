@@ -78,7 +78,7 @@
                [f :conn connectable modelable-columns & kv-args? query?])}
   [f & unparsed-args]
   (let [f     (comp realize/realize f)
-        rf    (pipeline/with-init conj #{})
+        rf    (pipeline/conj-with-init! #{})
         xform (map f)]
     (not-empty (pipeline/transduce-unparsed (xform rf) :toucan.query-type/select.instances.fns unparsed-args))))
 
@@ -98,7 +98,7 @@
                [f :conn connectable modelable-columns & kv-args? query?])}
   [f & unparsed-args]
   (let [f     (comp realize/realize f)
-        rf    (pipeline/with-init conj [])
+        rf    (pipeline/conj-with-init! [])
         xform (map f)]
     (not-empty (pipeline/transduce-unparsed (xform rf) :toucan.query-type/select.instances.fns unparsed-args))))
 
@@ -190,7 +190,7 @@
   [f1 f2 & unparsed-args]
   (let [f1    (comp realize/realize f1)
         f2    (comp realize/realize f2)
-        rf    (pipeline/with-init conj {})
+        rf    (pipeline/conj-with-init! {})
         xform (map (juxt f1 f2))]
     (pipeline/transduce-unparsed (xform rf) :toucan.query-type/select.instances unparsed-args)))
 
