@@ -7,7 +7,7 @@
   com.github.seancorfield/honeysql    {:mvn/version "2.6.1147"}
   com.github.seancorfield/next.jdbc   {:mvn/version "1.3.939"}
   environ/environ                     {:mvn/version "1.2.0"}
-  methodical/methodical               {:mvn/version "1.0.123"}
+  methodical/methodical               {:mvn/version "1.0.125"}
   mvxcvi/puget                        {:mvn/version "1.3.4"}
   org.clojure/tools.logging           {:mvn/version "1.3.0"}
   org.clojure/tools.trace             {:mvn/version "0.8.0"}
@@ -17,7 +17,8 @@
  :aliases
  {:dev
   {:extra-deps
-   {com.h2database/h2                    {:mvn/version "2.3.232"}
+   {clj-kondo/clj-kondo                  {:mvn/version "2025.01.16"}
+    com.h2database/h2                    {:mvn/version "2.3.232"}
     eftest/eftest                        {:mvn/version "0.6.0"}
     io.github.camsaul/humane-are         {:mvn/version "1.0.2"}
     org.clojure/java.classpath           {:mvn/version "1.1.0"}
@@ -67,7 +68,7 @@
   ;;
   ;;    clojure -M:kondo --copy-configs --dependencies --lint "$(clojure -A:dev -Spath)" --skip-lint --parallel
   :kondo
-  {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.08.29"}}
+  {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2025.01.16"}}
    :main-opts    ["-m" "clj-kondo.main"]}
 
   ;; lint everything with Kondo
