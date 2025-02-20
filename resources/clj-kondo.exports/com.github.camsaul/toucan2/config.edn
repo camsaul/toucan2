@@ -28,6 +28,7 @@
    toucan2.tools.before-insert/define-before-insert        hooks.toucan2.tools.before-insert/define-before-insert
    toucan2.tools.before-select/define-before-select        hooks.toucan2.tools.before-select/define-before-select
    toucan2.tools.before-update/define-before-update        hooks.toucan2.tools.before-update/define-before-update
+   toucan2.tools.default-fields/define-default-fields      hooks.toucan2.tools.default-fields/define-default-fields
    toucan2.tools.named-query/define-named-query            hooks.toucan2.tools.named-query/define-named-query
    toucan2.tools.simple-out-transform/define-out-transform hooks.toucan2.tools.simple-out-transform/define-out-transform
    toucan2.tools.with-temp/with-temp                       hooks.toucan2.tools.with-temp/with-temp}
@@ -35,5 +36,4 @@
   :macroexpand
   {toucan.db/with-call-counting                       macros.toucan2.execute/with-call-count
    toucan.models/defmodel                             macros.toucan.models/defmodel
-   toucan2.execute/with-call-count                    macros.toucan2.execute/with-call-count
-   toucan2.tools.default-fields/define-default-fields macros.toucan2.tools.default-fields/define-default-fields}}}
+   toucan2.execute/with-call-count                    macros.toucan2.execute/with-call-count}}}
