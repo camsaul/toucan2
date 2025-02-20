@@ -70,7 +70,6 @@
             []
             (map realize/realize)
             (eduction
-             #_{:clj-kondo/ignore [:unused-binding]}
              (comp (map #(update % :id inc))
                    (take 1))
              (execute/reducible-query ::test/db "SELECT * FROM people;")))))))

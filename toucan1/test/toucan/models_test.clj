@@ -33,8 +33,6 @@
 #_{:clj-kondo/ignore [:unused-private-var]}
 (def ^:private MyCategory :toucan.test-models.category/Category)
 
-;;; Work around https://github.com/clj-kondo/clj-kondo/issues/2026
-#_{:clj-kondo/ignore [:invalid-arity]}
 (t1.models/defmodel MyCategoryDefModel :t1_category)
 
 (deftest ^:parallel resolve-model-test

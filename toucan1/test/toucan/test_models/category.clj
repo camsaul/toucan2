@@ -13,8 +13,6 @@
 
 (set! *warn-on-reflection* true)
 
-;;; Work around https://github.com/clj-kondo/clj-kondo/issues/2026
-#_{:clj-kondo/ignore [:invalid-arity]}
 (t1.models/defmodel Category :t1_categories)
 
 (defn- maybe-lowercase-string [s]
