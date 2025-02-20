@@ -9,15 +9,6 @@
           ~args-binding]
        ~@body)))
 
-(defmacro define-after-select [model [instance-binding] & body]
-  `(do
-     ~model
-     (fn [~(common/ignore-unused '&query-type)
-          ~(common/ignore-unused '&model)
-          ~(common/ignore-unused '&parsed-args)
-          ~instance-binding]
-       ~@body)))
-
 (defmacro define-before-delete
   [model [instance-binding] & body]
   `(do
