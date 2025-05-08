@@ -143,7 +143,12 @@
   ([instance]
    (primary-key-values-map (protocols/model instance) instance))
   ([model m]
-   (select-keys m (primary-keys model))))
+   ;; clojure.core/select-keys is quite inefficient on Toucan2 Instances; using a custom implementation.
+   (let [ks (set (primary-keys model))]
+     (reduce-kv (fn [acc k v]
+                  (cond-> acc
+                    (contains? ks k) (assoc k v)))
+                {} m))))
 
 ;;; TODO -- consider renaming this to something better. What?
 (defn select-pks-fn
