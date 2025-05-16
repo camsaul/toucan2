@@ -1,6 +1,5 @@
 (ns toucan2.tools.with-temp
   (:require
-   [clojure.pprint :as pprint]
    [clojure.spec.alpha :as s]
    [clojure.test :as t]
    [methodical.core :as m]
@@ -48,13 +47,6 @@
    :dispatch-value-spec (s/nonconforming ::types/dispatch-value.model)}
   u/dispatch-on-first-arg)
 
-(defn delayed-string
-  "Return a CharSequence that only executes `(f)` when toString is called. Caches the result."
-  [f]
-  (let [d (delay (f))]
-    (reify CharSequence
-      (toString [_] @d))))
-
 (m/defmethod do-with-temp* :default
   [model explicit-attributes f]
   (assert (some? model) (format "%s model cannot be nil." `with-temp))
@@ -70,10 +62,7 @@
       (let [temp-object (first (insert/insert-returning-instances! model merged-attributes))]
         (log/debugf "[with-temp] => %s" temp-object)
         (try
-          (t/testing (delayed-string
-                      #(format "\nwith temporary %s with attributes\n%s\n"
-                               (pr-str model)
-                               (with-out-str (pprint/pprint merged-attributes))))
+          (t/testing (format "\nwith temporary %s\n" (pr-str model))
             (f temp-object))
           (finally
             (delete/delete! model :toucan/pk ((model/select-pks-fn model) temp-object))))))))
