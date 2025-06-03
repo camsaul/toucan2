@@ -18,7 +18,8 @@
    [toucan2.realize :as realize]
    [toucan2.util :as u])
   (:import
-   (java.sql ResultSet)))
+   (java.sql ResultSet)
+   (toucan2.instance TransientInstance)))
 
 (set! *warn-on-reflection* true)
 
@@ -52,8 +53,6 @@
                                 ;; a function that given a column name key will normalize it and return the
                                 ;; corresponding JDBC index. This should probably be memoized for the whole result set.
                                 column-name->index
-                                ;; an atom with a set of realized column name keywords.
-                                realized-keys
                                 ;; ATOM with map. Given a JDBC column index (starting at 1) return a thunk that can be
                                 ;; used to fetch the column. This usually comes
                                 ;; from [[toucan2.jdbc.read/make-cached-i->thunk]].
@@ -83,7 +82,6 @@
                                                            (pr-str transient-row')
                                                            (pr-str (.valAt transient-row' k))))
                                            transient-row')))
-        (swap! realized-keys conj k)
         this)))
 
   ;; TODO -- can we `assocEx` the transient row?
@@ -110,14 +108,12 @@
                                 (if (= index k-index)
                                   (constantly ::not-found)
                                   (i->thunk index))))))
-          (swap! realized-keys disj k)
           (if (identical? column-name->index column-name->index')
             this
             (TransientRow. model
                            rset
                            builder
                            column-name->index'
-                           realized-keys
                            i->thunk
                            volatile-transient-row
                            realized-row))))))
@@ -276,6 +272,24 @@
   (toString [this]
     (str/join \space (map str (print-representation-parts this)))))
 
+(let [transient-array-field
+      (delay
+        (doto (.getDeclaredField clojure.lang.PersistentArrayMap$TransientArrayMap "array")
+          (.setAccessible true)))]
+  (defn- transient-instance-snapshot
+    "We need to extract current keyvalues from the transient row. Transients API does not allow to do that publicly without
+  persisting the transient, and that will break all future transient operations on it. So, we use reflection instead to
+  extract the underlying array and read values from it. Reflection should be fine because this function should be used
+  only during development/debugging."
+    [^TransientInstance transient-instance]
+    (when (instance? TransientInstance transient-instance)
+      (let [tmap (.m transient-instance)
+            array (.get ^java.lang.reflect.Field @transient-array-field tmap)]
+        (-> (apply array-map array)
+            ;; We don't know how many elements are in the transient (calling `count` persists it), so we just assume there
+            ;; were no `nil` keys in it.
+            (dissoc nil))))))
+
 ;;; We don't use [[pretty.core/PrettyPrintable]] for this like we do for everything else because we want to print TWO
 ;;; things, the [[print-symbol]] and a map.
 
@@ -284,12 +298,8 @@
   'transient' mode."
   [^toucan2.jdbc.row.TransientRow row]
   (try
-    (let [transient-row @(.volatile_transient_row row)
-          realized-keys (.realized_keys row)]
-      [(symbol (format "^%s " `TransientRow))
-       ;; (instance? pretty.core.PrettyPrintable transient-row) (pretty/pretty transient-row)
-       (zipmap @realized-keys
-               (map #(get transient-row %) @realized-keys))])
+    (let [transient-instance @(.volatile_transient_row row)]
+      [(symbol (format "^%s " `TransientRow)) (transient-instance-snapshot transient-instance)])
     (catch Exception _
       ["unrealized result set {row} -- do you need to call toucan2.realize/realize ?"])))
 
@@ -352,14 +362,12 @@
   (assert (not (.isClosed rset)) "ResultSet is already closed")
   (let [volatile-transient-row (volatile! (next.jdbc.rs/->row builder))
         i->thunk               (atom i->thunk)
-        realized-row-delay     (make-realized-row-delay builder i->thunk volatile-transient-row)
-        realized-keys          (atom #{})]
+        realized-row-delay     (make-realized-row-delay builder i->thunk volatile-transient-row)]
     ;; this is a gross amount of positional args. But using `reify` makes debugging things too hard IMO.
     (->TransientRow model
                     rset
                     builder
                     col-name->index
-                    realized-keys
                     i->thunk
                     volatile-transient-row
                     realized-row-delay)))
