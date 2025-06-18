@@ -15,6 +15,7 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
+   [toucan2.tools.before-select :as before-select]
    [toucan2.tools.before-update :as before-update]
    [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.identity-query :as identity-query]
@@ -106,6 +107,25 @@
              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
            (select/select-one ::venues.string-id-and-category-keyword :toucan/pk "1")
            (select/select-one ::venues.string-id-and-category-keyword {:order-by [[:id :asc]]})))))
+
+(derive ::venues.category-keyword.before-select ::venues.category-keyword)
+
+(before-select/define-before-select ::venues.category-keyword.before-select
+  [venue]
+  venue)
+
+(deftest ^:synchronized select-with-before-select-test
+  (testing "transforms and before-selects should play nicely together"
+    (test/with-discarded-table-changes :venues
+      (is (= [(instance/instance
+                ::venues.category-keyword.before-select
+                {:id         4
+                 :name       "Hi-Dive"
+                 :category   :bar
+                 :created-at (LocalDateTime/parse "2017-01-01T00:00")
+                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+             (insert/insert-returning-instances! ::venues.category-keyword.before-select
+                                                 [{:name "Hi-Dive", :category :bar}]))))))
 
 (m/defmethod transformed/transforms ::unnormalized
   [_model]

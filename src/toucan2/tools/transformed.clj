@@ -434,3 +434,9 @@
 (m/prefer-method! #'pipeline/results-transform
                   [:toucan.result-type/instances ::transformed.model]
                   [:toucan.result-type/instances :toucan2.tools.default-fields/default-fields])
+
+;; with selects, apply the transform build step before before-select
+;; the actual order doesn't matter here, but having an order can avoid rare errors
+(m/prefer-method! #'pipeline/build
+                  [:toucan.query-type/select.instances-from-pks ::transformed.model :default]
+                  [:toucan.query-type/select.* :toucan2.tools.before-select/model :default])
