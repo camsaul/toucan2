@@ -24,15 +24,12 @@
                            "com.mysql.cj.MysqlConnection"])
   (require 'toucan2.jdbc.mysql-mariadb))
 
-;;; c3p0 and Hikari integration: when we encounter a wrapped connection pool connection, dispatch off of the class of
-;;; connection it wraps
-(doseq [pool-connection-class-name ["com.mchange.v2.c3p0.impl.NewProxyConnection"
-                                    "com.zaxxer.hikari.pool.HikariProxyConnection"]]
-  (when-let [pool-connection-class (class-for-name pool-connection-class-name)]
-    (extend pool-connection-class
-      protocols/IDispatchValue
-      {:dispatch-value (fn [^java.sql.Wrapper conn]
-                         (try
-                           (protocols/dispatch-value (.unwrap conn java.sql.Connection))
-                           (catch Throwable _
-                             pool-connection-class)))})))
+;;; c3p0 and Hikari integration, or any other library that wraps real SQL connections: when we encounter a wrapped
+;;; connection, dispatch off of the class of connection it wraps
+(extend java.sql.Connection
+  protocols/IDispatchValue
+  {:dispatch-value (fn [^java.sql.Wrapper conn]
+                     (try
+                       (type (.unwrap conn java.sql.Connection))
+                       (catch Throwable _
+                         (type conn))))})
