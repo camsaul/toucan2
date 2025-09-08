@@ -10,6 +10,8 @@
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.named-query :as tools.named-query]))
 
+(set! *warn-on-reflection* true)
+
 (deftest ^:parallel query-test
   (is (= [[1 2]
           [:a :b]]
@@ -80,6 +82,10 @@
              results))
       (testing "Return plain rows, not instances"
         (is (not (instance/instance? (first results))))))))
+
+(deftest ^:parallel can-unwrap-identity-connection
+  (let [conn (identity-query/->IdentityConnection)]
+    (is (identical? conn (.unwrap ^java.sql.Wrapper conn java.sql.Connection)))))
 
 ;; (deftest ^:parallel insert-test
 ;;   (testing "Can we use identity-query with insert?"

@@ -74,6 +74,14 @@
 ;;;; Identity connection
 
 (deftype ^:no-doc IdentityConnection []
+  java.sql.Wrapper
+  (isWrapperFor [_this klass]
+    (= klass java.sql.Connection))
+  (unwrap [this klass]
+    (if (.isWrapperFor this klass)
+      this
+      (throw (ex-info (str "IdentityConnection is not the wrapper for " klass) {}))))
+
   pretty/PrettyPrintable
   (pretty [_this]
     (list `->IdentityConnection)))
