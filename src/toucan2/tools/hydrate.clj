@@ -631,17 +631,20 @@
   (reduce (partial hydrate-one-form model) results forms))
 
 (defn- unnest-first-result
-  "Given an arbitrarily nested sequence `coll`, continue unnesting the sequence until we get a non-sequential first item.
+  "Given an arbitrarily nested sequence `coll`, continue unnesting the sequence until we get a non-sequential non-nil first item.
 
   ```clj
-  (unnest-first-result [:a :b])  => :a
-  (unnest-first-result [[:a]])   => :a
-  (unnest-first-result [[[:a]]]) => :a
+  (unnest-first-result [:a :b])      => :a
+  (unnest-first-result [[:a]])       => :a
+  (unnest-first-result [[[:a]]])     => :a
+  (unnest-first-result [nil :a :b])  => :a
+  (unnest-first-result [[nil :a]])   => :a
   ```"
   [coll]
   (->> (iterate first coll)
        (take-while sequential?)
        last
+       (remove nil?)
        first))
 
 
