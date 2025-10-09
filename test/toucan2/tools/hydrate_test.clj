@@ -538,13 +538,16 @@
 (deftest ^:parallel unnest-first-result-test
   (are [coll expected] (= expected
                           (#'hydrate/unnest-first-result coll))
-    nil        nil
-    :a         nil
-    []         nil
-    [:a]       :a
-    [[:a]]     :a
-    [[[:a]]]   :a
-    [[[[:a]]]] :a))
+    nil                nil
+    :a                 nil
+    []                 nil
+    [:a]               :a
+    [nil :a]           :a
+    [nil nil]          nil
+    [[:a]]             :a
+    [[[:a]]]           :a
+    [[[nil nil :a]]]   :a
+    [[[[:a]]]]         :a))
 
 (m/defmethod hydrate/simple-hydrate [:default ::k]
   [_model k m]
