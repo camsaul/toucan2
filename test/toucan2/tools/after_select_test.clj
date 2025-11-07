@@ -168,3 +168,30 @@
              (generated-name `(after-select/define-after-select :model-2
                                 [~'venue]
                                 ~'venue)))))))
+
+(deftest ^:synchronized hierarchy-validity-test
+  (testing "define-after-select should maintain valid hierarchies when models derive from each other"
+    (testing "metabase scenario: derive child from parent, then define-after-select on both"
+      ;; This reproduces the issue metabase with the following setup:
+      ;; (derive :metadata/segment :model/Segment)
+      ;; (define-after-select :metadata/segment ...)
+      ;; (define-after-select :model/Segment ...)
+      ;; would create an invalid hierarchy
+      (with-redefs [clojure.core/global-hierarchy (make-hierarchy)]
+      (let [parent ::test-parent-model
+            child ::test-child-model]
+        (derive child parent)
+        (after-select/define-after-select child
+          [instance]
+          (assoc instance :child-processed true))
+        (after-select/define-after-select parent
+          [instance]
+          (assoc instance :parent-processed true))
+        (is (isa? child parent))
+        (is (isa? child ::after-select/after-select))
+        (is (isa? parent ::after-select/after-select))
+        (is (not (contains? (parents child) ::after-select/after-select))
+            "child should not have ::after-select as a direct parent")
+        (underive parent ::after-select/after-select)
+        (underive child ::after-select/after-select)
+          (underive child parent))))))

@@ -84,6 +84,7 @@
   {:style/indent :defn}
   [model [instance-binding] & body]
   `(do
+     (u/unparent-descendants ~model ::before-delete)
      (u/maybe-derive ~model ::before-delete)
      (m/defmethod before-delete ~model
        [model# instance#]

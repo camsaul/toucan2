@@ -40,6 +40,12 @@
   (when-not (isa? child parent)
     (derive child parent)))
 
+(defn unparent-descendants
+  "For all descendants of `ancestor`, [[underive]] them from `parent-to-remove`."
+  [ancestor parent-to-remove]
+  (doseq [descendant (descendants ancestor)]
+    (underive descendant parent-to-remove)))
+
 ;;;; [[try-with-error-context]]
 
 ;;; TODO -- I don't love this stuff anymore, need to rework it at some point.

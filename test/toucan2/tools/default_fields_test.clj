@@ -172,7 +172,7 @@
     (is (= {:id         1
             :name       "Tempest"
             :category   "bar"
-            :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00"),}
+            :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00")}
            (select/select-one ::venues.with-created-at 1)))))
 
 (named-query/define-named-query ::named-query.select-venues-override-default-fields
@@ -208,3 +208,23 @@
              (generated-name `(default-fields/define-default-fields :model-2
                                 [~'venue]
                                 ~'venue)))))))
+
+(deftest ^:synchronized hierarchy-validity-test
+  (testing "define-default-fields should maintain valid hierarchies when models derive from each other"
+    (testing "metabase scenario: derive child from parent, then define-default-fields on both"
+      (with-redefs [clojure.core/global-hierarchy (make-hierarchy)]
+      (let [parent ::test-parent-model
+            child ::test-child-model]
+        (derive child parent)
+        (default-fields/define-default-fields child
+          [:id :name])
+        (default-fields/define-default-fields parent
+          [:id :category])
+        (is (isa? child parent))
+        (is (isa? child ::default-fields/default-fields))
+        (is (isa? parent ::default-fields/default-fields))
+        (is (not (contains? (parents child) ::default-fields/default-fields))
+            "child should not have ::default-fields as a direct parent")
+        (underive parent ::default-fields/default-fields)
+        (underive child ::default-fields/default-fields)
+          (underive child parent))))))
