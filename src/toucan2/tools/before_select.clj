@@ -37,6 +37,7 @@
   {:style/indent :defn}
   [model [args-binding] & body]
   `(do
+     (u/unparent-descendants ~model ::model)
      (u/maybe-derive ~model ::model)
      (m/defmethod before-select ~model
        [~'&model ~args-binding]

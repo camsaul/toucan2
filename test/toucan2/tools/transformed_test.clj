@@ -564,6 +564,26 @@
              (generated-name `(transformed/deftransforms :model-2
                                 {:x {:in ~'inc}})))))))
 
+(deftest ^:synchronized hierarchy-validity-test
+  (testing "deftransforms should maintain valid hierarchies when models derive from each other"
+    (testing "metabase scenario: derive child from parent, then deftransforms on both"
+      (with-redefs [clojure.core/global-hierarchy (make-hierarchy)]
+        (let [parent ::test-parent-model
+              child ::test-child-model]
+          (derive child parent)
+          (transformed/deftransforms child
+            {:name {:in identity, :out identity}})
+          (transformed/deftransforms parent
+            {:category {:in identity, :out identity}})
+          (is (isa? child parent))
+          (is (isa? child ::transformed/transformed.model))
+          (is (isa? parent ::transformed/transformed.model))
+          (is (not (contains? (parents child) ::transformed/transformed.model))
+              "child should not have ::transformed.model as a direct parent")
+          (underive parent ::transformed/transformed.model)
+          (underive child ::transformed/transformed.model)
+          (underive child parent))))))
+
 (derive ::venues.edn-category ::test/venues)
 
 (transformed/deftransforms ::venues.edn-category

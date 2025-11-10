@@ -410,6 +410,7 @@
   {:style/indent 1}
   [model column->direction->fn]
   `(do
+     (u/unparent-descendants ~model ::transformed.model)
      (u/maybe-derive ~model ::transformed.model)
      (m/defmethod transforms ~model
        [~'model]

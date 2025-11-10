@@ -27,6 +27,7 @@
   {:style/indent :defn}
   [model [instance-binding] & body]
   `(do
+     (u/unparent-descendants ~model ::after-select)
      (u/maybe-derive ~model ::after-select)
      (m/defmethod after-select ~model
        [instance#]

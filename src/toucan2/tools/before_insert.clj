@@ -63,6 +63,7 @@
   {:style/indent :defn}
   [model [instance-binding] & body]
   `(do
+     (u/unparent-descendants ~model ::before-insert)
      (u/maybe-derive ~model ::before-insert)
      (m/defmethod before-insert ~model
        [~'&model ~instance-binding]

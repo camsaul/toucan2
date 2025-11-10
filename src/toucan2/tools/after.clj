@@ -115,6 +115,7 @@
 (defmacro define-after
   [query-type model [instance-binding] & body]
   `(do
+     (u/unparent-descendants ~model ::model)
      (u/maybe-derive ~model ::model)
      (m/defmethod each-row-fn [~query-type ~model]
        [~'&query-type ~'&model]

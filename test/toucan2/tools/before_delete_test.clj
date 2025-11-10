@@ -199,3 +199,26 @@
              (generated-name `(before-delete/define-before-delete :model-2
                                 [~'venue]
                                 ~'venue)))))))
+
+(deftest ^:synchronized hierarchy-validity-test
+  (testing "define-before-delete should maintain valid hierarchies when models derive from each other"
+    (testing "metabase scenario: derive child from parent, then define-before-delete on both"
+      (with-redefs [clojure.core/global-hierarchy (make-hierarchy)]
+      (let [parent ::test-parent-model
+            child ::test-child-model]
+        (derive child parent)
+        (before-delete/define-before-delete child
+          [instance]
+          instance)
+        (before-delete/define-before-delete parent
+          [instance]
+          instance)
+        (is (isa? child parent))
+        (is (isa? child ::before-delete/before-delete))
+        (is (isa? parent ::before-delete/before-delete))
+        (is (not (contains? (parents child) ::before-delete/before-delete))
+            "child should not have ::before-delete as a direct parent")
+        (underive ::some-unrelated-model ::test/venues)
+        (underive child ::before-delete/before-delete)
+        (underive child parent)
+          (underive parent ::before-delete/before-delete))))))

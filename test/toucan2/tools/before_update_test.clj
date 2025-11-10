@@ -495,3 +495,25 @@
              (generated-name `(before-update/define-before-update :model-2
                                 [~'venue]
                                 ~'venue)))))))
+
+(deftest ^:synchronized hierarchy-validity-test
+  (testing "define-before-update should maintain valid hierarchies when models derive from each other"
+    (testing "metabase scenario: derive child from parent, then define-before-update on both"
+      (with-redefs [clojure.core/global-hierarchy (make-hierarchy)]
+      (let [parent ::test-parent-model
+            child ::test-child-model]
+        (derive child parent)
+        (before-update/define-before-update child
+          [instance]
+          (assoc instance :child-processed true))
+        (before-update/define-before-update parent
+          [instance]
+          (assoc instance :parent-processed true))
+        (is (isa? child parent))
+        (is (isa? child ::before-update/before-update))
+        (is (isa? parent ::before-update/before-update))
+        (is (not (contains? (parents child) ::before-update/before-update))
+            "child should not have ::before-update as a direct parent")
+        (underive parent ::before-update/before-update)
+        (underive child ::before-update/before-update)
+          (underive child parent))))))

@@ -119,6 +119,7 @@
 
 (defmacro define-default-fields {:style/indent :defn} [model & body]
   `(do
+     (u/unparent-descendants ~model ::default-fields)
      (u/maybe-derive ~model ::default-fields)
      (m/defmethod default-fields ~model [~'&model] ~@body)))
 

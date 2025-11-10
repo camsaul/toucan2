@@ -123,6 +123,7 @@
 
 (defmacro define-before-update [model [instance-binding] & body]
   `(do
+     (u/unparent-descendants ~model ::before-update)
      (u/maybe-derive ~model ::before-update)
      (m/defmethod before-update ~model
        [~'&model ~instance-binding]

@@ -220,3 +220,25 @@
              (generated-name `(before-insert/define-before-insert :model-2
                                 [~'venue]
                                 ~'venue)))))))
+
+(deftest ^:synchronized hierarchy-validity-test
+  (testing "define-before-insert should maintain valid hierarchies when models derive from each other"
+    (testing "metabase scenario: derive child from parent, then define-before-insert on both"
+      (with-redefs [clojure.core/global-hierarchy (make-hierarchy)]
+      (let [parent ::test-parent-model
+            child ::test-child-model]
+        (derive child parent)
+        (before-insert/define-before-insert child
+          [instance]
+          (assoc instance :child-processed true))
+        (before-insert/define-before-insert parent
+          [instance]
+          (assoc instance :parent-processed true))
+        (is (isa? child parent))
+        (is (isa? child ::before-insert/before-insert))
+        (is (isa? parent ::before-insert/before-insert))
+        (is (not (contains? (parents child) ::before-insert/before-insert))
+            "child should not have ::before-insert as a direct parent")
+        (underive parent ::before-insert/before-insert)
+        (underive child ::before-insert/before-insert)
+          (underive child parent))))))
