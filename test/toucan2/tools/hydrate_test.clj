@@ -547,7 +547,10 @@
     [[:a]]             :a
     [[[:a]]]           :a
     [[[nil nil :a]]]   :a
-    [[[[:a]]]]         :a))
+    [[[[:a]]]]         :a
+    [[] :a]            :a
+    [[nil nil] [:a]]   :a
+    [[:a] :b]          :a))
 
 (m/defmethod hydrate/simple-hydrate [:default ::k]
   [_model k m]
