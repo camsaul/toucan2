@@ -639,13 +639,17 @@
   (unnest-first-result [[[:a]]])     => :a
   (unnest-first-result [nil :a :b])  => :a
   (unnest-first-result [[nil :a]])   => :a
+  (unnest-first-result [[] :a])      => :a
   ```"
   [coll]
-  (->> (iterate first coll)
-       (take-while sequential?)
-       last
-       (remove nil?)
-       first))
+  (if (sequential? coll)
+    (loop [[current & more] coll]
+      (cond
+        (sequential? current) (recur (concat current more))
+        (some? current) current
+        (seq more) (recur more)
+        :else nil))
+    nil))
 
 
 ;;;                                                 Public Interface
