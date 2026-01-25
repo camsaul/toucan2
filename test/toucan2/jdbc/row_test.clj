@@ -33,7 +33,7 @@
           (select/reducible-select ::test/venues 1)))))
 
 (defn- realized-keys [^TransientRow row]
-  @(.realized_keys row))
+  (set (keys (second (#'jdbc.row/print-representation-parts row)))))
 
 (defn- already-realized? [^TransientRow row]
   (realized? (.realized_row row)))
