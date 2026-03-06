@@ -353,7 +353,8 @@
                (case (test/current-db-type)
                  :postgres #"ERROR: null value in column .* violates not-null constraint"
                  :h2       #"NULL not allowed for column \"CATEGORY\""
-                 :mariadb  #"Column 'category' cannot be null")
+                 :mariadb  #"Column 'category' cannot be null"
+                 :sqlite   #"\[SQLITE_CONSTRAINT_NOTNULL\]")
                (insert/insert! ::venues.category-keyword {:name "No Category", :category nil})))))
       (testing "conditions"
         (is (= nil

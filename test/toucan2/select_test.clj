@@ -136,6 +136,7 @@
               (let [expected-key (case (test/current-db-type)
                                    :h2       (keyword "max(-id)")
                                    :postgres :max
+                                   :sqlite   (keyword "max(\"id\")")
                                    :mariadb  (keyword "max(`id`)"))]
                 (is (= [(instance/instance ::test/people {expected-key 4})]
                        (select/select [::test/people [expr]]))))))))
@@ -453,7 +454,7 @@
   (testing "Should build an efficient query"
     (is (= (case (test/current-db-type)
              :mariadb  ["SELECT COUNT(*) AS `count` FROM `venues` WHERE `id` = ?" 1]
-             :postgres ["SELECT COUNT(*) AS \"count\" FROM \"venues\" WHERE \"id\" = ?" 1]
+             (:postgres :sqlite) ["SELECT COUNT(*) AS \"count\" FROM \"venues\" WHERE \"id\" = ?" 1]
              :h2       ["SELECT COUNT(*) AS \"COUNT\" FROM \"VENUES\" WHERE \"ID\" = ?" 1])
            (tools.compile/compile
              (select/count ::test/venues 1)))))
@@ -465,8 +466,9 @@
                               (select/count ::test/venues ["SELECT count(*) AS count FROM venues;"])))]
         (is (not (str/includes? s "inefficient count query")))))
     (testing "Query that returns multiple rows"
-      (is (= 3
-             (select/count ::test/venues ["(SELECT 1 AS count) UNION ALL (SELECT 2 AS count);"]))))
+      (when-not (= (test/current-db-type) :sqlite)
+        (is (= 3
+               (select/count ::test/venues ["(SELECT 1 AS count) UNION ALL (SELECT 2 AS count);"])))))
     (testing "(inefficient query)"
       (is (= 3
              (select/count ::test/venues ["SELECT * FROM venues;"])))
@@ -486,14 +488,14 @@
   (testing "Should build an efficient query"
     (is (= (case (test/current-db-type)
              :mariadb  ["SELECT EXISTS (SELECT 1 FROM `venues` WHERE `id` = ?) AS `exists`" 1]
-             :postgres ["SELECT EXISTS (SELECT 1 FROM \"venues\" WHERE \"id\" = ?) AS \"exists\"" 1]
+             (:postgres :sqlite) ["SELECT EXISTS (SELECT 1 FROM \"venues\" WHERE \"id\" = ?) AS \"exists\"" 1]
              :h2       ["SELECT EXISTS (SELECT 1 FROM \"VENUES\" WHERE \"ID\" = ?) AS \"EXISTS\"" 1])
            (tools.compile/compile
              (select/exists? ::test/venues 1)))))
   (testing "Should be possible to do count with a raw SQL query"
     (let [exists-identifier (case (test/current-db-type)
-                              :mariadb        "`exists`"
-                              (:h2 :postgres) "\"exists\"")]
+                              :mariadb              "`exists`"
+                              (:h2 :postgres :sqlite) "\"exists\"")]
       (is (true? (select/exists? ::test/venues  [(format "SELECT exists(SELECT 1 FROM venues WHERE id = 1) AS %s;"
                                                          exists-identifier)])))
       (is (false? (select/exists? ::test/venues  [(format "SELECT exists(SELECT 1 FROM venues WHERE id < 1) AS %s;"
@@ -502,12 +504,13 @@
         (is (true? (select/exists? ::test/venues  [(format "SELECT 1 AS %s;" exists-identifier)])))
         (is (false? (select/exists? ::test/venues [(format "SELECT 0 AS %s;" exists-identifier)]))))
       (testing "query that returns multiple rows"
-        (is (true? (select/exists? ::test/venues  [(format "(SELECT false AS %s) UNION ALL (SELECT true AS %s);"
-                                                           exists-identifier
-                                                           exists-identifier)])))
-        (is (false? (select/exists? ::test/venues  [(format "(SELECT false AS %s) UNION ALL (SELECT false AS %s);"
-                                                            exists-identifier
-                                                            exists-identifier)]))))
+        (when-not (= (test/current-db-type) :sqlite)
+          (is (true? (select/exists? ::test/venues  [(format "(SELECT false AS %s) UNION ALL (SELECT true AS %s);"
+                                                             exists-identifier
+                                                             exists-identifier)])))
+          (is (false? (select/exists? ::test/venues  [(format "(SELECT false AS %s) UNION ALL (SELECT false AS %s);"
+                                                              exists-identifier
+                                                              exists-identifier)])))))
       (testing "should not log a warning, since this query returns :exists"
         (let [s (with-out-str
                   (binding [log/*level* :warn]
@@ -532,7 +535,7 @@
            (select/select-one ::test/people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]})))
     (is (= [(case (test/current-db-type)
               :h2       "SELECT \"P\".\"ID\" FROM \"PEOPLE\" AS \"P\" WHERE \"P\".\"ID\" = ?"
-              :postgres "SELECT \"p\".\"id\" FROM \"people\" AS \"p\" WHERE \"p\".\"id\" = ?"
+              (:postgres :sqlite) "SELECT \"p\".\"id\" FROM \"people\" AS \"p\" WHERE \"p\".\"id\" = ?"
               :mariadb  "SELECT `p`.`id` FROM `people` AS `p` WHERE `p`.`id` = ?")
             1]
            (tools.compile/compile
@@ -550,7 +553,7 @@
                (pipeline/build :toucan.query-type/select.* ::test/venues parsed-args query)))))
     (is (= [(case (test/current-db-type)
               :h2       "SELECT * FROM \"VENUES\" WHERE \"ID\" IS NULL"
-              :postgres "SELECT * FROM \"venues\" WHERE \"id\" IS NULL"
+              (:postgres :sqlite) "SELECT * FROM \"venues\" WHERE \"id\" IS NULL"
               :mariadb  "SELECT * FROM `venues` WHERE `id` IS NULL")]
            (tools.compile/compile
              (select/select ::test/venues nil))))

@@ -222,7 +222,7 @@
                (pipeline/build :toucan.query-type/update.* ::test/venues parsed-args query)))))
     (is (= [(case (test/current-db-type)
               :h2       "UPDATE \"VENUES\" SET \"NAME\" = ? WHERE \"ID\" IS NULL"
-              :postgres "UPDATE \"venues\" SET \"name\" = ? WHERE \"id\" IS NULL"
+              (:postgres :sqlite) "UPDATE \"venues\" SET \"name\" = ? WHERE \"id\" IS NULL"
               :mariadb  "UPDATE `venues` SET `name` = ? WHERE `id` IS NULL")
             "Taco Bell"]
            (tools.compile/compile

@@ -24,6 +24,11 @@
                            "com.mysql.cj.MysqlConnection"])
   (require 'toucan2.jdbc.mysql-mariadb))
 
+(when (some class-for-name ["org.sqlite.SQLiteConnection"
+                            "org.sqlite.jdbc3.JDBC3Connection"
+                            "org.sqlite.jdbc4.JDBC4Connection"])
+  (require 'toucan2.jdbc.sqlite))
+
 ;;; c3p0 and Hikari integration, or any other library that wraps real SQL connections: when we encounter a wrapped
 ;;; connection, dispatch off of the class of connection it wraps
 (extend java.sql.Connection

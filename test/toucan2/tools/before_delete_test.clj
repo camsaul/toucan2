@@ -83,7 +83,8 @@
                    ::venues.before-delete-exception.db-land      (case (test/current-db-type)
                                                                    :postgres #"ERROR: duplicate key value violates unique constraint"
                                                                    :h2       #"Unique index or primary key violation"
-                                                                   :mariadb  #"Duplicate entry"))
+                                                                   :mariadb  #"Duplicate entry"
+                                                                   :sqlite   #"\[SQLITE_CONSTRAINT_PRIMARYKEY\]"))
                  (delete/delete! model)))
             (is (= [[model 1]
                     [model 2]

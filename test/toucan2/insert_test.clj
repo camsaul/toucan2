@@ -271,9 +271,9 @@
       (testing (format "row-or-rows = %s" (pr-str row-or-rows))
         (test/with-discarded-table-changes :birds
           (is (= [(case (test/current-db-type)
-                    :h2       "INSERT INTO \"BIRDS\" DEFAULT VALUES"
-                    :postgres "INSERT INTO \"birds\" DEFAULT VALUES"
-                    :mariadb  "INSERT INTO `birds` VALUES ()")]
+                    :h2                "INSERT INTO \"BIRDS\" DEFAULT VALUES"
+                    (:postgres :sqlite) "INSERT INTO \"birds\" DEFAULT VALUES"
+                    :mariadb           "INSERT INTO `birds` VALUES ()")]
                  (tools.compile/compile
                    (insert/insert! ::test/birds row-or-rows))))
           (is (= 1
@@ -388,5 +388,6 @@
                  (insert! ::test.track-realized/venues {:name "Walgreens", :category "store"})))
           (is (= (case (test/current-db-type)
                    (:postgres :h2) #{:venues/id}
+                   :sqlite         #{}  ; SQLite computes PKs from last_insert_rowid() without reading columns
                    :mariadb        #{:insert-id})
                  (realized-columns))))))))

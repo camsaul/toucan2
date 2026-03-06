@@ -161,7 +161,8 @@
                  ::venues.exception.db-land      (case (test/current-db-type)
                                                    :postgres #"ERROR: duplicate key value violates unique constraint"
                                                    :h2       #"Unique index or primary key violation"
-                                                   :mariadb  #"Duplicate entry"))
+                                                   :mariadb  #"Duplicate entry"
+                                                   :sqlite   #"\[SQLITE_CONSTRAINT_PRIMARYKEY\]"))
                (insert/insert! model {:category "store", :name "My Store"})))
           (testing "\nShould be done inside a transaction"
             (is (= [(instance/instance model

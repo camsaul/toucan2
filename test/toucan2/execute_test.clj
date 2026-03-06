@@ -260,7 +260,7 @@
            (execute/query ::test/db "SELECT 1 AS one;")))))
 
 (deftest ^:parallel query-returning-no-columns-test
-  ;; this syntax doesn't seem to work on MariaDB
+  ;; this syntax doesn't seem to work on MariaDB or SQLite
   (when (#{:h2 :postgres} (test/current-db-type))
     (is (= [(instance/instance nil {})
             (instance/instance nil {})

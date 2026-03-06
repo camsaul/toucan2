@@ -6,7 +6,7 @@ CREATE TABLE birds (
   id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   name TEXT NOT NULL DEFAULT 'birb',
   bird_type TEXT NOT NULL DEFAULT 'parrot',
-  good_bird INTEGER
+  good_bird BOOLEAN
 );
 
 INSERT INTO birds (name, bird_type, good_bird)

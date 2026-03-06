@@ -93,7 +93,8 @@
   ([db-type]
    (case db-type
      :h2               ::h2
-     (:postgres :sqlite) :ansi
+     :postgres         :ansi
+     :sqlite           :ansi
      (:mysql :mariadb) :mysql)))
 
 #_{:clj-kondo/ignore [:discouraged-var]}
@@ -173,6 +174,7 @@
          (fn [f]
            (comp str/upper-case f))))
 
+
 ;;; in case we need it later, so we can reset it. See [[toucan.test-setup/do-with-default-quoting-style]]
 (defonce global-honeysql-options @t2.honeysql/global-options)
 
@@ -196,7 +198,7 @@
 
 (defmethod default-test-db-url :sqlite
   [_db-type]
-  "jdbc:sqlite:file::memory:?cache=shared")
+  "jdbc:sqlite:/tmp/toucan2-test.db")
 
 (defn test-db-url
   (^String []
