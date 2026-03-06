@@ -13,6 +13,7 @@
    [toucan2.connection :as conn]
    [toucan2.honeysql2 :as t2.honeysql]
    [toucan2.jdbc.options :as jdbc.options]
+   [toucan2.jdbc.sqlite]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
@@ -92,7 +93,7 @@
   ([db-type]
    (case db-type
      :h2               ::h2
-     :postgres         :ansi
+     (:postgres :sqlite) :ansi
      (:mysql :mariadb) :mysql)))
 
 #_{:clj-kondo/ignore [:discouraged-var]}
@@ -192,6 +193,10 @@
 (defmethod default-test-db-url :h2
   [_db-type]
   "jdbc:h2:mem:toucan2;DB_CLOSE_DELAY=-1")
+
+(defmethod default-test-db-url :sqlite
+  [_db-type]
+  "jdbc:sqlite:file::memory:?cache=shared")
 
 (defn test-db-url
   (^String []
@@ -359,12 +364,13 @@
 (defn set-db-types!
   "Change the DB types to run tests against for the current REPL session."
   [& ks]
-  {:pre [(every? #{:postgres :mariadb :h2} ks) (seq ks)]}
+  {:pre [(every? #{:postgres :mariadb :h2 :sqlite} ks) (seq ks)]}
   (reset! db-types* (set ks)))
 
 (derive ::convenience-connectable ::db)
 (derive :repl/h2                  ::convenience-connectable)
 (derive :repl/postgres            ::convenience-connectable)
+(derive :repl/sqlite              ::convenience-connectable)
 
 (m/defmethod conn/do-with-connection ::convenience-connectable
   [connectable f]

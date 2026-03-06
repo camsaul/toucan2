@@ -30,6 +30,7 @@
     ;; https://mariadb.com/kb/en/about-mariadb-connector-j/#generated-keys-limitation
     org.mariadb.jdbc/mariadb-java-client {:mvn/version "2.7.8"}
     org.postgresql/postgresql            {:mvn/version "42.7.4"}
+    org.xerial/sqlite-jdbc               {:mvn/version "3.47.1.0"}
     pjstadig/humane-test-output          {:mvn/version "0.11.0"}}
 
    :extra-paths
@@ -87,7 +88,7 @@
   ;; clojure -X:dev:test
   :test
   {:exec-fn   toucan2.test-runner/run-tests
-   :jvm-opts  ["-Dtest.dbs=h2,postgres,mariadb"
+   :jvm-opts  ["-Dtest.dbs=h2,postgres,mariadb,sqlite"
                "-Dtoucan.test=true"
                "-Dtoucan.debug.level=disabled" #_trace]
    :exec-args {:only ["test"
@@ -122,6 +123,12 @@
   ;; clj -X:dev:test:test-mariadb
   :test-mariadb
   {:jvm-opts ["-Dtest.dbs=mariadb"]}
+
+  ;; run tests only against SQLite.
+  ;;
+  ;; clj -X:dev:test:test-sqlite
+  :test-sqlite
+  {:jvm-opts ["-Dtest.dbs=sqlite"]}
 
   ;; clj -X:dev:cloverage
   :cloverage
