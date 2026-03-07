@@ -1,14 +1,12 @@
 (ns toucan2.jdbc.sqlite
-  "SQLite integration (workarounds for timestamps, generated keys, and UPDATE returning PKs)."
+  "SQLite integration (workarounds for generated keys, booleans, and UPDATE returning PKs)."
   (:require
    [clojure.string :as str]
    [methodical.core :as m]
    [toucan2.connection :as conn]
    [toucan2.jdbc.connection]
-   [toucan2.jdbc.options :as jdbc.options]
    [toucan2.jdbc.pipeline]
    [toucan2.jdbc.read :as jdbc.read]
-   [toucan2.jdbc.result-set :as jdbc.rs]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline])
@@ -66,6 +64,8 @@
     (.execute stmt "PRAGMA foreign_keys = ON"))
   (f conn))
 
+(m/prefer-method! #'conn/do-with-connection ::connection java.sql.Connection)
+
 ;;;; SQL rewriting — apply on each query execution
 
 (m/defmethod pipeline/transduce-execute-with-connection :around [#_conn       ::connection
@@ -90,18 +90,25 @@
       (when (some? v)
         (not (zero? (long v)))))))
 
-;;;; INSERT returning PKs — generated key column renaming
+;;;; INSERT returning PKs
 ;;;
-;;; SQLite's JDBC driver returns the generated key as `last_insert_rowid()` instead of the
-;;; actual PK column name. Same pattern as MySQL/MariaDB's `insert_id`.
+;;; Use SQLite's RETURNING clause (3.35+) to get inserted PKs directly,
+;;; avoiding the fragile last_insert_rowid() + contiguous-rowid assumption.
+
+(defn- append-returning-pks
+  "Append a RETURNING clause for the model's PK columns to a compiled INSERT query."
+  [compiled-query model]
+  (let [pks        (model/primary-keys model)
+        returning  (str " RETURNING " (str/join ", " (map #(str "\"" (name %) "\"") pks)))
+        sql        (first compiled-query)]
+    (into [(str sql returning)] (rest compiled-query))))
 
 (m/defmethod pipeline/transduce-execute-with-connection [#_conn       ::connection
                                                           #_query-type :toucan.query-type/insert.pks
                                                           #_model      :default]
-  "SQLite RETURN_GENERATED_KEYS workaround.
-  - If all rows specify PKs, return them directly (skip getGeneratedKeys).
-  - For single-PK auto-generated inserts, execute as update-count then compute all IDs
-    from last_insert_rowid() since SQLite's getGeneratedKeys only returns the last row."
+  "SQLite INSERT returning PKs.
+  - If all rows specify PKs, return them directly (skip the DB round-trip for keys).
+  - Otherwise, append RETURNING clause and execute as a regular query."
   [rf conn query-type model compiled-query]
   (let [rows                 (:rows pipeline/*parsed-args*)
         pks                  (model/primary-keys model)
@@ -122,48 +129,19 @@
          (map (model/select-pks-fn model))
          rf
          rows))
-      ;; For single auto-generated PK: execute as update-count, then compute all IDs from
-      ;; last_insert_rowid(). SQLite guarantees contiguous rowids for a single INSERT statement.
-      ;; This works for both direct rows and named queries (where *parsed-args* has no :rows).
-      (if (= (count pks) 1)
-        (let [update-count (pipeline/transduce-execute-with-connection
-                            (pipeline/default-rf :toucan.query-type/insert.update-count)
-                            conn
-                            :toucan.query-type/insert.update-count
-                            model
-                            compiled-query)
-              last-id      (with-open [stmt (.createStatement ^java.sql.Connection conn)
-                                       rs   (.executeQuery stmt "SELECT last_insert_rowid()")]
-                             (when (.next rs) (.getLong ^java.sql.ResultSet rs 1)))
-              first-id     (- last-id (dec (long update-count)))]
-          (transduce identity rf (mapv #(+ first-id %) (range update-count))))
-        (next-method rf conn query-type model compiled-query)))))
+      ;; Append RETURNING clause and execute as a default query (not :return-keys).
+      ;; The result set contains the PK columns directly.
+      (let [returning-query (append-returning-pks compiled-query model)
+            xform          (map (model/select-pks-fn model))]
+        (pipeline/transduce-execute-with-connection (xform rf)
+                                                    conn
+                                                    :default
+                                                    model
+                                                    returning-query)))))
 
 (m/prefer-method! #'pipeline/transduce-execute-with-connection
                   [::connection :toucan.query-type/insert.pks :default]
                   [java.sql.Connection :toucan.result-type/pks :default])
-
-;;;; Builder function — rename `last_insert_rowid()` to actual PK column name
-
-(m/defmethod jdbc.rs/builder-fn [::connection :default]
-  "Rename `last_insert_rowid()` to the actual PK column name for SQLite."
-  [conn model rset opts]
-  (let [opts               (jdbc.options/merge-options opts)
-        label-fn           (get opts :label-fn name)
-        model-pks          (model/primary-keys model)
-        rowid-label-fn     (if (= (count model-pks) 1)
-                             (fn [label]
-                               (if (= label "last_insert_rowid()")
-                                 (let [pk (first model-pks)
-                                       pk (if (namespace pk)
-                                            pk
-                                            (name pk))]
-                                   (log/debugf "SQLite inserted ID workaround: fetching last_insert_rowid() as %s" pk)
-                                   pk)
-                                 label))
-                             identity)
-        label-fn'          (comp label-fn rowid-label-fn)]
-    (next-method conn model rset (assoc opts :label-fn label-fn'))))
 
 ;;;; UPDATE returning PKs workaround
 ;;;
