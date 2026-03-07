@@ -13,9 +13,7 @@
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline])
   (:import
-   (java.sql ResultSet ResultSetMetaData Types)
-   (java.time LocalDateTime OffsetDateTime)
-   (java.time.format DateTimeParseException)))
+   (java.sql ResultSet ResultSetMetaData Types)))
 
 (set! *warn-on-reflection* true)
 
