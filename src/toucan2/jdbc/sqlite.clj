@@ -37,9 +37,7 @@
   (if-let [[_ stmt-type table alias] (re-find #"(?i)(UPDATE|DELETE FROM)\s+\"([^\"]+)\"\s+(?:AS\s+)?\"([^\"]+)\"" sql)]
     (let [quoted-alias (java.util.regex.Pattern/quote alias)]
       (-> sql
-          ;; First strip alias-qualified column references: "alias"."col" → "col"
           (str/replace (str "\"" alias "\".") "")
-          ;; Then remove the alias declaration after the table name (with or without AS)
           (str/replace (re-pattern (str "(?i)(\"" (java.util.regex.Pattern/quote table) "\")\\s+(?:AS\\s+)?\"" quoted-alias "\""))
                        "$1")))
     sql))
@@ -55,8 +53,7 @@
         compiled-query))
     compiled-query))
 
-;;;; Foreign keys pragma — enable once per connection, not per query
-
+;;;; Foreign keys pragma
 (m/defmethod conn/do-with-connection ::connection
   "Enable foreign keys when opening a SQLite connection."
   [^java.sql.Connection conn f]
@@ -67,7 +64,6 @@
 (m/prefer-method! #'conn/do-with-connection ::connection java.sql.Connection)
 
 ;;;; SQL rewriting — apply on each query execution
-
 (m/defmethod pipeline/transduce-execute-with-connection :around [#_conn       ::connection
                                                                   #_query-type :default
                                                                   #_model      :default]
@@ -79,7 +75,6 @@
 ;;;
 ;;; SQLite stores booleans as integers (0/1). The JDBC driver reports the type as Types/BOOLEAN
 ;;; but returns Integer values. Convert them to proper booleans.
-
 (m/defmethod jdbc.read/read-column-thunk [#_conn  ::connection
                                            #_model :default
                                            #_type  Types/BOOLEAN]
@@ -92,9 +87,7 @@
 
 ;;;; INSERT returning PKs
 ;;;
-;;; Use SQLite's RETURNING clause (3.35+) to get inserted PKs directly,
-;;; avoiding the fragile last_insert_rowid() + contiguous-rowid assumption.
-
+;;; Use SQLite's RETURNING clause (3.35+) to get inserted PKs directly.
 (defn- append-returning-pks
   "Append a RETURNING clause for the model's PK columns to a compiled INSERT query."
   [compiled-query model]
@@ -129,8 +122,6 @@
          (map (model/select-pks-fn model))
          rf
          rows))
-      ;; Append RETURNING clause and execute as a default query (not :return-keys).
-      ;; The result set contains the PK columns directly.
       (let [returning-query (append-returning-pks compiled-query model)
             xform          (map (model/select-pks-fn model))]
         (pipeline/transduce-execute-with-connection (xform rf)

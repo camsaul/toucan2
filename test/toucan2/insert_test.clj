@@ -387,7 +387,6 @@
           (is (= expected
                  (insert! ::test.track-realized/venues {:name "Walgreens", :category "store"})))
           (is (= (case (test/current-db-type)
-                   (:postgres :h2) #{:venues/id}
-                   :sqlite         #{}  ; SQLite computes PKs from last_insert_rowid() without reading columns
-                   :mariadb        #{:insert-id})
+                   (:postgres :h2 :sqlite) #{:venues/id}
+                   :mariadb                #{:insert-id})
                  (realized-columns))))))))

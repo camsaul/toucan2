@@ -197,7 +197,6 @@
          (fn [f]
            (comp str/upper-case f))))
 
-
 ;;; in case we need it later, so we can reset it. See [[toucan.test-setup/do-with-default-quoting-style]]
 (defonce global-honeysql-options @t2.honeysql/global-options)
 
