@@ -3,6 +3,7 @@
   (:require
    [clojure.string :as str]
    [methodical.core :as m]
+   [toucan2.connection :as conn]
    [toucan2.jdbc.connection]
    [toucan2.jdbc.options :as jdbc.options]
    [toucan2.jdbc.pipeline]
@@ -10,12 +11,11 @@
    [toucan2.jdbc.result-set :as jdbc.rs]
    [toucan2.log :as log]
    [toucan2.model :as model]
-   [toucan2.pipeline :as pipeline]
-   [toucan2.util :as u])
+   [toucan2.pipeline :as pipeline])
   (:import
    (java.sql ResultSet ResultSetMetaData Types)
    (java.time LocalDateTime OffsetDateTime)
-   (java.time.format DateTimeFormatter DateTimeParseException)))
+   (java.time.format DateTimeParseException)))
 
 (set! *warn-on-reflection* true)
 
@@ -59,15 +59,22 @@
         compiled-query))
     compiled-query))
 
-;;;; Foreign keys pragma
+;;;; Foreign keys pragma — enable once per connection, not per query
+
+(m/defmethod conn/do-with-connection ::connection
+  "Enable foreign keys when opening a SQLite connection."
+  [^java.sql.Connection conn f]
+  (with-open [stmt (.createStatement conn)]
+    (.execute stmt "PRAGMA foreign_keys = ON"))
+  (f conn))
+
+;;;; SQL rewriting — apply on each query execution
 
 (m/defmethod pipeline/transduce-execute-with-connection :around [#_conn       ::connection
                                                                   #_query-type :default
                                                                   #_model      :default]
-  "Enable foreign keys for SQLite connections and rewrite SQL for compatibility."
+  "Rewrite SQL for SQLite compatibility (strip table aliases from UPDATE/DELETE)."
   [rf conn query-type model compiled-query]
-  (with-open [stmt (.createStatement ^java.sql.Connection conn)]
-    (.execute stmt "PRAGMA foreign_keys = ON"))
   (next-method rf conn query-type model (maybe-rewrite-sql compiled-query)))
 
 ;;;; Boolean handling
