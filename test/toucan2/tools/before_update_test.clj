@@ -39,7 +39,7 @@
   [venue]
   (assert (map? venue) (format "Expected venue to be a map, got ^%s %s" (some-> venue class .getCanonicalName) (pr-str venue)))
   (is (isa? (protocols/model venue) ::venues.before-update))
-  (assoc venue :updated-at (LocalDateTime/parse "2021-06-09T15:18:00")))
+  (assoc venue :updated-at (test/local-dt "2021-06-09T15:18:00")))
 
 (deftest ^:synchronized add-changes-test
   (testing "Updates returned by the before-update method should actually be applied"
@@ -61,8 +61,8 @@
         (is (= {:id         1
                 :name       "Kennedy's Irish Pub and Curry House"
                 :category   "bar"
-                :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                :updated-at (LocalDateTime/parse "2021-06-09T15:18:00")}
+                :created-at (test/local-dt "2017-01-01T00:00")
+                :updated-at (test/local-dt "2021-06-09T15:18:00")}
                (select/select-one ::venues.update-updated-at 1)))))))
 
 (derive ::venues.with-removed-primary-key ::venues.before-update)
@@ -89,7 +89,7 @@
           (testing "sanity check"
             (is (= row-2 (select/select-one [::venues.with-removed-primary-key :id :name :category] :id 2))))
           (testing "we only update 2 rows"
-            (is (= 2 (update/update! ::venues.with-removed-primary-key :id [:in [1 3]] {:category "store" :updated-at (LocalDateTime/parse "2024-11-22T00:00")}))))
+            (is (= 2 (update/update! ::venues.with-removed-primary-key :id [:in [1 3]] {:category "store" :updated-at (test/local-dt "2024-11-22T00:00")}))))
           (testing "the other row is unchanged"
             (is (= row-2 (select/select-one [::venues.with-removed-primary-key :id :name :category] :id 2)))))))))
 
@@ -112,8 +112,8 @@
         (is (= {:id         1
                 :name       "Kennedy's Irish Pub and Curry House"
                 :category   "bar"
-                :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                :created-at (test/local-dt "2017-01-01T00:00")
+                :updated-at (test/local-dt "2017-01-01T00:00")}
                (select/select-one ::venues.discard-category-change 1)))))))
 
 (deftest ^:synchronized pk-condition-test
@@ -129,15 +129,15 @@
             (is (= [(instance/instance ::venues.before-update {:id         1
                                                                :name       "Kennedy's Irish Pub and Curry House"
                                                                :category   "bar"
-                                                               :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                               :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                                               :created-at (test/local-dt "2017-01-01T00:00")
+                                                               :updated-at (test/local-dt "2017-01-01T00:00")})]
                    @*updated-venues*)))
           (testing "original"
             (is (= [(instance/instance ::venues.before-update {:id         1
                                                                :name       "Tempest"
                                                                :category   "bar"
-                                                               :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                               :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                                               :created-at (test/local-dt "2017-01-01T00:00")
+                                                               :updated-at (test/local-dt "2017-01-01T00:00")})]
                    (map protocols/original @*updated-venues*))))
           (testing "changes"
             (is (= [{:name "Kennedy's Irish Pub and Curry House"}]
@@ -157,13 +157,13 @@
             (is (= [{:id         1
                      :name       "Tempest"
                      :category   "not-store"
-                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                     :created-at (test/local-dt "2017-01-01T00:00")
+                     :updated-at (test/local-dt "2017-01-01T00:00")}
                     {:id         2
                      :name       "Ho's Tavern"
                      :category   "not-store"
-                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
+                     :created-at (test/local-dt "2017-01-01T00:00")
+                     :updated-at (test/local-dt "2017-01-01T00:00")}]
                    (sort-by :id @*updated-venues*))))
           (testing "changes"
             (is (= [{:category "not-store"}
@@ -183,8 +183,8 @@
             (is (= [{:id         3
                      :name       "BevMo"
                      :category   "not-bar"
-                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
+                     :created-at (test/local-dt "2017-01-01T00:00")
+                     :updated-at (test/local-dt "2017-01-01T00:00")}]
                    @*updated-venues*)))
           (testing "changes"
             (is (= [{:category "not-bar"}]
@@ -202,8 +202,8 @@
           (is (= [{:id         3
                    :name       "BevMo"
                    :category   "not-bar"
-                   :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                   :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
+                   :created-at (test/local-dt "2017-01-01T00:00")
+                   :updated-at (test/local-dt "2017-01-01T00:00")}]
                  @*updated-venues*)))
         (testing "changes"
           (is (= [{:category "not-bar"}]
@@ -288,16 +288,16 @@
             (testing "Should affect two rows"
               (is (= 2
                      (update/update! ::venues.add-unique-category :category "bar"
-                                     {:updated-at (LocalDateTime/parse "2021-06-09T15:18:00")}))))
+                                     {:updated-at (test/local-dt "2021-06-09T15:18:00")}))))
             (testing "Should have 3 DB calls -- one to fetch matching rows, then 2 separate updates"
               (is (= 3
                      (call-count)))
               (is (= [{:update [:venues]
-                       :set    {:updated-at (LocalDateTime/parse "2021-06-09T15:18")
+                       :set    {:updated-at (test/local-dt "2021-06-09T15:18")
                                 :category   "category-1"}
                        :where  [:= :id 1]}
                       {:update [:venues]
-                       :set    {:updated-at (LocalDateTime/parse "2021-06-09T15:18")
+                       :set    {:updated-at (test/local-dt "2021-06-09T15:18")
                                 :category   "category-2"}
                        :where  [:= :id 2]}]
                      @*venues-update-queries*))
@@ -305,15 +305,15 @@
                                          {:id         1
                                           :name       "Tempest"
                                           :category   "category-1"
-                                          :updated-at (LocalDateTime/parse "2021-06-09T15:18")})
+                                          :updated-at (test/local-dt "2021-06-09T15:18")})
                       (instance/instance ::test/venues {:id         2
                                                         :name       "Ho's Tavern"
                                                         :category   "category-2"
-                                                        :updated-at (LocalDateTime/parse "2021-06-09T15:18")})
+                                                        :updated-at (test/local-dt "2021-06-09T15:18")})
                       (instance/instance ::test/venues {:id         3
                                                         :name       "BevMo"
                                                         :category   "store"
-                                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                                        :updated-at (test/local-dt "2017-01-01T00:00")})]
                      (select/select [::test/venues :id :name :category :updated-at] {:order-by [[:id :asc]]}))))))))))
 
 ;;; TODO -- need a test that we do some number of update batches BETWEEN 1..n for n affected rows. e.g. we affect 3 rows
@@ -336,7 +336,7 @@
     (test/with-discarded-table-changes :venues
       (is (= 1
              (update/update! ::venues.upper-case-name.unique-category :id 1
-                             {:updated-at (LocalDateTime/parse "2022-08-22T18:17:00")})))
+                             {:updated-at (test/local-dt "2022-08-22T18:17:00")})))
       (is (= {:id 1, :name "TEMPEST", :category "category-1"}
              (select/select-one [::test/venues :id :name :category] 1))))))
 
@@ -362,7 +362,7 @@
         (is (= ::venues.upper-case-name
                (:dispatch-value (meta (m/effective-method before-update/before-update ::venues.upper-case-name)))))
         (is (= 3
-               (update/update! ::venues.upper-case-name {:updated-at (LocalDateTime/parse "2022-08-22T18:17:00")})))
+               (update/update! ::venues.upper-case-name {:updated-at (test/local-dt "2022-08-22T18:17:00")})))
         (is (= [{:id 1, :name "TEMPEST"}
                 {:id 2, :name "HO'S TAVERN"}
                 {:id 3, :name "BEVMO"}]
@@ -375,7 +375,7 @@
              :h2       #"NULL not allowed for column \"CATEGORY\";"
              :mariadb  #"Column 'category' cannot be null"
              :sqlite   #"\[SQLITE_CONSTRAINT_NOTNULL\]")
-           (update/update! ::venues.upper-case-name.no-stores {:updated-at (LocalDateTime/parse "2022-08-22T18:17:00")})))
+           (update/update! ::venues.upper-case-name.no-stores {:updated-at (test/local-dt "2022-08-22T18:17:00")})))
       (is (= [{:id 1, :name "Tempest", :category "bar"}
               {:id 2, :name "Ho's Tavern", :category "bar"}
               {:id 3, :name "BevMo", :category "store"}]
@@ -472,7 +472,7 @@
                (update! ::people.suffix-name ::people.named-conditions {:name "CAM"})))
         (is (= {:id         2
                 :name       "CAM 2.0"
-                :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")}
+                :created-at (test/offset-dt "2019-01-11T23:56Z")}
                (select/select-one ::test/people 2)))))))
 
 (deftest ^:parallel macroexpansion-test

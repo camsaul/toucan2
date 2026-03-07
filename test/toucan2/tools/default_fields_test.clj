@@ -63,7 +63,7 @@
                               {:id 1, :name "Tempest"})
            (select/select-one [::venues.default-fields :id :name] {:order-by [[:id :asc]]})))
     (testing `select/select-one-fn
-      (is (= (java.time.LocalDateTime/parse "2017-01-01T00:00")
+      (is (= (test/local-dt "2017-01-01T00:00")
              (select/select-one-fn :created-at ::venues.default-fields 1))))))
 
 (deftest ^:synchronized insert-returning-instances-test
@@ -172,7 +172,7 @@
     (is (= {:id         1
             :name       "Tempest"
             :category   "bar"
-            :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00")}
+            :created-at (test/local-dt "2017-01-01T00:00")}
            (select/select-one ::venues.with-created-at 1)))))
 
 (named-query/define-named-query ::named-query.select-venues-override-default-fields
@@ -182,7 +182,7 @@
   (testing "Don't apply default-fields if we specify a Honey SQL query with explicit"
     (doseq [select [:select :select-distinct]]
       (testing select
-        (are [query] (= {:id 1, :name "Tempest", :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+        (are [query] (= {:id 1, :name "Tempest", :updated-at (test/local-dt "2017-01-01T00:00")}
                         (select/select-one ::venues.default-fields query))
           {select [:id :name :updated-at], :where [:= :id 1]}
           ::named-query.select-venues-override-default-fields)))))

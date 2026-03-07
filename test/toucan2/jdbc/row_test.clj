@@ -232,7 +232,7 @@
     (is (= {:name       "Cam"
             :cool-name  "Cool Cam"
             :id         1
-            :created-at (java.time.OffsetDateTime/parse "2020-04-21T23:56Z")}
+            :created-at (test/offset-dt "2020-04-21T23:56Z")}
            (t2/select-one ::people 1)))
     (is (= {:name      "Cam"
             :cool-name "Cool Cam"

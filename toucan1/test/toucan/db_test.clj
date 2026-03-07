@@ -236,8 +236,8 @@
     (are [thunk] (= [{:id         1
                       :name       "Tempest"
                       :category   :bar
-                      :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
+                      :created-at (test/local-dt "2017-01-01T00:00")
+                      :updated-at (test/local-dt "2017-01-01T00:00")}]
                     thunk)
       (t1.db/simple-select Venue {:where [:= :id 1]})
       (into [] (t1.db/simple-select-reducible Venue {:where [:= :id 1]})))))
@@ -554,15 +554,15 @@
              {:id         5
               :name       "Venue 2"
               :category   {:name :category-2}
-              :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00")
-              :updated-at (java.time.LocalDateTime/parse "2017-01-01T00:00")})
+              :created-at (test/local-dt "2017-01-01T00:00")
+              :updated-at (test/local-dt "2017-01-01T00:00")})
             (instance/instance
              ::venues.edn-category
              {:id         4
               :name       "Venue 1"
               :category   {:name "Category 1"}
-              :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00")
-              :updated-at (java.time.LocalDateTime/parse "2017-01-01T00:00")})]
+              :created-at (test/local-dt "2017-01-01T00:00")
+              :updated-at (test/local-dt "2017-01-01T00:00")})]
            (t1.db/select ::venues.edn-category {:order-by [[:id :desc]], :limit 2})))))
 
 (deftest ^:parallel select-one-test

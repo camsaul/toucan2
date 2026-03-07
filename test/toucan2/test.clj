@@ -86,6 +86,30 @@
         :h2)
       (first (db-types))))
 
+(def ^:private ^java.time.format.DateTimeFormatter local-dt-formatter
+  (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm:ss"))
+
+(def ^:private ^java.time.format.DateTimeFormatter offset-dt-formatter
+  (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"))
+
+(defn local-dt
+  "Expected LocalDateTime value. Returns LocalDateTime on most DBs, string on SQLite
+  (formatted to match how SQLite JDBC stores it)."
+  [^String s]
+  (let [t (java.time.LocalDateTime/parse s)]
+    (if (= (current-db-type) :sqlite)
+      (.format t local-dt-formatter)
+      t)))
+
+(defn offset-dt
+  "Expected OffsetDateTime value. Returns OffsetDateTime on most DBs, string on SQLite
+  (formatted to match how SQLite JDBC stores it)."
+  [^String s]
+  (let [t (java.time.OffsetDateTime/parse s)]
+    (if (= (current-db-type) :sqlite)
+      (.format t offset-dt-formatter)
+      t)))
+
 (defn current-honey-sql-dialect
   "Honey SQL dialect name for the [[current-db-type]]."
   ([]

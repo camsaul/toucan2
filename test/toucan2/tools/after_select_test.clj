@@ -29,8 +29,8 @@
                                :name       "Tempest"
                                :short-name "Temp"
                                :category   "bar"
-                               :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                               :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                               :created-at (test/local-dt "2017-01-01T00:00")
+                               :updated-at (test/local-dt "2017-01-01T00:00")})
            instance))
     (is (nil? (protocols/changes instance)))))
 
@@ -64,13 +64,13 @@
                       :name       "Savoy Tivoli"
                       :short-name "Savo"
                       :category   "bar"
-                      :created-at (LocalDateTime/parse "2023-01-11T18:44")
-                      :updated-at (LocalDateTime/parse "2023-01-11T18:44")}]
+                      :created-at (test/local-dt "2023-01-11T18:44")
+                      :updated-at (test/local-dt "2023-01-11T18:44")}]
                     (insert/insert-returning-instances! ::venues.short-name
                                                         {:name       "Savoy Tivoli"
                                                          :category   "bar"
-                                                         :created-at (LocalDateTime/parse "2023-01-11T18:44")
-                                                         :updated-at (LocalDateTime/parse "2023-01-11T18:44")})))))
+                                                         :created-at (test/local-dt "2023-01-11T18:44")
+                                                         :updated-at (test/local-dt "2023-01-11T18:44")})))))
         (testing "[model & fields] syntax"
           ;; & fields happens in the query so stuff added by after-select should still come back.
           (test/with-discarded-table-changes :venues

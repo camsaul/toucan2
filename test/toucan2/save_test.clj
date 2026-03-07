@@ -23,7 +23,7 @@
           (is (= {:id         1
                   :name       "Hi-Dive"
                   :category   "bar"
-                  :created-at (LocalDateTime/parse "2017-01-01T00:00")}
+                  :created-at (test/local-dt "2017-01-01T00:00")}
                  (dissoc updated :updated-at)
                  (dissoc (protocols/original updated) :updated-at)))
           (is (= nil
@@ -31,7 +31,7 @@
       (is (= (instance/instance ::test/venues {:id         1
                                                :name       "Hi-Dive"
                                                :category   "bar"
-                                               :created-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                               :created-at (test/local-dt "2017-01-01T00:00")})
              (dissoc (select/select-one ::test/venues 1) :updated-at))))))
 
 (deftest ^:synchronized magic-normalized-keys-test
@@ -40,16 +40,16 @@
       (is (= {:id         1
               :name       "Tempest"
               :category   "bar"
-              :created-at (LocalDateTime/parse "2017-01-01T00:00")
-              :updated-at (LocalDateTime/parse "2021-05-13T04:19:00")}
+              :created-at (test/local-dt "2017-01-01T00:00")
+              :updated-at (test/local-dt "2021-05-13T04:19:00")}
              (-> (select/select-one ::test/venues 1)
-                 (assoc :updated-at (LocalDateTime/parse "2021-05-13T04:19:00"))
+                 (assoc :updated-at (test/local-dt "2021-05-13T04:19:00"))
                  save/save!)))
       (is (= (instance/instance ::test/venues {:id         1
                                                :name       "Tempest"
                                                :category   "bar"
-                                               :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                               :updated-at (LocalDateTime/parse "2021-05-13T04:19:00")})
+                                               :created-at (test/local-dt "2017-01-01T00:00")
+                                               :updated-at (test/local-dt "2021-05-13T04:19:00")})
              (select/select-one ::test/venues 1))))))
 
 (deftest ^:synchronized no-op-test
@@ -85,7 +85,7 @@
           (is (= {:id         "1"
                   :name       "Hi-Dive"
                   :category   "bar"
-                  :created-at (LocalDateTime/parse "2017-01-01T00:00")}
+                  :created-at (test/local-dt "2017-01-01T00:00")}
                  (dissoc (save/save! (assoc venue :id "1")) :updated-at)))))))
 
 (deftest ^:synchronized positional-connectable-test

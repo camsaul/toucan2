@@ -21,17 +21,17 @@
 
 (deftest ^:parallel reducible-query-test
   (testing "raw SQL"
-    (is (= [{:id 1, :name "Cam", :created_at (OffsetDateTime/parse "2020-04-21T23:56-00:00")}
-            {:id 2, :name "Sam", :created_at (OffsetDateTime/parse "2019-01-11T23:56-00:00")}
-            {:id 3, :name "Pam", :created_at (OffsetDateTime/parse "2020-01-01T21:56-00:00")}
-            {:id 4, :name "Tam", :created_at (OffsetDateTime/parse "2020-05-25T19:56-00:00")}]
+    (is (= [{:id 1, :name "Cam", :created_at (test/offset-dt "2020-04-21T23:56-00:00")}
+            {:id 2, :name "Sam", :created_at (test/offset-dt "2019-01-11T23:56-00:00")}
+            {:id 3, :name "Pam", :created_at (test/offset-dt "2020-01-01T21:56-00:00")}
+            {:id 4, :name "Tam", :created_at (test/offset-dt "2020-05-25T19:56-00:00")}]
            (transduce
             (map (fn [row] (into {} row)))
             conj
             []
             (execute/reducible-query ::test/db "SELECT * FROM people ORDER BY id ASC;")))))
   (testing "SQL + params"
-    (is (= [{:id 1, :name "Cam", :created_at (OffsetDateTime/parse "2020-04-21T23:56Z")}]
+    (is (= [{:id 1, :name "Cam", :created_at (test/offset-dt "2020-04-21T23:56Z")}]
            (transduce
             (map (fn [row] (into {} row)))
             conj
@@ -65,7 +65,7 @@
                  (execute/reducible-query nil ::test/venues "SELECT count(*) AS \"count\" FROM people;")))))
 
   (testing "eductions"
-    (is (= [{:id 2, :name "Cam", :created_at (OffsetDateTime/parse "2020-04-21T23:56Z")}]
+    (is (= [{:id 2, :name "Cam", :created_at (test/offset-dt "2020-04-21T23:56Z")}]
            (into
             []
             (map realize/realize)
@@ -75,9 +75,9 @@
              (execute/reducible-query ::test/db "SELECT * FROM people;")))))))
 
 (deftest ^:parallel query-test
-  (let [expected [{:id 1, :created_at (LocalDateTime/parse "2017-01-01T00:00")}
-                  {:id 2, :created_at (LocalDateTime/parse "2017-01-01T00:00")}
-                  {:id 3, :created_at (LocalDateTime/parse "2017-01-01T00:00")}]]
+  (let [expected [{:id 1, :created_at (test/local-dt "2017-01-01T00:00")}
+                  {:id 2, :created_at (test/local-dt "2017-01-01T00:00")}
+                  {:id 3, :created_at (test/local-dt "2017-01-01T00:00")}]]
     (testing "SQL"
       (is (= expected
              (execute/query ::test/db "SELECT id, created_at FROM venues ORDER BY id ASC;"))))
@@ -86,9 +86,9 @@
              (execute/query ::test/db {:select [:id :created_at], :from [:venues], :order-by [[:id :asc]]}))))))
 
 (deftest ^:parallel kebab-case-query-test
-  (let [expected [{:id 1, :created-at (LocalDateTime/parse "2017-01-01T00:00")}
-                  {:id 2, :created-at (LocalDateTime/parse "2017-01-01T00:00")}
-                  {:id 3, :created-at (LocalDateTime/parse "2017-01-01T00:00")}]]
+  (let [expected [{:id 1, :created-at (test/local-dt "2017-01-01T00:00")}
+                  {:id 2, :created-at (test/local-dt "2017-01-01T00:00")}
+                  {:id 3, :created-at (test/local-dt "2017-01-01T00:00")}]]
     (binding [jdbc.options/*options* {:label-fn csk/->kebab-case}]
       (testing "SQL"
         (is (= expected
@@ -108,10 +108,10 @@
       (is (= [{:count 4}]
              (execute/query "SELECT count(*) AS \"count\" FROM people;")))))
   (testing "HoneySQL query"
-    (is (= [{:id 1, :name "Cam", :created_at (OffsetDateTime/parse "2020-04-21T23:56Z")}
-            {:id 2, :name "Sam", :created_at (OffsetDateTime/parse "2019-01-11T23:56Z")}
-            {:id 3, :name "Pam", :created_at (OffsetDateTime/parse "2020-01-01T21:56Z")}
-            {:id 4, :name "Tam", :created_at (OffsetDateTime/parse "2020-05-25T19:56Z")}]
+    (is (= [{:id 1, :name "Cam", :created_at (test/offset-dt "2020-04-21T23:56Z")}
+            {:id 2, :name "Sam", :created_at (test/offset-dt "2019-01-11T23:56Z")}
+            {:id 3, :name "Pam", :created_at (test/offset-dt "2020-01-01T21:56Z")}
+            {:id 4, :name "Tam", :created_at (test/offset-dt "2020-05-25T19:56Z")}]
            (execute/query ::test/db {:select [:*], :from [:people]})))))
 
 (deftest ^:parallel execute-named-query-test
@@ -156,12 +156,12 @@
                    "Cam"]))))))))
 
 (deftest ^:parallel reducible-query-as-test
-  (is (= [(instance/instance :people {:id 1, :name "Cam", :created_at (OffsetDateTime/parse "2020-04-21T23:56Z")})]
+  (is (= [(instance/instance :people {:id 1, :name "Cam", :created_at (test/offset-dt "2020-04-21T23:56Z")})]
          (realize/realize (execute/reducible-query ::test/db :people "SELECT * FROM people WHERE id = 1;")))))
 
 (deftest ^:parallel kebab-case-reducible-query-as-test
   (binding [jdbc.options/*options* {:label-fn csk/->kebab-case}]
-    (is (= [(instance/instance :people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]
+    (is (= [(instance/instance :people {:id 1, :name "Cam", :created-at (test/offset-dt "2020-04-21T23:56Z")})]
            (realize/realize (execute/reducible-query ::test/db :people "SELECT * FROM people WHERE id = 1;"))))))
 
 (deftest ^:parallel query-as-test

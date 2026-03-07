@@ -144,15 +144,15 @@
             (is (= [(instance/instance model
                                        {:id         1
                                         :name       "Tempest"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})
                     (instance/instance model
                                        {:id         2
                                         :name       "Ho's Tavern"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})
                     (instance/instance model
                                        {:id         3
                                         :name       "BevMo"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})]
                    (select/select [model :id :name :updated-at]
                                   {:order-by [[:id :asc]]})))))))))
 
@@ -198,7 +198,7 @@
       (let [[{row-id :id}] (insert/insert-returning-instances! ::people.bird-lovers
                                                                {:name "Gwynydd Purves Wynne-Aubrey Meredith"})]
         ;; Update without the relevant changes:
-        (update/update! ::people.bird-lovers row-id {:created-at (LocalDateTime/parse "2017-01-01T00:00")})
+        (update/update! ::people.bird-lovers row-id {:created-at (test/local-dt "2017-01-01T00:00")})
         (is (false? @bird-lover-found?))
         ;; Update with relevant changes:
         (update/update! ::people.bird-lovers row-id {:name "Cam Era"})

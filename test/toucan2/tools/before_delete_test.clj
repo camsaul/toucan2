@@ -54,7 +54,7 @@
   [venue]
   (when *before-delete-calls*
     (swap! *before-delete-calls* conj [::venues.before-delete-exception.clojure-land (:id venue)]))
-  (update/update! ::test/venues (:id venue) {:updated-at (LocalDateTime/parse "2022-08-16T14:22:00")})
+  (update/update! ::test/venues (:id venue) {:updated-at (test/local-dt "2022-08-16T14:22:00")})
   (when (= (:category venue) "store")
     (throw (ex-info "Don't delete a store!" {:venue venue}))))
 
@@ -94,15 +94,15 @@
               (is (= [(instance/instance model
                                          {:id         1
                                           :name       "Tempest"
-                                          :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                          :updated-at (test/local-dt "2017-01-01T00:00")})
                       (instance/instance model
                                          {:id         2
                                           :name       "Ho's Tavern"
-                                          :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                          :updated-at (test/local-dt "2017-01-01T00:00")})
                       (instance/instance model
                                          {:id         3
                                           :name       "BevMo"
-                                          :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                          :updated-at (test/local-dt "2017-01-01T00:00")})]
                      (select/select [model :id :name :updated-at]
                                     {:order-by [[:id :asc]]}))))))))))
 

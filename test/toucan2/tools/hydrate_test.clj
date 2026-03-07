@@ -446,14 +446,14 @@
                                                 ::people.composite-pk
                                                 {:id         1
                                                  :name       "Cam"
-                                                 :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})})
+                                                 :created-at (test/offset-dt "2020-04-21T23:56Z")})})
           {:person-id   2
            :person-name "Sam"
            ::people     (instance/instance
                          ::people.composite-pk
                          {:id         2
                           :name       "Sam"
-                          :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")})}
+                          :created-at (test/offset-dt "2019-01-11T23:56Z")})}
           {:person-id   3
            :person-name "Bird"
            ::people     nil}
@@ -474,7 +474,7 @@
                 :person-name "Cam"
                 ::people     {:id         1
                               :name       "Cam"
-                              :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}}
+                              :created-at (test/offset-dt "2020-04-21T23:56Z")}}
                (hydrate/hydrate (instance/instance nil {:person-id 1, :person-name "Cam"})
                                 ::people)))
         (is (= 1
@@ -667,11 +667,11 @@
           :person-name "Cam"
           ::person     {:id         1
                         :name       "Cam"
-                        :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}
+                        :created-at (test/offset-dt "2020-04-21T23:56Z")}
           :name        "Tempest"
           :category    "bar"
-          :created-at  (LocalDateTime/parse "2017-01-01T00:00")
-          :updated-at  (LocalDateTime/parse "2017-01-01T00:00")}
+          :created-at  (test/local-dt "2017-01-01T00:00")
+          :updated-at  (test/local-dt "2017-01-01T00:00")}
          (select/select-one ::venues.hydrate-in-after-select 1)))
   (testing "Don't force realization of other columns."
     (test.track-realized/with-realized-columns [realized-columns]
