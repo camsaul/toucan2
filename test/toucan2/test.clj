@@ -13,7 +13,6 @@
    [toucan2.connection :as conn]
    [toucan2.honeysql2 :as t2.honeysql]
    [toucan2.jdbc.options :as jdbc.options]
-   [toucan2.jdbc.sqlite]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
