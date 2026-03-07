@@ -41,3 +41,27 @@
     [:b :a.c [:d :e]] [:x :y] [:y/b :a.c [:d :e]] ; ignore non-keywords
     [:b :a.c nil]     [:x :y] [:y/b :a.c nil]     ; ignore non-keywords
     [:a/b :a.c :d]    [:x]    [:a/b :a.c :x/d]))  ; ignore namespaced keywords
+
+(deftest ^:parallel rewrite-empty-in-clauses-test
+  (are [keep? where] (= {:where (if keep? where false)}
+                         (#'t2.honeysql/rewrite-empty-in-clauses {:where where}))
+    false [:in :id []]
+    false [:in :id nil]
+    false [:in :id '()]
+    false [:in :id #{}]
+    false [:in :id (lazy-seq [])]
+    true  [:in :id [1]]
+    true  [:in :id #{1}]
+    true  [:in :id (lazy-seq [1])]
+    true  [:in :id {}]
+    true  [:in :id {:select [:id] :from [:other]}]
+    true  [:in :id 1]
+    true  [:in :id "invalid"]
+    true  [:> :id 5]
+    true  [:= :id 1]
+    true  {:select [:*]}
+    true  "not a vector"
+    true  nil)
+  (testing "rewrites nested empty IN clauses"
+    (is (= {:where [:and [:= :a 1] false]}
+           (#'t2.honeysql/rewrite-empty-in-clauses {:where [:and [:= :a 1] [:in :id []]]})))))
