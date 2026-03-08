@@ -10,9 +10,7 @@
    [toucan2.test :as test]
    [toucan2.tools.before-insert :as before-insert]
    [toucan2.tools.named-query :as tools.named-query]
-   [toucan2.tools.transformed :as transformed])
-  (:import
-   (java.time LocalDateTime OffsetDateTime)))
+   [toucan2.tools.transformed :as transformed]))
 
 (set! *warn-on-reflection* true)
 

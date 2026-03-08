@@ -14,9 +14,7 @@
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.default-fields :as default-fields]
    [toucan2.tools.named-query :as named-query]
-   [toucan2.tools.transformed :as transformed])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.tools.transformed :as transformed]))
 
 (set! *warn-on-reflection* true)
 

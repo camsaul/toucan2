@@ -10,9 +10,7 @@
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.after-update :as after-update]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 

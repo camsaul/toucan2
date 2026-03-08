@@ -13,9 +13,7 @@
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.after-update :as after-update]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 

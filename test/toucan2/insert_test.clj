@@ -13,9 +13,7 @@
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.compile :as tools.compile]
-   [toucan2.tools.named-query :as tools.named-query])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.tools.named-query :as tools.named-query]))
 
 (set! *warn-on-reflection* true)
 

@@ -12,9 +12,7 @@
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.named-query :as tools.named-query]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 

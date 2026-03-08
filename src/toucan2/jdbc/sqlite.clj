@@ -34,10 +34,10 @@
   `UPDATE \"venues\" AS \"venue\" SET ...` (with AS) forms.
   Also strips alias-qualified column references like `\"venue\".\"name\"`."
   [^String sql]
-  (if-let [[_ stmt-type table alias] (re-find #"(?i)(UPDATE|DELETE FROM)\s+\"([^\"]+)\"\s+(?:AS\s+)?\"([^\"]+)\"" sql)]
-    (let [quoted-alias (java.util.regex.Pattern/quote alias)]
+  (if-let [[_ _stmt-type table table-alias] (re-find #"(?i)(UPDATE|DELETE FROM)\s+\"([^\"]+)\"\s+(?:AS\s+)?\"([^\"]+)\"" sql)]
+    (let [quoted-alias (java.util.regex.Pattern/quote table-alias)]
       (-> sql
-          (str/replace (str "\"" alias "\".") "")
+          (str/replace (str "\"" table-alias "\".") "")
           (str/replace (re-pattern (str "(?i)(\"" (java.util.regex.Pattern/quote table) "\")\\s+(?:AS\\s+)?\"" quoted-alias "\""))
                        "$1")))
     sql))
@@ -102,7 +102,7 @@
   "SQLite INSERT returning PKs.
   - If all rows specify PKs, return them directly (skip the DB round-trip for keys).
   - Otherwise, append RETURNING clause and execute as a regular query."
-  [rf conn query-type model compiled-query]
+  [rf conn _query-type model compiled-query]
   (let [rows                 (:rows pipeline/*parsed-args*)
         pks                  (model/primary-keys model)
         return-pks-directly? (and (seq rows)

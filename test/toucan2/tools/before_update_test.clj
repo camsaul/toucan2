@@ -15,9 +15,7 @@
    [toucan2.tools.before-update :as before-update]
    [toucan2.tools.default-fields :as default-fields]
    [toucan2.tools.named-query :as named-query]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime OffsetDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 

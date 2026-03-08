@@ -24,7 +24,6 @@
    [toucan2.tools.compile :as tools.compile]
    [toucan2.util :as u])
   (:import
-   (java.time LocalDateTime)
    (java.util Locale)))
 
 (set! *warn-on-reflection* true)

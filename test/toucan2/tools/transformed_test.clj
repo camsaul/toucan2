@@ -21,9 +21,7 @@
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.named-query :as named-query]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 

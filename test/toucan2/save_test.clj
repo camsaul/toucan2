@@ -7,9 +7,7 @@
    [toucan2.protocols :as protocols]
    [toucan2.save :as save]
    [toucan2.select :as select]
-   [toucan2.test :as test])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.test :as test]))
 
 (set! *warn-on-reflection* true)
 

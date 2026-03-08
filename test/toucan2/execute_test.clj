@@ -10,9 +10,7 @@
    [toucan2.pipeline :as pipeline]
    [toucan2.realize :as realize]
    [toucan2.test :as test]
-   [toucan2.tools.named-query :as tools.named-query])
-  (:import
-   (java.time LocalDateTime OffsetDateTime)))
+   [toucan2.tools.named-query :as tools.named-query]))
 
 (set! *warn-on-reflection* true)
 

@@ -12,9 +12,7 @@
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.default-fields :as default-fields]
    [toucan2.tools.hydrate :as hydrate]
-   [toucan2.tools.transformed :as transformed])
-  (:import
-   (java.time LocalDateTime OffsetDateTime)))
+   [toucan2.tools.transformed :as transformed]))
 
 (set! *warn-on-reflection* true)
 
