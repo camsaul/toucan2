@@ -2,6 +2,7 @@
   (:require
    [better-cond.core :as b]
    [clojure.string :as str]
+   [clojure.walk :as walk]
    [honey.sql :as hsql]
    [honey.sql.helpers :as hsql.helpers]
    [methodical.core :as m]
@@ -274,12 +275,30 @@
 
 ;;;; Query compilation
 
+(defn- empty-in-clause?
+  "Matches HoneySQL [:in column coll] forms where coll is empty.
+   These produce invalid SQL syntax like `X IN ()` which we need to rewrite."
+  [form]
+  (when (and (vector? form) (= 3 (count form)))
+    (let [[op _ coll] form]
+      (and (= :in op)
+           (seqable? coll)
+           (empty? coll)
+           (not (map? coll))))))
+
+(defn- rewrite-empty-in-clauses [form]
+  (walk/postwalk #(if (empty-in-clause? %) false %) form))
+
 (m/defmethod pipeline/compile [#_query-type :default
                                #_model      :default
                                #_query      clojure.lang.IPersistentMap]
   "Compile a Honey SQL 2 map to [sql & args]."
   [query-type model honeysql]
-  (let [options-map (options)
+  ;; HoneySQL generates invalid `X IN ()` for empty collections. It offers `:checking :basic`
+  ;; to throw an exception, but as a thin DSL it won't auto-fix. Toucan2 is more opinionated,
+  ;; so we rewrite to `false` here to make things "just work".
+  (let [honeysql    (rewrite-empty-in-clauses honeysql)
+        options-map (options)
         _           (log/debugf "Compiling Honey SQL 2 with options %s" options-map)
         sql-args    (u/try-with-error-context ["compile Honey SQL to SQL" {::honeysql honeysql, ::options-map options-map}]
                       (hsql/format honeysql options-map))]
