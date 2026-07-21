@@ -67,6 +67,42 @@
   an explicit will connectable will use it rather than the `:default` connection."
   nil)
 
+(defonce ^:private unshared-connections
+  ;; identity-weak set: an entry disappears when its connection is garbage collected, so a mark can never
+  ;; outlive the connection object it applies to
+  (java.util.Collections/newSetFromMap
+   (java.util.Collections/synchronizedMap (java.util.WeakHashMap.))))
+
+(defn unshared-connection!
+  "Mark an open connection as *unshared*: Toucan will still execute queries and transactions on it when you pass
+  it explicitly, but will never bind it to [[*current-connectable*]] -- while it is in use,
+  [[*current-connectable*]] is bound to `nil`, so code running inside a query or transaction on this connection
+  that resolves its connection *ambiently* (e.g. `(t2/select ...)` with no explicit connectable) gets the
+  `:default` connectable instead of this connection.
+
+  Use this for a connection whose state must not be disturbed by unrelated work that happens to run while it is
+  in use: a streaming result set (a PostgreSQL portal/cursor dies if anything else commits on its connection
+  mid-iteration), or a connection holding row locks that must survive other queries. Note this cuts both ways:
+  a transaction opened on an unshared connection does *not* propagate to ambient calls in its body -- they run
+  (and commit) on their own connections -- so don't mark a connection whose transaction ambient work is
+  expected to join.
+
+  The mark lasts for the lifetime of the connection object and cannot be removed. Returns the connection:
+
+  ```clj
+  (with-open [conn (.getConnection my-datasource)]
+    (t2/unshared-connection! conn)
+    ...)
+  ```"
+  [conn]
+  (.add ^java.util.Set unshared-connections conn)
+  conn)
+
+(defn unshared-connection?
+  "Whether `conn` has been marked as [[unshared-connection!]]."
+  [conn]
+  (.contains ^java.util.Set unshared-connections conn))
+
 (m/defmulti do-with-connection
   "Take a *connectable*, get a connection of some sort from it, and execute `(f connection)` with an open connection. A
   normal implementation might look something like:
@@ -96,11 +132,15 @@
 
 (defn- bind-current-connectable-fn
   "Wrap functions as passed to [[do-with-connection]] or [[do-with-transaction]] in a way that
-  binds [[*current-connectable*]]."
+  binds [[*current-connectable*]]. An [[unshared-connection!]] is never bound -- `nil` is bound in its place,
+  shadowing any outer binding (including the pipeline's transport of an explicit `:connectable`, see
+  [[toucan2.pipeline/transduce-parsed]]), so ambient resolution inside `f` falls through to the `:default`
+  connectable rather than ever seeing the connection."
   [f]
   {:pre [(fn? f)]}
   (^:once fn* [conn]
-   (binding [*current-connectable* conn]
+   (binding [*current-connectable* (when-not (unshared-connection? conn)
+                                     conn)]
      (f conn))))
 
 (m/defmethod do-with-connection :around ::default

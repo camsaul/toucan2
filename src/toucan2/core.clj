@@ -63,6 +63,8 @@
 (p/import-vars
  [toucan2.connection
   do-with-connection
+  unshared-connection!
+  unshared-connection?
   with-connection
   with-transaction]
 
