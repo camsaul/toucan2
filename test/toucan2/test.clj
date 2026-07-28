@@ -187,7 +187,8 @@
 
 (defmethod default-test-db-url :mariadb
   [_db-type]
-  "jdbc:mysql://localhost:3306/metabase_test?user=root")
+  ;; mariadb-java-client 3.x only claims `jdbc:mysql:` URLs when the URL string contains `permitMysqlScheme`
+  "jdbc:mysql://localhost:3306/metabase_test?user=root&permitMysqlScheme=true")
 
 (defmethod default-test-db-url :h2
   [_db-type]

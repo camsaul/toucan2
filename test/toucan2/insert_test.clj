@@ -178,6 +178,25 @@
                                                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
                   (select/select ::test/venues :id [:>= 4] {:order-by [[:id :asc]]})))))))))
 
+(deftest ^:synchronized multiple-rows-generated-keys-test
+  (testing (str "Every row's real PK comes back for a multi-row insert, in row order. The MySQL wire protocol only "
+                "reports the FIRST generated key for a multi-row INSERT; mariadb-java-client 2.x fabricated the rest "
+                "arithmetically (silently wrong on Galera) and 3.x returns only the first, so the MySQL/MariaDB "
+                "backend executes multi-row inserts returning PKs as a JDBC batch. See [[toucan2.jdbc.mysql-mariadb]].")
+    (let [rows [{:name "Multi Row 1", :category "bar"}
+                {:name "Multi Row 2", :category "bar"}
+                {:name "Multi Row 3", :category "bar"}]]
+      (test/with-discarded-table-changes :venues
+        (let [pks (insert/insert-returning-pks! ::test/venues rows)]
+          (is (= (count rows)
+                 (count pks)))
+          (testing "each returned PK belongs to the corresponding inserted row"
+            (is (= (map :name rows)
+                   (map #(select/select-one-fn :name ::test/venues %) pks))))))
+      (test/with-discarded-table-changes :venues
+        (is (= (map :name rows)
+               (map :name (insert/insert-returning-instances! ::test/venues rows))))))))
+
 (deftest ^:synchronized key-values-test
   (do-insert-and-insert-returning-pks
    (fn [returning-keys? insert!]
