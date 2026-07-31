@@ -24,11 +24,11 @@
     org.clojure/java.classpath           {:mvn/version "1.1.0"}
     org.clojure/math.combinatorics       {:mvn/version "0.3.0"}
     org.clojure/tools.namespace          {:mvn/version "1.5.0"}
-    ;; Don't upgrade to 3.x yet. It only returns the first generated key when inserting multiple rows. So keep using v2
-    ;; until we decide how to work around it or they fix it. See
-    ;;
-    ;; https://mariadb.com/kb/en/about-mariadb-connector-j/#generated-keys-limitation
-    org.mariadb.jdbc/mariadb-java-client {:mvn/version "2.7.8"}
+    ;; 3.x only returns the first generated key when inserting multiple rows in one statement (see
+    ;; https://mariadb.com/kb/en/about-mariadb-connector-j/#generated-keys-limitation) -- worked around in
+    ;; [[toucan2.jdbc.mysql-mariadb]] by executing multi-row inserts returning PKs as a JDBC batch. Note that 3.x
+    ;; only claims `jdbc:mysql:` URLs whose URL string contains `permitMysqlScheme`.
+    org.mariadb.jdbc/mariadb-java-client {:mvn/version "3.5.9"}
     org.postgresql/postgresql            {:mvn/version "42.7.4"}
     pjstadig/humane-test-output          {:mvn/version "0.11.0"}}
 

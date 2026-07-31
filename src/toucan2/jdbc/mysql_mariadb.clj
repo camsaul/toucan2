@@ -2,15 +2,18 @@
   "MySQL and MariaDB integration (mostly workarounds for broken stuff)."
   (:require
    [methodical.core :as m]
+   [next.jdbc]
+   [next.jdbc.prepare :as next.jdbc.prepare]
    [toucan2.jdbc.options :as jdbc.options]
    [toucan2.jdbc.read :as jdbc.read]
    [toucan2.jdbc.result-set :as jdbc.rs]
    [toucan2.log :as log]
    [toucan2.model :as model]
    [toucan2.pipeline :as pipeline]
+   [toucan2.realize :as realize]
    [toucan2.util :as u])
   (:import
-   (java.sql ResultSet ResultSetMetaData Types)))
+   (java.sql PreparedStatement ResultSet ResultSetMetaData Types)))
 
 (set! *warn-on-reflection* true)
 
@@ -41,25 +44,78 @@
                   [::connection :default Types/TIMESTAMP]
                   [java.sql.Connection :default Types/TIMESTAMP])
 
-;;;; INSERT RETURN_GENERATED_KEYS with explicit non-integer PK value workaround
+;;;; INSERT RETURN_GENERATED_KEYS workarounds
+
+(defn- single-row-sql-args
+  "Compile a single-row version of the current INSERT for each row in `rows`, using the same build/compile pipeline the
+  original multi-row query went through."
+  [query-type model rows]
+  (mapv (fn [row]
+          (pipeline/compile query-type model
+                            (pipeline/build query-type model
+                                            (assoc pipeline/*parsed-args* :rows [row])
+                                            pipeline/*resolved-query*)))
+        rows))
+
+(defn- normalize-generated-key
+  "Bring integral generated keys back to `Long`.
+
+  Nothing server-side is new here: the MySQL wire protocol has always reported `last_insert_id` as an unsigned
+  64-bit integer. What changed in mariadb-java-client 3.x is how the driver types the synthetic `getGeneratedKeys`
+  result set it builds from that value: 2.x declared the column a (signed) BIGINT and returned `Long`; 3.x declares
+  it `BIGINT UNSIGNED` — faithful to the protocol, since the value could in principle exceed `Long/MAX_VALUE` — and
+  the driver's type mapping for unsigned BIGINT is `java.math.BigInteger`. Downstream code dispatches on PK class —
+  e.g. `(select model pk)` builds a PK query for `Long` but passes a `BigInteger` through as if it were a compiled
+  query — so coerce keys back to `Long` (`.longValueExact` throws rather than truncates in the fanciful case of a
+  key beyond `Long/MAX_VALUE`)."
+  [v]
+  (cond
+    (instance? java.math.BigInteger v) (.longValueExact ^java.math.BigInteger v)
+    (vector? v)                        (mapv normalize-generated-key v)
+    :else                              v))
+
+(defn- execute-batched-inserts-returning-key-rows!
+  "Execute compiled single-row INSERT `sql-argses` as JDBC batches — one batch per consecutive run of identical SQL —
+  and return the generated-key rows in insertion order."
+  [conn model sql-argses]
+  (let [opts (jdbc.options/merge-options nil)]
+    (reduce (fn [acc sql-args-group]
+              (let [sql (ffirst sql-args-group)]
+                (with-open [ps (next.jdbc/prepare conn [sql] (assoc opts :return-keys true))]
+                  (doseq [sql-args sql-args-group]
+                    (next.jdbc.prepare/set-parameters ps (vec (rest sql-args)))
+                    (.addBatch ^PreparedStatement ps))
+                  (.executeBatch ^PreparedStatement ps)
+                  (with-open [rset (.getGeneratedKeys ^PreparedStatement ps)]
+                    ;; key rows are lazily backed by the live ResultSet -- realize them before it closes
+                    (jdbc.rs/reduce-result-set ((map realize/realize) conj) acc conn model rset opts)))))
+            []
+            (partition-by first sql-argses))))
 
 (m/defmethod pipeline/transduce-execute-with-connection [#_conn       ::connection
                                                          #_query-type :toucan.query-type/insert.pks
                                                          #_model      :default]
-  "Apparently `RETURN_GENERATED_KEYS` doesn't work for MySQL/MariaDB if:
+  "Two workarounds:
 
-  1. Values for the primary key are specified in the INSERT itself, *and*
-
-  2. The primary key is not an integer.
-
-  So to work around this we will look at the rows we're inserting: if every rows specifies the primary key
-  column(s) (including `nil` values), we'll transduce those specified values rather than what JDBC returns.
+  1. Apparently `RETURN_GENERATED_KEYS` doesn't work for MySQL/MariaDB if values for the primary key are specified in
+  the INSERT itself *and* the primary key is not an integer. So look at the rows we're inserting: if every row
+  specifies the primary key column(s) (including `nil` values), transduce those specified values rather than what JDBC
+  returns.
 
   This seems like it won't work if these values were arbitrary Honey SQL expressions. I suppose we could work around
-  THAT problem by running the primary key values thru another SELECT query... but that just seems like too much. I guess
-  we can cross that bridge when we get there."
+  THAT problem by running the primary key values thru another SELECT query... but that just seems like too much. I
+  guess we can cross that bridge when we get there.
+
+  2. The server only reports the FIRST generated key for a multi-row `INSERT ... VALUES (...), (...)`. The 2.x MariaDB
+  connector fabricated the remaining keys arithmetically from `auto_increment_increment` — plausible on a single-node
+  server, silently wrong on Galera/multi-master (where the increment changes with cluster topology) and for mixed
+  explicit-PK inserts — and the 3.x connector stopped guessing and returns only the first key. Executing the same
+  insert as a JDBC *batch* of single-row statements sidesteps all of that: the driver reports each statement's own
+  server-reported key. So multi-row inserts are recompiled per row and executed as a batch."
   [rf conn query-type model compiled-query]
-  (let [rows                 (:rows pipeline/*parsed-args*)
+  ;; rows can come from the parsed args or from the resolved query (e.g. named queries) -- same lookup the
+  ;; Honey SQL build method does
+  (let [rows                 (some (comp not-empty :rows) [pipeline/*parsed-args* pipeline/*resolved-query*])
         pks                  (model/primary-keys model)
         return-pks-directly? (and (seq rows)
                                   (every? (fn [row]
@@ -67,7 +123,8 @@
                                                       (contains? row k))
                                                     pks))
                                           rows))]
-    (if return-pks-directly?
+    (cond
+      return-pks-directly?
       (do
         (pipeline/transduce-execute-with-connection (pipeline/default-rf :toucan.query-type/insert.update-count)
                                                     conn
@@ -78,7 +135,22 @@
          (map (model/select-pks-fn model))
          rf
          rows))
-      (next-method rf conn query-type model compiled-query))))
+
+      ;; multi-row insert relying on generated keys: recompile per row and execute as a batch (see workaround 2 above)
+      (next rows)
+      (let [key-rows (execute-batched-inserts-returning-key-rows!
+                      conn
+                      model
+                      (single-row-sql-args query-type model rows))]
+        (log/debugf "batched multi-row insert workaround: got %s generated key rows" (count key-rows))
+        (transduce
+         (comp (map (model/select-pks-fn model))
+               (map normalize-generated-key))
+         rf
+         key-rows))
+
+      :else
+      (next-method ((map normalize-generated-key) rf) conn query-type model compiled-query))))
 
 (m/prefer-method! #'pipeline/transduce-execute-with-connection
                   [::connection :toucan.query-type/insert.pks :default]
