@@ -178,7 +178,8 @@
           (case (test/current-db-type)
             :postgres #"ERROR: duplicate key value violates unique constraint"
             :h2       #"Unique index or primary key violation"
-            :mariadb  #"Duplicate entry")
+            :mariadb  #"Duplicate entry"
+            :sqlite   #"\[SQLITE_CONSTRAINT_PRIMARYKEY\]")
           (with-temp/with-temp [::test/birds bird {:id 1}]
             (is (= :not-here
                    bird)

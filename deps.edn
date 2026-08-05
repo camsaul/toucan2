@@ -30,6 +30,7 @@
     ;; only claims `jdbc:mysql:` URLs whose URL string contains `permitMysqlScheme`.
     org.mariadb.jdbc/mariadb-java-client {:mvn/version "3.5.9"}
     org.postgresql/postgresql            {:mvn/version "42.7.4"}
+    org.xerial/sqlite-jdbc               {:mvn/version "3.47.1.0"}
     pjstadig/humane-test-output          {:mvn/version "0.11.0"}}
 
    :extra-paths
@@ -87,7 +88,7 @@
   ;; clojure -X:dev:test
   :test
   {:exec-fn   toucan2.test-runner/run-tests
-   :jvm-opts  ["-Dtest.dbs=h2,postgres,mariadb"
+   :jvm-opts  ["-Dtest.dbs=h2,postgres,mariadb,sqlite"
                "-Dtoucan.test=true"
                "-Dtoucan.debug.level=disabled" #_trace]
    :exec-args {:only ["test"
@@ -123,6 +124,12 @@
   :test-mariadb
   {:jvm-opts ["-Dtest.dbs=mariadb"]}
 
+  ;; run tests only against SQLite.
+  ;;
+  ;; clj -X:dev:test:test-sqlite
+  :test-sqlite
+  {:jvm-opts ["-Dtest.dbs=sqlite"]}
+
   ;; clj -X:dev:cloverage
   :cloverage
   {:extra-deps
@@ -152,7 +159,8 @@
                 ;; ignore namespaces we don't test with Cloverage.
                 :ns-exclude-regex
                 ["^toucan2\\.jdbc\\.mysql-mariadb.*"
-                 "^toucan2\\.jdbc\\.postgres.*"]}}
+                 "^toucan2\\.jdbc\\.postgres.*"
+                  "^toucan2\\.jdbc\\.sqlite.*"]}}
 
   ;; clojure -T:build
   :build

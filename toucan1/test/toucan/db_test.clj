@@ -24,7 +24,6 @@
    [toucan2.tools.compile :as tools.compile]
    [toucan2.util :as u])
   (:import
-   (java.time LocalDateTime)
    (java.util Locale)))
 
 (set! *warn-on-reflection* true)
@@ -236,8 +235,8 @@
     (are [thunk] (= [{:id         1
                       :name       "Tempest"
                       :category   :bar
-                      :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
+                      :created-at (test/local-dt "2017-01-01T00:00")
+                      :updated-at (test/local-dt "2017-01-01T00:00")}]
                     thunk)
       (t1.db/simple-select Venue {:where [:= :id 1]})
       (into [] (t1.db/simple-select-reducible Venue {:where [:= :id 1]})))))
@@ -554,15 +553,15 @@
              {:id         5
               :name       "Venue 2"
               :category   {:name :category-2}
-              :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00")
-              :updated-at (java.time.LocalDateTime/parse "2017-01-01T00:00")})
+              :created-at (test/local-dt "2017-01-01T00:00")
+              :updated-at (test/local-dt "2017-01-01T00:00")})
             (instance/instance
              ::venues.edn-category
              {:id         4
               :name       "Venue 1"
               :category   {:name "Category 1"}
-              :created-at (java.time.LocalDateTime/parse "2017-01-01T00:00")
-              :updated-at (java.time.LocalDateTime/parse "2017-01-01T00:00")})]
+              :created-at (test/local-dt "2017-01-01T00:00")
+              :updated-at (test/local-dt "2017-01-01T00:00")})]
            (t1.db/select ::venues.edn-category {:order-by [[:id :desc]], :limit 2})))))
 
 (deftest ^:parallel select-one-test
@@ -594,9 +593,9 @@
 (deftest ^:parallel select-test
   (testing "identifiers should be quoted"
     (is (= [(case (test/current-db-type)
-              :h2       "SELECT * FROM \"T1_USERS\" ORDER BY \"ID\" ASC"
-              :postgres "SELECT * FROM \"t1_users\" ORDER BY \"id\" ASC"
-              :mariadb  "SELECT * FROM `t1_users` ORDER BY `id` ASC")]
+              :h2                "SELECT * FROM \"T1_USERS\" ORDER BY \"ID\" ASC"
+              (:postgres :sqlite) "SELECT * FROM \"t1_users\" ORDER BY \"id\" ASC"
+              :mariadb           "SELECT * FROM `t1_users` ORDER BY `id` ASC")]
            (tools.compile/compile (t1.db/select User {:order-by [:id]})))))
   (is (= [{:id 1, :first-name "Cam", :last-name "Saul"}
           {:id 2, :first-name "Rasta", :last-name "Toucan"}
@@ -671,9 +670,9 @@
 
 (deftest ^:parallel honeysql->sql-test
   (is (= [(case (test/current-db-type)
-            :h2       "SELECT * FROM \"USER\" WHERE \"NAME\" = ?"
-            :postgres "SELECT * FROM \"user\" WHERE \"name\" = ?"
-            :mariadb  "SELECT * FROM `user` WHERE `name` = ?")
+            :h2                "SELECT * FROM \"USER\" WHERE \"NAME\" = ?"
+            (:postgres :sqlite) "SELECT * FROM \"user\" WHERE \"name\" = ?"
+            :mariadb           "SELECT * FROM `user` WHERE `name` = ?")
           "Cam"]
          (t1.db/honeysql->sql {:select [:*], :from [:user], :where [:= :name "Cam"]}))))
 

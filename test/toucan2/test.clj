@@ -85,6 +85,30 @@
         :h2)
       (first (db-types))))
 
+(def ^:private ^java.time.format.DateTimeFormatter local-dt-formatter
+  (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm:ss"))
+
+(def ^:private ^java.time.format.DateTimeFormatter offset-dt-formatter
+  (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"))
+
+(defn local-dt
+  "Expected LocalDateTime value. Returns LocalDateTime on most DBs, string on SQLite
+  (formatted to match how SQLite JDBC stores it)."
+  [^String s]
+  (let [t (java.time.LocalDateTime/parse s)]
+    (if (= (current-db-type) :sqlite)
+      (.format t local-dt-formatter)
+      t)))
+
+(defn offset-dt
+  "Expected OffsetDateTime value. Returns OffsetDateTime on most DBs, string on SQLite
+  (formatted to match how SQLite JDBC stores it)."
+  [^String s]
+  (let [t (java.time.OffsetDateTime/parse s)]
+    (if (= (current-db-type) :sqlite)
+      (.format t offset-dt-formatter)
+      t)))
+
 (defn current-honey-sql-dialect
   "Honey SQL dialect name for the [[current-db-type]]."
   ([]
@@ -93,6 +117,7 @@
    (case db-type
      :h2               ::h2
      :postgres         :ansi
+     :sqlite           :ansi
      (:mysql :mariadb) :mysql)))
 
 #_{:clj-kondo/ignore [:discouraged-var]}
@@ -193,6 +218,10 @@
 (defmethod default-test-db-url :h2
   [_db-type]
   "jdbc:h2:mem:toucan2;DB_CLOSE_DELAY=-1")
+
+(defmethod default-test-db-url :sqlite
+  [_db-type]
+  "jdbc:sqlite:/tmp/toucan2-test.db")
 
 (defn test-db-url
   (^String []
@@ -360,12 +389,13 @@
 (defn set-db-types!
   "Change the DB types to run tests against for the current REPL session."
   [& ks]
-  {:pre [(every? #{:postgres :mariadb :h2} ks) (seq ks)]}
+  {:pre [(every? #{:postgres :mariadb :h2 :sqlite} ks) (seq ks)]}
   (reset! db-types* (set ks)))
 
 (derive ::convenience-connectable ::db)
 (derive :repl/h2                  ::convenience-connectable)
 (derive :repl/postgres            ::convenience-connectable)
+(derive :repl/sqlite              ::convenience-connectable)
 
 (m/defmethod conn/do-with-connection ::convenience-connectable
   [connectable f]

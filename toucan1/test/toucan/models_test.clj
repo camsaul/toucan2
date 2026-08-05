@@ -21,9 +21,7 @@
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.hydrate :as hydrate]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.util :as u])
-  (:import
-   (java.time LocalDateTime OffsetDateTime)))
+   [toucan2.util :as u]))
 
 (set! *warn-on-reflection* true)
 
@@ -167,8 +165,9 @@
       (is (= {:name "bevmo", :after-select? true}
              (t1.models/do-post-select ::PostSelect {:name "BevMo"}))))))
 
-(defn- timestamp-after-jan-first? [^LocalDateTime t]
-  (.isAfter t (LocalDateTime/parse "2017-01-01T00:00:00")))
+(defn- timestamp-after-jan-first? [t]
+  (let [t (cond-> t (string? t) java.time.LocalDateTime/parse)]
+    (.isAfter ^java.time.LocalDateTime t (java.time.LocalDateTime/parse "2017-01-01T00:00:00"))))
 
 (deftest ^:synchronized insert!-properties-test
   (testing (str "calling insert! for Venue should trigger the :timestamped? :insert function which should set an "
@@ -188,8 +187,10 @@
         (Thread/sleep 1000)
         (is (= true
                (t1.db/update! Venue (:id venue) :category "dive-bar"))))
-      (let [{:keys [created-at updated-at]} (t1.db/select-one [Venue :created-at :updated-at] :name "Zeitgeist")]
-        (is (.isAfter ^LocalDateTime updated-at ^LocalDateTime created-at))))))
+      (let [{:keys [created-at updated-at]} (t1.db/select-one [Venue :created-at :updated-at] :name "Zeitgeist")
+            parse-if-string (fn [v] (cond-> v (string? v) java.time.LocalDateTime/parse))]
+        (is (.isAfter ^java.time.LocalDateTime (parse-if-string updated-at)
+                      ^java.time.LocalDateTime (parse-if-string created-at)))))))
 
 ;; for Category, we set up `pre-insert` and `pre-update` to assert that a Category with `parent-category-id` exists
 ;; before setting it.
@@ -254,8 +255,8 @@
           (is (= {:id         1
                   :name       "Tempest"
                   :category   "bar"
-                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                  :created-at (test/local-dt "2017-01-01T00:00")
+                  :updated-at (test/local-dt "2017-01-01T00:00")}
                  (protocols/original @*updated-venue*))))
         (testing "Should still be able to get only the changes"
           (is (= {:name "Savoy Tivoli"}
@@ -447,13 +448,13 @@
 
 (deftest ^:parallel default-fields-test
   (testing "check that we can still override default-fields"
-    (is (= {:created-at (LocalDateTime/parse "2017-01-01T00:00:00")}
+    (is (= {:created-at (test/local-dt "2017-01-01T00:00:00")}
            (t1.db/select-one [Venue :created-at] :id 1)))
     (testing `select/select-one-fn
-      (is (= (LocalDateTime/parse "2017-01-01T00:00")
+      (is (= (test/local-dt "2017-01-01T00:00")
              (select/select-one-fn :created-at Venue 1))))
     (testing `t1.db/select-one-field
-      (is (= (LocalDateTime/parse "2017-01-01T00:00")
+      (is (= (test/local-dt "2017-01-01T00:00")
              (t1.db/select-one-field :created-at Venue :id 1))))))
 
 (deftest ^:parallel default-fields-fn-test
@@ -496,7 +497,7 @@
 (t1.models/add-property! ::created-at-timestamped
   :insert (fn [instance]
             (merge
-             {:created_at (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")}
+             {:created_at (java.time.OffsetDateTime/parse "2022-12-31T17:26:00-08:00")}
              instance)))
 
 (t1.models/define-methods-with-IModel-method-map
@@ -509,8 +510,9 @@
     (let [expected {:id         6
                     :name       "Default Person"
                     :created-at (case (test/current-db-type)
-                                  :h2                  (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")
-                                  (:postgres :mariadb) (OffsetDateTime/parse "2023-01-01T01:26Z"))}]
+                                  :sqlite              "2022-12-31T17:26-08:00"
+                                  :h2                  (java.time.OffsetDateTime/parse "2022-12-31T17:26:00-08:00")
+                                  (:postgres :mariadb) (java.time.OffsetDateTime/parse "2023-01-01T01:26Z"))}]
       (is (= expected
              (t1.db/insert! ::people.default-values {:id 6})))
       (is (= expected
@@ -532,6 +534,6 @@
       (isa? ::people.unnamespaced-property :toucan.models.properties/unnamespaced))
     (is (= {:id                           1
             :name                         "Cam"
-            :created-at                   (OffsetDateTime/parse "2020-04-21T23:56Z")
+            :created-at                   (test/offset-dt "2020-04-21T23:56Z")
             :unnamespaced-select-property true}
            (t1.db/select-one ::people.unnamespaced-property :id 1)))))

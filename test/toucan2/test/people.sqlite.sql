@@ -1,0 +1,14 @@
+DROP TABLE IF EXISTS people;
+
+CREATE TABLE people (
+  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  name TEXT,
+  created_at TEXT
+);
+
+INSERT INTO people (name, created_at)
+VALUES
+('Cam', '2020-04-21T23:56:00.000Z'),
+('Sam', '2019-01-11T23:56:00.000Z'),
+('Pam', '2020-01-01T21:56:00.000Z'),
+('Tam', '2020-05-25T19:56:00.000Z');
