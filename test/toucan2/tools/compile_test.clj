@@ -15,7 +15,7 @@
   (execute/with-call-count [call-count]
     (is (= [(case (test/current-db-type)
               :h2       "SELECT * FROM \"PEOPLE\" WHERE \"ID\" > ?"
-              :postgres "SELECT * FROM \"people\" WHERE \"id\" > ?"
+              (:postgres :sqlite) "SELECT * FROM \"people\" WHERE \"id\" > ?"
               :mariadb  "SELECT * FROM `people` WHERE `id` > ?")
             1]
            (tools.compile/compile
@@ -24,20 +24,20 @@
              (select/select-one ::test/people :id [:> 1]))))
     (is (= [(case (test/current-db-type)
               :h2       "UPDATE \"VENUES\" SET \"NAME\" = ? WHERE \"ID\" IS NULL"
-              :postgres "UPDATE \"venues\" SET \"name\" = ? WHERE \"id\" IS NULL"
+              (:postgres :sqlite) "UPDATE \"venues\" SET \"name\" = ? WHERE \"id\" IS NULL"
               :mariadb  "UPDATE `venues` SET `name` = ? WHERE `id` IS NULL")
             "Taco Bell"]
            (tools.compile/compile
              (update/update! ::test/venues nil {:name "Taco Bell"}))))
     (is (= [(case (test/current-db-type)
               :h2       "DELETE FROM \"VENUES\" WHERE \"ID\" IS NULL"
-              :postgres "DELETE FROM \"venues\" WHERE \"id\" IS NULL"
+              (:postgres :sqlite) "DELETE FROM \"venues\" WHERE \"id\" IS NULL"
               :mariadb  "DELETE FROM `venues` WHERE `id` IS NULL")]
            (tools.compile/compile
              (delete/delete! ::test/venues nil))))
     (is (= [(case (test/current-db-type)
               :h2       "INSERT INTO \"VENUES\" (\"A\") VALUES (?)"
-              :postgres "INSERT INTO \"venues\" (\"a\") VALUES (?)"
+              (:postgres :sqlite) "INSERT INTO \"venues\" (\"a\") VALUES (?)"
               :mariadb  "INSERT INTO `venues` (`a`) VALUES (?)")
             1]
            (tools.compile/compile

@@ -10,9 +10,7 @@
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.after-update :as after-update]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 
@@ -137,21 +135,22 @@
                  ::venues.exception.db-land      (case (test/current-db-type)
                                                    :postgres #"ERROR: column \"venue_name\" of relation \"venues\" does not exist"
                                                    :h2       #"Column \"VENUE_NAME\" not found"
-                                                   :mariadb  #"Unknown column 'venue_name' in 'SET'"))
+                                                   :mariadb  #"Unknown column 'venue_name' in 'SET'"
+                                                   :sqlite   #"no such column: venue_name"))
                (update/update! model 2 {:category "store", :name "My Store"})))
           (testing "\nShould be done inside a transaction"
             (is (= [(instance/instance model
                                        {:id         1
                                         :name       "Tempest"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})
                     (instance/instance model
                                        {:id         2
                                         :name       "Ho's Tavern"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})
                     (instance/instance model
                                        {:id         3
                                         :name       "BevMo"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})]
                    (select/select [model :id :name :updated-at]
                                   {:order-by [[:id :asc]]})))))))))
 
@@ -197,7 +196,7 @@
       (let [[{row-id :id}] (insert/insert-returning-instances! ::people.bird-lovers
                                                                {:name "Gwynydd Purves Wynne-Aubrey Meredith"})]
         ;; Update without the relevant changes:
-        (update/update! ::people.bird-lovers row-id {:created-at (LocalDateTime/parse "2017-01-01T00:00")})
+        (update/update! ::people.bird-lovers row-id {:created-at (test/local-dt "2017-01-01T00:00")})
         (is (false? @bird-lover-found?))
         ;; Update with relevant changes:
         (update/update! ::people.bird-lovers row-id {:name "Cam Era"})

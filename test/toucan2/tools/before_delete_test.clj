@@ -9,9 +9,7 @@
    [toucan2.select :as select]
    [toucan2.test :as test]
    [toucan2.tools.before-delete :as before-delete]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 
@@ -54,7 +52,7 @@
   [venue]
   (when *before-delete-calls*
     (swap! *before-delete-calls* conj [::venues.before-delete-exception.clojure-land (:id venue)]))
-  (update/update! ::test/venues (:id venue) {:updated-at (LocalDateTime/parse "2022-08-16T14:22:00")})
+  (update/update! ::test/venues (:id venue) {:updated-at (test/local-dt "2022-08-16T14:22:00")})
   (when (= (:category venue) "store")
     (throw (ex-info "Don't delete a store!" {:venue venue}))))
 
@@ -83,7 +81,8 @@
                    ::venues.before-delete-exception.db-land      (case (test/current-db-type)
                                                                    :postgres #"ERROR: duplicate key value violates unique constraint"
                                                                    :h2       #"Unique index or primary key violation"
-                                                                   :mariadb  #"Duplicate entry"))
+                                                                   :mariadb  #"Duplicate entry"
+                                                                   :sqlite   #"\[SQLITE_CONSTRAINT_PRIMARYKEY\]"))
                  (delete/delete! model)))
             (is (= [[model 1]
                     [model 2]
@@ -93,15 +92,15 @@
               (is (= [(instance/instance model
                                          {:id         1
                                           :name       "Tempest"
-                                          :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                          :updated-at (test/local-dt "2017-01-01T00:00")})
                       (instance/instance model
                                          {:id         2
                                           :name       "Ho's Tavern"
-                                          :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                          :updated-at (test/local-dt "2017-01-01T00:00")})
                       (instance/instance model
                                          {:id         3
                                           :name       "BevMo"
-                                          :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                          :updated-at (test/local-dt "2017-01-01T00:00")})]
                      (select/select [model :id :name :updated-at]
                                     {:order-by [[:id :asc]]}))))))))))
 

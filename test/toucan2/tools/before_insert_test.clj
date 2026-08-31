@@ -10,9 +10,7 @@
    [toucan2.test :as test]
    [toucan2.tools.before-insert :as before-insert]
    [toucan2.tools.named-query :as tools.named-query]
-   [toucan2.tools.transformed :as transformed])
-  (:import
-   (java.time LocalDateTime OffsetDateTime)))
+   [toucan2.tools.transformed :as transformed]))
 
 (set! *warn-on-reflection* true)
 
@@ -67,8 +65,8 @@
           (let [expected {:id         4
                           :name       "Tin Vietnamese"
                           :category   {:name "restaurant", :validated? true}
-                          :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                          :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
+                          :created-at (test/local-dt "2017-01-01T00:00")
+                          :updated-at (test/local-dt "2017-01-01T00:00")}]
             (is (= (condp = insert!
                      #'insert/insert!                     1
                      #'insert/insert-returning-pks!       [4]
@@ -95,15 +93,15 @@
                                                         {:id         4
                                                          :name       "GRANT & GREEN"
                                                          :category   "bar"
-                                                         :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                                         :created-at (test/local-dt "2017-01-01T00:00")
+                                                         :updated-at (test/local-dt "2017-01-01T00:00")})
                                                        (instance/instance
                                                         ::venues.before-insert
                                                         {:id         5
                                                          :name       "NORTH BEACH CANTINA"
                                                          :category   "restaurant"
-                                                         :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
+                                                         :created-at (test/local-dt "2017-01-01T00:00")
+                                                         :updated-at (test/local-dt "2017-01-01T00:00")})])
                (insert! ::venues.before-insert ::named-rows)))))))
 
 (derive ::people.suffix-name ::test/people)
@@ -160,21 +158,22 @@
                  ::venues.exception.db-land      (case (test/current-db-type)
                                                    :postgres #"ERROR: duplicate key value violates unique constraint"
                                                    :h2       #"Unique index or primary key violation"
-                                                   :mariadb  #"Duplicate entry"))
+                                                   :mariadb  #"Duplicate entry"
+                                                   :sqlite   #"\[SQLITE_CONSTRAINT_PRIMARYKEY\]"))
                (insert/insert! model {:category "store", :name "My Store"})))
           (testing "\nShould be done inside a transaction"
             (is (= [(instance/instance model
                                        {:id         1
                                         :name       "Tempest"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})
                     (instance/instance model
                                        {:id         2
                                         :name       "Ho's Tavern"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})
                     (instance/instance model
                                        {:id         3
                                         :name       "BevMo"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})]
                    (select/select [model :id :name :updated-at]
                                   {:order-by [[:id :asc]]})))))))))
 
@@ -184,7 +183,7 @@
   [person]
   (merge
    {:name       "Default Person"
-    :created_at (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")}
+    :created_at (test/offset-dt "2022-12-31T17:26:00-08:00")}
    person))
 
 (deftest ^:synchronized default-values-test
@@ -194,8 +193,8 @@
     (is (= {:id         5
             :name       "Default Person"
             :created-at (case (test/current-db-type)
-                          :h2                  (OffsetDateTime/parse "2022-12-31T17:26:00-08:00")
-                          (:postgres :mariadb) (OffsetDateTime/parse "2023-01-01T01:26Z"))}
+                          (:h2 :sqlite)        (test/offset-dt "2022-12-31T17:26:00-08:00")
+                          (:postgres :mariadb) (test/offset-dt "2023-01-01T01:26Z"))}
            (select/select-one ::people.default-values 5)))))
 
 (deftest ^:parallel macroexpansion-test

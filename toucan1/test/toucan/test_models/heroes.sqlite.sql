@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS t1_heroes;
+
+CREATE TABLE t1_heroes (
+  "ID" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "NAME" TEXT
+);
+
+INSERT INTO t1_heroes ("NAME")
+VALUES
+('Batman');

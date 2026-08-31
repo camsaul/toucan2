@@ -12,9 +12,7 @@
    [toucan2.test :as test]
    [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.named-query :as tools.named-query]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 
@@ -54,8 +52,8 @@
     (is (= (instance/instance ::test/venues {:id         1
                                              :name       "Hi-Dive"
                                              :category   "bar"
-                                             :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                             :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                             :created-at (test/local-dt "2017-01-01T00:00")
+                                             :updated-at (test/local-dt "2017-01-01T00:00")})
            (select/select-one ::test/venues 1)))))
 
 (deftest ^:synchronized key-value-conditions-test
@@ -170,14 +168,14 @@
                                    {:id         1
                                     :name       "Tempest"
                                     :category   "BARRR"
-                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")
-                                    :created-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                    :updated-at (test/local-dt "2017-01-01T00:00")
+                                    :created-at (test/local-dt "2017-01-01T00:00")})
                 (instance/instance ::test/venues
                                    {:id         2
                                     :name       "Ho's Tavern"
                                     :category   "BARRR"
-                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")
-                                    :created-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                    :updated-at (test/local-dt "2017-01-01T00:00")
+                                    :created-at (test/local-dt "2017-01-01T00:00")})]
                (sort-by
                 :id
                 (conn/with-connection [_conn ::test/db]
@@ -222,7 +220,7 @@
                (pipeline/build :toucan.query-type/update.* ::test/venues parsed-args query)))))
     (is (= [(case (test/current-db-type)
               :h2       "UPDATE \"VENUES\" SET \"NAME\" = ? WHERE \"ID\" IS NULL"
-              :postgres "UPDATE \"venues\" SET \"name\" = ? WHERE \"id\" IS NULL"
+              (:postgres :sqlite) "UPDATE \"venues\" SET \"name\" = ? WHERE \"id\" IS NULL"
               :mariadb  "UPDATE `venues` SET `name` = ? WHERE `id` IS NULL")
             "Taco Bell"]
            (tools.compile/compile

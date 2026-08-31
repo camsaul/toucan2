@@ -18,8 +18,7 @@
    [toucan2.tools.compile :as tools.compile]
    [toucan2.tools.named-query :as tools.named-query]
    [toucan2.util :as u])
-  (:import
-   (java.time LocalDateTime OffsetDateTime)))
+)
 
 (set! *warn-on-reflection* true)
 
@@ -98,7 +97,7 @@
          (pipeline/build :toucan.query-type/select.* :default {:kv-args {:toucan/pk 1}} {:where [:= :name "Cam"]}))))
 
 (deftest ^:parallel select-test
-  (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})]]
+  (let [expected [(instance/instance ::test/people {:id 1, :name "Cam", :created-at (test/offset-dt"2020-04-21T23:56Z")})]]
     (testing "plain SQL"
       (is (= expected
              (select/select ::test/people "SELECT * FROM people WHERE id = 1;"))))
@@ -136,6 +135,7 @@
               (let [expected-key (case (test/current-db-type)
                                    :h2       (keyword "max(-id)")
                                    :postgres :max
+                                   :sqlite   (keyword "max(\"id\")")
                                    :mariadb  (keyword "max(`id`)"))]
                 (is (= [(instance/instance ::test/people {expected-key 4})]
                        (select/select [::test/people [expr]]))))))))
@@ -144,10 +144,10 @@
                (select/select [::test/people [:id :person-number]] :id 1)))))))
 
 (deftest ^:parallel select-test-2
-  (let [all-rows [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}
-                  {:id 2, :name "Sam", :created-at (OffsetDateTime/parse "2019-01-11T23:56:00Z")}
-                  {:id 3, :name "Pam", :created-at (OffsetDateTime/parse "2020-01-01T21:56:00Z")}
-                  {:id 4, :name "Tam", :created-at (OffsetDateTime/parse "2020-05-25T19:56:00Z")}]]
+  (let [all-rows [{:id 1, :name "Cam", :created-at (test/offset-dt"2020-04-21T23:56:00Z")}
+                  {:id 2, :name "Sam", :created-at (test/offset-dt"2019-01-11T23:56:00Z")}
+                  {:id 3, :name "Pam", :created-at (test/offset-dt"2020-01-01T21:56:00Z")}
+                  {:id 4, :name "Tam", :created-at (test/offset-dt"2020-05-25T19:56:00Z")}]]
     (testing "no args"
       (is (= all-rows
              (sort-by :id (select/select ::people))))
@@ -156,18 +156,18 @@
       (is (every? (partial instance/instance-of? ::test/people)
                   (select/select ::test/people {:order-by [[:id :asc]]})))))
   (testing "one arg (id)"
-    (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (test/offset-dt"2020-04-21T23:56:00Z")}]
            (select/select ::people 1))))
   (testing "one arg (query)"
-    (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (test/offset-dt"2020-04-21T23:56:00Z")}]
            (select/select ::test/people {:where [:= :id 1]})))
     (is (= [{:id 1, :name "Tempest", :category "bar"}]
            (select/select ::test/venues {:select [:id :name :category], :limit 1, :where [:= :id 1]}))))
   (testing "two args (k v)"
-    (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (test/offset-dt"2020-04-21T23:56:00Z")}]
            (select/select ::test/people :id 1)))
     (testing "sequential v"
-      (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
+      (is (= [{:id 1, :name "Cam", :created-at (test/offset-dt"2020-04-21T23:56:00Z")}]
              (select/select ::test/people :id [:= 1])))))
   (testing "k v conditions + query"
     (is (= [(instance/instance ::test/venues {:id 3, :name "BevMo"})]
@@ -208,16 +208,16 @@
          (into [] (map :name) (select/reducible-select ::test/people {:order-by [[:id :asc]]}))))
   (are [form] (= [{:id         1
                    :name       "Cam"
-                   :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")}
+                   :created-at (test/offset-dt"2020-04-21T23:56Z")}
                   {:id         2
                    :name       "Sam"
-                   :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")}
+                   :created-at (test/offset-dt"2019-01-11T23:56Z")}
                   {:id         3
                    :name       "Pam"
-                   :created-at (OffsetDateTime/parse "2020-01-01T21:56Z")}
+                   :created-at (test/offset-dt"2020-01-01T21:56Z")}
                   {:id         4
                    :name       "Tam"
-                   :created-at (OffsetDateTime/parse "2020-05-25T19:56Z")}]
+                   :created-at (test/offset-dt"2020-05-25T19:56Z")}]
                  form)
     (into [] (map realize/realize) (select/reducible-select ::test/people {:order-by [[:id :asc]]}))
     (into [] (eduction
@@ -244,11 +244,11 @@
 
 (deftest ^:parallel select-non-integer-pks-test
   (testing "non-integer PK"
-    (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (test/offset-dt"2020-04-21T23:56:00Z")}]
            (select/select ::people.name-is-pk :toucan/pk "Cam"))))
 
   (testing "composite PK"
-    (is (= [{:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56:00Z")}]
+    (is (= [{:id 1, :name "Cam", :created-at (test/offset-dt"2020-04-21T23:56:00Z")}]
            (select/select ::people.composite-pk :toucan/pk [1 "Cam"])))
     (is (= []
            (select/select ::people.composite-pk :toucan/pk [2 "Cam"])
@@ -301,8 +301,8 @@
 
 (deftest ^:parallel pre-select-test
   (testing "Should be able to do cool stuff in pre-select (select* :before)"
-    (is (= [(instance/instance ::people.limit-2 {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})
-            (instance/instance ::people.limit-2 {:id 2, :name "Sam", :created-at (OffsetDateTime/parse "2019-01-11T23:56Z")})]
+    (is (= [(instance/instance ::people.limit-2 {:id 1, :name "Cam", :created-at (test/offset-dt"2020-04-21T23:56Z")})
+            (instance/instance ::people.limit-2 {:id 2, :name "Sam", :created-at (test/offset-dt"2019-01-11T23:56Z")})]
            (select/select ::people.limit-2)))))
 
 (derive ::people.no-timestamps-limit-2 ::people.no-timestamps)
@@ -315,7 +315,7 @@
            (select/select ::people.no-timestamps-limit-2)))))
 
 (deftest ^:parallel select-one-test
-  (is (= (instance/instance ::test/people {:id 1, :name "Cam", :created-at (OffsetDateTime/parse "2020-04-21T23:56Z")})
+  (is (= (instance/instance ::test/people {:id 1, :name "Cam", :created-at (test/offset-dt"2020-04-21T23:56Z")})
          (select/select-one ::test/people 1)))
   (is (= nil
          (select/select-one ::test/people :id 1000))))
@@ -334,10 +334,10 @@
     (is (= [2 3 4 5]
            (select/select-fn-vec (comp inc :id) ::test/people {:order-by [[:id :asc]]}))))
   (testing "Should work with magical keys"
-    (are [k] (= [(OffsetDateTime/parse "2020-04-21T23:56Z")
-                 (OffsetDateTime/parse "2019-01-11T23:56Z")
-                 (OffsetDateTime/parse "2020-01-01T21:56Z")
-                 (OffsetDateTime/parse "2020-05-25T19:56Z")]
+    (are [k] (= [(test/offset-dt"2020-04-21T23:56Z")
+                 (test/offset-dt"2019-01-11T23:56Z")
+                 (test/offset-dt"2020-01-01T21:56Z")
+                 (test/offset-dt"2020-05-25T19:56Z")]
                 (select/select-fn-vec k ::test/people {:order-by [[:id :asc]]}))
       :created-at
       :created_at))
@@ -453,7 +453,7 @@
   (testing "Should build an efficient query"
     (is (= (case (test/current-db-type)
              :mariadb  ["SELECT COUNT(*) AS `count` FROM `venues` WHERE `id` = ?" 1]
-             :postgres ["SELECT COUNT(*) AS \"count\" FROM \"venues\" WHERE \"id\" = ?" 1]
+             (:postgres :sqlite) ["SELECT COUNT(*) AS \"count\" FROM \"venues\" WHERE \"id\" = ?" 1]
              :h2       ["SELECT COUNT(*) AS \"COUNT\" FROM \"VENUES\" WHERE \"ID\" = ?" 1])
            (tools.compile/compile
              (select/count ::test/venues 1)))))
@@ -465,8 +465,9 @@
                               (select/count ::test/venues ["SELECT count(*) AS count FROM venues;"])))]
         (is (not (str/includes? s "inefficient count query")))))
     (testing "Query that returns multiple rows"
-      (is (= 3
-             (select/count ::test/venues ["(SELECT 1 AS count) UNION ALL (SELECT 2 AS count);"]))))
+      (when-not (= (test/current-db-type) :sqlite)
+        (is (= 3
+               (select/count ::test/venues ["(SELECT 1 AS count) UNION ALL (SELECT 2 AS count);"])))))
     (testing "(inefficient query)"
       (is (= 3
              (select/count ::test/venues ["SELECT * FROM venues;"])))
@@ -486,14 +487,14 @@
   (testing "Should build an efficient query"
     (is (= (case (test/current-db-type)
              :mariadb  ["SELECT EXISTS (SELECT 1 FROM `venues` WHERE `id` = ?) AS `exists`" 1]
-             :postgres ["SELECT EXISTS (SELECT 1 FROM \"venues\" WHERE \"id\" = ?) AS \"exists\"" 1]
+             (:postgres :sqlite) ["SELECT EXISTS (SELECT 1 FROM \"venues\" WHERE \"id\" = ?) AS \"exists\"" 1]
              :h2       ["SELECT EXISTS (SELECT 1 FROM \"VENUES\" WHERE \"ID\" = ?) AS \"EXISTS\"" 1])
            (tools.compile/compile
              (select/exists? ::test/venues 1)))))
   (testing "Should be possible to do count with a raw SQL query"
     (let [exists-identifier (case (test/current-db-type)
-                              :mariadb        "`exists`"
-                              (:h2 :postgres) "\"exists\"")]
+                              :mariadb              "`exists`"
+                              (:h2 :postgres :sqlite) "\"exists\"")]
       (is (true? (select/exists? ::test/venues  [(format "SELECT exists(SELECT 1 FROM venues WHERE id = 1) AS %s;"
                                                          exists-identifier)])))
       (is (false? (select/exists? ::test/venues  [(format "SELECT exists(SELECT 1 FROM venues WHERE id < 1) AS %s;"
@@ -502,12 +503,13 @@
         (is (true? (select/exists? ::test/venues  [(format "SELECT 1 AS %s;" exists-identifier)])))
         (is (false? (select/exists? ::test/venues [(format "SELECT 0 AS %s;" exists-identifier)]))))
       (testing "query that returns multiple rows"
-        (is (true? (select/exists? ::test/venues  [(format "(SELECT false AS %s) UNION ALL (SELECT true AS %s);"
-                                                           exists-identifier
-                                                           exists-identifier)])))
-        (is (false? (select/exists? ::test/venues  [(format "(SELECT false AS %s) UNION ALL (SELECT false AS %s);"
-                                                            exists-identifier
-                                                            exists-identifier)]))))
+        (when-not (= (test/current-db-type) :sqlite)
+          (is (true? (select/exists? ::test/venues  [(format "(SELECT false AS %s) UNION ALL (SELECT true AS %s);"
+                                                             exists-identifier
+                                                             exists-identifier)])))
+          (is (false? (select/exists? ::test/venues  [(format "(SELECT false AS %s) UNION ALL (SELECT false AS %s);"
+                                                              exists-identifier
+                                                              exists-identifier)])))))
       (testing "should not log a warning, since this query returns :exists"
         (let [s (with-out-str
                   (binding [log/*level* :warn]
@@ -532,7 +534,7 @@
            (select/select-one ::test/people {:select [:p.id], :from [[:people :p]], :where [:= :p.id 1]})))
     (is (= [(case (test/current-db-type)
               :h2       "SELECT \"P\".\"ID\" FROM \"PEOPLE\" AS \"P\" WHERE \"P\".\"ID\" = ?"
-              :postgres "SELECT \"p\".\"id\" FROM \"people\" AS \"p\" WHERE \"p\".\"id\" = ?"
+              (:postgres :sqlite) "SELECT \"p\".\"id\" FROM \"people\" AS \"p\" WHERE \"p\".\"id\" = ?"
               :mariadb  "SELECT `p`.`id` FROM `people` AS `p` WHERE `p`.`id` = ?")
             1]
            (tools.compile/compile
@@ -550,7 +552,7 @@
                (pipeline/build :toucan.query-type/select.* ::test/venues parsed-args query)))))
     (is (= [(case (test/current-db-type)
               :h2       "SELECT * FROM \"VENUES\" WHERE \"ID\" IS NULL"
-              :postgres "SELECT * FROM \"venues\" WHERE \"id\" IS NULL"
+              (:postgres :sqlite) "SELECT * FROM \"venues\" WHERE \"id\" IS NULL"
               :mariadb  "SELECT * FROM `venues` WHERE `id` IS NULL")]
            (tools.compile/compile
              (select/select ::test/venues nil))))
@@ -568,8 +570,8 @@
                               {:id              1
                                :name            "Tempest"
                                :category        "bar"
-                               :created-at      (LocalDateTime/parse "2017-01-01T00:00")
-                               :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
+                               :created-at      (test/local-dt"2017-01-01T00:00")
+                               :updated-at      (test/local-dt"2017-01-01T00:00")
                                :slug            "bar_01"
                                :parent-category nil})
            (select/select-one ::test/venues
@@ -615,8 +617,8 @@
                               {:id              1
                                :name            "Tempest"
                                :category        "bar"
-                               :created-at      (LocalDateTime/parse "2017-01-01T00:00")
-                               :updated-at      (LocalDateTime/parse "2017-01-01T00:00")
+                               :created-at      (test/local-dt"2017-01-01T00:00")
+                               :updated-at      (test/local-dt"2017-01-01T00:00")
                                :slug            "bar_01"
                                :parent-category nil})
            (select/select-one ::venues.with-category
@@ -650,8 +652,8 @@
                               {:venue/id         1
                                :venue/name       "Tempest"
                                :venue/category   "bar"
-                               :venue/created-at (LocalDateTime/parse "2017-01-01T00:00")
-                               :venue/updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                               :venue/created-at (test/local-dt"2017-01-01T00:00")
+                               :venue/updated-at (test/local-dt"2017-01-01T00:00")})
            (select/select-one ::venues.namespaced {:order-by [[:id :asc]]}))))
   (testing `select/select-fn-set
     (is (= #{"bar" "store"}
@@ -699,8 +701,8 @@
           {:venue/id                 1
            :venue/name               "Tempest"
            :venue/category           "bar"
-           :venue/created-at         (LocalDateTime/parse "2017-01-01T00:00")
-           :venue/updated-at         (LocalDateTime/parse "2017-01-01T00:00")
+           :venue/created-at         (test/local-dt"2017-01-01T00:00")
+           :venue/updated-at         (test/local-dt"2017-01-01T00:00")
            :category/name            "bar"
            :category/slug            "bar_01"
            :category/parent-category nil})

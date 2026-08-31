@@ -21,9 +21,7 @@
    [toucan2.tools.identity-query :as identity-query]
    [toucan2.tools.named-query :as named-query]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 
@@ -103,8 +101,8 @@
             {:id         "1"
              :name       "Tempest"
              :category   :bar
-             :created-at (LocalDateTime/parse "2017-01-01T00:00")
-             :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+             :created-at (test/local-dt "2017-01-01T00:00")
+             :updated-at (test/local-dt "2017-01-01T00:00")})
            (select/select-one ::venues.string-id-and-category-keyword :toucan/pk "1")
            (select/select-one ::venues.string-id-and-category-keyword {:order-by [[:id :asc]]})))))
 
@@ -122,8 +120,8 @@
                 {:id         4
                  :name       "Hi-Dive"
                  :category   :bar
-                 :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                 :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                 :created-at (test/local-dt "2017-01-01T00:00")
+                 :updated-at (test/local-dt "2017-01-01T00:00")})]
              (insert/insert-returning-instances! ::venues.category-keyword.before-select
                                                  [{:name "Hi-Dive", :category :bar}]))))))
 
@@ -204,22 +202,22 @@
           (is (= {:id         1
                   :name       "My Venue"
                   :category   :BAR
-                  :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                  :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                  :created-at (test/local-dt "2017-01-01T00:00")
+                  :updated-at (test/local-dt "2017-01-01T00:00")}
                  @*venue-before-update*))
           (testing `protocols/original
             (is (= {:id         1
                     :name       "Tempest"
                     :category   :bar
-                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                    :created-at (test/local-dt "2017-01-01T00:00")
+                    :updated-at (test/local-dt "2017-01-01T00:00")}
                    (protocols/original @*venue-before-update*))))
           (testing `protocols/current
             (is (= {:id         1
                     :name       "My Venue"
                     :category   :BAR
-                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                    :created-at (test/local-dt "2017-01-01T00:00")
+                    :updated-at (test/local-dt "2017-01-01T00:00")}
                    (protocols/current @*venue-before-update*))))
           (testing `protocols/changes
             (is (= {:category :BAR, :name "My Venue"}
@@ -227,8 +225,8 @@
         (is (= {:id         1
                 :name       "My Venue"
                 :category   :BAR
-                :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                :created-at (test/local-dt "2017-01-01T00:00")
+                :updated-at (test/local-dt "2017-01-01T00:00")}
                (select/select-one ::venues.category-keyword.before-update 1)))))))
 
 (deftest ^:synchronized save!-test
@@ -239,14 +237,14 @@
       (is (= {:id         1
               :name       "Tempest"
               :category   :dive-bar
-              :created-at (LocalDateTime/parse "2017-01-01T00:00")
-              :updated-at (LocalDateTime/parse  "2017-01-01T00:00")}
+              :created-at (test/local-dt "2017-01-01T00:00")
+              :updated-at (test/local-dt  "2017-01-01T00:00")}
              (save/save! (assoc venue :category :dive-bar))))
       (is (= {:id         1
               :name       "Tempest"
               :category   :dive-bar
-              :created-at (LocalDateTime/parse "2017-01-01T00:00")
-              :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+              :created-at (test/local-dt "2017-01-01T00:00")
+              :updated-at (test/local-dt "2017-01-01T00:00")}
              (select/select-one ::venues.category-keyword 1))))))
 
 (named-query/define-named-query ::insert.named-rows
@@ -272,8 +270,8 @@
                                                             {:id         4
                                                              :name       "Hi-Dive"
                                                              :category   :bar
-                                                             :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                             :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
+                                                             :created-at (test/local-dt "2017-01-01T00:00")
+                                                             :updated-at (test/local-dt "2017-01-01T00:00")})])
                    (apply insert! ::venues.category-keyword args)))
             (is (= #{"Tempest" "Ho's Tavern" "Hi-Dive"}
                    (select/select-fn-set :name ::venues.category-keyword :category :bar))))))
@@ -287,8 +285,8 @@
                                                           {:id         "4"
                                                            :name       "Hi-Dive"
                                                            :category   :bar
-                                                           :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
+                                                           :created-at (test/local-dt "2017-01-01T00:00")
+                                                           :updated-at (test/local-dt "2017-01-01T00:00")})])
                  (insert! ::venues.string-id-and-category-keyword [{:name "Hi-Dive", :category :bar}]))))))))
 
 (deftest ^:synchronized transform-insert-returning-results-without-select-test
@@ -353,7 +351,8 @@
                (case (test/current-db-type)
                  :postgres #"ERROR: null value in column .* violates not-null constraint"
                  :h2       #"NULL not allowed for column \"CATEGORY\""
-                 :mariadb  #"Column 'category' cannot be null")
+                 :mariadb  #"Column 'category' cannot be null"
+                 :sqlite   #"\[SQLITE_CONSTRAINT_NOTNULL\]")
                (insert/insert! ::venues.category-keyword {:name "No Category", :category nil})))))
       (testing "conditions"
         (is (= nil
@@ -389,8 +388,8 @@
               {:id         3
                :name       "BevMo"
                :category   "store"
-               :created-at (LocalDateTime/parse "2017-01-01T00:00")
-               :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+               :created-at (test/local-dt "2017-01-01T00:00")
+               :updated-at (test/local-dt "2017-01-01T00:00")})
              (select/select-one ::venues-transform-in-only :category :store))))))
 
 ;;;; deftransforms
@@ -407,8 +406,8 @@
           {:id         "1"
            :name       "Tempest"
            :category   "bar"
-           :created-at (LocalDateTime/parse "2017-01-01T00:00")
-           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+           :created-at (test/local-dt "2017-01-01T00:00")
+           :updated-at (test/local-dt "2017-01-01T00:00")})
          (select/select-one ::transformed-venues :toucan/pk "1"))))
 
 (transformed/deftransforms ::transformed-venues-2
@@ -434,8 +433,8 @@
           {:id         "1"
            :name       "Tempest"
            :category   :bar
-           :created-at (LocalDateTime/parse "2017-01-01T00:00")
-           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+           :created-at (test/local-dt "2017-01-01T00:00")
+           :updated-at (test/local-dt "2017-01-01T00:00")})
          (select/select-one ::venues.composed-deftransform :toucan/pk "1"))))
 
 (derive ::venues.override-transforms ::venues.composed-deftransform)
@@ -452,8 +451,8 @@
           {:id         1
            :name       "Tempest"
            :category   "bar"
-           :created-at (LocalDateTime/parse "2017-01-01T00:00")
-           :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+           :created-at (test/local-dt "2017-01-01T00:00")
+           :updated-at (test/local-dt "2017-01-01T00:00")})
          (select/select-one ::venues.override-transforms :toucan/pk 1))))
 
 (derive ::categories.namespaced.category-keyword ::test/categories)
@@ -497,8 +496,8 @@
           {:venue/id                 1
            :venue/name               "Tempest"
            :venue/category           :bar
-           :venue/created-at         (LocalDateTime/parse "2017-01-01T00:00")
-           :venue/updated-at         (LocalDateTime/parse "2017-01-01T00:00")
+           :venue/created-at         (test/local-dt "2017-01-01T00:00")
+           :venue/updated-at         (test/local-dt "2017-01-01T00:00")
            :category/name            :bar
            :category/slug            "bar_01"
            :category/parent-category nil})

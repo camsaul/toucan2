@@ -13,9 +13,7 @@
    [toucan2.tools.after-select :as after-select]
    [toucan2.tools.after-update :as after-update]
    [toucan2.tools.transformed :as transformed]
-   [toucan2.update :as update])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.update :as update]))
 
 (set! *warn-on-reflection* true)
 
@@ -55,8 +53,8 @@
                                                           {:id                   4
                                                            :name                 "Lombard Heights Market"
                                                            :category             "liquor-store"
-                                                           :created-at           (LocalDateTime/parse "2017-01-01T00:00")
-                                                           :updated-at           (LocalDateTime/parse "2017-01-01T00:00")
+                                                           :created-at           (test/local-dt "2017-01-01T00:00")
+                                                           :updated-at           (test/local-dt "2017-01-01T00:00")
                                                            :awaiting-moderation? true}
                                                           (when (= model ::venues.after-insert.composed)
                                                             {:composed? true}))])
@@ -68,8 +66,8 @@
                       {:id         4
                        :name       "Lombard Heights Market"
                        :category   "liquor-store"
-                       :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                       :updated-at (LocalDateTime/parse "2017-01-01T00:00")}
+                       :created-at (test/local-dt "2017-01-01T00:00")
+                       :updated-at (test/local-dt "2017-01-01T00:00")}
                       (when (= model ::venues.after-insert.composed)
                         {:composed? true})))]
                    @*venues-awaiting-moderation*))))))))
@@ -89,8 +87,8 @@
         (is (= [{:id                   4
                  :name                 "Lombard Heights Market"
                  :category             "liquor-store"
-                 :created-at           (LocalDateTime/parse "2017-01-01T00:00")
-                 :updated-at           (LocalDateTime/parse "2017-01-01T00:00")
+                 :created-at           (test/local-dt "2017-01-01T00:00")
+                 :updated-at           (test/local-dt "2017-01-01T00:00")
                  :awaiting-moderation? true
                  :after-select?        true}]
                (insert/insert-returning-instances! ::venues.after-insert.after-select
@@ -102,8 +100,8 @@
                    {:id            4
                     :name          "Lombard Heights Market"
                     :category      "liquor-store"
-                    :created-at    (LocalDateTime/parse "2017-01-01T00:00")
-                    :updated-at    (LocalDateTime/parse "2017-01-01T00:00")
+                    :created-at    (test/local-dt "2017-01-01T00:00")
+                    :updated-at    (test/local-dt "2017-01-01T00:00")
                     :after-select? true})]
                  @*venues-awaiting-moderation*)))))))
 
@@ -161,21 +159,22 @@
                  ::venues.exception.db-land      (case (test/current-db-type)
                                                    :postgres #"ERROR: duplicate key value violates unique constraint"
                                                    :h2       #"Unique index or primary key violation"
-                                                   :mariadb  #"Duplicate entry"))
+                                                   :mariadb  #"Duplicate entry"
+                                                   :sqlite   #"\[SQLITE_CONSTRAINT_PRIMARYKEY\]"))
                (insert/insert! model {:category "store", :name "My Store"})))
           (testing "\nShould be done inside a transaction"
             (is (= [(instance/instance model
                                        {:id         1
                                         :name       "Tempest"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})
                     (instance/instance model
                                        {:id         2
                                         :name       "Ho's Tavern"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})
                     (instance/instance model
                                        {:id         3
                                         :name       "BevMo"
-                                        :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                        :updated-at (test/local-dt "2017-01-01T00:00")})]
                    (select/select [model :id :name :updated-at]
                                   {:order-by [[:id :asc]]})))))))))
 
@@ -244,16 +243,16 @@
                      #'insert/insert-returning-instances! [{:id                   4,
                                                             :name                 "Savoy Tivoli"
                                                             :category             :bar
-                                                            :created-at           (LocalDateTime/parse "2017-01-01T00:00")
-                                                            :updated-at           (LocalDateTime/parse "2017-01-01T00:00")
+                                                            :created-at           (test/local-dt "2017-01-01T00:00")
+                                                            :updated-at           (test/local-dt "2017-01-01T00:00")
                                                             :awaiting-moderation? true}])
                    (f ::venues.after-insert.transformed {:name "Savoy Tivoli", :category "bar"})))
             (testing '*venues-awaiting-moderation*
               (is (= [{:id         4,
                        :name       "Savoy Tivoli"
                        :category   :bar
-                       :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                       :updated-at (LocalDateTime/parse "2017-01-01T00:00")}]
+                       :created-at (test/local-dt "2017-01-01T00:00")
+                       :updated-at (test/local-dt "2017-01-01T00:00")}]
                      @*venues-awaiting-moderation*)))))))))
 
 (deftest ^:parallel macroexpansion-test

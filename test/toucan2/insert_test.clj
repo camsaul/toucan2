@@ -13,9 +13,7 @@
    [toucan2.test :as test]
    [toucan2.test.track-realized-columns :as test.track-realized]
    [toucan2.tools.compile :as tools.compile]
-   [toucan2.tools.named-query :as tools.named-query])
-  (:import
-   (java.time LocalDateTime)))
+   [toucan2.tools.named-query :as tools.named-query]))
 
 (set! *warn-on-reflection* true)
 
@@ -88,8 +86,8 @@
        (is (= (instance/instance ::test/venues {:id         4
                                                 :name       "Grant & Green"
                                                 :category   "bar"
-                                                :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                                :created-at (test/local-dt "2017-01-01T00:00")
+                                                :updated-at (test/local-dt "2017-01-01T00:00")})
               (select/select-one ::test/venues 4)))))))
 
 (deftest ^:synchronized include-pk-test
@@ -99,8 +97,8 @@
                      {:id         4
                       :name       "Grant & Green"
                       :category   "bar"
-                      :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                      :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                      :created-at (test/local-dt "2017-01-01T00:00")
+                      :updated-at (test/local-dt "2017-01-01T00:00")})]
       (doseq [[insert! expected] {#'insert/insert!                     1
                                   #'insert/insert-returning-pk!        4
                                   #'insert/insert-returning-pks!       [4]
@@ -114,8 +112,8 @@
               (is (= (instance/instance ::test/venues {:id         4
                                                        :name       "Grant & Green"
                                                        :category   "bar"
-                                                       :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                       :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                                       :created-at (test/local-dt "2017-01-01T00:00")
+                                                       :updated-at (test/local-dt "2017-01-01T00:00")})
                      (select/select-one ::test/venues 4))))))))))
 
 (deftest ^:synchronized include-pk-non-integer-test
@@ -149,8 +147,8 @@
            (is (= (instance/instance ::test/venues {:id         4
                                                     :name       "Grant & Green"
                                                     :category   "bar"
-                                                    :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                    :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                                    :created-at (test/local-dt "2017-01-01T00:00")
+                                                    :updated-at (test/local-dt "2017-01-01T00:00")})
                   (select/select-one ::test/venues 4)))))))))
 
 (deftest ^:synchronized multiple-rows-test
@@ -169,13 +167,13 @@
            (is (= [(instance/instance ::test/venues {:id         4
                                                      :name       "Black Horse London Pub"
                                                      :category   "bar"
-                                                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                                     :created-at (test/local-dt "2017-01-01T00:00")
+                                                     :updated-at (test/local-dt "2017-01-01T00:00")})
                    (instance/instance ::test/venues {:id         5
                                                      :name       "Nick's Crispy Tacos"
                                                      :category   "bar"
-                                                     :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                     :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+                                                     :created-at (test/local-dt "2017-01-01T00:00")
+                                                     :updated-at (test/local-dt "2017-01-01T00:00")})]
                   (select/select ::test/venues :id [:>= 4] {:order-by [[:id :asc]]})))))))))
 
 (deftest ^:synchronized multiple-rows-generated-keys-test
@@ -208,8 +206,8 @@
        (is (= (instance/instance ::test/venues {:id         4
                                                 :name       "HiDive SF"
                                                 :category   "bar"
-                                                :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                                :created-at (test/local-dt "2017-01-01T00:00")
+                                                :updated-at (test/local-dt "2017-01-01T00:00")})
               (select/select-one ::test/venues :id 4)))))))
 
 (deftest ^:synchronized multiple-rows-with-column-names-test
@@ -254,15 +252,15 @@
              {:id         4
               :name       "Grant & Green"
               :category   "bar"
-              :created-at (LocalDateTime/parse "2017-01-01T00:00")
-              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+              :created-at (test/local-dt "2017-01-01T00:00")
+              :updated-at (test/local-dt "2017-01-01T00:00")})
             (instance/instance
              ::test/venues
              {:id         5
               :name       "North Beach Cantina"
               :category   "restaurant"
-              :created-at (LocalDateTime/parse "2017-01-01T00:00")
-              :updated-at (LocalDateTime/parse "2017-01-01T00:00")})]
+              :created-at (test/local-dt "2017-01-01T00:00")
+              :updated-at (test/local-dt "2017-01-01T00:00")})]
            (insert/insert-returning-instances!
             ::test/venues
             [{:name "Grant & Green", :category "bar"}
@@ -290,9 +288,9 @@
       (testing (format "row-or-rows = %s" (pr-str row-or-rows))
         (test/with-discarded-table-changes :birds
           (is (= [(case (test/current-db-type)
-                    :h2       "INSERT INTO \"BIRDS\" DEFAULT VALUES"
-                    :postgres "INSERT INTO \"birds\" DEFAULT VALUES"
-                    :mariadb  "INSERT INTO `birds` VALUES ()")]
+                    :h2                "INSERT INTO \"BIRDS\" DEFAULT VALUES"
+                    (:postgres :sqlite) "INSERT INTO \"birds\" DEFAULT VALUES"
+                    :mariadb           "INSERT INTO `birds` VALUES ()")]
                  (tools.compile/compile
                    (insert/insert! ::test/birds row-or-rows))))
           (is (= 1
@@ -335,15 +333,15 @@
                                                         {:id         4
                                                          :name       "Grant & Green"
                                                          :category   "bar"
-                                                         :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})
+                                                         :created-at (test/local-dt "2017-01-01T00:00")
+                                                         :updated-at (test/local-dt "2017-01-01T00:00")})
                                                        (instance/instance
                                                         ::test/venues
                                                         {:id         5
                                                          :name       "North Beach Cantina"
                                                          :category   "restaurant"
-                                                         :created-at (LocalDateTime/parse "2017-01-01T00:00")
-                                                         :updated-at (LocalDateTime/parse "2017-01-01T00:00")})])
+                                                         :created-at (test/local-dt "2017-01-01T00:00")
+                                                         :updated-at (test/local-dt "2017-01-01T00:00")})])
                (insert! ::test/venues ::named-rows)))))))
 
 (derive ::venues.namespaced ::test/venues)
@@ -406,6 +404,6 @@
           (is (= expected
                  (insert! ::test.track-realized/venues {:name "Walgreens", :category "store"})))
           (is (= (case (test/current-db-type)
-                   (:postgres :h2) #{:venues/id}
-                   :mariadb        #{:insert-id})
+                   (:postgres :h2 :sqlite) #{:venues/id}
+                   :mariadb                #{:insert-id})
                  (realized-columns))))))))
