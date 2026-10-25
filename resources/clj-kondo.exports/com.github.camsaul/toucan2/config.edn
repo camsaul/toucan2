@@ -12,6 +12,7 @@
  {:analyze-call
   {toucan2.connection/with-connection                      hooks.toucan2.connection/with-connection
    toucan2.connection/with-transaction                     hooks.toucan2.connection/with-transaction
+   toucan2.core/define-after-delete                        hooks.toucan2.tools.after-delete/define-after-delete
    toucan2.core/define-after-insert                        hooks.toucan2.tools.after-insert/define-after-insert
    toucan2.core/define-after-select                        hooks.toucan2.tools.after-select/define-after-select
    toucan2.core/define-after-update                        hooks.toucan2.tools.after-update/define-after-update
@@ -21,6 +22,7 @@
    toucan2.core/define-before-update                       hooks.toucan2.tools.before-update/define-before-update
    toucan2.core/with-connection                            hooks.toucan2.connection/with-connection
    toucan2.core/with-transaction                           hooks.toucan2.connection/with-transaction
+   toucan2.tools.after-delete/define-after-delete          hooks.toucan2.tools.after-delete/define-after-delete
    toucan2.tools.after-insert/define-after-insert          hooks.toucan2.tools.after-insert/define-after-insert
    toucan2.tools.after-select/define-after-select          hooks.toucan2.tools.after-select/define-after-select
    toucan2.tools.after-update/define-after-update          hooks.toucan2.tools.after-update/define-after-update

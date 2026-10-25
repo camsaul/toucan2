@@ -54,6 +54,7 @@
     toucan2.select                      select
     toucan2.test.track-realized-columns test.track-realized
     toucan2.tools.after                 tools.after
+    toucan2.tools.after-delete          after-delete
     toucan2.tools.after-insert          after-insert
     toucan2.tools.after-select          after-select
     toucan2.tools.after-update          after-update

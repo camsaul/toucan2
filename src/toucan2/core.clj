@@ -15,6 +15,7 @@
    [toucan2.protocols]
    [toucan2.save]
    [toucan2.select]
+   [toucan2.tools.after-delete]
    [toucan2.tools.after-insert]
    [toucan2.tools.after-select]
    [toucan2.tools.after-update]
@@ -44,6 +45,7 @@
   toucan2.protocols/keep-me
   toucan2.save/keep-me
   toucan2.select/keep-me
+  toucan2.tools.after-delete/keep-me
   toucan2.tools.after-insert/keep-me
   toucan2.tools.after-select/keep-me
   toucan2.tools.after-update/keep-me
@@ -122,6 +124,9 @@
   select-pk->fn
   select-pks-set
   select-pks-vec]
+
+ [toucan2.tools.after-delete
+  define-after-delete]
 
  [toucan2.tools.after-insert
   define-after-insert]

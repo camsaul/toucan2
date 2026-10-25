@@ -105,6 +105,18 @@
                      (select/select [model :id :name :updated-at]
                                     {:order-by [[:id :asc]]}))))))))))
 
+(deftest ^:synchronized honeysql-delete-test
+  (testing "a Honey SQL DELETE map selects the rows it deletes from its table, keeping its alias (#203)"
+    (doseq [query [{:delete-from [:venues :v], :where [:= :v.category "bar"]}
+                   {:delete-from :venues, :where [:= :category "bar"]}]]
+      (testing (pr-str query)
+        (test/with-discarded-table-changes :venues
+          (binding [*deleted-venues* (atom [])]
+            (is (= 2
+                   (delete/delete! ::venues.before-delete query)))
+            (is (= [1 2]
+                   (sort (map :id @*deleted-venues*))))))))))
+
 (derive ::venues.before-delete.composed ::venues.before-delete)
 
 (def ^:dynamic ^:private *deleted-venues-2* nil)
