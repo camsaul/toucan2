@@ -120,6 +120,19 @@
              (csk/->kebab-case (name x)))
     (csk/->kebab-case x)))
 
+(let [not-found (Object.)]
+  (defn memoize'
+    "A more efficient version of `clojure.core/memoize` that is only restricted to 1-arity functions."
+    [f]
+    (let [mem (atom {})]
+      (fn [arg]
+        (let [v (get @mem arg not-found)]
+          (if (identical? v not-found)
+            (let [ret (f arg)]
+              (swap! mem assoc arg ret)
+              ret)
+            v))))))
+
 (defprotocol IsCustomMap
   "Is this a map a transient row, or created using p/def-map-type? This includes Instances."
   (custom-map? [m]))
