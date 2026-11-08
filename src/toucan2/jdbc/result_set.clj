@@ -71,7 +71,7 @@
   {:pre [(fn? label-fn)]}
   (if (empty? cols)
     (constantly nil)
-    (memoize
+    (u/memoize'
      (fn [column-name]
        (when (or (string? column-name)
                  (instance? clojure.lang.Named column-name))
@@ -100,7 +100,7 @@
   [model ^ResultSet rset opts]
   (let [table-name->ns (model/table-name->namespace model)
         label-fn       (get opts :label-fn name)
-        qualifier-fn   (memoize
+        qualifier-fn   (u/memoize'
                         (fn [table]
                           (let [table    (some-> table not-empty name label-fn)
                                 table-ns (some-> (get table-name->ns table) name)]
